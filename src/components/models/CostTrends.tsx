@@ -39,9 +39,6 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           recurring: "#82CA9D"
         };
         
-        // Check if setup costs should be amortized
-        const setupCostsAmortized = metadata.costs?.spreadSetupCosts || false;
-        
         // Generate data for each week
         for (let week = 1; week <= weeks; week++) {
           const point: any = { point: `Week ${week}` };
@@ -55,12 +52,8 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
             
             // Handle different cost types with proper week calculation
             if (costType === "fixed") {
-              // Fixed costs only in first week
-              if (week === 1) {
-                costValue = cost.value;
-              } else {
-                costValue = 0; // Explicitly set to 0 for other weeks
-              }
+              // Fixed costs ONLY in first week
+              costValue = week === 1 ? cost.value : 0;
             } else if (costType === "variable") {
               // Variable costs grow with revenue/attendance over time
               costValue = cost.value;
@@ -97,7 +90,6 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
       } else {
         // Monthly model calculation
         const months = timePoints;
-        let cumulativeTotal = 0;
         
         // Generate data for each month
         for (let month = 1; month <= months; month++) {
@@ -112,11 +104,7 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
             // Handle different cost types for monthly model
             if (costType === "fixed") {
               // Fixed costs are only applied in month 1
-              if (month === 1) {
-                costValue = cost.value;
-              } else {
-                costValue = 0; // No cost for subsequent months
-              }
+              costValue = month === 1 ? cost.value : 0;
             } else if (costType === "variable") {
               // Variable costs grow with the model's growth rate
               costValue = cost.value;
@@ -137,8 +125,14 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           });
           
           point.total = Math.ceil(monthlyTotal);
-          cumulativeTotal += monthlyTotal;
-          point.cumulativeTotal = Math.ceil(cumulativeTotal);
+          
+          // Calculate cumulative total
+          if (month === 1) {
+            point.cumulativeTotal = Math.ceil(monthlyTotal);
+          } else {
+            point.cumulativeTotal = Math.ceil(data[month - 2].cumulativeTotal + monthlyTotal);
+          }
+          
           data.push(point);
         }
       }
