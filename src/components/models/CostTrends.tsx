@@ -49,20 +49,19 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           
           costs.forEach(cost => {
             let costValue = cost.value;
+            const costType = cost.type?.toLowerCase();
             
-            // Apply growth to recurring costs
-            if (week > 1 && cost.type?.toLowerCase() === "recurring") {
-              costValue *= Math.pow(1 + (model.assumptions.growthModel.rate * 0.7), week - 1);
-            }
-            
-            // Apply growth to variable costs based on attendance
-            if (week > 1 && cost.type?.toLowerCase() === "variable") {
-              const attendanceGrowth = metadata.growth?.attendanceGrowthRate / 100 || model.assumptions.growthModel.rate;
-              costValue *= Math.pow(1 + attendanceGrowth, week - 1);
+            // Only apply growth to variable costs
+            if (week > 1) {
+              if (costType === "variable") {
+                // For variable costs like F&B COGS, use the revenue growth rate
+                const fbGrowthRate = metadata.growth?.fbSpendGrowth / 100 || model.assumptions.growthModel.rate;
+                costValue *= Math.pow(1 + fbGrowthRate, week - 1);
+              }
             }
             
             // Handle setup costs
-            if (cost.type?.toLowerCase() === "fixed") {
+            if (costType === "fixed") {
               if (metadata.costs?.spreadSetupCosts) {
                 costValue = cost.value / weeks;
               } else if (week > 1) {
@@ -91,16 +90,17 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           
           costs.forEach(cost => {
             let costValue = cost.value;
+            const costType = cost.type?.toLowerCase();
             
-            // Apply growth to costs based on type
+            // Only apply growth to variable costs
             if (month > 1) {
-              const { rate } = model.assumptions.growthModel;
-              const growthFactor = cost.type?.toLowerCase() === "fixed" ? 0 : 
-                                  cost.type?.toLowerCase() === "variable" ? rate : rate * 0.7;
-              
-              if (cost.type?.toLowerCase() !== "fixed") {
-                costValue *= Math.pow(1 + growthFactor, month - 1);
+              if (costType === "variable") {
+                const { rate } = model.assumptions.growthModel;
+                costValue *= Math.pow(1 + rate, month - 1);
               }
+              
+              // Fixed costs remain constant and no growth is applied
+              // Recurring costs also remain constant for non-event models
             }
             
             const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
