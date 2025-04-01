@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
@@ -56,7 +57,7 @@ const CostTrends = ({ model, combinedData, onUpdateCostData, shouldSpreadSetupCo
             let costValue = 0;
             
             if (costType === "fixed") {
-              // Critical fix: handle setup costs correctly
+              // Handle setup costs correctly based on the flag
               if (cost.name === "Setup Costs") {
                 if (shouldSpreadSetupCosts) {
                   // If spreading setup costs, divide by total weeks
