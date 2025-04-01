@@ -31,6 +31,9 @@ const FinancialMatrix = ({
     );
   }
   
+  // Debug the incoming data
+  console.log("FinancialMatrix received data:", trendData[0]);
+  
   // Combined data view - both revenue and cost data in one table
   if (combinedView) {
     // Validate that we have the required properties

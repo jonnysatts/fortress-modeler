@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
@@ -39,7 +38,11 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           variable: "#8884D8",
           recurring: "#82CA9D"
         };
-
+        
+        // Identify fixed costs to handle them correctly
+        const fixedCosts = costs.filter(cost => cost.type?.toLowerCase() === "fixed");
+        const setupCostsAmortized = metadata.costs?.spreadSetupCosts || false;
+        
         let cumulativeTotal = 0;
         
         // Generate data for each week
@@ -48,18 +51,20 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           let totalCost = 0;
           
           costs.forEach(cost => {
-            let costValue = 0; // Default to 0
+            let costValue = 0;
             const costType = cost.type?.toLowerCase();
             
             // Handle different cost types
             if (costType === "fixed") {
-              // Fixed costs (setup costs) are only applied in week 1 or spread across all weeks
-              if (metadata.costs?.spreadSetupCosts) {
-                costValue = cost.value / weeks; // Spread evenly
+              if (setupCostsAmortized) {
+                // If amortized, divide by total weeks
+                costValue = cost.value / weeks;
               } else if (week === 1) {
-                costValue = cost.value; // Apply only in first week
+                // Otherwise apply only in first week
+                costValue = cost.value;
               } else {
-                costValue = 0; // No cost for subsequent weeks if not spreading
+                // No cost in subsequent weeks if not amortized
+                costValue = 0;
               }
             } else if (costType === "variable") {
               // Variable costs like F&B COGS grow with revenue
@@ -85,6 +90,10 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
         }
       } else {
         const months = timePoints;
+        
+        // Identify fixed costs to handle them correctly
+        const fixedCosts = costs.filter(cost => cost.type?.toLowerCase() === "fixed");
+        
         let cumulativeTotal = 0;
         
         // Generate data for each month
@@ -93,7 +102,7 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           let totalCost = 0;
           
           costs.forEach(cost => {
-            let costValue = 0; // Default to 0
+            let costValue = 0;
             const costType = cost.type?.toLowerCase();
             
             // Handle different cost types for monthly model
@@ -127,6 +136,9 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           data.push(point);
         }
       }
+      
+      // Log the first few data points to help debug
+      console.log("Cost data (first 3 points):", data.slice(0, 3));
       
       return data;
     } catch (error) {
