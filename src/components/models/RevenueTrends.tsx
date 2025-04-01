@@ -61,14 +61,14 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
             }
             
             const safeName = stream.name.replace(/[^a-zA-Z0-9]/g, "");
-            point[safeName] = Math.round(streamRevenue * 100) / 100;
+            point[safeName] = Math.ceil(streamRevenue);
             point[`${safeName}Color`] = colorMap[stream.name] || "#999999";
             totalRevenue += streamRevenue;
           });
           
-          point.revenue = Math.round(totalRevenue * 100) / 100;
+          point.revenue = Math.ceil(totalRevenue);
           cumulativeTotal += totalRevenue;
-          point.cumulativeRevenue = Math.round(cumulativeTotal * 100) / 100;
+          point.cumulativeRevenue = Math.ceil(cumulativeTotal);
           data.push(point);
         }
       } else {
@@ -93,13 +93,13 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
             }
             
             const safeName = stream.name.replace(/[^a-zA-Z0-9]/g, "");
-            point[safeName] = Math.round(streamRevenue * 100) / 100;
+            point[safeName] = Math.ceil(streamRevenue);
             totalRevenue += streamRevenue;
           });
           
-          point.total = Math.round(totalRevenue * 100) / 100;
+          point.total = Math.ceil(totalRevenue);
           cumulativeTotal += totalRevenue;
-          point.cumulativeTotal = Math.round(cumulativeTotal * 100) / 100;
+          point.cumulativeTotal = Math.ceil(cumulativeTotal);
           data.push(point);
         }
       }
@@ -181,10 +181,10 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
             />
             <YAxis 
               tick={{ fontSize: 12 }}
-              tickFormatter={(value) => `$${value.toLocaleString()}`}
+              tickFormatter={(value) => `$${Math.ceil(value).toLocaleString()}`}
             />
             <Tooltip 
-              formatter={(value: number) => [`$${value.toLocaleString()}`, ""]}
+              formatter={(value: number) => [`$${Math.ceil(value).toLocaleString()}`, ""]}
               labelFormatter={(label) => `${label}`}
             />
             <Legend />

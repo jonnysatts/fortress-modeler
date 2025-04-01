@@ -115,15 +115,15 @@ const FinancialMatrix = ({
                     const safeName = stream.name.replace(/[^a-zA-Z0-9]/g, "");
                     return (
                       <td key={streamIdx} className="text-right py-2 px-3 text-green-600">
-                        ${(period[safeName] || 0).toLocaleString()}
+                        ${Math.ceil(period[safeName] || 0).toLocaleString()}
                       </td>
                     );
                   })}
                   <td className="text-right py-2 px-3 font-medium text-green-700 border-r">
-                    ${periodRevenue.toLocaleString()}
+                    ${Math.ceil(periodRevenue).toLocaleString()}
                   </td>
                   <td className="text-right py-2 px-3 font-medium text-green-800">
-                    ${cumulativeRevenue.toLocaleString()}
+                    ${Math.ceil(cumulativeRevenue).toLocaleString()}
                   </td>
                   
                   {/* Cost columns */}
@@ -131,24 +131,24 @@ const FinancialMatrix = ({
                     const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
                     return (
                       <td key={costIdx} className="text-right py-2 px-3 text-red-600">
-                        ${(period[safeName] || 0).toLocaleString()}
+                        ${Math.ceil(period[safeName] || 0).toLocaleString()}
                       </td>
                     );
                   })}
                   <td className="text-right py-2 px-3 font-medium text-red-700 border-r">
-                    ${periodCosts.toLocaleString()}
+                    ${Math.ceil(periodCosts).toLocaleString()}
                   </td>
                   <td className="text-right py-2 px-3 font-medium text-red-800">
-                    ${cumulativeCosts.toLocaleString()}
+                    ${Math.ceil(cumulativeCosts).toLocaleString()}
                   </td>
                   
                   {/* Profit/Loss column */}
                   <td className={`text-right py-2 px-3 font-medium ${periodProfit >= 0 ? 'text-black' : 'text-red-600'} bg-gray-50`}>
-                    ${Math.abs(periodProfit).toLocaleString()}
+                    ${Math.ceil(Math.abs(periodProfit)).toLocaleString()}
                     {periodProfit < 0 && ' (Loss)'}
                   </td>
                   <td className={`text-right py-2 px-3 font-bold ${cumulativeProfit >= 0 ? 'text-black' : 'text-red-600'} bg-gray-100`}>
-                    ${Math.abs(cumulativeProfit).toLocaleString()}
+                    ${Math.ceil(Math.abs(cumulativeProfit)).toLocaleString()}
                     {cumulativeProfit < 0 && ' (Loss)'}
                   </td>
                 </tr>
@@ -192,7 +192,7 @@ const FinancialMatrix = ({
                 const safeName = stream.name.replace(/[^a-zA-Z0-9]/g, "");
                 return (
                   <td key={streamIdx} className="text-right py-2 px-3">
-                    ${(period[safeName] || 0).toLocaleString()}
+                    ${Math.ceil(period[safeName] || 0).toLocaleString()}
                   </td>
                 );
               })}
@@ -200,15 +200,15 @@ const FinancialMatrix = ({
                 const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
                 return (
                   <td key={costIdx} className="text-right py-2 px-3">
-                    ${(period[safeName] || 0).toLocaleString()}
+                    ${Math.ceil(period[safeName] || 0).toLocaleString()}
                   </td>
                 );
               })}
               <td className="text-right py-2 px-3 font-bold">
-                ${(period.total || period.revenue || period.costs || 0).toLocaleString()}
+                ${Math.ceil(period.total || period.revenue || period.costs || 0).toLocaleString()}
               </td>
               <td className="text-right py-2 px-3 font-bold text-green-700">
-                ${(period.cumulativeTotal || period.cumulativeRevenue || period.cumulativeCosts || 0).toLocaleString()}
+                ${Math.ceil(period.cumulativeTotal || period.cumulativeRevenue || period.cumulativeCosts || 0).toLocaleString()}
               </td>
             </tr>
           ))}

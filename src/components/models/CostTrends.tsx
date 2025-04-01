@@ -68,10 +68,9 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
             // Handle different cost types
             if (costType === "fixed") {
               if (setupCostsAmortized) {
-                // If amortized, divide by total weeks
                 // For visualization purposes, we show the full amount in week 1 only
                 if (week === 1) {
-                  point[safeName] = Math.round(cost.value * 100) / 100;
+                  point[safeName] = Math.ceil(cost.value);
                   totalCost += cost.value; // Add full cost to the first week's total
                 } else {
                   point[safeName] = 0; // Show as zero in subsequent weeks
@@ -81,7 +80,7 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
               } else if (week === 1) {
                 // Apply only in first week
                 costValue = cost.value;
-                point[safeName] = Math.round(costValue * 100) / 100;
+                point[safeName] = Math.ceil(costValue);
                 totalCost += costValue;
                 // Skip further processing for this cost item
                 return;
@@ -103,13 +102,13 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
               costValue = cost.value;
             }
             
-            point[safeName] = Math.round(costValue * 100) / 100;
+            point[safeName] = Math.ceil(costValue);
             totalCost += costValue;
           });
           
-          point.costs = Math.round(totalCost * 100) / 100;
+          point.costs = Math.ceil(totalCost);
           cumulativeTotal += totalCost;
-          point.cumulativeCosts = Math.round(cumulativeTotal * 100) / 100;
+          point.cumulativeCosts = Math.ceil(cumulativeTotal);
           data.push(point);
         }
       } else {
@@ -146,13 +145,13 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
               costValue = cost.value;
             }
             
-            point[safeName] = Math.round(costValue * 100) / 100;
+            point[safeName] = Math.ceil(costValue);
             totalCost += costValue;
           });
           
-          point.total = Math.round(totalCost * 100) / 100;
+          point.total = Math.ceil(totalCost);
           cumulativeTotal += totalCost;
-          point.cumulativeTotal = Math.round(cumulativeTotal * 100) / 100;
+          point.cumulativeTotal = Math.ceil(cumulativeTotal);
           data.push(point);
         }
       }
@@ -229,10 +228,10 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
             />
             <YAxis 
               tick={{ fontSize: 12 }}
-              tickFormatter={(value) => `$${value.toLocaleString()}`}
+              tickFormatter={(value) => `$${Math.ceil(value).toLocaleString()}`}
             />
             <Tooltip 
-              formatter={(value: number) => [`$${value.toLocaleString()}`, ""]} 
+              formatter={(value: number) => [`$${Math.ceil(value).toLocaleString()}`, ""]} 
               labelFormatter={(label) => `${label}`}
             />
             <Legend />
