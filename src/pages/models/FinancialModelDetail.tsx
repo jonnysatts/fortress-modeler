@@ -218,11 +218,8 @@ const FinancialModelDetail = () => {
   }
 
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
-  const shouldSpreadSetupCosts = isWeeklyEvent && 
-    model.assumptions.metadata?.costs?.spreadSetupCosts === true;
   
   console.log("Model metadata:", model.assumptions.metadata);
-  console.log("Should spread setup costs:", shouldSpreadSetupCosts);
 
   const calculateTotalRevenue = (model: FinancialModel): number => {
     try {
@@ -247,40 +244,52 @@ const FinancialModelDetail = () => {
 
   const calculateTotalCosts = (model: FinancialModel): number => {
     try {
-      if (model.assumptions.metadata?.type !== "WeeklyEvent") return 0;
+      if (model.assumptions.metadata?.type !== "WeeklyEvent" || !model.assumptions.metadata) return 0;
       
       const metadata = model.assumptions.metadata;
       const weeks = metadata.weeks || 12;
+      if (weeks <= 0) return 0; // Avoid division by zero
       
-      const shouldSpreadSetupCosts = metadata.costs?.spreadSetupCosts === true;
-      
-      const fixedCosts = model.assumptions.costs
-        .filter(cost => cost.type?.toLowerCase() === "fixed")
+      // Separate costs: Setup, Other Fixed, Recurring/Variable
+      const setupCostItem = model.assumptions.costs.find(cost => cost.name === "Setup Costs");
+      const setupCostValue = setupCostItem?.value || 0;
+      const isSetupCostFixed = setupCostItem?.type === 'fixed'; // True if fixed, false if recurring (spread) or not found
+
+      const otherFixedCosts = model.assumptions.costs
+        .filter(cost => cost.type?.toLowerCase() === "fixed" && cost.name !== "Setup Costs")
         .reduce((sum, cost) => sum + cost.value, 0);
       
-      const recurringAndVariableCosts = model.assumptions.costs
-        .filter(cost => cost.type?.toLowerCase() !== "fixed")
-        .reduce((sum, cost) => sum + cost.value, 0);
-      
+      const recurringAndVariableCostsList = model.assumptions.costs
+        .filter(cost => cost.type?.toLowerCase() !== "fixed" && cost.name !== "Setup Costs");
+        
       let totalCosts = 0;
-      
-      if (shouldSpreadSetupCosts) {
-        totalCosts += fixedCosts;
-      } else {
-        totalCosts += fixedCosts;
+
+      // Add one-time costs (Other Fixed + Setup if Fixed)
+      totalCosts += otherFixedCosts;
+      if (isSetupCostFixed) {
+        totalCosts += setupCostValue;
       }
       
+      // Calculate sum of weekly costs
+      let totalWeeklyComponentCosts = 0;
       for (let week = 0; week < weeks; week++) {
-        const growthFactor = Math.pow(1 + ((model.assumptions.growthModel.rate || 0) * 0.7), week);
-        
-        const weekCosts = recurringAndVariableCosts * growthFactor;
-        
-        if (shouldSpreadSetupCosts && week > 0) {
-          totalCosts += weekCosts + (fixedCosts / weeks);
-        } else {
-          totalCosts += weekCosts;
+        let currentWeekRecurringVariableCost = 0;
+        recurringAndVariableCostsList.forEach(cost => {
+          // Apply growth factor (example uses 70% of revenue growth rate for costs)
+          const growthFactor = Math.pow(1 + ((model.assumptions.growthModel.rate || 0) * 0.7), week);
+          currentWeekRecurringVariableCost += cost.value * growthFactor;
+        });
+
+        // Add recurring/variable costs for the week
+        totalWeeklyComponentCosts += currentWeekRecurringVariableCost;
+
+        // Add spread setup cost component for the week if applicable
+        if (!isSetupCostFixed && setupCostItem) { // If setup cost exists and is recurring (spread)
+          totalWeeklyComponentCosts += (setupCostValue / weeks);
         }
       }
+      
+      totalCosts += totalWeeklyComponentCosts;
       
       return Math.round(totalCosts);
     } catch (error) {
@@ -493,7 +502,6 @@ const FinancialModelDetail = () => {
                   model={model} 
                   trendData={combinedFinancialData} 
                   combinedView={true}
-                  shouldSpreadSetupCosts={shouldSpreadSetupCosts}
                 />
               ) : (
                 <div className="flex justify-center items-center py-10">
@@ -540,7 +548,6 @@ const FinancialModelDetail = () => {
                 <CostTrends 
                   model={model} 
                   onUpdateCostData={setCostData} 
-                  shouldSpreadSetupCosts={shouldSpreadSetupCosts}
                 />
               </CardContent>
             </Card>
@@ -566,7 +573,6 @@ const FinancialModelDetail = () => {
             <CardContent>
               <ModelProjections 
                 model={model} 
-                shouldSpreadSetupCosts={shouldSpreadSetupCosts}
               />
             </CardContent>
           </Card>

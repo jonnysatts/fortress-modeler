@@ -56,19 +56,8 @@ const CostTrends = ({ model, combinedData, onUpdateCostData, shouldSpreadSetupCo
             let costValue = 0;
             
             if (costType === "fixed") {
-              // Critical fix: handle setup costs correctly
-              if (cost.name === "Setup Costs") {
-                if (shouldSpreadSetupCosts) {
-                  // If spreading setup costs, divide by total weeks
-                  costValue = cost.value / metadata.weeks;
-                } else {
-                  // Otherwise only show in week 1
-                  costValue = week === 1 ? cost.value : 0;
-                }
-              } else {
-                // For other fixed costs, only apply in week 1
-                costValue = week === 1 ? cost.value : 0;
-              }
+              // Fixed costs only apply in the first period (week 1 or month 1)
+              costValue = week === 1 ? cost.value : 0;
             } else if (costType === "variable") {
               // Special handling for F&B COGS - should be exactly the percentage of F&B revenue
               if (cost.name === "F&B COGS") {
@@ -77,13 +66,26 @@ const CostTrends = ({ model, combinedData, onUpdateCostData, shouldSpreadSetupCo
               } else {
                 costValue = cost.value;
                 if (week > 1) {
-                  const growthRate = metadata.growth?.fbSpendGrowth / 100 || model.assumptions.growthModel.rate;
+                  // Apply growth if applicable (use specific F&B growth or general rate)
+                  const growthRate = metadata.growth?.useCustomerSpendGrowth 
+                                     ? metadata.growth?.fbSpendGrowth / 100 
+                                     : (model.assumptions.growthModel.rate || 0);
                   costValue *= Math.pow(1 + growthRate, week - 1);
                 }
               }
             } else if (costType === "recurring") {
-              costValue = cost.value;
+              // Recurring costs apply every week
+              // Special handling for Setup Costs if they are marked as recurring (i.e., should be spread)
+              if (cost.name === "Setup Costs" && shouldSpreadSetupCosts && metadata.weeks > 0) {
+                 // Spread the setup cost evenly across all weeks
+                 costValue = cost.value / metadata.weeks;
+              } else {
+                 // Regular recurring cost, apply the full value
+                 costValue = cost.value;
+              }
             } else {
+              // Default behavior for unknown types (maybe log a warning?)
+              // For now, treat as recurring for safety, but might need refinement
               costValue = cost.value;
             }
             
@@ -245,7 +247,6 @@ const CostTrends = ({ model, combinedData, onUpdateCostData, shouldSpreadSetupCo
           model={model} 
           trendData={trendData} 
           costData={true} 
-          shouldSpreadSetupCosts={shouldSpreadSetupCosts}
         />
       )}
     </div>

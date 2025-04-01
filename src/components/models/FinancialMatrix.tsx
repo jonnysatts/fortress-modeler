@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { FinancialModel } from "@/lib/db";
 
@@ -8,7 +7,6 @@ interface FinancialMatrixProps {
   revenueData?: boolean;
   costData?: boolean;
   combinedView?: boolean;
-  shouldSpreadSetupCosts?: boolean;
 }
 
 const FinancialMatrix = ({ 
@@ -17,7 +15,6 @@ const FinancialMatrix = ({
   revenueData = false,
   costData = false,
   combinedView = false,
-  shouldSpreadSetupCosts = false
 }: FinancialMatrixProps) => {
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
@@ -32,9 +29,6 @@ const FinancialMatrix = ({
       </div>
     );
   }
-  
-  console.log("FinancialMatrix received data:", trendData[0]);
-  console.log("Should spread setup costs:", shouldSpreadSetupCosts);
   
   // Helper function to find a setup cost in the model
   const findSetupCost = () => {
@@ -59,10 +53,8 @@ const FinancialMatrix = ({
       );
     }
 
-    // Find setup cost for processing
+    // Find setup cost for processing (only needed for metadata access if required elsewhere, keep for now)
     const setupCost = findSetupCost();
-    const setupCostValue = setupCost ? setupCost.value : 0;
-    const weeks = model.assumptions.metadata?.weeks || 12;
     
     return (
       <div className="overflow-x-auto mt-4">
@@ -118,19 +110,6 @@ const FinancialMatrix = ({
               const periodProfit = periodRevenue - periodCosts;
               const cumulativeProfit = cumulativeRevenue - cumulativeCosts;
 
-              // Handle setup costs display based on shouldSpreadSetupCosts flag
-              const setupCostDisplay = (() => {
-                if (!setupCost) return 0;
-                
-                if (shouldSpreadSetupCosts) {
-                  // If spreading costs, divide by total weeks
-                  return setupCostValue / weeks;
-                } else {
-                  // If not spreading, only show in first period
-                  return idx === 0 ? setupCostValue : 0;
-                }
-              })();
-              
               return (
                 <tr key={idx} className={idx % 2 === 0 ? "bg-gray-50" : ""}>
                   <td className="py-2 px-3">{period.point || `Period ${idx+1}`}</td>
@@ -155,11 +134,8 @@ const FinancialMatrix = ({
                   {model.assumptions.costs.map((cost, costIdx) => {
                     const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
                     
-                    // Special handling for setup costs
+                    // Use the pre-calculated value from trendData directly
                     let displayValue = period[safeName] || 0;
-                    if (cost.name === "Setup Costs") {
-                      displayValue = setupCostDisplay;
-                    }
                     
                     return (
                       <td key={costIdx} className="text-right py-2 px-3 text-red-600">

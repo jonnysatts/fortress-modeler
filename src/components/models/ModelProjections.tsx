@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
@@ -49,6 +48,11 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
         const metadata = model.assumptions.metadata;
         const weeks = metadata.weeks || 12;
         const timePoints = Math.min(weeks, projectionMonths) + 1; // +1 for starting point
+        
+        // Find the setup cost item from the main costs array
+        const setupCostItem = model.assumptions.costs.find(cost => cost.name === "Setup Costs");
+        const setupCostValue = setupCostItem?.value || 0;
+        const isSetupCostFixed = setupCostItem?.type === 'fixed';
         
         let totalCumulativeRevenue = 0;
         let totalCumulativeCosts = 0;
@@ -110,18 +114,25 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
           const fbCOGS = (weeklyRevenue.fbSales * (metadata.costs.fbCOGSPercent || 30)) / 100;
           const staffCosts = (metadata.costs.staffCount || 0) * (metadata.costs.staffCostPerPerson || 0);
           
+          // Calculate setup costs for the week based on its type ('fixed' or 'recurring')
           let setupCostsForWeek = 0;
-          
-          // Critical fix for setup costs
-          if (shouldSpreadSetupCosts) {
-            // Only apply setup costs to weeks > 0 (not the starting point)
-            setupCostsForWeek = week > 0 ? (metadata.costs.setupCosts || 0) / (weeks) : 0;
-          } else {
-            // Only apply setup costs to week 1 (not week 0, which is the starting point)
-            setupCostsForWeek = week === 1 ? (metadata.costs.setupCosts || 0) : 0;
+          if (setupCostItem) { // Check if setup cost item exists
+            if (isSetupCostFixed) {
+              // Fixed costs only apply to week 1 (not week 0, the starting point)
+              setupCostsForWeek = week === 1 ? setupCostValue : 0;
+            } else { // Assumed recurring (spread)
+              // Spread costs apply to weeks > 0
+              if (week > 0 && weeks > 0) {
+                setupCostsForWeek = setupCostValue / weeks;
+              }
+            }
           }
           
-          const totalWeeklyCosts = fbCOGS + staffCosts + (metadata.costs.managementCosts || 0) + setupCostsForWeek;
+          // Removed direct dependency on metadata.costs.setupCosts and shouldSpreadSetupCosts prop here
+          // const totalWeeklyCosts = fbCOGS + staffCosts + (metadata.costs.managementCosts || 0) + setupCostsForWeek;
+          const managementCosts = metadata.costs?.managementCosts || 0; // Get management costs from metadata
+          const totalWeeklyCosts = fbCOGS + staffCosts + managementCosts + setupCostsForWeek;
+
           const weeklyProfit = totalWeeklyRevenue - totalWeeklyCosts;
           
           totalCumulativeRevenue += totalWeeklyRevenue;
