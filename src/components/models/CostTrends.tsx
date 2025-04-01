@@ -53,10 +53,8 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
             if (costType === "fixed") {
               if (cost.name === "Setup Costs" && shouldSpreadSetupCosts) {
                 costValue = cost.value / weeks;
-              } else if (week === 1 || (costType === "fixed" && cost.name !== "Setup Costs")) {
-                costValue = cost.value;
               } else {
-                costValue = 0;
+                costValue = week === 1 ? cost.value : 0;
               }
             } else if (costType === "variable") {
               costValue = cost.value;
@@ -68,10 +66,6 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
               costValue = cost.value;
             } else {
               costValue = cost.value;
-            }
-            
-            if (cost.name === "Setup Costs" && week > 1 && !shouldSpreadSetupCosts) {
-              costValue = 0;
             }
             
             point[safeName] = Math.ceil(costValue);
@@ -213,21 +207,6 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
                 "#ff8042", "#8884d8", "#82ca9d", "#ffc658", "#0088fe", 
                 "#00c49f", "#ffbb28", "#9370db", "#3366cc"
               ];
-              
-              if (cost.name === "Setup Costs" && !shouldSpreadSetupCosts) {
-                return (
-                  <Area
-                    key={index}
-                    type="monotone"
-                    dataKey={(dataPoint: any) => dataPoint.point === "Week 1" ? dataPoint[safeName] : 0}
-                    name={cost.name}
-                    stackId="1"
-                    stroke={colors[index % colors.length]}
-                    fill={colors[index % colors.length]}
-                  />
-                );
-              }
-              
               return (
                 <Area
                   key={index}
