@@ -35,6 +35,105 @@ const FinancialMatrix = ({
     return model.assumptions.costs.find(cost => cost.name === "Setup Costs");
   };
 
+  const calculatePeriodData = (week: number) => {
+    try {
+      if (!model?.assumptions?.metadata) return null;
+      
+      const metadata = model.assumptions.metadata;
+      const initialAttendance = metadata.initialWeeklyAttendance;
+      const perCustomer = metadata.perCustomer;
+      
+      // Calculate attendance for this week
+      const attendanceGrowthRate = metadata.growth.attendanceGrowthRate / 100;
+      const currentAttendance = Math.round(
+        initialAttendance * Math.pow(1 + attendanceGrowthRate, week - 1)
+      );
+
+      // Calculate per-customer values with growth if enabled
+      let currentPerCustomer = { ...perCustomer };
+      if (metadata.growth.useCustomerSpendGrowth) {
+        currentPerCustomer = {
+          ticketPrice: perCustomer.ticketPrice * 
+            Math.pow(1 + (metadata.growth.ticketPriceGrowth / 100), week - 1),
+          fbSpend: perCustomer.fbSpend * 
+            Math.pow(1 + (metadata.growth.fbSpendGrowth / 100), week - 1),
+          merchandiseSpend: perCustomer.merchandiseSpend * 
+            Math.pow(1 + (metadata.growth.merchandiseSpendGrowth / 100), week - 1),
+          onlineSpend: perCustomer.onlineSpend * 
+            Math.pow(1 + (metadata.growth.onlineSpendGrowth / 100), week - 1),
+          miscSpend: perCustomer.miscSpend * 
+            Math.pow(1 + (metadata.growth.miscSpendGrowth / 100), week - 1),
+        };
+      }
+
+      // Calculate revenue streams
+      const ticketSales = currentAttendance * (currentPerCustomer.ticketPrice || 0);
+      const fbSales = currentAttendance * (currentPerCustomer.fbSpend || 0);
+      const merchandiseSales = currentAttendance * (currentPerCustomer.merchandiseSpend || 0);
+      const onlineSales = currentAttendance * (currentPerCustomer.onlineSpend || 0);
+      const miscRevenue = currentAttendance * (currentPerCustomer.miscSpend || 0);
+
+      const totalRevenue = ticketSales + fbSales + merchandiseSales + onlineSales + miscRevenue;
+
+      // Calculate costs
+      const setupCosts = model.assumptions.costs.find(cost => cost.name === "Setup Costs")?.value || 0;
+      const fbCOGS = (fbSales * (metadata.costs.fbCOGSPercent || 30)) / 100;
+      const staffCosts = (metadata.costs.staffCount || 0) * (metadata.costs.staffCostPerPerson || 0);
+      const managementCosts = metadata.costs.managementCosts || 0;
+
+      // Only apply setup costs in week 1
+      const weeklySetupCosts = week === 1 ? setupCosts : 0;
+      const totalCosts = weeklySetupCosts + fbCOGS + staffCosts + managementCosts;
+
+      return {
+        week,
+        attendance: currentAttendance,
+        revenue: {
+          ticketSales: Math.round(ticketSales),
+          fbSales: Math.round(fbSales),
+          merchandiseSales: Math.round(merchandiseSales),
+          onlineSales: Math.round(onlineSales),
+          miscRevenue: Math.round(miscRevenue),
+          total: Math.round(totalRevenue)
+        },
+        costs: {
+          setupCosts: Math.round(weeklySetupCosts),
+          fbCOGS: Math.round(fbCOGS),
+          staffCosts: Math.round(staffCosts),
+          managementCosts: Math.round(managementCosts),
+          total: Math.round(totalCosts)
+        }
+      };
+    } catch (error) {
+      console.error("Error calculating period data:", error);
+      return null;
+    }
+  };
+
+  // Calculate all periods data
+  const calculateAllPeriodsData = () => {
+    const weeks = model?.assumptions?.metadata?.weeks || 12;
+    let cumulativeRevenue = 0;
+    let cumulativeCosts = 0;
+    
+    return Array.from({ length: weeks }, (_, i) => {
+      const week = i + 1;
+      const periodData = calculatePeriodData(week);
+      
+      if (!periodData) return null;
+      
+      cumulativeRevenue += periodData.revenue.total;
+      cumulativeCosts += periodData.costs.total;
+      
+      return {
+        ...periodData,
+        cumulativeRevenue,
+        cumulativeCosts,
+        cumulativeProfit: cumulativeRevenue - cumulativeCosts
+      };
+    }).filter(Boolean);
+  };
+
   // Combined data view - both revenue and cost data in one table
   if (combinedView) {
     // Validate that we have the required properties
@@ -53,7 +152,7 @@ const FinancialMatrix = ({
       );
     }
 
-    // Find setup cost for processing (only needed for metadata access if required elsewhere, keep for now)
+    // Find setup cost for processing
     const setupCost = findSetupCost();
     
     return (
@@ -143,13 +242,9 @@ const FinancialMatrix = ({
                   {/* Cost columns */}
                   {model.assumptions.costs.map((cost, costIdx) => {
                     const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
-                    
-                    // Use the pre-calculated value from trendData directly
-                    let displayValue = period[safeName] || 0;
-                    
                     return (
                       <td key={costIdx} className="text-right py-2 px-3 text-red-600">
-                        ${Math.ceil(displayValue).toLocaleString()}
+                        ${Math.ceil(period[safeName] || 0).toLocaleString()}
                       </td>
                     );
                   })}

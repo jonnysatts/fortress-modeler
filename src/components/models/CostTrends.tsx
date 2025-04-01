@@ -23,7 +23,7 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
   
-  const calculateCostTrends = () => {
+  const calculateCostData = () => {
     try {
       const data = [];
       const costs = model.assumptions.costs;
@@ -45,16 +45,14 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
             const growthRate = metadata.growth.attendanceGrowthRate / 100;
             currentAttendance = initialAttendance * Math.pow(1 + growthRate, week - 1);
           }
-          
-          // --- Calculate current F&B Spend per customer for this week --- 
-          let currentFbSpendPerCustomer = metadata.perCustomer?.fbSpend || 0;
+
+          // Calculate F&B revenue for this week
+          let fbSpendPerCustomer = metadata.perCustomer?.fbSpend || 0;
           if (week > 1 && metadata.growth?.useCustomerSpendGrowth) {
             const fbSpendGrowthRate = (metadata.growth.fbSpendGrowth || 0) / 100;
-            currentFbSpendPerCustomer *= Math.pow(1 + fbSpendGrowthRate, week - 1);
+            fbSpendPerCustomer *= Math.pow(1 + fbSpendGrowthRate, week - 1);
           }
-
-          // Calculate F&B revenue for *this week* using current attendance and spend
-          const fbRevenue = currentAttendance * currentFbSpendPerCustomer;
+          const fbRevenue = currentAttendance * fbSpendPerCustomer;
           
           costs.forEach(cost => {
             const costType = cost.type?.toLowerCase();
@@ -72,10 +70,9 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
               } else {
                 costValue = cost.value;
                 if (week > 1) {
-                  // Apply growth if applicable (use specific F&B growth or general rate)
                   const growthRate = metadata.growth?.useCustomerSpendGrowth 
-                                     ? metadata.growth?.fbSpendGrowth / 100 
-                                     : (model.assumptions.growthModel.rate || 0);
+                    ? metadata.growth?.fbSpendGrowth / 100 
+                    : (model.assumptions.growthModel.rate || 0);
                   costValue *= Math.pow(1 + growthRate, week - 1);
                 }
               }
@@ -161,7 +158,7 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
     }
   };
 
-  const trendData = calculateCostTrends();
+  const trendData = calculateCostData();
   
   useEffect(() => {
     if (onUpdateCostData && trendData.length > 0) {

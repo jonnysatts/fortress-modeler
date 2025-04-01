@@ -47,92 +47,77 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
       if (isWeeklyEvent && model.assumptions.metadata) {
         const metadata = model.assumptions.metadata;
         const weeks = metadata.weeks || 12;
-        const timePoints = Math.min(weeks, projectionMonths) + 1; // +1 for starting point
+        const timePoints = Math.min(weeks, projectionMonths);
         
         // Find the setup cost item from the main costs array
-        const setupCostItem = model.assumptions.costs.find(cost => cost.name === "Setup Costs");
-        const setupCostValue = setupCostItem?.value || 0;
-        const isSetupCostFixed = setupCostItem?.type === 'fixed';
+        const setupCosts = model.assumptions.costs.find(cost => cost.name === "Setup Costs")?.value || 0;
         
         let totalCumulativeRevenue = 0;
-        let totalCumulativeCosts = 0;
-        let totalCumulativeProfit = 0;
+        let totalCumulativeCosts = setupCosts; // Start with setup costs
+        let totalCumulativeProfit = -setupCosts; // Initial profit is negative setup costs
         let totalAttendance = 0;
         
-        for (let week = 0; week <= weeks; week++) {
-          if (week > timePoints - 1) break;
-          
+        // Add starting point (Week 0) with initial values but no growth
+        const initialAttendance = metadata.initialWeeklyAttendance;
+        const initialPerCustomer = metadata.perCustomer;
+        
+        // Add Week 0 data point
+        data.push({
+          point: "Start",
+          revenue: 0,
+          costs: setupCosts,
+          profit: -setupCosts,
+          attendance: initialAttendance,
+          cumulativeRevenue: 0,
+          cumulativeCosts: setupCosts,
+          cumulativeProfit: -setupCosts,
+          totalAttendance: initialAttendance
+        });
+        
+        // Calculate weeks 1 through N
+        for (let week = 1; week <= timePoints; week++) {
           // Calculate attendance with compounding growth rate
-          let currentAttendance = metadata.initialWeeklyAttendance;
-          if (week > 0) {
-            // Use compound growth formula: initialValue * (1 + rate)^time
-            const growthRate = metadata.growth.attendanceGrowthRate / 100;
-            currentAttendance = metadata.initialWeeklyAttendance * 
-              Math.pow(1 + growthRate, week);
-          }
+          const attendanceGrowthRate = metadata.growth.attendanceGrowthRate / 100;
+          const currentAttendance = Math.round(
+            initialAttendance * Math.pow(1 + attendanceGrowthRate, week - 1)
+          );
           
-          // Round and add to total attendance
-          const roundedAttendance = Math.round(currentAttendance);
-          totalAttendance += roundedAttendance;
+          totalAttendance += currentAttendance;
           
-          // Handle per-customer metrics with proper growth rates
+          // Calculate per-customer values with growth if enabled
           let currentPerCustomer = { ...metadata.perCustomer };
-          if (week > 0 && metadata.growth.useCustomerSpendGrowth) {
-            const ticketGrowthRate = metadata.growth.ticketPriceGrowth / 100;
-            const fbSpendGrowthRate = metadata.growth.fbSpendGrowth / 100;
-            const merchGrowthRate = metadata.growth.merchandiseSpendGrowth / 100;
-            const onlineGrowthRate = metadata.growth.onlineSpendGrowth / 100;
-            const miscGrowthRate = metadata.growth.miscSpendGrowth / 100;
-            
-            // Apply compound growth to each revenue stream
+          if (metadata.growth.useCustomerSpendGrowth) {
             currentPerCustomer = {
               ticketPrice: metadata.perCustomer.ticketPrice * 
-                Math.pow(1 + ticketGrowthRate, week),
+                Math.pow(1 + (metadata.growth.ticketPriceGrowth / 100), week - 1),
               fbSpend: metadata.perCustomer.fbSpend * 
-                Math.pow(1 + fbSpendGrowthRate, week),
+                Math.pow(1 + (metadata.growth.fbSpendGrowth / 100), week - 1),
               merchandiseSpend: metadata.perCustomer.merchandiseSpend * 
-                Math.pow(1 + merchGrowthRate, week),
+                Math.pow(1 + (metadata.growth.merchandiseSpendGrowth / 100), week - 1),
               onlineSpend: metadata.perCustomer.onlineSpend * 
-                Math.pow(1 + onlineGrowthRate, week),
+                Math.pow(1 + (metadata.growth.onlineSpendGrowth / 100), week - 1),
               miscSpend: metadata.perCustomer.miscSpend * 
-                Math.pow(1 + miscGrowthRate, week),
+                Math.pow(1 + (metadata.growth.miscSpendGrowth / 100), week - 1),
             };
           }
           
           // Calculate revenue based on attendance and per-customer values
           const weeklyRevenue = {
-            ticketSales: roundedAttendance * (currentPerCustomer.ticketPrice || 0),
-            fbSales: roundedAttendance * (currentPerCustomer.fbSpend || 0),
-            merchandiseSales: roundedAttendance * (currentPerCustomer.merchandiseSpend || 0),
-            onlineSales: roundedAttendance * (currentPerCustomer.onlineSpend || 0),
-            miscRevenue: roundedAttendance * (currentPerCustomer.miscSpend || 0),
+            ticketSales: currentAttendance * (currentPerCustomer.ticketPrice || 0),
+            fbSales: currentAttendance * (currentPerCustomer.fbSpend || 0),
+            merchandiseSales: currentAttendance * (currentPerCustomer.merchandiseSpend || 0),
+            onlineSales: currentAttendance * (currentPerCustomer.onlineSpend || 0),
+            miscRevenue: currentAttendance * (currentPerCustomer.miscSpend || 0),
           };
           
           const totalWeeklyRevenue = Object.values(weeklyRevenue).reduce((sum, val) => sum + val, 0);
           
-          // Calculate costs that depend on revenue
+          // Calculate weekly costs
           const fbCOGS = (weeklyRevenue.fbSales * (metadata.costs.fbCOGSPercent || 30)) / 100;
           const staffCosts = (metadata.costs.staffCount || 0) * (metadata.costs.staffCostPerPerson || 0);
+          const managementCosts = metadata.costs.managementCosts || 0;
           
-          // Calculate setup costs for the week based on its type ('fixed' or 'recurring')
-          let setupCostsForWeek = 0;
-          if (setupCostItem) { // Check if setup cost item exists
-            if (isSetupCostFixed) {
-              // Fixed costs only apply to week 1 (not week 0, the starting point)
-              setupCostsForWeek = week === 1 ? setupCostValue : 0;
-            } else { // Assumed recurring (spread)
-              // Spread costs apply to weeks > 0
-              if (week > 0 && weeks > 0) {
-                setupCostsForWeek = setupCostValue / weeks;
-              }
-            }
-          }
-          
-          // Removed direct dependency on metadata.costs.setupCosts and shouldSpreadSetupCosts prop here
-          // const totalWeeklyCosts = fbCOGS + staffCosts + (metadata.costs.managementCosts || 0) + setupCostsForWeek;
-          const managementCosts = metadata.costs?.managementCosts || 0; // Get management costs from metadata
-          const totalWeeklyCosts = fbCOGS + staffCosts + managementCosts + setupCostsForWeek;
-
+          const totalWeeklyCosts = fbCOGS + staffCosts + managementCosts;
           const weeklyProfit = totalWeeklyRevenue - totalWeeklyCosts;
           
           totalCumulativeRevenue += totalWeeklyRevenue;
@@ -140,11 +125,11 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
           totalCumulativeProfit += weeklyProfit;
           
           data.push({
-            point: week === 0 ? "Start" : `Week ${week}`,
+            point: `Week ${week}`,
             revenue: Math.round(totalWeeklyRevenue * 100) / 100,
             costs: Math.round(totalWeeklyCosts * 100) / 100,
             profit: Math.round(weeklyProfit * 100) / 100,
-            attendance: roundedAttendance,
+            attendance: currentAttendance,
             cumulativeRevenue: Math.round(totalCumulativeRevenue * 100) / 100,
             cumulativeCosts: Math.round(totalCumulativeCosts * 100) / 100,
             cumulativeProfit: Math.round(totalCumulativeProfit * 100) / 100,

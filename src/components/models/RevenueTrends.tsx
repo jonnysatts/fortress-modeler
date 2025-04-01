@@ -23,7 +23,7 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
 
-  const calculateRevenueTrends = () => {
+  const calculateRevenueData = () => {
     try {
       const data = [];
       const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
@@ -55,23 +55,33 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
           
           let totalRevenue = 0;
           revenueStreams.forEach(stream => {
-            let streamBaseValue = stream.value;
-            let streamRevenue = streamBaseValue;
+            let streamBaseValue = 0;
+            let streamRevenue = 0;
             
-            if (week > 1) {
-              let growthRateToApply = 0;
-
-              if (metadata.growth?.useCustomerSpendGrowth) {
-                switch(stream.name) {
-                  case "Ticket Sales": growthRateToApply = (metadata.growth.ticketPriceGrowth || 0) / 100; break;
-                  case "F&B Sales": growthRateToApply = (metadata.growth.fbSpendGrowth || 0) / 100; break;
-                  case "Merchandise Sales": growthRateToApply = (metadata.growth.merchandiseSpendGrowth || 0) / 100; break;
-                  case "Online Sales": growthRateToApply = (metadata.growth.onlineSpendGrowth || 0) / 100; break;
-                  case "Miscellaneous Revenue": growthRateToApply = (metadata.growth.miscSpendGrowth || 0) / 100; break;
-                }
+            // Calculate revenue based on per-customer spending
+            if (stream.name === "F&B Sales") {
+              let fbSpendPerCustomer = metadata.perCustomer?.fbSpend || 0;
+              if (week > 1 && metadata.growth?.useCustomerSpendGrowth) {
+                const fbSpendGrowthRate = (metadata.growth.fbSpendGrowth || 0) / 100;
+                fbSpendPerCustomer *= Math.pow(1 + fbSpendGrowthRate, week - 1);
               }
+              streamRevenue = currentAttendance * fbSpendPerCustomer;
+            } else {
+              streamBaseValue = stream.value;
+              streamRevenue = streamBaseValue;
               
-              streamRevenue = streamBaseValue * Math.pow(1 + growthRateToApply, week - 1);
+              if (week > 1) {
+                let growthRateToApply = 0;
+                if (metadata.growth?.useCustomerSpendGrowth) {
+                  switch(stream.name) {
+                    case "Ticket Sales": growthRateToApply = (metadata.growth.ticketPriceGrowth || 0) / 100; break;
+                    case "Merchandise Sales": growthRateToApply = (metadata.growth.merchandiseSpendGrowth || 0) / 100; break;
+                    case "Online Sales": growthRateToApply = (metadata.growth.onlineSpendGrowth || 0) / 100; break;
+                    case "Miscellaneous Revenue": growthRateToApply = (metadata.growth.miscSpendGrowth || 0) / 100; break;
+                  }
+                }
+                streamRevenue = streamBaseValue * Math.pow(1 + growthRateToApply, week - 1);
+              }
             }
             
             const safeName = stream.name.replace(/[^a-zA-Z0-9]/g, "");
@@ -126,7 +136,7 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
     }
   };
 
-  const trendData = calculateRevenueTrends();
+  const trendData = calculateRevenueData();
   
   // Use useEffect to update combined data to prevent infinite render loops
   useEffect(() => {
