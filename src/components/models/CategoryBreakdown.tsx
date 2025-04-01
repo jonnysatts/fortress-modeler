@@ -14,6 +14,14 @@ import {
   CartesianGrid,
 } from "recharts";
 import { Card } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface CategoryBreakdownProps {
   model: FinancialModel;
@@ -29,7 +37,7 @@ interface RevenueData {
 interface CostData {
   name: string;
   value: number;
-  type: 'fixed' | 'variable' | 'recurring';
+  type: string;
   percentage?: number;
 }
 
@@ -51,7 +59,6 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
     let totalRevenue = 0;
     
     const data: RevenueData[] = revenueStreams.map(stream => {
-      // Calculate full revenue across all weeks
       let fullRevenue = stream.value;
       if (isWeeklyEvent) {
         const growthRate = model.assumptions.growthModel.rate || 0;
@@ -65,12 +72,10 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
       };
     });
     
-    // Calculate percentages
     data.forEach(item => {
       item.percentage = Math.round((item.value / totalRevenue) * 100);
     });
     
-    // Sort by value descending
     return data.sort((a, b) => b.value - a.value);
   };
   
@@ -80,19 +85,18 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
     
     const data: CostData[] = costs.map(cost => {
       totalCost += cost.value;
+      const costType = cost.type?.toLowerCase() || "recurring";
       return {
         name: cost.name,
         value: cost.value,
-        type: cost.type
+        type: costType.charAt(0).toUpperCase() + costType.slice(1)
       };
     });
     
-    // Calculate percentages
     data.forEach(item => {
       item.percentage = Math.round((item.value / totalCost) * 100);
     });
     
-    // Sort by value descending
     return data.sort((a, b) => b.value - a.value);
   };
   
@@ -105,7 +109,7 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
     };
     
     costs.forEach(cost => {
-      const costType = cost.type.toLowerCase();
+      const costType = (cost.type || "recurring").toLowerCase();
       if (typeCategories[costType]) {
         typeCategories[costType].value += cost.value;
       }
@@ -125,7 +129,6 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
     let totalRevenue = 0;
     let totalCosts = 0;
     
-    // Calculate totals across all weeks with growth
     for (let week = 0; week < weeks; week++) {
       const revGrowthFactor = Math.pow(1 + model.assumptions.growthModel.rate, week);
       totalRevenue += initialRevenue * revGrowthFactor;
@@ -176,7 +179,6 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
   
   return (
     <div className="space-y-6">
-      {/* Tab Selection */}
       <div className="flex justify-between items-center">
         <div className="flex gap-2">
           <button
@@ -202,9 +204,7 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
         </h3>
       </div>
       
-      {/* Main content */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Pie Chart */}
         <Card className="p-4">
           <h4 className="text-sm font-medium mb-4">
             {breakdownView === "revenue" ? "Revenue Distribution" : "Cost Distribution"}
@@ -235,7 +235,6 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
           </div>
         </Card>
         
-        {/* Bar Chart */}
         <Card className="p-4">
           <h4 className="text-sm font-medium mb-4">
             {breakdownView === "revenue" ? "Revenue Streams" : "Cost Categories"} By Amount
@@ -264,7 +263,6 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
                   radius={[0, 4, 4, 0]}
                 >
                   {breakdownData.map((entry, index) => {
-                    // Type assertion to handle both revenue and cost data
                     const costEntry = breakdownView === "costs" ? (entry as CostData) : null;
                     const color = costEntry && costEntry.type
                       ? getTypeColor(costEntry.type)
@@ -279,7 +277,6 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
         </Card>
       </div>
       
-      {/* Additional section for costs by type if in costs view */}
       {breakdownView === "costs" && typeCategorizedData.length > 0 && (
         <Card className="p-4">
           <h4 className="text-sm font-medium mb-4">Costs By Type</h4>
@@ -316,7 +313,6 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
         </Card>
       )}
       
-      {/* Overall financial summary for weekly events */}
       {isWeeklyEvent && weeklyTotals && (
         <Card className="p-4">
           <h4 className="text-sm font-medium mb-4">Projected Total Financials</h4>
@@ -349,36 +345,35 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
         </Card>
       )}
       
-      {/* Data table */}
       <Card className="p-4">
         <h4 className="text-sm font-medium mb-4">
           {breakdownView === "revenue" ? "Revenue Stream Details" : "Cost Category Details"}
         </h4>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left py-2 px-3">Name</th>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
                 {breakdownView === "costs" && (
-                  <th className="text-left py-2 px-3">Type</th>
+                  <TableHead>Type</TableHead>
                 )}
-                <th className="text-right py-2 px-3">Amount</th>
-                <th className="text-right py-2 px-3">Percentage</th>
-              </tr>
-            </thead>
-            <tbody>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-right">Percentage</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {breakdownData.map((item, idx) => (
-                <tr key={idx} className={idx % 2 === 0 ? "bg-gray-50" : ""}>
-                  <td className="py-2 px-3">{item.name}</td>
+                <TableRow key={idx} className={idx % 2 === 0 ? "bg-gray-50" : ""}>
+                  <TableCell>{item.name}</TableCell>
                   {breakdownView === "costs" && (
-                    <td className="py-2 px-3 capitalize">{(item as CostData).type}</td>
+                    <TableCell className="capitalize">{(item as CostData).type}</TableCell>
                   )}
-                  <td className="text-right py-2 px-3">${item.value.toLocaleString()}</td>
-                  <td className="text-right py-2 px-3">{item.percentage}%</td>
-                </tr>
+                  <TableCell className="text-right">${item.value.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">{item.percentage}%</TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </Card>
     </div>
