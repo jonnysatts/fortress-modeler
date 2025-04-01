@@ -19,138 +19,168 @@ interface ModelProjectionsProps {
 const ModelProjections = ({ model }: ModelProjectionsProps) => {
   const [projectionMonths, setProjectionMonths] = useState<number>(12);
 
+  // Validate model data to avoid errors
+  if (!model || !model.assumptions || !model.assumptions.growthModel) {
+    return (
+      <div className="p-4 border border-red-200 rounded-md bg-red-50">
+        <p className="text-red-600">
+          Unable to generate projections. Model data is incomplete or invalid.
+        </p>
+      </div>
+    );
+  }
+
   // Calculate projections based on model assumptions
   const calculateProjections = () => {
-    const data = [];
-    const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
-    
-    // Initial values
-    const totalInitialRevenue = model.assumptions.revenue.reduce(
-      (sum, item) => sum + item.value,
-      0
-    );
-    const totalInitialCosts = model.assumptions.costs.reduce(
-      (sum, item) => sum + item.value,
-      0
-    );
+    try {
+      const data = [];
+      const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
+      
+      // Initial values
+      const totalInitialRevenue = model.assumptions.revenue.reduce(
+        (sum, item) => sum + item.value,
+        0
+      );
+      const totalInitialCosts = model.assumptions.costs.reduce(
+        (sum, item) => sum + item.value,
+        0
+      );
 
-    // Handle weekly event models with per-customer revenue approach
-    if (isWeeklyEvent) {
-      const metadata = model.assumptions.metadata;
-      const weeks = metadata.weeks || 12;
-      const timePoints = Math.min(weeks, projectionMonths) + 1; // +1 for starting point
-      
-      let currentAttendance = metadata.initialWeeklyAttendance;
-      let currentPerCustomer = { ...metadata.perCustomer };
-      
-      for (let week = 0; week <= weeks; week++) {
-        if (week > timePoints - 1) break; // Only calculate up to our projection limit
+      // Handle weekly event models with per-customer revenue approach
+      if (isWeeklyEvent && model.assumptions.metadata) {
+        const metadata = model.assumptions.metadata;
+        const weeks = metadata.weeks || 12;
+        const timePoints = Math.min(weeks, projectionMonths) + 1; // +1 for starting point
         
-        // Calculate attendance for this week
-        if (week > 0) {
-          currentAttendance = metadata.initialWeeklyAttendance * 
-            (1 + (metadata.growth.attendanceGrowthRate / 100) * week);
-        }
+        let currentAttendance = metadata.initialWeeklyAttendance;
+        let currentPerCustomer = { ...metadata.perCustomer };
         
-        // Calculate per-customer spending for this week
-        if (week > 0 && metadata.growth.useCustomerSpendGrowth) {
-          currentPerCustomer = {
-            ticketPrice: metadata.perCustomer.ticketPrice * 
-              (1 + (metadata.growth.ticketPriceGrowth / 100) * week),
-            fbSpend: metadata.perCustomer.fbSpend * 
-              (1 + (metadata.growth.fbSpendGrowth / 100) * week),
-            merchandiseSpend: metadata.perCustomer.merchandiseSpend * 
-              (1 + (metadata.growth.merchandiseSpendGrowth / 100) * week),
-            onlineSpend: metadata.perCustomer.onlineSpend * 
-              (1 + (metadata.growth.onlineSpendGrowth / 100) * week),
-            miscSpend: metadata.perCustomer.miscSpend * 
-              (1 + (metadata.growth.miscSpendGrowth / 100) * week),
+        for (let week = 0; week <= weeks; week++) {
+          if (week > timePoints - 1) break; // Only calculate up to our projection limit
+          
+          // Calculate attendance for this week
+          if (week > 0) {
+            currentAttendance = metadata.initialWeeklyAttendance * 
+              (1 + (metadata.growth.attendanceGrowthRate / 100) * week);
+          }
+          
+          // Calculate per-customer spending for this week
+          if (week > 0 && metadata.growth.useCustomerSpendGrowth) {
+            currentPerCustomer = {
+              ticketPrice: metadata.perCustomer.ticketPrice * 
+                (1 + (metadata.growth.ticketPriceGrowth / 100) * week),
+              fbSpend: metadata.perCustomer.fbSpend * 
+                (1 + (metadata.growth.fbSpendGrowth / 100) * week),
+              merchandiseSpend: metadata.perCustomer.merchandiseSpend * 
+                (1 + (metadata.growth.merchandiseSpendGrowth / 100) * week),
+              onlineSpend: metadata.perCustomer.onlineSpend * 
+                (1 + (metadata.growth.onlineSpendGrowth / 100) * week),
+              miscSpend: metadata.perCustomer.miscSpend * 
+                (1 + (metadata.growth.miscSpendGrowth / 100) * week),
+            };
+          }
+          
+          // Calculate weekly revenue
+          const weeklyRevenue = {
+            ticketSales: currentAttendance * (currentPerCustomer.ticketPrice || 0),
+            fbSales: currentAttendance * (currentPerCustomer.fbSpend || 0),
+            merchandiseSales: currentAttendance * (currentPerCustomer.merchandiseSpend || 0),
+            onlineSales: currentAttendance * (currentPerCustomer.onlineSpend || 0),
+            miscRevenue: currentAttendance * (currentPerCustomer.miscSpend || 0),
           };
+          
+          const totalRevenue = Object.values(weeklyRevenue).reduce((sum, val) => sum + val, 0);
+          
+          // Calculate costs
+          const fbCOGS = (weeklyRevenue.fbSales * (metadata.costs.fbCOGSPercent || 30)) / 100;
+          const staffCosts = (metadata.costs.staffCount || 0) * (metadata.costs.staffCostPerPerson || 0);
+          
+          // Setup costs handling
+          let setupCostsForWeek = 0;
+          if (metadata.costs.spreadSetupCosts) {
+            setupCostsForWeek = (metadata.costs.setupCosts || 0) / weeks;
+          } else if (week === 0) {
+            setupCostsForWeek = metadata.costs.setupCosts || 0;
+          }
+          
+          const totalCosts = fbCOGS + staffCosts + (metadata.costs.managementCosts || 0) + setupCostsForWeek;
+          
+          data.push({
+            point: week === 0 ? "Start" : `Week ${week}`,
+            revenue: Math.round(totalRevenue * 100) / 100,
+            costs: Math.round(totalCosts * 100) / 100,
+            profit: Math.round((totalRevenue - totalCosts) * 100) / 100,
+            attendance: Math.round(currentAttendance),
+          });
         }
-        
-        // Calculate weekly revenue
-        const weeklyRevenue = {
-          ticketSales: currentAttendance * currentPerCustomer.ticketPrice,
-          fbSales: currentAttendance * currentPerCustomer.fbSpend,
-          merchandiseSales: currentAttendance * currentPerCustomer.merchandiseSpend,
-          onlineSales: currentAttendance * currentPerCustomer.onlineSpend,
-          miscRevenue: currentAttendance * currentPerCustomer.miscSpend,
-        };
-        
-        const totalRevenue = Object.values(weeklyRevenue).reduce((sum, val) => sum + val, 0);
-        
-        // Calculate costs
-        const fbCOGS = (weeklyRevenue.fbSales * metadata.costs.fbCOGSPercent) / 100;
-        const staffCosts = metadata.costs.staffCount * metadata.costs.staffCostPerPerson;
-        
-        // Setup costs handling
-        let setupCostsForWeek = 0;
-        if (metadata.costs.spreadSetupCosts) {
-          setupCostsForWeek = metadata.costs.setupCosts / weeks;
-        } else if (week === 0) {
-          setupCostsForWeek = metadata.costs.setupCosts;
-        }
-        
-        const totalCosts = fbCOGS + staffCosts + metadata.costs.managementCosts + setupCostsForWeek;
-        
-        data.push({
-          point: week === 0 ? "Start" : `Week ${week}`,
-          revenue: Math.round(totalRevenue * 100) / 100,
-          costs: Math.round(totalCosts * 100) / 100,
-          profit: Math.round((totalRevenue - totalCosts) * 100) / 100,
-          attendance: Math.round(currentAttendance),
-        });
-      }
-    } else {
-      // Original logic for non-event models
-      // Initialize revenue and costs
-      let currentRevenue = totalInitialRevenue;
-      let currentCosts = totalInitialCosts;
+      } else {
+        // Original logic for non-event models
+        // Initialize revenue and costs
+        let currentRevenue = totalInitialRevenue;
+        let currentCosts = totalInitialCosts;
 
-      for (let month = 0; month <= projectionMonths; month++) {
-        // Calculate growth based on model type
-        const { type, rate, seasonalFactors } = model.assumptions.growthModel;
-        
-        if (month > 0) {
-          if (type === "linear") {
-            // Linear growth: add a fixed amount each period
-            currentRevenue = totalInitialRevenue * (1 + rate * month);
-          } else if (type === "exponential") {
-            // Exponential growth: compound growth
-            currentRevenue = totalInitialRevenue * Math.pow(1 + rate, month);
-          } else if (type === "seasonal" && seasonalFactors && seasonalFactors.length > 0) {
-            // Seasonal growth: apply seasonal factors in rotation
-            const seasonIndex = (month - 1) % seasonalFactors.length;
-            const seasonFactor = seasonalFactors[seasonIndex];
-            currentRevenue = totalInitialRevenue * Math.pow(1 + rate, month) * seasonFactor;
-          } else {
-            // Default to simple growth
-            currentRevenue = totalInitialRevenue * (1 + rate * month);
+        for (let month = 0; month <= projectionMonths; month++) {
+          // Calculate growth based on model type
+          const { type, rate, seasonalFactors } = model.assumptions.growthModel;
+          
+          if (month > 0) {
+            if (type === "linear") {
+              // Linear growth: add a fixed amount each period
+              currentRevenue = totalInitialRevenue * (1 + rate * month);
+            } else if (type === "exponential") {
+              // Exponential growth: compound growth
+              currentRevenue = totalInitialRevenue * Math.pow(1 + rate, month);
+            } else if (type === "seasonal" && seasonalFactors && seasonalFactors.length > 0) {
+              // Seasonal growth: apply seasonal factors in rotation
+              const seasonIndex = (month - 1) % seasonalFactors.length;
+              const seasonFactor = seasonalFactors[seasonIndex];
+              currentRevenue = totalInitialRevenue * Math.pow(1 + rate, month) * seasonFactor;
+            } else {
+              // Default to simple growth
+              currentRevenue = totalInitialRevenue * (1 + rate * month);
+            }
+
+            // Simple growth for costs (typically doesn't grow as fast as revenue)
+            currentCosts = totalInitialCosts * (1 + (rate * 0.7) * month);
           }
 
-          // Simple growth for costs (typically doesn't grow as fast as revenue)
-          currentCosts = totalInitialCosts * (1 + (rate * 0.7) * month);
+          // Calculate profit
+          const profit = currentRevenue - currentCosts;
+
+          // Add data point
+          data.push({
+            point: month === 0 ? "Start" : `Month ${month}`,
+            revenue: Math.round(currentRevenue * 100) / 100,
+            costs: Math.round(currentCosts * 100) / 100,
+            profit: Math.round(profit * 100) / 100,
+          });
         }
-
-        // Calculate profit
-        const profit = currentRevenue - currentCosts;
-
-        // Add data point
-        data.push({
-          point: month === 0 ? "Start" : `Month ${month}`,
-          revenue: Math.round(currentRevenue * 100) / 100,
-          costs: Math.round(currentCosts * 100) / 100,
-          profit: Math.round(profit * 100) / 100,
-        });
       }
-    }
 
-    return data;
+      return data;
+    } catch (error) {
+      console.error("Error calculating projections:", error);
+      return [];
+    }
   };
 
   const projectionData = calculateProjections();
+  
+  // If we couldn't calculate projections, show an error
+  if (!projectionData || projectionData.length === 0) {
+    return (
+      <div className="p-4 border border-red-200 rounded-md bg-red-50">
+        <p className="text-red-600">
+          Unable to generate projections. There might be an issue with the model data.
+        </p>
+      </div>
+    );
+  }
+  
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
+  
+  const finalDataPoint = projectionData[projectionData.length - 1];
 
   return (
     <div className="space-y-6">
@@ -229,7 +259,7 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
               stroke="#2196F3"
               strokeWidth={2}
             />
-            {isWeeklyEvent && (
+            {isWeeklyEvent && 'attendance' in finalDataPoint && (
               <Line
                 type="monotone"
                 dataKey="attendance"
@@ -247,7 +277,7 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
         <div className="border rounded-lg p-4 bg-green-50">
           <h4 className="text-sm font-medium text-green-700">Final Revenue</h4>
           <p className="text-2xl font-bold text-green-800">
-            ${projectionData[projectionData.length - 1].revenue.toLocaleString()}
+            ${finalDataPoint.revenue.toLocaleString()}
           </p>
           <p className="text-xs text-green-600">
             {projectionMonths} {timeUnit.toLowerCase()} projection
@@ -257,7 +287,7 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
         <div className="border rounded-lg p-4 bg-red-50">
           <h4 className="text-sm font-medium text-red-700">Final Costs</h4>
           <p className="text-2xl font-bold text-red-800">
-            ${projectionData[projectionData.length - 1].costs.toLocaleString()}
+            ${finalDataPoint.costs.toLocaleString()}
           </p>
           <p className="text-xs text-red-600">
             {projectionMonths} {timeUnit.toLowerCase()} projection
@@ -267,7 +297,7 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
         <div className="border rounded-lg p-4 bg-blue-50">
           <h4 className="text-sm font-medium text-blue-700">Final Profit</h4>
           <p className="text-2xl font-bold text-blue-800">
-            ${projectionData[projectionData.length - 1].profit.toLocaleString()}
+            ${finalDataPoint.profit.toLocaleString()}
           </p>
           <p className="text-xs text-blue-600">
             {projectionMonths} {timeUnit.toLowerCase()} projection
@@ -275,11 +305,11 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
         </div>
       </div>
 
-      {isWeeklyEvent && (
+      {isWeeklyEvent && 'attendance' in finalDataPoint && (
         <div className="border rounded-lg p-4 bg-purple-50">
           <h4 className="text-sm font-medium text-purple-700">Final Attendance</h4>
           <p className="text-2xl font-bold text-purple-800">
-            {projectionData[projectionData.length - 1].attendance?.toLocaleString() || "N/A"} customers
+            {finalDataPoint.attendance?.toLocaleString() || "N/A"} customers
           </p>
           <p className="text-xs text-purple-600">
             Projected weekly attendance after {projectionMonths} weeks

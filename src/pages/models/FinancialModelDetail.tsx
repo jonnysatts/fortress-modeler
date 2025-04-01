@@ -35,13 +35,38 @@ const FinancialModelDetail = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState<FinancialModel | null>(null);
-  const { currentProject } = useStore();
+  const { loadProjectById, currentProject, setCurrentProject } = useStore();
 
   useEffect(() => {
-    const loadModel = async () => {
-      if (!projectId || !modelId) return;
+    const loadData = async () => {
+      if (!projectId || !modelId) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Missing project or model ID",
+        });
+        navigate("/projects");
+        return;
+      }
 
+      setLoading(true);
       try {
+        // Load the project if it's not already loaded
+        if (!currentProject || currentProject.id !== parseInt(projectId)) {
+          const project = await loadProjectById(parseInt(projectId));
+          if (!project) {
+            toast({
+              variant: "destructive",
+              title: "Project not found",
+              description: "The requested project could not be found.",
+            });
+            navigate("/projects");
+            return;
+          }
+          setCurrentProject(project);
+        }
+
+        // Load the financial model
         const financialModel = await db.financialModels.get(parseInt(modelId));
         if (financialModel) {
           setModel(financialModel);
@@ -60,13 +85,14 @@ const FinancialModelDetail = () => {
           title: "Error loading model",
           description: "There was an error loading the financial model.",
         });
+        navigate(`/projects/${projectId}`);
       } finally {
         setLoading(false);
       }
     };
 
-    loadModel();
-  }, [projectId, modelId, navigate]);
+    loadData();
+  }, [projectId, modelId, navigate, currentProject, loadProjectById, setCurrentProject]);
 
   const handleDeleteModel = async () => {
     if (!modelId) return;
@@ -104,6 +130,45 @@ const FinancialModelDetail = () => {
       day: "numeric",
     });
   };
+
+  // Check if all required data is available in the model
+  const hasRequiredData = model && 
+    model.assumptions && 
+    model.assumptions.revenue && 
+    model.assumptions.costs && 
+    model.assumptions.growthModel;
+
+  if (!hasRequiredData) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(`/projects/${projectId}`)}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-3xl font-bold text-fortress-blue">{model?.name || "Model"}</h1>
+        </div>
+        <Card>
+          <CardContent className="py-6">
+            <div className="text-center py-10">
+              <p className="text-lg font-medium text-red-500">
+                This financial model data appears to be corrupted or incomplete.
+              </p>
+              <Button 
+                className="mt-4" 
+                onClick={() => navigate(`/projects/${projectId}`)}
+              >
+                Return to Project
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -198,6 +263,17 @@ const FinancialModelDetail = () => {
                   <h3 className="text-sm font-medium">Cost Categories</h3>
                   <p className="mt-1">{model.assumptions.costs.length} categories</p>
                 </div>
+
+                {model.assumptions.metadata?.type === "WeeklyEvent" && (
+                  <div>
+                    <h3 className="text-sm font-medium">Event Type</h3>
+                    <p className="mt-1">Weekly Event Series</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {model.assumptions.metadata.weeks} weeks, 
+                      {model.assumptions.metadata.initialWeeklyAttendance} initial attendees per week
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

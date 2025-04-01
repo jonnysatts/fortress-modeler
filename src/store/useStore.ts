@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import { Project, FinancialModel, db } from '@/lib/db';
 
@@ -48,10 +49,11 @@ const useStore = create<AppState>((set, get) => ({
       const project = await db.projects.get(id);
       if (project) {
         set({ currentProject: project, isLoading: false });
+        return project;
       } else {
         set({ error: 'Project not found', isLoading: false });
+        return null;
       }
-      return project || null;
     } catch (error) {
       console.error('Error loading project:', error);
       set({ error: 'Failed to load project', isLoading: false });
@@ -72,6 +74,7 @@ const useStore = create<AppState>((set, get) => ({
         updatedAt: new Date()
       });
       await get().loadProjects();
+      set({ isLoading: false });
       return id;
     } catch (error) {
       console.error('Error adding project:', error);
@@ -114,6 +117,7 @@ const useStore = create<AppState>((set, get) => ({
       }
       
       await get().loadProjects();
+      set({ isLoading: false });
     } catch (error) {
       console.error('Error deleting project:', error);
       set({ error: 'Failed to delete project', isLoading: false });
