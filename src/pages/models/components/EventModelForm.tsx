@@ -34,12 +34,12 @@ import { toast } from '@/hooks/use-toast';
 import { db } from '@/lib/db';
 
 // Types for event-specific model
-interface WeeklyRevenue {
-  ticketSales: number;
-  fbSales: number;
-  merchandiseSales: number;
-  onlineSales: number;
-  miscRevenue: number;
+interface PerCustomerRevenue {
+  ticketPrice: number;
+  fbSpend: number;
+  merchandiseSpend: number;
+  onlineSpend: number;
+  miscSpend: number;
 }
 
 interface WeeklyCosts {
@@ -52,25 +52,26 @@ interface WeeklyCosts {
 }
 
 interface GrowthSettings {
-  useBlanketed: boolean;
-  blanketedRate: number;
-  ticketGrowth: number;
-  fbGrowth: number;
-  merchandiseGrowth: number;
-  onlineGrowth: number;
-  miscGrowth: number;
+  attendanceGrowthRate: number;
+  useCustomerSpendGrowth: boolean;
+  ticketPriceGrowth: number;
+  fbSpendGrowth: number;
+  merchandiseSpendGrowth: number;
+  onlineSpendGrowth: number;
+  miscSpendGrowth: number;
 }
 
 // Schema for validation
 const formSchema = z.object({
   name: z.string().min(1, "Model name is required"),
   weeks: z.coerce.number().int().min(1, "Must have at least one week"),
-  revenue: z.object({
-    ticketSales: z.coerce.number().min(0),
-    fbSales: z.coerce.number().min(0),
-    merchandiseSales: z.coerce.number().min(0),
-    onlineSales: z.coerce.number().min(0),
-    miscRevenue: z.coerce.number().min(0),
+  initialWeeklyAttendance: z.coerce.number().int().min(1, "Must have at least one attendee"),
+  perCustomer: z.object({
+    ticketPrice: z.coerce.number().min(0),
+    fbSpend: z.coerce.number().min(0),
+    merchandiseSpend: z.coerce.number().min(0),
+    onlineSpend: z.coerce.number().min(0),
+    miscSpend: z.coerce.number().min(0),
   }),
   costs: z.object({
     setupCosts: z.coerce.number().min(0),
@@ -81,13 +82,13 @@ const formSchema = z.object({
     managementCosts: z.coerce.number().min(0),
   }),
   growth: z.object({
-    useBlanketed: z.boolean().default(true),
-    blanketedRate: z.coerce.number().default(0),
-    ticketGrowth: z.coerce.number().default(0),
-    fbGrowth: z.coerce.number().default(0),
-    merchandiseGrowth: z.coerce.number().default(0),
-    onlineGrowth: z.coerce.number().default(0),
-    miscGrowth: z.coerce.number().default(0),
+    attendanceGrowthRate: z.coerce.number().default(0),
+    useCustomerSpendGrowth: z.boolean().default(false),
+    ticketPriceGrowth: z.coerce.number().default(0),
+    fbSpendGrowth: z.coerce.number().default(0),
+    merchandiseSpendGrowth: z.coerce.number().default(0),
+    onlineSpendGrowth: z.coerce.number().default(0),
+    miscSpendGrowth: z.coerce.number().default(0),
   }),
 });
 
@@ -105,12 +106,13 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
     defaultValues: {
       name: "Weekly Event Model",
       weeks: 12,
-      revenue: {
-        ticketSales: 0,
-        fbSales: 0,
-        merchandiseSales: 0,
-        onlineSales: 0,
-        miscRevenue: 0,
+      initialWeeklyAttendance: 100,
+      perCustomer: {
+        ticketPrice: 0,
+        fbSpend: 0,
+        merchandiseSpend: 0,
+        onlineSpend: 0,
+        miscSpend: 0,
       },
       costs: {
         setupCosts: 0,
@@ -121,33 +123,56 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
         managementCosts: 0,
       },
       growth: {
-        useBlanketed: true,
-        blanketedRate: 0,
-        ticketGrowth: 0,
-        fbGrowth: 0,
-        merchandiseGrowth: 0,
-        onlineGrowth: 0,
-        miscGrowth: 0,
+        attendanceGrowthRate: 0,
+        useCustomerSpendGrowth: false,
+        ticketPriceGrowth: 0,
+        fbSpendGrowth: 0,
+        merchandiseSpendGrowth: 0,
+        onlineSpendGrowth: 0,
+        miscSpendGrowth: 0,
       },
     },
   });
 
-  const watchUseBlanketed = form.watch("growth.useBlanketed");
-  const watchFbSales = form.watch("revenue.fbSales");
+  const watchInitialAttendance = form.watch("initialWeeklyAttendance");
+  const watchPerCustomer = form.watch("perCustomer");
   const watchFbCOGSPercent = form.watch("costs.fbCOGSPercent");
+  const watchUseCustomerSpendGrowth = form.watch("growth.useCustomerSpendGrowth");
 
+  // Calculate total weekly revenue based on attendance and per-customer spending
+  const calculateWeeklyRevenue = () => {
+    return {
+      ticketSales: watchInitialAttendance * watchPerCustomer.ticketPrice,
+      fbSales: watchInitialAttendance * watchPerCustomer.fbSpend,
+      merchandiseSales: watchInitialAttendance * watchPerCustomer.merchandiseSpend,
+      onlineSales: watchInitialAttendance * watchPerCustomer.onlineSpend,
+      miscRevenue: watchInitialAttendance * watchPerCustomer.miscSpend,
+    };
+  };
+
+  const weeklyRevenue = calculateWeeklyRevenue();
+  
   // Calculate F&B COGS automatically based on F&B sales and percentage
-  const fbCOGS = (watchFbSales * watchFbCOGSPercent) / 100;
+  const fbCOGS = (weeklyRevenue.fbSales * watchFbCOGSPercent) / 100;
 
   const onSubmit = async (data: FormValues) => {
     try {
+      // Calculate initial weekly revenue based on attendance and per-customer spend
+      const weeklyRevenue = {
+        ticketSales: data.initialWeeklyAttendance * data.perCustomer.ticketPrice,
+        fbSales: data.initialWeeklyAttendance * data.perCustomer.fbSpend, 
+        merchandiseSales: data.initialWeeklyAttendance * data.perCustomer.merchandiseSpend,
+        onlineSales: data.initialWeeklyAttendance * data.perCustomer.onlineSpend,
+        miscRevenue: data.initialWeeklyAttendance * data.perCustomer.miscSpend,
+      };
+
       // Transform the event-specific data to fit the general model structure
       const revenueAssumptions = [
-        { name: "Ticket Sales", value: data.revenue.ticketSales, type: "recurring" as const, frequency: "weekly" as const },
-        { name: "F&B Sales", value: data.revenue.fbSales, type: "recurring" as const, frequency: "weekly" as const },
-        { name: "Merchandise Sales", value: data.revenue.merchandiseSales, type: "recurring" as const, frequency: "weekly" as const },
-        { name: "Online Sales", value: data.revenue.onlineSales, type: "recurring" as const, frequency: "weekly" as const },
-        { name: "Miscellaneous Revenue", value: data.revenue.miscRevenue, type: "recurring" as const, frequency: "weekly" as const },
+        { name: "Ticket Sales", value: weeklyRevenue.ticketSales, type: "recurring" as const, frequency: "weekly" as const },
+        { name: "F&B Sales", value: weeklyRevenue.fbSales, type: "recurring" as const, frequency: "weekly" as const },
+        { name: "Merchandise Sales", value: weeklyRevenue.merchandiseSales, type: "recurring" as const, frequency: "weekly" as const },
+        { name: "Online Sales", value: weeklyRevenue.onlineSales, type: "recurring" as const, frequency: "weekly" as const },
+        { name: "Miscellaneous Revenue", value: weeklyRevenue.miscRevenue, type: "recurring" as const, frequency: "weekly" as const },
       ];
 
       const costAssumptions = [
@@ -160,13 +185,13 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
       // Create growth model
       const growthModel = {
         type: "linear" as const,
-        rate: data.growth.useBlanketed ? data.growth.blanketedRate / 100 : 0,
-        individualRates: !data.growth.useBlanketed ? {
-          ticketSales: data.growth.ticketGrowth / 100,
-          fbSales: data.growth.fbGrowth / 100,
-          merchandiseSales: data.growth.merchandiseGrowth / 100,
-          onlineSales: data.growth.onlineGrowth / 100,
-          miscRevenue: data.growth.miscGrowth / 100,
+        rate: data.growth.attendanceGrowthRate / 100,
+        individualRates: data.growth.useCustomerSpendGrowth ? {
+          ticketPrice: data.growth.ticketPriceGrowth / 100,
+          fbSpend: data.growth.fbSpendGrowth / 100,
+          merchandiseSpend: data.growth.merchandiseSpendGrowth / 100,
+          onlineSpend: data.growth.onlineSpendGrowth / 100,
+          miscSpend: data.growth.miscSpendGrowth / 100,
         } : undefined,
       };
 
@@ -174,7 +199,8 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
       const eventMetadata = {
         type: "WeeklyEvent",
         weeks: data.weeks,
-        revenue: data.revenue,
+        initialWeeklyAttendance: data.initialWeeklyAttendance,
+        perCustomer: data.perCustomer,
         costs: data.costs,
         growth: data.growth,
       };
@@ -232,7 +258,7 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
               <CardTitle>Model Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <FormField
                   control={form.control}
                   name="name"
@@ -263,13 +289,30 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="initialWeeklyAttendance"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Initial Weekly Attendance</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={1} {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Expected weekly customer count
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             </CardContent>
           </Card>
 
           <Tabs defaultValue="revenue" className="w-full">
             <TabsList className="grid grid-cols-3 mb-4">
-              <TabsTrigger value="revenue">Revenue Categories</TabsTrigger>
+              <TabsTrigger value="revenue">Customer Revenue</TabsTrigger>
               <TabsTrigger value="costs">Cost Categories</TabsTrigger>
               <TabsTrigger value="growth">Growth Settings</TabsTrigger>
             </TabsList>
@@ -277,20 +320,23 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
             <TabsContent value="revenue" className="space-y-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>Weekly Revenue Sources</CardTitle>
+                  <CardTitle>Per-Customer Revenue Sources</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <FormField
                         control={form.control}
-                        name="revenue.ticketSales"
+                        name="perCustomer.ticketPrice"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Ticket Sales (per week)</FormLabel>
+                            <FormLabel>Ticket Price (per customer)</FormLabel>
                             <FormControl>
                               <Input type="number" min={0} step={0.01} {...field} />
                             </FormControl>
+                            <FormDescription>
+                              Projected weekly revenue: ${(watchInitialAttendance * field.value).toFixed(2)}
+                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -298,13 +344,16 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
 
                       <FormField
                         control={form.control}
-                        name="revenue.fbSales"
+                        name="perCustomer.fbSpend"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>F&B Sales (per week)</FormLabel>
+                            <FormLabel>F&B Spend (per customer)</FormLabel>
                             <FormControl>
                               <Input type="number" min={0} step={0.01} {...field} />
                             </FormControl>
+                            <FormDescription>
+                              Projected weekly revenue: ${(watchInitialAttendance * field.value).toFixed(2)}
+                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -314,13 +363,16 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <FormField
                         control={form.control}
-                        name="revenue.merchandiseSales"
+                        name="perCustomer.merchandiseSpend"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Merchandise Sales (per week)</FormLabel>
+                            <FormLabel>Merchandise Spend (per customer)</FormLabel>
                             <FormControl>
                               <Input type="number" min={0} step={0.01} {...field} />
                             </FormControl>
+                            <FormDescription>
+                              Projected weekly revenue: ${(watchInitialAttendance * field.value).toFixed(2)}
+                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -328,13 +380,16 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
 
                       <FormField
                         control={form.control}
-                        name="revenue.onlineSales"
+                        name="perCustomer.onlineSpend"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Online Sales (per week)</FormLabel>
+                            <FormLabel>Online Spend (per customer)</FormLabel>
                             <FormControl>
                               <Input type="number" min={0} step={0.01} {...field} />
                             </FormControl>
+                            <FormDescription>
+                              Projected weekly revenue: ${(watchInitialAttendance * field.value).toFixed(2)}
+                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -342,18 +397,61 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
 
                       <FormField
                         control={form.control}
-                        name="revenue.miscRevenue"
+                        name="perCustomer.miscSpend"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Miscellaneous Revenue (per week)</FormLabel>
+                            <FormLabel>Miscellaneous Spend (per customer)</FormLabel>
                             <FormControl>
                               <Input type="number" min={0} step={0.01} {...field} />
                             </FormControl>
+                            <FormDescription>
+                              Projected weekly revenue: ${(watchInitialAttendance * field.value).toFixed(2)}
+                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
+
+                    <Card className="bg-muted/50 border-dashed">
+                      <CardContent className="pt-6">
+                        <h3 className="text-lg font-medium mb-2">Weekly Revenue Summary</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Tickets</p>
+                            <p className="text-lg font-medium">${weeklyRevenue.ticketSales.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">F&B</p>
+                            <p className="text-lg font-medium">${weeklyRevenue.fbSales.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Merchandise</p>
+                            <p className="text-lg font-medium">${weeklyRevenue.merchandiseSales.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Online</p>
+                            <p className="text-lg font-medium">${weeklyRevenue.onlineSales.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Misc</p>
+                            <p className="text-lg font-medium">${weeklyRevenue.miscRevenue.toFixed(2)}</p>
+                          </div>
+                          <div className="md:col-span-2 lg:col-span-5 pt-2 border-t">
+                            <p className="text-sm text-muted-foreground">Total Weekly Revenue</p>
+                            <p className="text-xl font-bold">
+                              ${(
+                                weeklyRevenue.ticketSales +
+                                weeklyRevenue.fbSales +
+                                weeklyRevenue.merchandiseSales +
+                                weeklyRevenue.onlineSales +
+                                weeklyRevenue.miscRevenue
+                              ).toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
                 </CardContent>
               </Card>
@@ -487,7 +585,24 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
                   <div className="space-y-6">
                     <FormField
                       control={form.control}
-                      name="growth.useBlanketed"
+                      name="growth.attendanceGrowthRate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Weekly Attendance Growth Rate (%)</FormLabel>
+                          <FormControl>
+                            <Input type="number" step={0.1} {...field} />
+                          </FormControl>
+                          <FormDescription>
+                            Applied to weekly attendance (e.g., 5 = 5% weekly attendance growth)
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="growth.useCustomerSpendGrowth"
                       render={({ field }) => (
                         <FormItem className="flex flex-row items-center space-x-2 space-y-0">
                           <FormControl>
@@ -496,39 +611,22 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
                               onCheckedChange={field.onChange}
                             />
                           </FormControl>
-                          <FormLabel>Use blanket growth rate for all revenue</FormLabel>
+                          <FormLabel>Enable per-customer spend growth rates</FormLabel>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
 
-                    {watchUseBlanketed ? (
-                      <FormField
-                        control={form.control}
-                        name="growth.blanketedRate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Weekly Growth Rate (%)</FormLabel>
-                            <FormControl>
-                              <Input type="number" step={0.1} {...field} />
-                            </FormControl>
-                            <FormDescription>
-                              Applied to all revenue streams (e.g., 5 = 5% weekly growth)
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    ) : (
-                      <div className="space-y-4">
-                        <h4 className="text-sm font-medium">Individual Growth Rates (%)</h4>
+                    {watchUseCustomerSpendGrowth && (
+                      <div className="space-y-4 pl-6 border-l-2 border-muted">
+                        <h4 className="text-sm font-medium">Customer Spend Growth Rates (%)</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <FormField
                             control={form.control}
-                            name="growth.ticketGrowth"
+                            name="growth.ticketPriceGrowth"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Ticket Sales Growth</FormLabel>
+                                <FormLabel>Ticket Price Growth</FormLabel>
                                 <FormControl>
                                   <Input type="number" step={0.1} {...field} />
                                 </FormControl>
@@ -539,10 +637,10 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
 
                           <FormField
                             control={form.control}
-                            name="growth.fbGrowth"
+                            name="growth.fbSpendGrowth"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>F&B Sales Growth</FormLabel>
+                                <FormLabel>F&B Spend Growth</FormLabel>
                                 <FormControl>
                                   <Input type="number" step={0.1} {...field} />
                                 </FormControl>
@@ -555,10 +653,10 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                           <FormField
                             control={form.control}
-                            name="growth.merchandiseGrowth"
+                            name="growth.merchandiseSpendGrowth"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Merchandise Growth</FormLabel>
+                                <FormLabel>Merchandise Spend Growth</FormLabel>
                                 <FormControl>
                                   <Input type="number" step={0.1} {...field} />
                                 </FormControl>
@@ -569,10 +667,10 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
 
                           <FormField
                             control={form.control}
-                            name="growth.onlineGrowth"
+                            name="growth.onlineSpendGrowth"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Online Sales Growth</FormLabel>
+                                <FormLabel>Online Spend Growth</FormLabel>
                                 <FormControl>
                                   <Input type="number" step={0.1} {...field} />
                                 </FormControl>
@@ -583,10 +681,10 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
 
                           <FormField
                             control={form.control}
-                            name="growth.miscGrowth"
+                            name="growth.miscSpendGrowth"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Misc. Revenue Growth</FormLabel>
+                                <FormLabel>Misc. Spend Growth</FormLabel>
                                 <FormControl>
                                   <Input type="number" step={0.1} {...field} />
                                 </FormControl>

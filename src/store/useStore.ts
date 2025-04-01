@@ -18,6 +18,7 @@ interface AppState {
   
   // Financial model methods
   loadModelsForProject: (projectId: number) => Promise<FinancialModel[]>;
+  loadModelById: (id: number) => Promise<FinancialModel | null>;
   addFinancialModel: (model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>) => Promise<number>;
   updateFinancialModel: (id: number, updates: Partial<FinancialModel>) => Promise<void>;
   deleteFinancialModel: (id: number) => Promise<void>;
@@ -119,7 +120,23 @@ const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  // Financial model methods
+  loadModelById: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      const model = await db.financialModels.get(id);
+      if (model) {
+        set({ currentModel: model, isLoading: false });
+      } else {
+        set({ error: 'Model not found', isLoading: false });
+      }
+      return model || null;
+    } catch (error) {
+      console.error('Error loading financial model:', error);
+      set({ error: 'Failed to load financial model', isLoading: false });
+      return null;
+    }
+  },
+
   loadModelsForProject: async (projectId) => {
     set({ isLoading: true, error: null });
     try {
