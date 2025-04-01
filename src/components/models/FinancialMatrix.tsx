@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { FinancialModel } from "@/lib/db";
 
@@ -22,7 +21,6 @@ const FinancialMatrix = ({
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
   
-  // Check if data is valid and not empty
   if (!trendData || trendData.length === 0) {
     return (
       <div className="p-4 border border-gray-200 rounded-md bg-gray-50">
@@ -36,14 +34,11 @@ const FinancialMatrix = ({
   console.log("FinancialMatrix received data:", trendData[0]);
   console.log("Should spread setup costs:", shouldSpreadSetupCosts);
   
-  // Helper function to find a setup cost in the model
   const findSetupCost = () => {
     return model.assumptions.costs.find(cost => cost.name === "Setup Costs");
   };
 
-  // Combined data view - both revenue and cost data in one table
   if (combinedView) {
-    // Validate that we have the required properties
     const hasRequiredData = trendData.every(period => 
       typeof period.revenue !== 'undefined' || 
       typeof period.costs !== 'undefined'
@@ -59,7 +54,6 @@ const FinancialMatrix = ({
       );
     }
 
-    // Find setup cost for processing
     const setupCost = findSetupCost();
     const setupCostValue = setupCost ? setupCost.value : 0;
     const weeks = model.assumptions.metadata?.weeks || 12;
@@ -72,7 +66,6 @@ const FinancialMatrix = ({
             <tr className="border-b">
               <th className="text-left py-2 px-3">{timeUnit}</th>
               
-              {/* Revenue columns */}
               {model.assumptions.revenue.map((stream, idx) => (
                 <th key={`rev-${idx}`} className="text-right py-2 px-3 text-green-700">
                   {stream.name}
@@ -85,7 +78,6 @@ const FinancialMatrix = ({
                 Cum. Revenue
               </th>
               
-              {/* Cost columns */}
               {model.assumptions.costs.map((cost, idx) => (
                 <th key={`cost-${idx}`} className="text-right py-2 px-3 text-red-700">
                   {cost.name}
@@ -98,7 +90,6 @@ const FinancialMatrix = ({
                 Cum. Costs
               </th>
               
-              {/* Profit/Loss column */}
               <th className="text-right py-2 px-3 font-bold bg-gray-50">
                 Profit/Loss
               </th>
@@ -109,7 +100,6 @@ const FinancialMatrix = ({
           </thead>
           <tbody>
             {trendData.map((period, idx) => {
-              // Calculate per-period profit/loss with fallbacks for missing data
               const periodRevenue = period.revenue || 0;
               const periodCosts = period.costs || 0;
               const cumulativeRevenue = period.cumulativeRevenue || 0;
@@ -118,15 +108,12 @@ const FinancialMatrix = ({
               const periodProfit = periodRevenue - periodCosts;
               const cumulativeProfit = cumulativeRevenue - cumulativeCosts;
 
-              // Handle setup costs display based on shouldSpreadSetupCosts flag
               const setupCostDisplay = (() => {
                 if (!setupCost) return 0;
                 
                 if (shouldSpreadSetupCosts) {
-                  // If spreading costs, divide by total weeks
                   return setupCostValue / weeks;
                 } else {
-                  // If not spreading, only show in first period
                   return idx === 0 ? setupCostValue : 0;
                 }
               })();
@@ -135,7 +122,6 @@ const FinancialMatrix = ({
                 <tr key={idx} className={idx % 2 === 0 ? "bg-gray-50" : ""}>
                   <td className="py-2 px-3">{period.point || `Period ${idx+1}`}</td>
                   
-                  {/* Revenue columns */}
                   {model.assumptions.revenue.map((stream, streamIdx) => {
                     const safeName = stream.name.replace(/[^a-zA-Z0-9]/g, "");
                     return (
@@ -151,11 +137,9 @@ const FinancialMatrix = ({
                     ${Math.ceil(cumulativeRevenue).toLocaleString()}
                   </td>
                   
-                  {/* Cost columns */}
                   {model.assumptions.costs.map((cost, costIdx) => {
                     const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
                     
-                    // Special handling for setup costs
                     let displayValue = period[safeName] || 0;
                     if (cost.name === "Setup Costs") {
                       displayValue = setupCostDisplay;
@@ -174,7 +158,6 @@ const FinancialMatrix = ({
                     ${Math.ceil(cumulativeCosts).toLocaleString()}
                   </td>
                   
-                  {/* Profit/Loss column */}
                   <td className={`text-right py-2 px-3 font-medium ${periodProfit >= 0 ? 'text-black' : 'text-red-600'} bg-gray-50`}>
                     ${Math.ceil(Math.abs(periodProfit)).toLocaleString()}
                     {periodProfit < 0 && ' (Loss)'}
@@ -192,7 +175,6 @@ const FinancialMatrix = ({
     );
   }
   
-  // Single data view - either revenue or cost
   return (
     <div className="overflow-x-auto mt-4">
       <h4 className="text-sm font-medium mb-2">
@@ -211,7 +193,7 @@ const FinancialMatrix = ({
             <th className="text-right py-2 px-3 font-bold">
               Total {revenueData ? "Revenue" : "Costs"}
             </th>
-            <th className="text-right py-2 px-3 font-bold">
+            <th className="text-right py-2 px-3 font-bold text-red-700">
               Cumulative {revenueData ? "Revenue" : "Costs"}
             </th>
           </tr>
@@ -239,7 +221,7 @@ const FinancialMatrix = ({
               <td className="text-right py-2 px-3 font-bold">
                 ${Math.ceil(period.total || period.revenue || period.costs || 0).toLocaleString()}
               </td>
-              <td className="text-right py-2 px-3 font-bold text-green-700">
+              <td className="text-right py-2 px-3 font-bold text-red-700">
                 ${Math.ceil(period.cumulativeTotal || period.cumulativeRevenue || period.cumulativeCosts || 0).toLocaleString()}
               </td>
             </tr>
