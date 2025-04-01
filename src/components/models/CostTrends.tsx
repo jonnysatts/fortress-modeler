@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
@@ -48,25 +47,27 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           let totalCost = 0;
           
           costs.forEach(cost => {
-            let costValue = cost.value;
+            let costValue = 0; // Default to 0
             const costType = cost.type?.toLowerCase();
             
-            // Only apply growth to variable costs
-            if (week > 1) {
-              if (costType === "variable") {
-                // For variable costs like F&B COGS, use the revenue growth rate
+            // Handle different cost types
+            if (costType === "fixed") {
+              // Fixed costs (setup costs) are only applied in week 1 or spread across all weeks
+              if (metadata.costs?.spreadSetupCosts) {
+                costValue = cost.value / weeks; // Spread evenly
+              } else if (week === 1) {
+                costValue = cost.value; // Apply only in first week
+              }
+            } else if (costType === "variable") {
+              // Variable costs like F&B COGS grow with revenue
+              costValue = cost.value;
+              if (week > 1) {
                 const fbGrowthRate = metadata.growth?.fbSpendGrowth / 100 || model.assumptions.growthModel.rate;
                 costValue *= Math.pow(1 + fbGrowthRate, week - 1);
               }
-            }
-            
-            // Handle setup costs
-            if (costType === "fixed") {
-              if (metadata.costs?.spreadSetupCosts) {
-                costValue = cost.value / weeks;
-              } else if (week > 1) {
-                costValue = 0; // Only apply fixed costs in the first period if not spreading
-              }
+            } else if (costType === "recurring") {
+              // Recurring costs remain constant each week
+              costValue = cost.value;
             }
             
             const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
@@ -89,18 +90,25 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           let totalCost = 0;
           
           costs.forEach(cost => {
-            let costValue = cost.value;
+            let costValue = 0; // Default to 0
             const costType = cost.type?.toLowerCase();
             
-            // Only apply growth to variable costs
-            if (month > 1) {
-              if (costType === "variable") {
+            // Handle different cost types for monthly model
+            if (costType === "fixed") {
+              // Fixed costs are only applied in month 1
+              if (month === 1) {
+                costValue = cost.value;
+              }
+            } else if (costType === "variable") {
+              // Variable costs grow with the model's growth rate
+              costValue = cost.value;
+              if (month > 1) {
                 const { rate } = model.assumptions.growthModel;
                 costValue *= Math.pow(1 + rate, month - 1);
               }
-              
-              // Fixed costs remain constant and no growth is applied
-              // Recurring costs also remain constant for non-event models
+            } else if (costType === "recurring") {
+              // Recurring costs remain constant each month
+              costValue = cost.value;
             }
             
             const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
