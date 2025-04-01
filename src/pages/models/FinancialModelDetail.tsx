@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, BarChart3, Edit, Trash2 } from "lucide-react";
+import { ArrowLeft, BarChart3, ChartLine, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -29,6 +29,9 @@ import { FinancialModel, db } from "@/lib/db";
 import useStore from "@/store/useStore";
 import { toast } from "@/hooks/use-toast";
 import ModelProjections from "@/components/models/ModelProjections";
+import RevenueTrends from "@/components/models/RevenueTrends"; 
+import CostTrends from "@/components/models/CostTrends";
+import CategoryBreakdown from "@/components/models/CategoryBreakdown";
 
 const FinancialModelDetail = () => {
   const { projectId, modelId } = useParams<{ projectId: string; modelId: string }>();
@@ -170,6 +173,8 @@ const FinancialModelDetail = () => {
     );
   }
 
+  const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -230,8 +235,8 @@ const FinancialModelDetail = () => {
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="revenue">Revenue</TabsTrigger>
-          <TabsTrigger value="costs">Costs</TabsTrigger>
+          <TabsTrigger value="trends">Trends</TabsTrigger>
+          <TabsTrigger value="breakdown">Breakdown</TabsTrigger>
           <TabsTrigger value="projections">Projections</TabsTrigger>
         </TabsList>
 
@@ -256,12 +261,32 @@ const FinancialModelDetail = () => {
 
                 <div>
                   <h3 className="text-sm font-medium">Revenue Streams</h3>
-                  <p className="mt-1">{model.assumptions.revenue.length} streams</p>
+                  <div className="mt-1">
+                    <p className="mb-1">{model.assumptions.revenue.length} streams</p>
+                    <div className="space-y-1">
+                      {model.assumptions.revenue.map((rev, idx) => (
+                        <div key={idx} className="text-sm flex justify-between">
+                          <span>{rev.name}</span>
+                          <span className="font-medium">${rev.value.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 <div>
                   <h3 className="text-sm font-medium">Cost Categories</h3>
-                  <p className="mt-1">{model.assumptions.costs.length} categories</p>
+                  <div className="mt-1">
+                    <p className="mb-1">{model.assumptions.costs.length} categories</p>
+                    <div className="space-y-1">
+                      {model.assumptions.costs.map((cost, idx) => (
+                        <div key={idx} className="text-sm flex justify-between">
+                          <span>{cost.name}</span>
+                          <span className="font-medium">${cost.value.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {model.assumptions.metadata?.type === "WeeklyEvent" && (
@@ -269,9 +294,14 @@ const FinancialModelDetail = () => {
                     <h3 className="text-sm font-medium">Event Type</h3>
                     <p className="mt-1">Weekly Event Series</p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {model.assumptions.metadata.weeks} weeks, 
+                      {model.assumptions.metadata.weeks} weeks, {" "}
                       {model.assumptions.metadata.initialWeeklyAttendance} initial attendees per week
                     </p>
+                    {model.assumptions.metadata.growth?.attendanceGrowthRate > 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        Attendance growth: {model.assumptions.metadata.growth.attendanceGrowthRate}% per week
+                      </p>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -282,10 +312,10 @@ const FinancialModelDetail = () => {
                 <CardTitle className="text-lg">Key Metrics</CardTitle>
                 <BarChart3 className="h-5 w-5 text-muted-foreground" />
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Total Revenue</p>
+                    <p className="text-sm text-muted-foreground">Initial Revenue</p>
                     <p className="text-2xl font-bold">
                       $
                       {model.assumptions.revenue
@@ -294,7 +324,7 @@ const FinancialModelDetail = () => {
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Total Costs</p>
+                    <p className="text-sm text-muted-foreground">Initial Costs</p>
                     <p className="text-2xl font-bold">
                       $
                       {model.assumptions.costs
@@ -303,67 +333,72 @@ const FinancialModelDetail = () => {
                     </p>
                   </div>
                 </div>
+
+                {isWeeklyEvent && (
+                  <div className="pt-2 border-t">
+                    <h3 className="text-sm font-medium mb-2">Estimated Totals (All Periods)</h3>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="p-2 bg-green-50 rounded">
+                        <p className="text-xs text-green-700">Total Revenue</p>
+                        <p className="text-lg font-bold text-green-800">
+                          ${calculateTotalRevenue(model).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="p-2 bg-red-50 rounded">
+                        <p className="text-xs text-red-700">Total Costs</p>
+                        <p className="text-lg font-bold text-red-800">
+                          ${calculateTotalCosts(model).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="p-2 bg-blue-50 rounded">
+                        <p className="text-xs text-blue-700">Total Profit</p>
+                        <p className="text-lg font-bold text-blue-800">
+                          ${(calculateTotalRevenue(model) - calculateTotalCosts(model)).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="revenue">
-          <Card>
-            <CardHeader>
-              <CardTitle>Revenue Assumptions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Value</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Frequency</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {model.assumptions.revenue.map((revenue, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{revenue.name}</TableCell>
-                      <TableCell>${revenue.value.toLocaleString()}</TableCell>
-                      <TableCell className="capitalize">{revenue.type}</TableCell>
-                      <TableCell className="capitalize">{revenue.frequency}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+        <TabsContent value="trends">
+          <div className="space-y-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <ChartLine className="mr-2 h-5 w-5" />
+                  Revenue Trends Over Time
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RevenueTrends model={model} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <ChartLine className="mr-2 h-5 w-5" />
+                  Cost Trends Over Time
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CostTrends model={model} />
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
-        <TabsContent value="costs">
+        <TabsContent value="breakdown">
           <Card>
             <CardHeader>
-              <CardTitle>Cost Assumptions</CardTitle>
+              <CardTitle>Category Breakdown</CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Value</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Category</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {model.assumptions.costs.map((cost, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{cost.name}</TableCell>
-                      <TableCell>${cost.value.toLocaleString()}</TableCell>
-                      <TableCell className="capitalize">{cost.type}</TableCell>
-                      <TableCell className="capitalize">{cost.category}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <CategoryBreakdown model={model} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -381,6 +416,49 @@ const FinancialModelDetail = () => {
       </Tabs>
     </div>
   );
+};
+
+// Helper functions for calculating estimated totals
+const calculateTotalRevenue = (model: FinancialModel): number => {
+  try {
+    if (model.assumptions.metadata?.type !== "WeeklyEvent") return 0;
+    
+    const metadata = model.assumptions.metadata;
+    const weeks = metadata.weeks || 12;
+    const initialRevenue = model.assumptions.revenue.reduce((sum, item) => sum + item.value, 0);
+    let totalRevenue = 0;
+    
+    for (let week = 0; week < weeks; week++) {
+      const growthFactor = Math.pow(1 + (model.assumptions.growthModel.rate || 0), week);
+      totalRevenue += initialRevenue * growthFactor;
+    }
+    
+    return Math.round(totalRevenue);
+  } catch (error) {
+    console.error("Error calculating total revenue:", error);
+    return 0;
+  }
+};
+
+const calculateTotalCosts = (model: FinancialModel): number => {
+  try {
+    if (model.assumptions.metadata?.type !== "WeeklyEvent") return 0;
+    
+    const metadata = model.assumptions.metadata;
+    const weeks = metadata.weeks || 12;
+    const initialCosts = model.assumptions.costs.reduce((sum, item) => sum + item.value, 0);
+    let totalCosts = 0;
+    
+    for (let week = 0; week < weeks; week++) {
+      const growthFactor = Math.pow(1 + ((model.assumptions.growthModel.rate || 0) * 0.7), week);
+      totalCosts += initialCosts * growthFactor;
+    }
+    
+    return Math.round(totalCosts);
+  } catch (error) {
+    console.error("Error calculating total costs:", error);
+    return 0;
+  }
 };
 
 export default FinancialModelDetail;
