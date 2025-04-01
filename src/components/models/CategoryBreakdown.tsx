@@ -20,17 +20,36 @@ interface CategoryBreakdownProps {
   model: FinancialModel;
 }
 
+// Define interfaces for our data objects
+interface RevenueData {
+  name: string;
+  value: number;
+  percentage?: number;
+}
+
+interface CostData {
+  name: string;
+  value: number;
+  type: 'fixed' | 'variable' | 'recurring';
+  percentage?: number;
+}
+
+interface TypeCategoryData {
+  name: string;
+  value: number;
+}
+
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8", "#82ca9d", "#ffc658", "#8dd1e1"];
 
 const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
   const [breakdownView, setBreakdownView] = useState<"revenue" | "costs">("revenue");
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   
-  const prepareRevenueData = () => {
+  const prepareRevenueData = (): RevenueData[] => {
     const revenueStreams = model.assumptions.revenue;
     let totalRevenue = 0;
     
-    const data = revenueStreams.map(stream => {
+    const data: RevenueData[] = revenueStreams.map(stream => {
       totalRevenue += stream.value;
       return {
         name: stream.name,
@@ -47,11 +66,11 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
     return data.sort((a, b) => b.value - a.value);
   };
   
-  const prepareCostData = () => {
+  const prepareCostData = (): CostData[] => {
     const costs = model.assumptions.costs;
     let totalCost = 0;
     
-    const data = costs.map(cost => {
+    const data: CostData[] = costs.map(cost => {
       totalCost += cost.value;
       return {
         name: cost.name,
@@ -69,9 +88,9 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
     return data.sort((a, b) => b.value - a.value);
   };
   
-  const prepareTypeCategorizedData = () => {
+  const prepareTypeCategorizedData = (): TypeCategoryData[] => {
     const costs = model.assumptions.costs;
-    const typeCategories = {
+    const typeCategories: Record<string, TypeCategoryData> = {
       fixed: { name: "Fixed Costs", value: 0 },
       variable: { name: "Variable Costs", value: 0 },
       recurring: { name: "Recurring Costs", value: 0 }
@@ -237,8 +256,10 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
                   radius={[0, 4, 4, 0]}
                 >
                   {breakdownData.map((entry, index) => {
-                    const color = breakdownView === "costs" && entry.type 
-                      ? getTypeColor(entry.type)
+                    // Type assertion to handle both revenue and cost data
+                    const costEntry = breakdownView === "costs" ? (entry as CostData) : null;
+                    const color = costEntry && costEntry.type
+                      ? getTypeColor(costEntry.type)
                       : COLORS[index % COLORS.length];
                     
                     return <Cell key={`cell-${index}`} fill={color} />;
@@ -342,7 +363,7 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
                 <tr key={idx} className={idx % 2 === 0 ? "bg-gray-50" : ""}>
                   <td className="py-2 px-3">{item.name}</td>
                   {breakdownView === "costs" && (
-                    <td className="py-2 px-3 capitalize">{item.type}</td>
+                    <td className="py-2 px-3 capitalize">{(item as CostData).type}</td>
                   )}
                   <td className="text-right py-2 px-3">${item.value.toLocaleString()}</td>
                   <td className="text-right py-2 px-3">{item.percentage}%</td>
