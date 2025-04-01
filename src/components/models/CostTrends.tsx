@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
@@ -39,6 +40,19 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           const point: any = { point: `Week ${week}` };
           let weeklyTotal = 0;
           
+          // Get week 1 attendance and current attendance
+          const initialAttendance = metadata.initialWeeklyAttendance;
+          let currentAttendance = initialAttendance;
+          
+          // Calculate attendance with growth if applicable
+          if (week > 1 && metadata.growth) {
+            const growthRate = metadata.growth.attendanceGrowthRate / 100;
+            currentAttendance = initialAttendance * Math.pow(1 + growthRate, week - 1);
+          }
+          
+          // Calculate F&B revenue to determine COGS correctly
+          const fbRevenue = currentAttendance * (metadata.perCustomer?.fbSpend || 0);
+          
           costs.forEach(cost => {
             const costType = cost.type?.toLowerCase();
             const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
@@ -51,10 +65,16 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
                 costValue = week === 1 ? cost.value : 0;
               }
             } else if (costType === "variable") {
-              costValue = cost.value;
-              if (week > 1) {
-                const growthRate = metadata.growth?.fbSpendGrowth / 100 || model.assumptions.growthModel.rate;
-                costValue *= Math.pow(1 + growthRate, week - 1);
+              // Special handling for F&B COGS - should be exactly the percentage of F&B revenue
+              if (cost.name === "F&B COGS") {
+                const cogsPct = metadata.costs?.fbCOGSPercent || 30;
+                costValue = (fbRevenue * cogsPct) / 100;
+              } else {
+                costValue = cost.value;
+                if (week > 1) {
+                  const growthRate = metadata.growth?.fbSpendGrowth / 100 || model.assumptions.growthModel.rate;
+                  costValue *= Math.pow(1 + growthRate, week - 1);
+                }
               }
             } else if (costType === "recurring") {
               costValue = cost.value;
@@ -76,8 +96,6 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           
           data.push(point);
         }
-        
-        console.log("Cost data calculated:", data.slice(0, 3));
       } else {
         const months = timePoints;
         

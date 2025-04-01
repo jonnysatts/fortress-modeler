@@ -47,6 +47,25 @@ const EditFinancialModel = () => {
         // Load the financial model
         const financialModel = await db.financialModels.get(parseInt(modelId));
         if (financialModel) {
+          // Ensure proper formatting of model metadata
+          if (financialModel.assumptions.metadata?.type === "WeeklyEvent") {
+            // Ensure costs object exists
+            if (!financialModel.assumptions.metadata.costs) {
+              financialModel.assumptions.metadata.costs = {
+                setupCosts: 0,
+                spreadSetupCosts: false,
+                fbCOGSPercent: 30,
+                staffCount: 0,
+                staffCostPerPerson: 0,
+                managementCosts: 0
+              };
+            }
+            
+            // Ensure spreadSetupCosts is a boolean
+            financialModel.assumptions.metadata.costs.spreadSetupCosts = 
+              !!financialModel.assumptions.metadata.costs.spreadSetupCosts;
+          }
+          
           setModel(financialModel);
         } else {
           toast({

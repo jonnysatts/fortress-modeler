@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
@@ -48,6 +47,7 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
         const metadata = model.assumptions.metadata;
         const weeks = metadata.weeks || 12;
         const timePoints = Math.min(weeks, projectionMonths) + 1; // +1 for starting point
+        const shouldSpreadSetupCosts = metadata.costs?.spreadSetupCosts === true;
         
         let totalCumulativeRevenue = 0;
         let totalCumulativeCosts = 0;
@@ -110,9 +110,9 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
           const staffCosts = (metadata.costs.staffCount || 0) * (metadata.costs.staffCostPerPerson || 0);
           
           let setupCostsForWeek = 0;
-          if (metadata.costs.spreadSetupCosts) {
-            setupCostsForWeek = (metadata.costs.setupCosts || 0) / weeks;
-          } else if (week === 0) {
+          if (shouldSpreadSetupCosts) {
+            setupCostsForWeek = week > 0 ? (metadata.costs.setupCosts || 0) / weeks : 0;
+          } else if (week === 1) { // Setup costs only apply on week 1 if not spread
             setupCostsForWeek = metadata.costs.setupCosts || 0;
           }
           
