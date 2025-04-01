@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
@@ -39,11 +40,20 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           recurring: "#82CA9D"
         };
         
-        // Identify fixed costs to handle them correctly
-        const fixedCosts = costs.filter(cost => cost.type?.toLowerCase() === "fixed");
+        // Check if setup costs should be amortized
         const setupCostsAmortized = metadata.costs?.spreadSetupCosts || false;
         
+        // Calculate one-time costs to be applied in first period or amortized
+        let oneTimeCosts = {};
         let cumulativeTotal = 0;
+        
+        // Pre-process fixed costs to track them separately
+        costs.forEach(cost => {
+          if (cost.type?.toLowerCase() === "fixed") {
+            const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
+            oneTimeCosts[safeName] = cost.value;
+          }
+        });
         
         // Generate data for each week
         for (let week = 1; week <= weeks; week++) {
@@ -51,20 +61,34 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           let totalCost = 0;
           
           costs.forEach(cost => {
-            let costValue = 0;
             const costType = cost.type?.toLowerCase();
+            const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
+            let costValue = 0;
             
             // Handle different cost types
             if (costType === "fixed") {
               if (setupCostsAmortized) {
                 // If amortized, divide by total weeks
-                costValue = cost.value / weeks;
+                costValue = week === 1 ? cost.value / weeks * weeks : 0; // Apply full amount in data for first week only
+                // For visualization purposes, we show the full amount in week 1 only
+                if (week === 1) {
+                  point[safeName] = Math.round(cost.value * 100) / 100;
+                } else {
+                  point[safeName] = 0; // Show as zero in subsequent weeks
+                }
+                // Still add the amortized amount to the total cost
+                totalCost += (week === 1 ? cost.value : 0);
+                continue; // Skip the normal flow for fixed costs
               } else if (week === 1) {
-                // Otherwise apply only in first week
+                // Apply only in first week
                 costValue = cost.value;
+                point[safeName] = Math.round(costValue * 100) / 100;
+                totalCost += costValue;
+                continue; // Skip the normal flow for fixed costs
               } else {
-                // No cost in subsequent weeks if not amortized
-                costValue = 0;
+                // No cost in subsequent weeks
+                point[safeName] = 0;
+                continue; // Skip the normal flow
               }
             } else if (costType === "variable") {
               // Variable costs like F&B COGS grow with revenue
@@ -78,7 +102,6 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
               costValue = cost.value;
             }
             
-            const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
             point[safeName] = Math.round(costValue * 100) / 100;
             totalCost += costValue;
           });
@@ -90,10 +113,6 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
         }
       } else {
         const months = timePoints;
-        
-        // Identify fixed costs to handle them correctly
-        const fixedCosts = costs.filter(cost => cost.type?.toLowerCase() === "fixed");
-        
         let cumulativeTotal = 0;
         
         // Generate data for each month
@@ -102,8 +121,9 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           let totalCost = 0;
           
           costs.forEach(cost => {
-            let costValue = 0;
             const costType = cost.type?.toLowerCase();
+            const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
+            let costValue = 0;
             
             // Handle different cost types for monthly model
             if (costType === "fixed") {
@@ -125,7 +145,6 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
               costValue = cost.value;
             }
             
-            const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
             point[safeName] = Math.round(costValue * 100) / 100;
             totalCost += costValue;
           });
