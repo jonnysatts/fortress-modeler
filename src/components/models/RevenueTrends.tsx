@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
   AreaChart,
@@ -22,8 +23,6 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
   const [timePoints, setTimePoints] = useState<number>(12);
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
-  
-  const [showCombinedView, setShowCombinedView] = useState<boolean>(false);
 
   const calculateRevenueTrends = () => {
     try {
@@ -114,9 +113,12 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
 
   const trendData = calculateRevenueTrends();
   
-  if (setCombinedData && trendData.length > 0) {
-    setCombinedData(trendData);
-  }
+  // Use useEffect to update combined data to prevent infinite render loops
+  useEffect(() => {
+    if (setCombinedData && trendData.length > 0) {
+      setCombinedData(trendData);
+    }
+  }, [trendData, timePoints, setCombinedData]);
   
   if (!trendData || trendData.length === 0) {
     return (
@@ -208,13 +210,8 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
         </ResponsiveContainer>
       </div>
 
-      {combinedData ? (
-        <FinancialMatrix 
-          model={model} 
-          trendData={combinedData} 
-          combinedView={true} 
-        />
-      ) : (
+      {/* Only render the FinancialMatrix when we're not in combined view */}
+      {!combinedData && (
         <FinancialMatrix 
           model={model} 
           trendData={trendData} 

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
@@ -50,18 +51,18 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
             let costValue = cost.value;
             
             // Apply growth to recurring costs
-            if (week > 1 && cost.type.toLowerCase() === "recurring") {
+            if (week > 1 && cost.type?.toLowerCase() === "recurring") {
               costValue *= Math.pow(1 + (model.assumptions.growthModel.rate * 0.7), week - 1);
             }
             
             // Apply growth to variable costs based on attendance
-            if (week > 1 && cost.type.toLowerCase() === "variable") {
+            if (week > 1 && cost.type?.toLowerCase() === "variable") {
               const attendanceGrowth = metadata.growth?.attendanceGrowthRate / 100 || model.assumptions.growthModel.rate;
               costValue *= Math.pow(1 + attendanceGrowth, week - 1);
             }
             
             // Handle setup costs
-            if (cost.type.toLowerCase() === "fixed") {
+            if (cost.type?.toLowerCase() === "fixed") {
               if (metadata.costs?.spreadSetupCosts) {
                 costValue = cost.value / weeks;
               } else if (week > 1) {
@@ -74,9 +75,9 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
             totalCost += costValue;
           });
           
-          point.costs = Math.round(totalCost * 100) / 100; // Changed from 'total' to 'costs'
+          point.costs = Math.round(totalCost * 100) / 100;
           cumulativeTotal += totalCost;
-          point.cumulativeCosts = Math.round(cumulativeTotal * 100) / 100; // Changed from 'cumulativeTotal' to 'cumulativeCosts'
+          point.cumulativeCosts = Math.round(cumulativeTotal * 100) / 100;
           data.push(point);
         }
       } else {
@@ -94,10 +95,10 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
             // Apply growth to costs based on type
             if (month > 1) {
               const { rate } = model.assumptions.growthModel;
-              const growthFactor = cost.type.toLowerCase() === "fixed" ? 0 : 
-                                  cost.type.toLowerCase() === "variable" ? rate : rate * 0.7;
+              const growthFactor = cost.type?.toLowerCase() === "fixed" ? 0 : 
+                                  cost.type?.toLowerCase() === "variable" ? rate : rate * 0.7;
               
-              if (cost.type.toLowerCase() !== "fixed") {
+              if (cost.type?.toLowerCase() !== "fixed") {
                 costValue *= Math.pow(1 + growthFactor, month - 1);
               }
             }
@@ -123,11 +124,12 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
 
   const trendData = calculateCostTrends();
   
+  // Use useEffect to update combined data to prevent infinite render loops
   useEffect(() => {
     if (onUpdateCostData && trendData.length > 0) {
       onUpdateCostData(trendData);
     }
-  }, [trendData, onUpdateCostData]);
+  }, [trendData, timePoints, onUpdateCostData]);
   
   if (!trendData || trendData.length === 0) {
     return (
@@ -211,13 +213,8 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
         </ResponsiveContainer>
       </div>
 
-      {combinedData ? (
-        <FinancialMatrix 
-          model={model} 
-          trendData={combinedData} 
-          combinedView={true} 
-        />
-      ) : (
+      {/* Only render the FinancialMatrix when we're not in combined view */}
+      {!combinedData && (
         <FinancialMatrix 
           model={model} 
           trendData={trendData} 

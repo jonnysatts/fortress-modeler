@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, BarChart3, ChartLine, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,33 +35,52 @@ const FinancialModelDetail = () => {
   const [combinedFinancialData, setCombinedFinancialData] = useState<any[]>([]);
   const [revenueData, setRevenueData] = useState<any[]>([]);
   const [costData, setCostData] = useState<any[]>([]);
+  const [isFinancialDataReady, setIsFinancialDataReady] = useState<boolean>(false);
 
-  const combineFinancialData = () => {
-    if (revenueData.length === 0 || costData.length === 0) return;
+  const combineFinancialData = useCallback(() => {
+    if (revenueData.length === 0 || costData.length === 0) {
+      return;
+    }
     
-    const periodMap = new Map();
-    
-    revenueData.forEach(revPeriod => {
-      const periodKey = revPeriod.point;
-      periodMap.set(periodKey, {
-        point: periodKey,
-        ...revPeriod
-      });
-    });
-    
-    costData.forEach(costPeriod => {
-      const periodKey = costPeriod.point;
-      const existingPeriod = periodMap.get(periodKey) || {};
+    try {
+      const periodMap = new Map();
       
-      periodMap.set(periodKey, {
-        ...existingPeriod,
-        ...costPeriod
+      revenueData.forEach(revPeriod => {
+        const periodKey = revPeriod.point;
+        periodMap.set(periodKey, {
+          point: periodKey,
+          ...revPeriod
+        });
       });
-    });
-    
-    const combined = Array.from(periodMap.values());
-    setCombinedFinancialData(combined);
-  };
+      
+      costData.forEach(costPeriod => {
+        const periodKey = costPeriod.point;
+        const existingPeriod = periodMap.get(periodKey) || {};
+        
+        periodMap.set(periodKey, {
+          ...existingPeriod,
+          ...costPeriod
+        });
+      });
+      
+      const combined = Array.from(periodMap.values());
+      combined.sort((a, b) => {
+        const aNum = parseInt(a.point.replace(/[^0-9]/g, '')) || 0;
+        const bNum = parseInt(b.point.replace(/[^0-9]/g, '')) || 0;
+        return aNum - bNum;
+      });
+      
+      setCombinedFinancialData(combined);
+      setIsFinancialDataReady(true);
+    } catch (error) {
+      console.error("Error combining financial data:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "There was a problem combining financial data.",
+      });
+    }
+  }, [revenueData, costData]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -117,6 +136,12 @@ const FinancialModelDetail = () => {
 
     loadData();
   }, [projectId, modelId, navigate, currentProject, loadProjectById, setCurrentProject]);
+
+  useEffect(() => {
+    if (revenueData.length > 0 && costData.length > 0) {
+      combineFinancialData();
+    }
+  }, [revenueData, costData, combineFinancialData]);
 
   const handleDeleteModel = async () => {
     if (!modelId) return;
@@ -393,7 +418,7 @@ const FinancialModelDetail = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {combinedFinancialData.length > 0 ? (
+              {isFinancialDataReady ? (
                 <FinancialMatrix 
                   model={model} 
                   trendData={combinedFinancialData} 
@@ -401,9 +426,15 @@ const FinancialModelDetail = () => {
                 />
               ) : (
                 <div className="flex justify-center items-center py-10">
-                  <p className="text-muted-foreground">
-                    Loading financial data...
-                  </p>
+                  <div className="flex flex-col items-center">
+                    <div className="h-8 w-8 border-4 border-fortress-emerald border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <p className="text-muted-foreground">
+                      Loading financial data...
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      (Please view the Trends tab first if this takes too long)
+                    </p>
+                  </div>
                 </div>
               )}
             </CardContent>

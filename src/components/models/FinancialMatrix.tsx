@@ -20,8 +20,35 @@ const FinancialMatrix = ({
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
   
+  // Check if data is valid and not empty
+  if (!trendData || trendData.length === 0) {
+    return (
+      <div className="p-4 border border-gray-200 rounded-md bg-gray-50">
+        <p className="text-gray-600">
+          No data available to display. Please wait while data is being loaded...
+        </p>
+      </div>
+    );
+  }
+  
   // Combined data view - both revenue and cost data in one table
   if (combinedView) {
+    // Validate that we have the required properties
+    const hasRequiredData = trendData.every(period => 
+      typeof period.revenue !== 'undefined' && 
+      typeof period.costs !== 'undefined'
+    );
+
+    if (!hasRequiredData) {
+      return (
+        <div className="p-4 border border-yellow-200 rounded-md bg-yellow-50">
+          <p className="text-yellow-600">
+            Incomplete financial data. Please ensure both revenue and cost data are available.
+          </p>
+        </div>
+      );
+    }
+    
     return (
       <div className="overflow-x-auto mt-4">
         <h4 className="text-sm font-medium mb-2">Period-by-Period Financial Matrix</h4>
@@ -67,28 +94,33 @@ const FinancialMatrix = ({
           </thead>
           <tbody>
             {trendData.map((period, idx) => {
-              // Calculate per-period profit/loss
-              const periodProfit = period.revenue - period.costs;
-              const cumulativeProfit = period.cumulativeRevenue - period.cumulativeCosts;
+              // Calculate per-period profit/loss with fallbacks for missing data
+              const periodRevenue = period.revenue || 0;
+              const periodCosts = period.costs || 0;
+              const cumulativeRevenue = period.cumulativeRevenue || 0;
+              const cumulativeCosts = period.cumulativeCosts || 0;
+              
+              const periodProfit = periodRevenue - periodCosts;
+              const cumulativeProfit = cumulativeRevenue - cumulativeCosts;
               
               return (
                 <tr key={idx} className={idx % 2 === 0 ? "bg-gray-50" : ""}>
-                  <td className="py-2 px-3">{period.point}</td>
+                  <td className="py-2 px-3">{period.point || `Period ${idx+1}`}</td>
                   
                   {/* Revenue columns */}
                   {model.assumptions.revenue.map((stream, streamIdx) => {
                     const safeName = stream.name.replace(/[^a-zA-Z0-9]/g, "");
                     return (
                       <td key={streamIdx} className="text-right py-2 px-3 text-green-600">
-                        ${period[safeName]?.toLocaleString() || "0"}
+                        ${(period[safeName] || 0).toLocaleString()}
                       </td>
                     );
                   })}
                   <td className="text-right py-2 px-3 font-medium text-green-700 border-r">
-                    ${period.revenue.toLocaleString()}
+                    ${periodRevenue.toLocaleString()}
                   </td>
                   <td className="text-right py-2 px-3 font-medium text-green-800">
-                    ${period.cumulativeRevenue.toLocaleString()}
+                    ${cumulativeRevenue.toLocaleString()}
                   </td>
                   
                   {/* Cost columns */}
@@ -96,15 +128,15 @@ const FinancialMatrix = ({
                     const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
                     return (
                       <td key={costIdx} className="text-right py-2 px-3 text-red-600">
-                        ${period[safeName]?.toLocaleString() || "0"}
+                        ${(period[safeName] || 0).toLocaleString()}
                       </td>
                     );
                   })}
                   <td className="text-right py-2 px-3 font-medium text-red-700 border-r">
-                    ${period.costs.toLocaleString()}
+                    ${periodCosts.toLocaleString()}
                   </td>
                   <td className="text-right py-2 px-3 font-medium text-red-800">
-                    ${period.cumulativeCosts.toLocaleString()}
+                    ${cumulativeCosts.toLocaleString()}
                   </td>
                   
                   {/* Profit/Loss column */}
@@ -152,12 +184,12 @@ const FinancialMatrix = ({
         <tbody>
           {trendData.map((period, idx) => (
             <tr key={idx} className={idx % 2 === 0 ? "bg-gray-50" : ""}>
-              <td className="py-2 px-3">{period.point}</td>
+              <td className="py-2 px-3">{period.point || `Period ${idx+1}`}</td>
               {revenueData && model.assumptions.revenue.map((stream, streamIdx) => {
                 const safeName = stream.name.replace(/[^a-zA-Z0-9]/g, "");
                 return (
                   <td key={streamIdx} className="text-right py-2 px-3">
-                    ${period[safeName]?.toLocaleString() || "0"}
+                    ${(period[safeName] || 0).toLocaleString()}
                   </td>
                 );
               })}
@@ -165,15 +197,15 @@ const FinancialMatrix = ({
                 const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
                 return (
                   <td key={costIdx} className="text-right py-2 px-3">
-                    ${period[safeName]?.toLocaleString() || "0"}
+                    ${(period[safeName] || 0).toLocaleString()}
                   </td>
                 );
               })}
               <td className="text-right py-2 px-3 font-bold">
-                ${period.total?.toLocaleString() || (revenueData ? period.revenue?.toLocaleString() : period.costs?.toLocaleString())}
+                ${(period.total || period.revenue || period.costs || 0).toLocaleString()}
               </td>
               <td className="text-right py-2 px-3 font-bold text-green-700">
-                ${period.cumulativeTotal?.toLocaleString() || (revenueData ? period.cumulativeRevenue?.toLocaleString() : period.cumulativeCosts?.toLocaleString())}
+                ${(period.cumulativeTotal || period.cumulativeRevenue || period.cumulativeCosts || 0).toLocaleString()}
               </td>
             </tr>
           ))}
