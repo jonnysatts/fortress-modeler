@@ -19,7 +19,6 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
   const [projectionMonths, setProjectionMonths] = useState<number>(12);
   const [showCumulative, setShowCumulative] = useState<boolean>(true);
 
-  // Validate model data to avoid errors
   if (!model || !model.assumptions || !model.assumptions.growthModel) {
     return (
       <div className="p-4 border border-red-200 rounded-md bg-red-50">
@@ -35,7 +34,6 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
       const data = [];
       const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
       
-      // Initial values
       const totalInitialRevenue = model.assumptions.revenue.reduce(
         (sum, item) => sum + item.value,
         0
@@ -45,7 +43,6 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
         0
       );
 
-      // Handle weekly event models with per-customer revenue approach
       if (isWeeklyEvent && model.assumptions.metadata) {
         const metadata = model.assumptions.metadata;
         const weeks = metadata.weeks || 12;
@@ -54,19 +51,20 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
         let totalCumulativeRevenue = 0;
         let totalCumulativeCosts = 0;
         let totalCumulativeProfit = 0;
+        let totalAttendance = 0;
         
         for (let week = 0; week <= weeks; week++) {
           if (week > timePoints - 1) break;
           
-          // Calculate attendance and spending for this week
           let currentAttendance = metadata.initialWeeklyAttendance;
           if (week > 0) {
             currentAttendance = metadata.initialWeeklyAttendance * 
               (1 + (metadata.growth.attendanceGrowthRate / 100) * week);
           }
           
-          // Calculate per-customer spending for this week
-          let currentPerCustomer = { ...metadata.perCustomer };
+          totalAttendance += Math.round(currentAttendance);
+          
+          const currentPerCustomer = { ...metadata.perCustomer };
           if (week > 0 && metadata.growth.useCustomerSpendGrowth) {
             currentPerCustomer = {
               ticketPrice: metadata.perCustomer.ticketPrice * 
@@ -82,7 +80,6 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
             };
           }
           
-          // Calculate weekly revenue streams
           const weeklyRevenue = {
             ticketSales: currentAttendance * (currentPerCustomer.ticketPrice || 0),
             fbSales: currentAttendance * (currentPerCustomer.fbSpend || 0),
@@ -93,11 +90,9 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
           
           const totalWeeklyRevenue = Object.values(weeklyRevenue).reduce((sum, val) => sum + val, 0);
           
-          // Calculate costs
           const fbCOGS = (weeklyRevenue.fbSales * (metadata.costs.fbCOGSPercent || 30)) / 100;
           const staffCosts = (metadata.costs.staffCount || 0) * (metadata.costs.staffCostPerPerson || 0);
           
-          // Setup costs handling
           let setupCostsForWeek = 0;
           if (metadata.costs.spreadSetupCosts) {
             setupCostsForWeek = (metadata.costs.setupCosts || 0) / weeks;
@@ -108,7 +103,6 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
           const totalWeeklyCosts = fbCOGS + staffCosts + (metadata.costs.managementCosts || 0) + setupCostsForWeek;
           const weeklyProfit = totalWeeklyRevenue - totalWeeklyCosts;
           
-          // Accumulate total cumulative values
           totalCumulativeRevenue += totalWeeklyRevenue;
           totalCumulativeCosts += totalWeeklyCosts;
           totalCumulativeProfit += weeklyProfit;
@@ -122,11 +116,10 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
             cumulativeRevenue: Math.round(totalCumulativeRevenue * 100) / 100,
             cumulativeCosts: Math.round(totalCumulativeCosts * 100) / 100,
             cumulativeProfit: Math.round(totalCumulativeProfit * 100) / 100,
+            totalAttendance: Math.round(totalAttendance),
           });
         }
       } else {
-        // Original logic for non-event models
-        // Initialize revenue and costs
         let currentRevenue = totalInitialRevenue;
         let currentCosts = totalInitialCosts;
         let cumulativeRevenue = 0;
@@ -134,39 +127,30 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
         let cumulativeProfit = 0;
 
         for (let month = 0; month <= projectionMonths; month++) {
-          // Calculate growth based on model type
           const { type, rate, seasonalFactors } = model.assumptions.growthModel;
           
           if (month > 0) {
             if (type === "linear") {
-              // Linear growth: add a fixed amount each period
               currentRevenue = totalInitialRevenue * (1 + rate * month);
             } else if (type === "exponential") {
-              // Exponential growth: compound growth
               currentRevenue = totalInitialRevenue * Math.pow(1 + rate, month);
             } else if (type === "seasonal" && seasonalFactors && seasonalFactors.length > 0) {
-              // Seasonal growth: apply seasonal factors in rotation
               const seasonIndex = (month - 1) % seasonalFactors.length;
               const seasonFactor = seasonalFactors[seasonIndex];
               currentRevenue = totalInitialRevenue * Math.pow(1 + rate, month) * seasonFactor;
             } else {
-              // Default to simple growth
               currentRevenue = totalInitialRevenue * (1 + rate * month);
             }
 
-            // Simple growth for costs (typically doesn't grow as fast as revenue)
             currentCosts = totalInitialCosts * (1 + (rate * 0.7) * month);
           }
 
-          // Calculate profit
           const profit = currentRevenue - currentCosts;
           
-          // Add to cumulative totals
           cumulativeRevenue += currentRevenue;
           cumulativeCosts += currentCosts;
           cumulativeProfit += profit;
 
-          // Add data point
           data.push({
             point: month === 0 ? "Start" : `Month ${month}`,
             revenue: Math.round(currentRevenue * 100) / 100,
@@ -188,7 +172,6 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
 
   const projectionData = calculateProjections();
   
-  // If we couldn't calculate projections, show an error
   if (!projectionData || projectionData.length === 0) {
     return (
       <div className="p-4 border border-red-200 rounded-md bg-red-50">
@@ -204,7 +187,6 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
   
   const finalDataPoint = projectionData[projectionData.length - 1];
   
-  // Determine which data to display (cumulative or per period)
   const displayData = showCumulative ? 
     projectionData.map(point => ({
       ...point,
@@ -381,14 +363,14 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
         </div>
       </div>
 
-      {isWeeklyEvent && 'attendance' in finalDataPoint && (
+      {isWeeklyEvent && 'totalAttendance' in (projectionData[projectionData.length - 1] || {}) && (
         <div className="border rounded-lg p-4 bg-purple-50">
-          <h4 className="text-sm font-medium text-purple-700">Final Attendance</h4>
+          <h4 className="text-sm font-medium text-purple-700">Total Attendance</h4>
           <p className="text-2xl font-bold text-purple-800">
-            {finalDataPoint.attendance?.toLocaleString() || "N/A"} customers
+            {projectionData[projectionData.length - 1].totalAttendance?.toLocaleString() || "N/A"} customers
           </p>
           <p className="text-xs text-purple-600">
-            Projected weekly attendance after {projectionMonths} weeks
+            Total projected customers over {projectionMonths} weeks
           </p>
         </div>
       )}
