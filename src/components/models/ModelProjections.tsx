@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
@@ -31,7 +30,6 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
     );
   }
 
-  // Calculate projections based on model assumptions
   const calculateProjections = () => {
     try {
       const data = [];
@@ -53,14 +51,14 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
         const weeks = metadata.weeks || 12;
         const timePoints = Math.min(weeks, projectionMonths) + 1; // +1 for starting point
         
-        let cumulativeRevenue = 0;
-        let cumulativeCosts = 0;
-        let cumulativeProfit = 0;
+        let totalCumulativeRevenue = 0;
+        let totalCumulativeCosts = 0;
+        let totalCumulativeProfit = 0;
         
         for (let week = 0; week <= weeks; week++) {
-          if (week > timePoints - 1) break; // Only calculate up to our projection limit
+          if (week > timePoints - 1) break;
           
-          // Calculate attendance for this week
+          // Calculate attendance and spending for this week
           let currentAttendance = metadata.initialWeeklyAttendance;
           if (week > 0) {
             currentAttendance = metadata.initialWeeklyAttendance * 
@@ -84,7 +82,7 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
             };
           }
           
-          // Calculate weekly revenue
+          // Calculate weekly revenue streams
           const weeklyRevenue = {
             ticketSales: currentAttendance * (currentPerCustomer.ticketPrice || 0),
             fbSales: currentAttendance * (currentPerCustomer.fbSpend || 0),
@@ -110,10 +108,10 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
           const totalWeeklyCosts = fbCOGS + staffCosts + (metadata.costs.managementCosts || 0) + setupCostsForWeek;
           const weeklyProfit = totalWeeklyRevenue - totalWeeklyCosts;
           
-          // Add to cumulative totals
-          cumulativeRevenue += totalWeeklyRevenue;
-          cumulativeCosts += totalWeeklyCosts;
-          cumulativeProfit += weeklyProfit;
+          // Accumulate total cumulative values
+          totalCumulativeRevenue += totalWeeklyRevenue;
+          totalCumulativeCosts += totalWeeklyCosts;
+          totalCumulativeProfit += weeklyProfit;
           
           data.push({
             point: week === 0 ? "Start" : `Week ${week}`,
@@ -121,9 +119,9 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
             costs: Math.round(totalWeeklyCosts * 100) / 100,
             profit: Math.round(weeklyProfit * 100) / 100,
             attendance: Math.round(currentAttendance),
-            cumulativeRevenue: Math.round(cumulativeRevenue * 100) / 100,
-            cumulativeCosts: Math.round(cumulativeCosts * 100) / 100,
-            cumulativeProfit: Math.round(cumulativeProfit * 100) / 100,
+            cumulativeRevenue: Math.round(totalCumulativeRevenue * 100) / 100,
+            cumulativeCosts: Math.round(totalCumulativeCosts * 100) / 100,
+            cumulativeProfit: Math.round(totalCumulativeProfit * 100) / 100,
           });
         }
       } else {
