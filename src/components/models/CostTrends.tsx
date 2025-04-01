@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
@@ -59,9 +58,17 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
             let costValue = 0;
             
             if (costType === "fixed") {
-              if (cost.name === "Setup Costs" && shouldSpreadSetupCosts) {
-                costValue = cost.value / weeks;
+              // Critical fix: handle setup costs correctly
+              if (cost.name === "Setup Costs") {
+                if (shouldSpreadSetupCosts) {
+                  // If spreading setup costs, divide by total weeks
+                  costValue = cost.value / metadata.weeks;
+                } else {
+                  // Otherwise only show in week 1
+                  costValue = week === 1 ? cost.value : 0;
+                }
               } else {
+                // For other fixed costs, only apply in week 1
                 costValue = week === 1 ? cost.value : 0;
               }
             } else if (costType === "variable") {

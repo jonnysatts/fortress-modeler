@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
@@ -99,7 +98,6 @@ const EditFinancialModel = () => {
     );
   }
 
-  // For WeeklyEvent models, use the specialized form component
   if (model.assumptions.metadata?.type === "WeeklyEvent") {
     return (
       <EventModelForm 
@@ -111,8 +109,6 @@ const EditFinancialModel = () => {
     );
   }
   
-  // For now, just provide a placeholder for other model types
-  // Ideally, we would create specific edit forms for each model type
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">

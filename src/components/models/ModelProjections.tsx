@@ -110,10 +110,14 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
           const staffCosts = (metadata.costs.staffCount || 0) * (metadata.costs.staffCostPerPerson || 0);
           
           let setupCostsForWeek = 0;
+          
+          // Critical fix for setup costs
           if (shouldSpreadSetupCosts) {
-            setupCostsForWeek = week > 0 ? (metadata.costs.setupCosts || 0) / weeks : 0;
-          } else if (week === 1) { // Setup costs only apply on week 1 if not spread
-            setupCostsForWeek = metadata.costs.setupCosts || 0;
+            // Only apply setup costs to weeks > 0 (not the starting point)
+            setupCostsForWeek = week > 0 ? (metadata.costs.setupCosts || 0) / (weeks) : 0;
+          } else {
+            // Only apply setup costs to week 1 (not week 0, which is the starting point)
+            setupCostsForWeek = week === 1 ? (metadata.costs.setupCosts || 0) : 0;
           }
           
           const totalWeeklyCosts = fbCOGS + staffCosts + (metadata.costs.managementCosts || 0) + setupCostsForWeek;
