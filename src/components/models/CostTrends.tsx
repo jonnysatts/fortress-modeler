@@ -47,14 +47,6 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
         let oneTimeCosts = {};
         let cumulativeTotal = 0;
         
-        // Pre-process fixed costs to track them separately
-        costs.forEach(cost => {
-          if (cost.type?.toLowerCase() === "fixed") {
-            const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
-            oneTimeCosts[safeName] = cost.value;
-          }
-        });
-        
         // Generate data for each week
         for (let week = 1; week <= weeks; week++) {
           const point: any = { point: `Week ${week}` };
@@ -67,29 +59,17 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
             
             // Handle different cost types
             if (costType === "fixed") {
-              if (setupCostsAmortized) {
-                // For visualization purposes, we show the full amount in week 1 only
-                if (week === 1) {
-                  point[safeName] = Math.ceil(cost.value);
-                  totalCost += cost.value; // Add full cost to the first week's total
-                } else {
-                  point[safeName] = 0; // Show as zero in subsequent weeks
-                }
-                // Skip further processing for this cost item
-                return;
-              } else if (week === 1) {
-                // Apply only in first week
+              // Fixed costs only appear in the first week
+              if (week === 1) {
                 costValue = cost.value;
                 point[safeName] = Math.ceil(costValue);
                 totalCost += costValue;
-                // Skip further processing for this cost item
-                return;
               } else {
                 // No cost in subsequent weeks
                 point[safeName] = 0;
-                // Skip further processing for this cost item
-                return;
               }
+              // Skip further processing for fixed costs
+              return;
             } else if (costType === "variable") {
               // Variable costs like F&B COGS grow with revenue
               costValue = cost.value;
