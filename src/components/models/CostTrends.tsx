@@ -69,26 +69,27 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
             if (costType === "fixed") {
               if (setupCostsAmortized) {
                 // If amortized, divide by total weeks
-                costValue = week === 1 ? cost.value / weeks * weeks : 0; // Apply full amount in data for first week only
                 // For visualization purposes, we show the full amount in week 1 only
                 if (week === 1) {
                   point[safeName] = Math.round(cost.value * 100) / 100;
+                  totalCost += cost.value; // Add full cost to the first week's total
                 } else {
                   point[safeName] = 0; // Show as zero in subsequent weeks
                 }
-                // Still add the amortized amount to the total cost
-                totalCost += (week === 1 ? cost.value : 0);
-                continue; // Skip the normal flow for fixed costs
+                // Skip further processing for this cost item
+                return;
               } else if (week === 1) {
                 // Apply only in first week
                 costValue = cost.value;
                 point[safeName] = Math.round(costValue * 100) / 100;
                 totalCost += costValue;
-                continue; // Skip the normal flow for fixed costs
+                // Skip further processing for this cost item
+                return;
               } else {
                 // No cost in subsequent weeks
                 point[safeName] = 0;
-                continue; // Skip the normal flow
+                // Skip further processing for this cost item
+                return;
               }
             } else if (costType === "variable") {
               // Variable costs like F&B COGS grow with revenue
