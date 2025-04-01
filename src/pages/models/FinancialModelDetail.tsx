@@ -220,6 +220,71 @@ const FinancialModelDetail = () => {
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const shouldSpreadSetupCosts = isWeeklyEvent && model.assumptions.metadata?.costs?.spreadSetupCosts === true;
 
+  const calculateTotalRevenue = (model: FinancialModel): number => {
+    try {
+      if (model.assumptions.metadata?.type !== "WeeklyEvent") return 0;
+      
+      const metadata = model.assumptions.metadata;
+      const weeks = metadata.weeks || 12;
+      const initialRevenue = model.assumptions.revenue.reduce((sum, item) => sum + item.value, 0);
+      let totalRevenue = 0;
+      
+      for (let week = 0; week < weeks; week++) {
+        const growthFactor = Math.pow(1 + (model.assumptions.growthModel.rate || 0), week);
+        totalRevenue += initialRevenue * growthFactor;
+      }
+      
+      return Math.round(totalRevenue);
+    } catch (error) {
+      console.error("Error calculating total revenue:", error);
+      return 0;
+    }
+  };
+
+  const calculateTotalCosts = (model: FinancialModel): number => {
+    try {
+      if (model.assumptions.metadata?.type !== "WeeklyEvent") return 0;
+      
+      const metadata = model.assumptions.metadata;
+      const weeks = metadata.weeks || 12;
+      
+      const shouldSpreadSetupCosts = metadata.costs?.spreadSetupCosts === true;
+      
+      const fixedCosts = model.assumptions.costs
+        .filter(cost => cost.type?.toLowerCase() === "fixed")
+        .reduce((sum, cost) => sum + cost.value, 0);
+      
+      const recurringAndVariableCosts = model.assumptions.costs
+        .filter(cost => cost.type?.toLowerCase() !== "fixed")
+        .reduce((sum, cost) => sum + cost.value, 0);
+      
+      let totalCosts = 0;
+      
+      if (shouldSpreadSetupCosts) {
+        totalCosts += fixedCosts;
+      } else {
+        totalCosts += fixedCosts;
+      }
+      
+      for (let week = 0; week < weeks; week++) {
+        const growthFactor = Math.pow(1 + ((model.assumptions.growthModel.rate || 0) * 0.7), week);
+        
+        const weekCosts = recurringAndVariableCosts * growthFactor;
+        
+        if (shouldSpreadSetupCosts && week > 0) {
+          totalCosts += weekCosts + (fixedCosts / weeks);
+        } else {
+          totalCosts += weekCosts;
+        }
+      }
+      
+      return Math.round(totalCosts);
+    } catch (error) {
+      console.error("Error calculating total costs:", error);
+      return 0;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -501,71 +566,6 @@ const FinancialModelDetail = () => {
       </Tabs>
     </div>
   );
-};
-
-const calculateTotalRevenue = (model: FinancialModel): number => {
-  try {
-    if (model.assumptions.metadata?.type !== "WeeklyEvent") return 0;
-    
-    const metadata = model.assumptions.metadata;
-    const weeks = metadata.weeks || 12;
-    const initialRevenue = model.assumptions.revenue.reduce((sum, item) => sum + item.value, 0);
-    let totalRevenue = 0;
-    
-    for (let week = 0; week < weeks; week++) {
-      const growthFactor = Math.pow(1 + (model.assumptions.growthModel.rate || 0), week);
-      totalRevenue += initialRevenue * growthFactor;
-    }
-    
-    return Math.round(totalRevenue);
-  } catch (error) {
-    console.error("Error calculating total revenue:", error);
-    return 0;
-  }
-};
-
-const calculateTotalCosts = (model: FinancialModel): number => {
-  try {
-    if (model.assumptions.metadata?.type !== "WeeklyEvent") return 0;
-    
-    const metadata = model.assumptions.metadata;
-    const weeks = metadata.weeks || 12;
-    
-    const shouldSpreadSetupCosts = metadata.costs?.spreadSetupCosts === true;
-    
-    const fixedCosts = model.assumptions.costs
-      .filter(cost => cost.type?.toLowerCase() === "fixed")
-      .reduce((sum, cost) => sum + cost.value, 0);
-    
-    const recurringAndVariableCosts = model.assumptions.costs
-      .filter(cost => cost.type?.toLowerCase() !== "fixed")
-      .reduce((sum, cost) => sum + cost.value, 0);
-    
-    let totalCosts = 0;
-    
-    if (shouldSpreadSetupCosts) {
-      totalCosts += fixedCosts;
-    } else {
-      totalCosts += fixedCosts;
-    }
-    
-    for (let week = 0; week < weeks; week++) {
-      const growthFactor = Math.pow(1 + ((model.assumptions.growthModel.rate || 0) * 0.7), week);
-      
-      const weekCosts = recurringAndVariableCosts * growthFactor;
-      
-      if (shouldSpreadSetupCosts && week > 0) {
-        totalCosts += weekCosts + (fixedCosts / weeks);
-      } else {
-        totalCosts += weekCosts;
-      }
-    }
-    
-    return Math.round(totalCosts);
-  } catch (error) {
-    console.error("Error calculating total costs:", error);
-    return 0;
-  }
 };
 
 export default FinancialModelDetail;

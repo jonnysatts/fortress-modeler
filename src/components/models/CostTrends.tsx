@@ -35,12 +35,6 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
         const metadata = model.assumptions.metadata;
         const weeks = Math.min(metadata.weeks || 12, timePoints);
         
-        const colorMap = {
-          fixed: "#FF8042",
-          variable: "#8884D8",
-          recurring: "#82CA9D"
-        };
-        
         for (let week = 1; week <= weeks; week++) {
           const point: any = { point: `Week ${week}` };
           let weeklyTotal = 0;
