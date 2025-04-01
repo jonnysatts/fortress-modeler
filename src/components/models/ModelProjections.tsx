@@ -18,6 +18,7 @@ interface ModelProjectionsProps {
 
 const ModelProjections = ({ model }: ModelProjectionsProps) => {
   const [projectionMonths, setProjectionMonths] = useState<number>(12);
+  const [showCumulative, setShowCumulative] = useState<boolean>(true);
 
   // Validate model data to avoid errors
   if (!model || !model.assumptions || !model.assumptions.growthModel) {
@@ -52,19 +53,22 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
         const weeks = metadata.weeks || 12;
         const timePoints = Math.min(weeks, projectionMonths) + 1; // +1 for starting point
         
-        let currentAttendance = metadata.initialWeeklyAttendance;
-        let currentPerCustomer = { ...metadata.perCustomer };
+        let cumulativeRevenue = 0;
+        let cumulativeCosts = 0;
+        let cumulativeProfit = 0;
         
         for (let week = 0; week <= weeks; week++) {
           if (week > timePoints - 1) break; // Only calculate up to our projection limit
           
           // Calculate attendance for this week
+          let currentAttendance = metadata.initialWeeklyAttendance;
           if (week > 0) {
             currentAttendance = metadata.initialWeeklyAttendance * 
               (1 + (metadata.growth.attendanceGrowthRate / 100) * week);
           }
           
           // Calculate per-customer spending for this week
+          let currentPerCustomer = { ...metadata.perCustomer };
           if (week > 0 && metadata.growth.useCustomerSpendGrowth) {
             currentPerCustomer = {
               ticketPrice: metadata.perCustomer.ticketPrice * 
@@ -89,7 +93,7 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
             miscRevenue: currentAttendance * (currentPerCustomer.miscSpend || 0),
           };
           
-          const totalRevenue = Object.values(weeklyRevenue).reduce((sum, val) => sum + val, 0);
+          const totalWeeklyRevenue = Object.values(weeklyRevenue).reduce((sum, val) => sum + val, 0);
           
           // Calculate costs
           const fbCOGS = (weeklyRevenue.fbSales * (metadata.costs.fbCOGSPercent || 30)) / 100;
@@ -103,14 +107,23 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
             setupCostsForWeek = metadata.costs.setupCosts || 0;
           }
           
-          const totalCosts = fbCOGS + staffCosts + (metadata.costs.managementCosts || 0) + setupCostsForWeek;
+          const totalWeeklyCosts = fbCOGS + staffCosts + (metadata.costs.managementCosts || 0) + setupCostsForWeek;
+          const weeklyProfit = totalWeeklyRevenue - totalWeeklyCosts;
+          
+          // Add to cumulative totals
+          cumulativeRevenue += totalWeeklyRevenue;
+          cumulativeCosts += totalWeeklyCosts;
+          cumulativeProfit += weeklyProfit;
           
           data.push({
             point: week === 0 ? "Start" : `Week ${week}`,
-            revenue: Math.round(totalRevenue * 100) / 100,
-            costs: Math.round(totalCosts * 100) / 100,
-            profit: Math.round((totalRevenue - totalCosts) * 100) / 100,
+            revenue: Math.round(totalWeeklyRevenue * 100) / 100,
+            costs: Math.round(totalWeeklyCosts * 100) / 100,
+            profit: Math.round(weeklyProfit * 100) / 100,
             attendance: Math.round(currentAttendance),
+            cumulativeRevenue: Math.round(cumulativeRevenue * 100) / 100,
+            cumulativeCosts: Math.round(cumulativeCosts * 100) / 100,
+            cumulativeProfit: Math.round(cumulativeProfit * 100) / 100,
           });
         }
       } else {
@@ -118,6 +131,9 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
         // Initialize revenue and costs
         let currentRevenue = totalInitialRevenue;
         let currentCosts = totalInitialCosts;
+        let cumulativeRevenue = 0;
+        let cumulativeCosts = 0;
+        let cumulativeProfit = 0;
 
         for (let month = 0; month <= projectionMonths; month++) {
           // Calculate growth based on model type
@@ -146,6 +162,11 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
 
           // Calculate profit
           const profit = currentRevenue - currentCosts;
+          
+          // Add to cumulative totals
+          cumulativeRevenue += currentRevenue;
+          cumulativeCosts += currentCosts;
+          cumulativeProfit += profit;
 
           // Add data point
           data.push({
@@ -153,6 +174,9 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
             revenue: Math.round(currentRevenue * 100) / 100,
             costs: Math.round(currentCosts * 100) / 100,
             profit: Math.round(profit * 100) / 100,
+            cumulativeRevenue: Math.round(cumulativeRevenue * 100) / 100,
+            cumulativeCosts: Math.round(cumulativeCosts * 100) / 100,
+            cumulativeProfit: Math.round(cumulativeProfit * 100) / 100,
           });
         }
       }
@@ -181,41 +205,69 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
   
   const finalDataPoint = projectionData[projectionData.length - 1];
+  
+  // Determine which data to display (cumulative or per period)
+  const displayData = showCumulative ? 
+    projectionData.map(point => ({
+      ...point,
+      displayRevenue: point.cumulativeRevenue,
+      displayCosts: point.cumulativeCosts,
+      displayProfit: point.cumulativeProfit
+    })) :
+    projectionData.map(point => ({
+      ...point,
+      displayRevenue: point.revenue,
+      displayCosts: point.costs,
+      displayProfit: point.profit
+    }));
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-lg font-medium">Financial Projections</h3>
-        <div className="flex items-center space-x-2">
-          <span className="text-sm">Projection Period:</span>
-          <select
-            className="border rounded px-2 py-1"
-            value={projectionMonths}
-            onChange={(e) => setProjectionMonths(Number(e.target.value))}
-          >
-            {isWeeklyEvent ? (
-              <>
-                <option value="4">4 weeks</option>
-                <option value="8">8 weeks</option>
-                <option value="12">12 weeks</option>
-                <option value="24">24 weeks</option>
-              </>
-            ) : (
-              <>
-                <option value="6">6 months</option>
-                <option value="12">12 months</option>
-                <option value="24">24 months</option>
-                <option value="36">36 months</option>
-              </>
-            )}
-          </select>
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <span className="text-sm">Display:</span>
+            <select
+              className="border rounded px-2 py-1"
+              value={showCumulative ? "cumulative" : "period"}
+              onChange={(e) => setShowCumulative(e.target.value === "cumulative")}
+            >
+              <option value="cumulative">Cumulative Totals</option>
+              <option value="period">Per {timeUnit}</option>
+            </select>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-sm">Projection Period:</span>
+            <select
+              className="border rounded px-2 py-1"
+              value={projectionMonths}
+              onChange={(e) => setProjectionMonths(Number(e.target.value))}
+            >
+              {isWeeklyEvent ? (
+                <>
+                  <option value="4">4 weeks</option>
+                  <option value="8">8 weeks</option>
+                  <option value="12">12 weeks</option>
+                  <option value="24">24 weeks</option>
+                </>
+              ) : (
+                <>
+                  <option value="6">6 months</option>
+                  <option value="12">12 months</option>
+                  <option value="24">24 months</option>
+                  <option value="36">36 months</option>
+                </>
+              )}
+            </select>
+          </div>
         </div>
       </div>
 
       <div className="w-full h-[400px]">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
-            data={projectionData}
+            data={displayData}
             margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
@@ -241,13 +293,16 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
                 if (name === "attendance" && typeof value === "number") {
                   return [value.toLocaleString(), "Attendance"];
                 }
+                if (name === "displayRevenue") return [`$${value.toLocaleString()}`, "Revenue"];
+                if (name === "displayCosts") return [`$${value.toLocaleString()}`, "Costs"];
+                if (name === "displayProfit") return [`$${value.toLocaleString()}`, "Profit"];
                 return [`$${value.toLocaleString()}`, name.charAt(0).toUpperCase() + name.slice(1)];
               }}
             />
             <Legend />
             <Line
               type="monotone"
-              dataKey="revenue"
+              dataKey="displayRevenue"
               name="Revenue"
               stroke="#4CAF50"
               strokeWidth={2}
@@ -255,14 +310,14 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
             />
             <Line
               type="monotone"
-              dataKey="costs"
+              dataKey="displayCosts"
               name="Costs"
               stroke="#FF5722"
               strokeWidth={2}
             />
             <Line
               type="monotone"
-              dataKey="profit"
+              dataKey="displayProfit"
               name="Profit"
               stroke="#2196F3"
               strokeWidth={2}
@@ -274,7 +329,7 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
                 name="Attendance"
                 stroke="#9C27B0"
                 strokeWidth={2}
-                yAxisId="right" // Add this missing yAxisId to match the YAxis
+                yAxisId="right"
               />
             )}
           </LineChart>
@@ -283,32 +338,47 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="border rounded-lg p-4 bg-green-50">
-          <h4 className="text-sm font-medium text-green-700">Final Revenue</h4>
+          <h4 className="text-sm font-medium text-green-700">
+            {showCumulative ? "Total Revenue" : `Revenue (${timeUnit} ${projectionMonths})`}
+          </h4>
           <p className="text-2xl font-bold text-green-800">
-            ${finalDataPoint.revenue.toLocaleString()}
+            ${showCumulative 
+              ? finalDataPoint.cumulativeRevenue.toLocaleString()
+              : finalDataPoint.revenue.toLocaleString()}
           </p>
           <p className="text-xs text-green-600">
-            {projectionMonths} {timeUnit.toLowerCase()} projection
+            {showCumulative ? "Cumulative across all " : "Last "} 
+            {projectionMonths} {timeUnit.toLowerCase()}{showCumulative ? "s" : ""}
           </p>
         </div>
 
         <div className="border rounded-lg p-4 bg-red-50">
-          <h4 className="text-sm font-medium text-red-700">Final Costs</h4>
+          <h4 className="text-sm font-medium text-red-700">
+            {showCumulative ? "Total Costs" : `Costs (${timeUnit} ${projectionMonths})`}
+          </h4>
           <p className="text-2xl font-bold text-red-800">
-            ${finalDataPoint.costs.toLocaleString()}
+            ${showCumulative 
+              ? finalDataPoint.cumulativeCosts.toLocaleString()
+              : finalDataPoint.costs.toLocaleString()}
           </p>
           <p className="text-xs text-red-600">
-            {projectionMonths} {timeUnit.toLowerCase()} projection
+            {showCumulative ? "Cumulative across all " : "Last "}
+            {projectionMonths} {timeUnit.toLowerCase()}{showCumulative ? "s" : ""}
           </p>
         </div>
 
         <div className="border rounded-lg p-4 bg-blue-50">
-          <h4 className="text-sm font-medium text-blue-700">Final Profit</h4>
+          <h4 className="text-sm font-medium text-blue-700">
+            {showCumulative ? "Total Profit" : `Profit (${timeUnit} ${projectionMonths})`}
+          </h4>
           <p className="text-2xl font-bold text-blue-800">
-            ${finalDataPoint.profit.toLocaleString()}
+            ${showCumulative
+              ? finalDataPoint.cumulativeProfit.toLocaleString()
+              : finalDataPoint.profit.toLocaleString()}
           </p>
           <p className="text-xs text-blue-600">
-            {projectionMonths} {timeUnit.toLowerCase()} projection
+            {showCumulative ? "Cumulative across all " : "Last "}
+            {projectionMonths} {timeUnit.toLowerCase()}{showCumulative ? "s" : ""}
           </p>
         </div>
       </div>
