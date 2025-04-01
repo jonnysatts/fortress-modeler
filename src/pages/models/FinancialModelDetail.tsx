@@ -218,7 +218,11 @@ const FinancialModelDetail = () => {
   }
 
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
-  const shouldSpreadSetupCosts = isWeeklyEvent && model.assumptions.metadata?.costs?.spreadSetupCosts === true;
+  const shouldSpreadSetupCosts = isWeeklyEvent && 
+    model.assumptions.metadata?.costs?.spreadSetupCosts === true;
+  
+  console.log("Model metadata:", model.assumptions.metadata);
+  console.log("Should spread setup costs:", shouldSpreadSetupCosts);
 
   const calculateTotalRevenue = (model: FinancialModel): number => {
     try {
@@ -536,6 +540,7 @@ const FinancialModelDetail = () => {
                 <CostTrends 
                   model={model} 
                   onUpdateCostData={setCostData} 
+                  shouldSpreadSetupCosts={shouldSpreadSetupCosts}
                 />
               </CardContent>
             </Card>
@@ -559,7 +564,10 @@ const FinancialModelDetail = () => {
               <CardTitle>Financial Projections</CardTitle>
             </CardHeader>
             <CardContent>
-              <ModelProjections model={model} />
+              <ModelProjections 
+                model={model} 
+                shouldSpreadSetupCosts={shouldSpreadSetupCosts}
+              />
             </CardContent>
           </Card>
         </TabsContent>

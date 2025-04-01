@@ -33,14 +33,19 @@ const FinancialMatrix = ({
     );
   }
   
-  // Debug the incoming data
   console.log("FinancialMatrix received data:", trendData[0]);
+  console.log("Should spread setup costs:", shouldSpreadSetupCosts);
   
+  // Helper function to find a setup cost in the model
+  const findSetupCost = () => {
+    return model.assumptions.costs.find(cost => cost.name === "Setup Costs");
+  };
+
   // Combined data view - both revenue and cost data in one table
   if (combinedView) {
     // Validate that we have the required properties
     const hasRequiredData = trendData.every(period => 
-      typeof period.revenue !== 'undefined' && 
+      typeof period.revenue !== 'undefined' || 
       typeof period.costs !== 'undefined'
     );
 
@@ -53,6 +58,11 @@ const FinancialMatrix = ({
         </div>
       );
     }
+
+    // Find setup cost for processing
+    const setupCost = findSetupCost();
+    const setupCostValue = setupCost ? setupCost.value : 0;
+    const weeks = model.assumptions.metadata?.weeks || 12;
     
     return (
       <div className="overflow-x-auto mt-4">
@@ -107,6 +117,19 @@ const FinancialMatrix = ({
               
               const periodProfit = periodRevenue - periodCosts;
               const cumulativeProfit = cumulativeRevenue - cumulativeCosts;
+
+              // Handle setup costs display based on shouldSpreadSetupCosts flag
+              const setupCostDisplay = (() => {
+                if (!setupCost) return 0;
+                
+                if (shouldSpreadSetupCosts) {
+                  // If spreading costs, divide by total weeks
+                  return setupCostValue / weeks;
+                } else {
+                  // If not spreading, only show in first period
+                  return idx === 0 ? setupCostValue : 0;
+                }
+              })();
               
               return (
                 <tr key={idx} className={idx % 2 === 0 ? "bg-gray-50" : ""}>
@@ -131,9 +154,16 @@ const FinancialMatrix = ({
                   {/* Cost columns */}
                   {model.assumptions.costs.map((cost, costIdx) => {
                     const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
+                    
+                    // Special handling for setup costs
+                    let displayValue = period[safeName] || 0;
+                    if (cost.name === "Setup Costs") {
+                      displayValue = setupCostDisplay;
+                    }
+                    
                     return (
                       <td key={costIdx} className="text-right py-2 px-3 text-red-600">
-                        ${Math.ceil(period[safeName] || 0).toLocaleString()}
+                        ${Math.ceil(displayValue).toLocaleString()}
                       </td>
                     );
                   })}
