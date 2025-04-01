@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { Project, FinancialModel, db } from '@/lib/db';
 
@@ -10,13 +9,14 @@ interface AppState {
   error: string | null;
   
   loadProjects: () => Promise<void>;
+  loadProjectById: (id: number) => Promise<Project | null>;
   setCurrentProject: (project: Project | null) => void;
   setCurrentModel: (model: FinancialModel | null) => void;
   addProject: (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => Promise<number>;
   updateProject: (id: number, updates: Partial<Project>) => Promise<void>;
   deleteProject: (id: number) => Promise<void>;
   
-  // New financial model methods
+  // Financial model methods
   loadModelsForProject: (projectId: number) => Promise<FinancialModel[]>;
   addFinancialModel: (model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>) => Promise<number>;
   updateFinancialModel: (id: number, updates: Partial<FinancialModel>) => Promise<void>;
@@ -38,6 +38,23 @@ const useStore = create<AppState>((set, get) => ({
     } catch (error) {
       console.error('Error loading projects:', error);
       set({ error: 'Failed to load projects', isLoading: false });
+    }
+  },
+  
+  loadProjectById: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      const project = await db.projects.get(id);
+      if (project) {
+        set({ currentProject: project, isLoading: false });
+      } else {
+        set({ error: 'Project not found', isLoading: false });
+      }
+      return project || null;
+    } catch (error) {
+      console.error('Error loading project:', error);
+      set({ error: 'Failed to load project', isLoading: false });
+      return null;
     }
   },
   
@@ -102,7 +119,7 @@ const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  // New financial model methods
+  // Financial model methods
   loadModelsForProject: async (projectId) => {
     set({ isLoading: true, error: null });
     try {

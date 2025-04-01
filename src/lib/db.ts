@@ -1,4 +1,3 @@
-
 import Dexie, { Table } from 'dexie';
 
 // Define interfaces for our database tables
@@ -24,6 +23,7 @@ export interface FinancialModel {
     revenue: RevenueAssumption[];
     costs: CostAssumption[];
     growthModel: GrowthModel;
+    metadata?: any; // For product-specific data
   };
   createdAt: Date;
   updatedAt: Date;
@@ -33,7 +33,7 @@ export interface RevenueAssumption {
   name: string;
   value: number;
   type: 'fixed' | 'variable' | 'recurring';
-  frequency?: 'monthly' | 'quarterly' | 'annually' | 'one-time';
+  frequency?: 'weekly' | 'monthly' | 'quarterly' | 'annually' | 'one-time';
 }
 
 export interface CostAssumption {
@@ -47,6 +47,9 @@ export interface GrowthModel {
   type: 'linear' | 'exponential' | 'seasonal';
   rate: number;
   seasonalFactors?: number[];
+  individualRates?: {
+    [key: string]: number;
+  };
 }
 
 export interface ActualPerformance {
@@ -107,7 +110,6 @@ export class FortressDB extends Dexie {
 
 export const db = new FortressDB();
 
-// Helper functions for data operations
 export const getProjects = async (): Promise<Project[]> => {
   return await db.projects.toArray();
 };
@@ -132,7 +134,6 @@ export const updateProject = async (id: number, project: Partial<Omit<Project, '
 
 export const deleteProject = async (id: number): Promise<void> => {
   await db.projects.delete(id);
-  // Cascade delete related data
   await db.financialModels.where('projectId').equals(id).delete();
   await db.actualPerformance.where('projectId').equals(id).delete();
   await db.risks.where('projectId').equals(id).delete();
@@ -144,11 +145,9 @@ export const getModelsForProject = async (projectId: number): Promise<FinancialM
 };
 
 export const addDemoData = async (): Promise<void> => {
-  // Check if we have demo data already
   const projectCount = await db.projects.count();
   if (projectCount > 0) return;
 
-  // Add a demo project
   const projectId = await db.projects.add({
     name: "SaaS Marketing Platform",
     description: "A cloud-based marketing automation platform for small businesses",
@@ -162,7 +161,6 @@ export const addDemoData = async (): Promise<void> => {
     }
   });
 
-  // Add a financial model
   const modelId = await db.financialModels.add({
     projectId,
     name: "Base Financial Model",
@@ -210,7 +208,6 @@ export const addDemoData = async (): Promise<void> => {
     updatedAt: new Date()
   });
 
-  // Add some risks
   await db.risks.bulkAdd([
     {
       projectId,
@@ -236,7 +233,6 @@ export const addDemoData = async (): Promise<void> => {
     }
   ]);
 
-  // Add a scenario
   await db.scenarios.add({
     projectId,
     modelId,

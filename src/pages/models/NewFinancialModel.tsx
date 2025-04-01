@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { db, getProject, RevenueAssumption, CostAssumption } from "@/lib/db";
 import useStore from "@/store/useStore";
 import { toast } from "@/hooks/use-toast";
+import EventModelForm from "./components/EventModelForm";
 
 // Schema for form validation
 const formSchema = z.object({
@@ -63,13 +63,20 @@ const defaultCostAssumption: CostAssumption = {
 const NewFinancialModel = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { currentProject } = useStore();
+  const { currentProject, loadProjectById } = useStore();
   const [revenueAssumptions, setRevenueAssumptions] = useState<RevenueAssumption[]>([
     { ...defaultRevenueAssumption, name: "Monthly Subscription" },
   ]);
   const [costAssumptions, setCostAssumptions] = useState<CostAssumption[]>([
     { ...defaultCostAssumption, name: "Cloud Infrastructure" },
   ]);
+
+  // Load project if not already loaded
+  useEffect(() => {
+    if (projectId && (!currentProject || currentProject.id !== Number(projectId))) {
+      loadProjectById(Number(projectId));
+    }
+  }, [projectId, currentProject, loadProjectById]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -85,6 +92,12 @@ const NewFinancialModel = () => {
     if (!projectId || !currentProject) return;
 
     try {
+      // Handle submission based on product type
+      if (currentProject.productType === "WeeklyEvent") {
+        // The event model form will handle its own submission
+        return;
+      }
+
       // Parse seasonal factors if provided
       let seasonalFactorsArray: number[] | undefined = undefined;
       if (data.growthModelType === "seasonal" && data.seasonalFactors) {
@@ -209,6 +222,18 @@ const NewFinancialModel = () => {
     );
   }
 
+  // Check if this is a weekly event project
+  if (currentProject.productType === "WeeklyEvent") {
+    return (
+      <EventModelForm 
+        projectId={Number(projectId)} 
+        projectName={currentProject.name} 
+        onCancel={() => navigate(`/projects/${projectId}`)}
+      />
+    );
+  }
+
+  // Default form for other product types
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
