@@ -64,7 +64,7 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
           
           totalAttendance += Math.round(currentAttendance);
           
-          const currentPerCustomer = { ...metadata.perCustomer };
+          let currentPerCustomer = { ...metadata.perCustomer };
           if (week > 0 && metadata.growth.useCustomerSpendGrowth) {
             currentPerCustomer = {
               ticketPrice: metadata.perCustomer.ticketPrice * 
