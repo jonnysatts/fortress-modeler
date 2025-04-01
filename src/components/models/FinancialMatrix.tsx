@@ -8,6 +8,7 @@ interface FinancialMatrixProps {
   revenueData?: boolean;
   costData?: boolean;
   combinedView?: boolean;
+  shouldSpreadSetupCosts?: boolean;
 }
 
 const FinancialMatrix = ({ 
@@ -15,7 +16,8 @@ const FinancialMatrix = ({
   trendData,
   revenueData = false,
   costData = false,
-  combinedView = false
+  combinedView = false,
+  shouldSpreadSetupCosts = false
 }: FinancialMatrixProps) => {
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
