@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
@@ -47,13 +46,22 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
   
   const prepareRevenueData = (): RevenueData[] => {
     const revenueStreams = model.assumptions.revenue;
+    const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
+    const weeks = isWeeklyEvent ? model.assumptions.metadata?.weeks || 12 : 12;
     let totalRevenue = 0;
     
     const data: RevenueData[] = revenueStreams.map(stream => {
-      totalRevenue += stream.value;
+      // Calculate full revenue across all weeks
+      let fullRevenue = stream.value;
+      if (isWeeklyEvent) {
+        const growthRate = model.assumptions.growthModel.rate || 0;
+        fullRevenue = stream.value * ((Math.pow(1 + growthRate, weeks) - 1) / growthRate) * weeks;
+      }
+      
+      totalRevenue += fullRevenue;
       return {
         name: stream.name,
-        value: stream.value
+        value: Math.ceil(fullRevenue)
       };
     });
     
