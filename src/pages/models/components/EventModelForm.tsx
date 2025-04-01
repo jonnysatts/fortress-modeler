@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
-import { db } from '@/lib/db';
+import { db, FinancialModel } from '@/lib/db';
 
 // Types for event-specific model
 interface PerCustomerRevenue {
@@ -97,13 +97,45 @@ type FormValues = z.infer<typeof formSchema>;
 interface EventModelFormProps {
   projectId: number;
   projectName: string;
+  existingModel?: FinancialModel; // Make existingModel optional
   onCancel: () => void;
 }
 
-const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProps) => {
+const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: EventModelFormProps) => {
+  // Get metadata from existing model if it exists
+  const eventMetadata = existingModel?.assumptions.metadata as any;
+  
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
+    defaultValues: existingModel ? {
+      name: existingModel.name,
+      weeks: eventMetadata?.weeks || 12,
+      initialWeeklyAttendance: eventMetadata?.initialWeeklyAttendance || 100,
+      perCustomer: eventMetadata?.perCustomer || {
+        ticketPrice: 0,
+        fbSpend: 0,
+        merchandiseSpend: 0,
+        onlineSpend: 0,
+        miscSpend: 0,
+      },
+      costs: eventMetadata?.costs || {
+        setupCosts: 0,
+        spreadSetupCosts: false,
+        fbCOGSPercent: 30,
+        staffCount: 0,
+        staffCostPerPerson: 0,
+        managementCosts: 0,
+      },
+      growth: eventMetadata?.growth || {
+        attendanceGrowthRate: 0,
+        useCustomerSpendGrowth: false,
+        ticketPriceGrowth: 0,
+        fbSpendGrowth: 0,
+        merchandiseSpendGrowth: 0,
+        onlineSpendGrowth: 0,
+        miscSpendGrowth: 0,
+      },
+    } : {
       name: "Weekly Event Model",
       weeks: 12,
       initialWeeklyAttendance: 100,
@@ -205,8 +237,8 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
         growth: data.growth,
       };
 
-      // Save to database with the transformed structure
-      const modelId = await db.financialModels.add({
+      // Updated model structure
+      const modelData = {
         projectId,
         name: data.name,
         assumptions: {
@@ -215,22 +247,36 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
           growthModel,
           metadata: eventMetadata,
         },
-        createdAt: new Date(),
         updatedAt: new Date(),
-      });
+      };
 
-      toast({
-        title: "Event model created",
-        description: `Successfully created "${data.name}" weekly event model.`,
-      });
+      // If editing existing model, update it, otherwise create new
+      if (existingModel) {
+        await db.financialModels.update(existingModel.id, modelData);
+        
+        toast({
+          title: "Event model updated",
+          description: `Successfully updated "${data.name}" weekly event model.`,
+        });
+      } else {
+        await db.financialModels.add({
+          ...modelData,
+          createdAt: new Date(),
+        });
+        
+        toast({
+          title: "Event model created",
+          description: `Successfully created "${data.name}" weekly event model.`,
+        });
+      }
 
       onCancel(); // Navigate back
     } catch (error) {
-      console.error("Error creating event model:", error);
+      console.error("Error saving event model:", error);
       toast({
         variant: "destructive",
-        title: "Failed to create model",
-        description: "There was an error creating your weekly event model.",
+        title: existingModel ? "Failed to update model" : "Failed to create model",
+        description: "There was an error saving your weekly event model.",
       });
     }
   };
@@ -243,10 +289,10 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
         </Button>
         <div>
           <h1 className="text-3xl font-bold text-fortress-blue">
-            New Weekly Event Model
+            {existingModel ? `Edit: ${existingModel.name}` : "New Weekly Event Model"}
           </h1>
           <p className="text-muted-foreground">
-            Create a specialized event model for {projectName}
+            {existingModel ? "Update" : "Create"} a specialized event model for {projectName}
           </p>
         </div>
       </div>
@@ -711,7 +757,7 @@ const EventModelForm = ({ projectId, projectName, onCancel }: EventModelFormProp
             </Button>
             <Button type="submit" className="bg-fortress-emerald hover:bg-fortress-emerald/90">
               <Save className="mr-2 h-4 w-4" />
-              Save Model
+              {existingModel ? "Update" : "Save"} Model
             </Button>
           </div>
         </form>
