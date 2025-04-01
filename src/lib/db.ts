@@ -13,6 +13,7 @@ export interface Project {
     startDate: Date;
     endDate?: Date;
   };
+  avatarImage?: string;
 }
 
 export interface FinancialModel {

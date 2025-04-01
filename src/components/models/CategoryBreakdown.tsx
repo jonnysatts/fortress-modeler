@@ -1,186 +1,100 @@
-import { useState } from "react";
 import { FinancialModel } from "@/lib/db";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Legend,
-  Tooltip,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from "recharts";
+
+// Import statements (will be commented out progressively)
+import { useState, useMemo } from "react";
+import { Tooltip } from "recharts";
 import { Card } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { calculateTotalRevenue, calculateTotalCosts } from "@/lib/financialCalculations";
+import { 
+  prepareRevenueDataForWeek,
+  prepareCostDataForWeek,
+  prepareTypeCategorizedDataForWeek,
+  RevenueData,
+  CostData,
+  TypeCategoryData 
+} from "./breakdownCalculations";
+import RevenueBreakdownView from "./RevenueBreakdownView";
+import CostBreakdownView from "./CostBreakdownView";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Add Select imports
 
 interface CategoryBreakdownProps {
   model: FinancialModel;
-}
-
-// Define interfaces for our data objects
-interface RevenueData {
-  name: string;
-  value: number;
-  percentage?: number;
-}
-
-interface CostData {
-  name: string;
-  value: number;
-  type: string;
-  percentage?: number;
-}
-
-interface TypeCategoryData {
-  name: string;
-  value: number;
+  revenueTrendData: any[]; // Add prop for full revenue trend data
+  costTrendData: any[]; // Add prop for full cost trend data
 }
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8", "#82ca9d", "#ffc658", "#8dd1e1"];
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const dataItem = payload[0].payload;
+    return (
+      <div className="bg-white p-3 border rounded-md shadow-sm">
+        <p className="font-medium">{dataItem.name || payload[0].name}</p>
+        <p>Value: ${dataItem.value.toLocaleString()}</p>
+        {dataItem.percentage !== undefined && (
+          <p>Percentage: {dataItem.percentage}%</p>
+        )}
+        {dataItem.type && (
+          <p>Type: {dataItem.type}</p>
+        )}
+      </div>
+    );
+  }
+  return null;
+};
 
-const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
+const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryBreakdownProps) => {
   const [breakdownView, setBreakdownView] = useState<"revenue" | "costs">("revenue");
+  const [selectedWeek, setSelectedWeek] = useState<number>(1); // Default to week 1
+  
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
+  const totalWeeks = model.assumptions.metadata?.weeks || 0;
+
+  console.log(`[CategoryBreakdown] View: ${breakdownView}, Selected Week: ${selectedWeek}`);
+
+  // Find the data point for the selected week
+  // Note: Assumes trendData arrays start from Week 1 at index 0
+  const selectedRevenuePoint = revenueTrendData?.[selectedWeek - 1] || null;
+  const selectedCostPoint = costTrendData?.[selectedWeek - 1] || null;
   
-  const prepareRevenueData = (): RevenueData[] => {
-    const revenueStreams = model.assumptions.revenue;
-    const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
-    const weeks = isWeeklyEvent ? model.assumptions.metadata?.weeks || 12 : 12;
-    let totalRevenue = 0;
-    
-    const data: RevenueData[] = revenueStreams.map(stream => {
-      let fullRevenue = stream.value;
-      if (isWeeklyEvent) {
-        const growthRate = model.assumptions.growthModel.rate || 0;
-        fullRevenue = stream.value * ((Math.pow(1 + growthRate, weeks) - 1) / growthRate) * weeks;
-      }
-      
-      totalRevenue += fullRevenue;
-      return {
-        name: stream.name,
-        value: Math.ceil(fullRevenue)
-      };
-    });
-    
-    data.forEach(item => {
-      item.percentage = Math.round((item.value / totalRevenue) * 100);
-    });
-    
-    return data.sort((a, b) => b.value - a.value);
-  };
-  
-  const prepareCostData = (): CostData[] => {
-    const costs = model.assumptions.costs;
-    let totalCost = 0;
-    
-    const data: CostData[] = costs.map(cost => {
-      totalCost += cost.value;
-      const costType = cost.type?.toLowerCase() || "recurring";
-      return {
-        name: cost.name,
-        value: cost.value,
-        type: costType.charAt(0).toUpperCase() + costType.slice(1)
-      };
-    });
-    
-    data.forEach(item => {
-      item.percentage = Math.round((item.value / totalCost) * 100);
-    });
-    
-    return data.sort((a, b) => b.value - a.value);
-  };
-  
-  const prepareTypeCategorizedData = (): TypeCategoryData[] => {
-    const costs = model.assumptions.costs;
-    const typeCategories: Record<string, TypeCategoryData> = {
-      fixed: { name: "Fixed Costs", value: 0 },
-      variable: { name: "Variable Costs", value: 0 },
-      recurring: { name: "Recurring Costs", value: 0 }
-    };
-    
-    costs.forEach(cost => {
-      const costType = (cost.type || "recurring").toLowerCase();
-      if (typeCategories[costType]) {
-        typeCategories[costType].value += cost.value;
-      }
-    });
-    
-    return Object.values(typeCategories).filter(category => category.value > 0);
-  };
-  
-  const prepareWeeklyTotalData = () => {
-    if (!isWeeklyEvent || !model.assumptions.metadata) return null;
-    
-    const metadata = model.assumptions.metadata;
-    const weeks = metadata.weeks || 12;
-    const initialRevenue = model.assumptions.revenue.reduce((sum, item) => sum + item.value, 0);
-    const initialCosts = model.assumptions.costs.reduce((sum, item) => sum + item.value, 0);
-    
-    let totalRevenue = 0;
-    let totalCosts = 0;
-    
-    for (let week = 0; week < weeks; week++) {
-      const revGrowthFactor = Math.pow(1 + model.assumptions.growthModel.rate, week);
-      totalRevenue += initialRevenue * revGrowthFactor;
-      
-      const costGrowthFactor = Math.pow(1 + (model.assumptions.growthModel.rate * 0.7), week);
-      totalCosts += initialCosts * costGrowthFactor;
-    }
-    
+  // Calculate breakdown data for the selected week
+  const revenueData = useMemo(() => 
+    prepareRevenueDataForWeek(selectedRevenuePoint), 
+    [selectedRevenuePoint]
+  );
+  const costData = useMemo(() => 
+    prepareCostDataForWeek(selectedCostPoint, model), // Pass model for base cost info
+    [selectedCostPoint, model]
+  );
+  const typeCategorizedData = useMemo(() => 
+    prepareTypeCategorizedDataForWeek(selectedCostPoint, model), // Pass model for base cost info
+    [selectedCostPoint, model]
+  );
+
+  const weeklyTotals = useMemo(() => {
+    if (!isWeeklyEvent) return null;
+    const totalRevenue = calculateTotalRevenue(model);
+    const totalCosts = calculateTotalCosts(model);
     const profit = totalRevenue - totalCosts;
-    const profitMarginPercentage = ((profit / totalRevenue) * 100).toFixed(1);
-    
-    return {
-      totalRevenue: Math.round(totalRevenue),
-      totalCosts: Math.round(totalCosts),
-      profit: Math.round(profit),
-      profitMargin: profitMarginPercentage
-    };
-  };
-  
-  const breakdownData = breakdownView === "revenue" ? prepareRevenueData() : prepareCostData();
-  const typeCategorizedData = breakdownView === "costs" ? prepareTypeCategorizedData() : [];
-  const weeklyTotals = prepareWeeklyTotalData();
+    const profitMarginPercentage = totalRevenue > 0 ? ((profit / totalRevenue) * 100).toFixed(1) : "0.0";
+    return { totalRevenue, totalCosts, profit, profitMargin: profitMarginPercentage };
+  }, [model, isWeeklyEvent]);
   
   const getTypeColor = (type: string) => {
     const typeLowerCase = type.toLowerCase();
-    
     if (typeLowerCase === "fixed") return "#FF8042";
     if (typeLowerCase === "variable") return "#8884D8";
     if (typeLowerCase === "recurring") return "#82CA9D";
     return "#CCCCCC";
   };
   
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white p-3 border rounded-md shadow-sm">
-          <p className="font-medium">{payload[0].name}</p>
-          <p>Value: ${payload[0].value.toLocaleString()}</p>
-          <p>Percentage: {payload[0].payload.percentage}%</p>
-          {payload[0].payload.type && (
-            <p>Type: {payload[0].payload.type}</p>
-          )}
-        </div>
-      );
-    }
-    return null;
-  };
+  const tooltipElement = <Tooltip content={<CustomTooltip />} />;
   
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="flex gap-2">
+      {/* Title, Toggles, and Week Selector */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
           <button
             className={`px-4 py-2 border rounded-md ${
               breakdownView === "revenue" ? "bg-blue-50 border-blue-200" : ""
@@ -199,142 +113,79 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
           </button>
         </div>
         
-        <h3 className="text-lg font-medium">
-          {breakdownView === "revenue" ? "Revenue" : "Cost"} Breakdown
+        {/* Week Selector */} 
+        {isWeeklyEvent && totalWeeks > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">View Week:</span>
+            <Select 
+              value={selectedWeek.toString()} 
+              onValueChange={(value) => setSelectedWeek(Number(value))}
+            >
+              <SelectTrigger className="w-[80px] h-9">
+                <SelectValue placeholder="Week" />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: totalWeeks }, (_, i) => i + 1).map(weekNum => (
+                  <SelectItem key={weekNum} value={weekNum.toString()}>
+                    {weekNum}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        <h3 className="text-lg font-medium w-full sm:w-auto text-center sm:text-right mt-2 sm:mt-0">
+          {breakdownView === "revenue" ? "Revenue" : "Cost"} Breakdown for Week {selectedWeek}
         </h3>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="p-4">
-          <h4 className="text-sm font-medium mb-4">
-            {breakdownView === "revenue" ? "Revenue Distribution" : "Cost Distribution"}
-          </h4>
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={breakdownData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  paddingAngle={2}
-                  dataKey="value"
-                  nameKey="name"
-                  label={({ name, percentage }) => `${name}: ${percentage}%`}
-                  labelLine={false}
-                >
-                  {breakdownData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <h4 className="text-sm font-medium mb-4">
-            {breakdownView === "revenue" ? "Revenue Streams" : "Cost Categories"} By Amount
-          </h4>
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={breakdownData}
-                layout="vertical"
-                margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" tickFormatter={(value) => `$${value}`} />
-                <YAxis 
-                  type="category" 
-                  dataKey="name" 
-                  tick={{ fontSize: 12 }}
-                  width={100}
-                />
-                <Tooltip
-                  formatter={(value) => [`$${value.toLocaleString()}`, ""]}
-                />
-                <Bar 
-                  dataKey="value" 
-                  fill="#8884d8"
-                  radius={[0, 4, 4, 0]}
-                >
-                  {breakdownData.map((entry, index) => {
-                    const costEntry = breakdownView === "costs" ? (entry as CostData) : null;
-                    const color = costEntry && costEntry.type
-                      ? getTypeColor(costEntry.type)
-                      : COLORS[index % COLORS.length];
-                    
-                    return <Cell key={`cell-${index}`} fill={color} />;
-                  })}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-      </div>
-      
-      {breakdownView === "costs" && typeCategorizedData.length > 0 && (
-        <Card className="p-4">
-          <h4 className="text-sm font-medium mb-4">Costs By Type</h4>
-          <div className="h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={typeCategorizedData}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis tickFormatter={(value) => `$${value}`} />
-                <Tooltip
-                  formatter={(value) => [`$${value.toLocaleString()}`, ""]}
-                />
-                <Bar 
-                  dataKey="value" 
-                  fill="#8884d8"
-                  radius={[4, 4, 0, 0]}
-                >
-                  {typeCategorizedData.map((entry, index) => {
-                    const typeKey = entry.name.toLowerCase().includes("fixed")
-                      ? "fixed"
-                      : entry.name.toLowerCase().includes("variable")
-                      ? "variable"
-                      : "recurring";
-                    
-                    return <Cell key={`cell-${index}`} fill={getTypeColor(typeKey)} />;
-                  })}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
+      {breakdownView === "revenue" && (
+        <RevenueBreakdownView 
+          data={revenueData} 
+          colors={COLORS} 
+          tooltip={tooltipElement} 
+          selectedWeek={selectedWeek} 
+        />
       )}
-      
+
+      {breakdownView === "costs" && (
+        <CostBreakdownView 
+          costData={costData} 
+          typeData={typeCategorizedData} 
+          colors={COLORS} 
+          tooltip={tooltipElement}
+          getTypeColor={getTypeColor}
+          selectedWeek={selectedWeek} 
+        />
+      )}
+
       {isWeeklyEvent && weeklyTotals && (
         <Card className="p-4">
           <h4 className="text-sm font-medium mb-4">Projected Total Financials</h4>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Total Revenue */}
             <div className="p-4 bg-green-50 border border-green-100 rounded-md">
               <div className="text-sm text-green-700">Total Revenue</div>
               <div className="text-2xl font-bold text-green-800">
                 ${weeklyTotals.totalRevenue.toLocaleString()}
               </div>
             </div>
+            {/* Total Costs */}
             <div className="p-4 bg-red-50 border border-red-100 rounded-md">
               <div className="text-sm text-red-700">Total Costs</div>
               <div className="text-2xl font-bold text-red-800">
                 ${weeklyTotals.totalCosts.toLocaleString()}
               </div>
             </div>
+            {/* Total Profit */}
             <div className="p-4 bg-blue-50 border border-blue-100 rounded-md">
               <div className="text-sm text-blue-700">Total Profit</div>
               <div className="text-2xl font-bold text-blue-800">
                 ${weeklyTotals.profit.toLocaleString()}
               </div>
             </div>
+            {/* Profit Margin */}
             <div className="p-4 bg-purple-50 border border-purple-100 rounded-md">
               <div className="text-sm text-purple-700">Profit Margin</div>
               <div className="text-2xl font-bold text-purple-800">
@@ -344,38 +195,6 @@ const CategoryBreakdown = ({ model }: CategoryBreakdownProps) => {
           </div>
         </Card>
       )}
-      
-      <Card className="p-4">
-        <h4 className="text-sm font-medium mb-4">
-          {breakdownView === "revenue" ? "Revenue Stream Details" : "Cost Category Details"}
-        </h4>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                {breakdownView === "costs" && (
-                  <TableHead>Type</TableHead>
-                )}
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-right">Percentage</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {breakdownData.map((item, idx) => (
-                <TableRow key={idx} className={idx % 2 === 0 ? "bg-gray-50" : ""}>
-                  <TableCell>{item.name}</TableCell>
-                  {breakdownView === "costs" && (
-                    <TableCell className="capitalize">{(item as CostData).type}</TableCell>
-                  )}
-                  <TableCell className="text-right">${item.value.toLocaleString()}</TableCell>
-                  <TableCell className="text-right">{item.percentage}%</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
     </div>
   );
 };

@@ -77,6 +77,11 @@ const FinancialMatrix = ({
                 Cum. Revenue
               </th>
               
+              {/* --- Add Attendance Header --- */}
+              <th className="text-right py-2 px-3 font-bold text-blue-800 border-l">
+                Attendance 
+              </th>
+
               {/* Cost columns */}
               {model.assumptions.costs.map((cost, idx) => (
                 <th key={`cost-${idx}`} className="text-right py-2 px-3 text-red-700">
@@ -130,6 +135,11 @@ const FinancialMatrix = ({
                     ${Math.ceil(cumulativeRevenue).toLocaleString()}
                   </td>
                   
+                  {/* --- Add Attendance Cell --- */}
+                  <td className="text-right py-2 px-3 font-medium text-blue-700 border-l">
+                    {(period.attendance || 0).toLocaleString()} 
+                  </td>
+
                   {/* Cost columns */}
                   {model.assumptions.costs.map((cost, costIdx) => {
                     const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");

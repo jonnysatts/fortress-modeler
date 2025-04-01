@@ -1,11 +1,11 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { ArrowLeft, Edit, Trash2, PlusCircle, BarChart3, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, PlusCircle, BarChart3, AlertTriangle, Building } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -112,10 +112,16 @@ const ProjectDetail = () => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate("/projects")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
+          <Avatar className="h-16 w-16 border">
+            <AvatarImage src={currentProject.avatarImage} alt={`${currentProject.name} avatar`} />
+            <AvatarFallback>
+               {currentProject.name.substring(0, 2).toUpperCase() || <Building size={24}/>}
+            </AvatarFallback>
+          </Avatar>
           <div>
             <h1 className="text-3xl font-bold text-fortress-blue">{currentProject.name}</h1>
             <div className="flex items-center mt-1 space-x-2">
@@ -128,7 +134,7 @@ const ProjectDetail = () => {
             </div>
           </div>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex space-x-2 self-start sm:self-center">
           <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/edit`)}>
             <Edit className="mr-1 h-4 w-4" />
             Edit

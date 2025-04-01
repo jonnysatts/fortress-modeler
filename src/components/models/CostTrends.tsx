@@ -16,10 +16,9 @@ interface CostTrendsProps {
   model: FinancialModel;
   combinedData?: any[];
   onUpdateCostData?: (data: any[]) => void;
-  shouldSpreadSetupCosts?: boolean;
 }
 
-const CostTrends = ({ model, combinedData, onUpdateCostData, shouldSpreadSetupCosts }: CostTrendsProps) => {
+const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) => {
   const [timePoints, setTimePoints] = useState<number>(12);
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
@@ -47,8 +46,15 @@ const CostTrends = ({ model, combinedData, onUpdateCostData, shouldSpreadSetupCo
             currentAttendance = initialAttendance * Math.pow(1 + growthRate, week - 1);
           }
           
-          // Calculate F&B revenue to determine COGS correctly
-          const fbRevenue = currentAttendance * (metadata.perCustomer?.fbSpend || 0);
+          // --- Calculate current F&B Spend per customer for this week --- 
+          let currentFbSpendPerCustomer = metadata.perCustomer?.fbSpend || 0;
+          if (week > 1 && metadata.growth?.useCustomerSpendGrowth) {
+            const fbSpendGrowthRate = (metadata.growth.fbSpendGrowth || 0) / 100;
+            currentFbSpendPerCustomer *= Math.pow(1 + fbSpendGrowthRate, week - 1);
+          }
+
+          // Calculate F&B revenue for *this week* using current attendance and spend
+          const fbRevenue = currentAttendance * currentFbSpendPerCustomer;
           
           costs.forEach(cost => {
             const costType = cost.type?.toLowerCase();
@@ -75,12 +81,12 @@ const CostTrends = ({ model, combinedData, onUpdateCostData, shouldSpreadSetupCo
               }
             } else if (costType === "recurring") {
               // Recurring costs apply every week
-              // Special handling for Setup Costs if they are marked as recurring (i.e., should be spread)
-              if (cost.name === "Setup Costs" && shouldSpreadSetupCosts && metadata.weeks > 0) {
-                 // Spread the setup cost evenly across all weeks
+              // Special handling for Setup Costs if they are marked as recurring
+              if (cost.name === "Setup Costs" && metadata.weeks > 0) { 
+                 // Spread the setup cost evenly across all weeks (based on type being recurring)
                  costValue = cost.value / metadata.weeks;
               } else {
-                 // Regular recurring cost, apply the full value
+                 // Regular recurring cost (or Setup Cost if metadata.weeks <= 0), apply the full value
                  costValue = cost.value;
               }
             } else {
@@ -94,6 +100,9 @@ const CostTrends = ({ model, combinedData, onUpdateCostData, shouldSpreadSetupCo
           });
           
           point.costs = Math.ceil(weeklyTotal);
+          
+          // Add attendance for merging later
+          point.attendance = Math.round(currentAttendance);
           
           if (week === 1) {
             point.cumulativeCosts = Math.ceil(weeklyTotal);

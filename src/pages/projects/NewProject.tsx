@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -17,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
 import useStore from "@/store/useStore";
+import { Label } from "@/components/ui/label";
 
 const formSchema = z.object({
   name: z.string().min(3, "Project name must be at least 3 characters"),
@@ -39,9 +39,11 @@ const productTypes = [
 
 const NewProject = () => {
   const navigate = useNavigate();
-  const addProject = useStore((state) => state.addProject);
+  const { addProject } = useStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarDataUrl, setAvatarDataUrl] = useState<string | undefined>(undefined);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -52,6 +54,33 @@ const NewProject = () => {
       startDate: new Date(),
     },
   });
+
+  const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast({ variant: 'destructive', title: 'Invalid File Type', description: 'Please select an image file.'});
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+         toast({ variant: 'destructive', title: 'File Too Large', description: 'Image size should not exceed 2MB.'});
+         return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setAvatarPreview(result);
+        setAvatarDataUrl(result);
+      };
+      reader.onerror = () => {
+        toast({ variant: 'destructive', title: 'Error Reading File', description: 'Could not read the selected image.'});
+        setAvatarPreview(null);
+        setAvatarDataUrl(undefined);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
@@ -65,6 +94,7 @@ const NewProject = () => {
           startDate: data.startDate,
           endDate: data.endDate,
         },
+        avatarImage: avatarDataUrl,
       });
       
       toast({
@@ -274,6 +304,37 @@ const NewProject = () => {
                     </FormItem>
                   )}
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="avatar-upload">Project Avatar (Optional)</Label>
+                <Input 
+                  id="avatar-upload"
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleImageChange}
+                  className="mt-1"
+                />
+                {avatarPreview && (
+                  <div className="mt-4">
+                    <Label>Preview:</Label>
+                    <img src={avatarPreview} alt="Avatar Preview" className="mt-2 w-24 h-24 object-cover rounded-md border" />
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="mt-2 text-xs" 
+                      onClick={() => { 
+                        setAvatarPreview(null); 
+                        setAvatarDataUrl(undefined); 
+                        const fileInput = document.getElementById('avatar-upload') as HTMLInputElement;
+                        if (fileInput) fileInput.value = "";
+                      }}
+                    >
+                      Remove Image
+                    </Button>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">Max 2MB. Recommended square aspect ratio.</p>
               </div>
 
               <CardFooter className="flex justify-between px-0 pb-0">

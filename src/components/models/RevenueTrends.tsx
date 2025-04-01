@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
@@ -48,16 +47,31 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
           const point: any = { point: `Week ${week}` };
           
           let currentAttendance = metadata.initialWeeklyAttendance;
-          if (week > 1) {
-            const growthRate = metadata.growth?.attendanceGrowthRate / 100 || model.assumptions.growthModel.rate;
-            currentAttendance = metadata.initialWeeklyAttendance * Math.pow(1 + growthRate, week - 1);
+          let attendanceGrowthRate = 0;
+          if (week > 1 && metadata.growth) { 
+            attendanceGrowthRate = metadata.growth.attendanceGrowthRate / 100;
+            currentAttendance = metadata.initialWeeklyAttendance * Math.pow(1 + attendanceGrowthRate, week - 1);
           }
           
           let totalRevenue = 0;
           revenueStreams.forEach(stream => {
-            let streamRevenue = stream.value;
+            let streamBaseValue = stream.value;
+            let streamRevenue = streamBaseValue;
+            
             if (week > 1) {
-              streamRevenue = stream.value * Math.pow(1 + model.assumptions.growthModel.rate, week - 1);
+              let growthRateToApply = 0;
+
+              if (metadata.growth?.useCustomerSpendGrowth) {
+                switch(stream.name) {
+                  case "Ticket Sales": growthRateToApply = (metadata.growth.ticketPriceGrowth || 0) / 100; break;
+                  case "F&B Sales": growthRateToApply = (metadata.growth.fbSpendGrowth || 0) / 100; break;
+                  case "Merchandise Sales": growthRateToApply = (metadata.growth.merchandiseSpendGrowth || 0) / 100; break;
+                  case "Online Sales": growthRateToApply = (metadata.growth.onlineSpendGrowth || 0) / 100; break;
+                  case "Miscellaneous Revenue": growthRateToApply = (metadata.growth.miscSpendGrowth || 0) / 100; break;
+                }
+              }
+              
+              streamRevenue = streamBaseValue * Math.pow(1 + growthRateToApply, week - 1);
             }
             
             const safeName = stream.name.replace(/[^a-zA-Z0-9]/g, "");
@@ -69,6 +83,7 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
           point.revenue = Math.ceil(totalRevenue);
           cumulativeTotal += totalRevenue;
           point.cumulativeRevenue = Math.ceil(cumulativeTotal);
+          point.attendance = Math.round(currentAttendance);
           data.push(point);
         }
       } else {
