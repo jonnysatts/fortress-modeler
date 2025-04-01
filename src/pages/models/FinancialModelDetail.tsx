@@ -218,6 +218,7 @@ const FinancialModelDetail = () => {
   }
 
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
+  const shouldSpreadSetupCosts = isWeeklyEvent && model.assumptions.metadata?.costs?.spreadSetupCosts === true;
 
   return (
     <div className="space-y-6">
@@ -422,7 +423,8 @@ const FinancialModelDetail = () => {
                 <FinancialMatrix 
                   model={model} 
                   trendData={combinedFinancialData} 
-                  combinedView={true} 
+                  combinedView={true}
+                  shouldSpreadSetupCosts={shouldSpreadSetupCosts}
                 />
               ) : (
                 <div className="flex justify-center items-center py-10">
@@ -528,12 +530,35 @@ const calculateTotalCosts = (model: FinancialModel): number => {
     
     const metadata = model.assumptions.metadata;
     const weeks = metadata.weeks || 12;
-    const initialCosts = model.assumptions.costs.reduce((sum, item) => sum + item.value, 0);
+    
+    const shouldSpreadSetupCosts = metadata.costs?.spreadSetupCosts === true;
+    
+    const fixedCosts = model.assumptions.costs
+      .filter(cost => cost.type?.toLowerCase() === "fixed")
+      .reduce((sum, cost) => sum + cost.value, 0);
+    
+    const recurringAndVariableCosts = model.assumptions.costs
+      .filter(cost => cost.type?.toLowerCase() !== "fixed")
+      .reduce((sum, cost) => sum + cost.value, 0);
+    
     let totalCosts = 0;
+    
+    if (shouldSpreadSetupCosts) {
+      totalCosts += fixedCosts;
+    } else {
+      totalCosts += fixedCosts;
+    }
     
     for (let week = 0; week < weeks; week++) {
       const growthFactor = Math.pow(1 + ((model.assumptions.growthModel.rate || 0) * 0.7), week);
-      totalCosts += initialCosts * growthFactor;
+      
+      const weekCosts = recurringAndVariableCosts * growthFactor;
+      
+      if (shouldSpreadSetupCosts && week > 0) {
+        totalCosts += weekCosts + (fixedCosts / weeks);
+      } else {
+        totalCosts += weekCosts;
+      }
     }
     
     return Math.round(totalCosts);

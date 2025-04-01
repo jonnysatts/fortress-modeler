@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -33,7 +32,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
 import { db, FinancialModel } from '@/lib/db';
 
-// Types for event-specific model
 interface PerCustomerRevenue {
   ticketPrice: number;
   fbSpend: number;
@@ -61,7 +59,6 @@ interface GrowthSettings {
   miscSpendGrowth: number;
 }
 
-// Schema for validation
 const formSchema = z.object({
   name: z.string().min(1, "Model name is required"),
   weeks: z.coerce.number().int().min(1, "Must have at least one week"),
@@ -97,12 +94,11 @@ type FormValues = z.infer<typeof formSchema>;
 interface EventModelFormProps {
   projectId: number;
   projectName: string;
-  existingModel?: FinancialModel; // Make existingModel optional
+  existingModel?: FinancialModel;
   onCancel: () => void;
 }
 
 const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: EventModelFormProps) => {
-  // Get metadata from existing model if it exists
   const eventMetadata = existingModel?.assumptions.metadata as any;
   
   const form = useForm<FormValues>({
@@ -171,7 +167,6 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
   const watchFbCOGSPercent = form.watch("costs.fbCOGSPercent");
   const watchUseCustomerSpendGrowth = form.watch("growth.useCustomerSpendGrowth");
 
-  // Calculate total weekly revenue based on attendance and per-customer spending
   const calculateWeeklyRevenue = () => {
     return {
       ticketSales: watchInitialAttendance * watchPerCustomer.ticketPrice,
@@ -184,12 +179,10 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
 
   const weeklyRevenue = calculateWeeklyRevenue();
   
-  // Calculate F&B COGS automatically based on F&B sales and percentage
   const fbCOGS = (weeklyRevenue.fbSales * watchFbCOGSPercent) / 100;
 
   const onSubmit = async (data: FormValues) => {
     try {
-      // Calculate initial weekly revenue based on attendance and per-customer spend
       const weeklyRevenue = {
         ticketSales: data.initialWeeklyAttendance * data.perCustomer.ticketPrice,
         fbSales: data.initialWeeklyAttendance * data.perCustomer.fbSpend, 
@@ -198,7 +191,6 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
         miscRevenue: data.initialWeeklyAttendance * data.perCustomer.miscSpend,
       };
 
-      // Transform the event-specific data to fit the general model structure
       const revenueAssumptions = [
         { name: "Ticket Sales", value: weeklyRevenue.ticketSales, type: "recurring" as const, frequency: "weekly" as const },
         { name: "F&B Sales", value: weeklyRevenue.fbSales, type: "recurring" as const, frequency: "weekly" as const },
@@ -207,14 +199,15 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
         { name: "Miscellaneous Revenue", value: weeklyRevenue.miscRevenue, type: "recurring" as const, frequency: "weekly" as const },
       ];
 
+      const setupCostType = data.costs.spreadSetupCosts ? "recurring" as const : "fixed" as const;
+      
       const costAssumptions = [
-        { name: "Setup Costs", value: data.costs.setupCosts, type: data.costs.spreadSetupCosts ? "recurring" as const : "fixed" as const, category: "operations" as const },
+        { name: "Setup Costs", value: data.costs.setupCosts, type: setupCostType, category: "operations" as const },
         { name: "F&B COGS", value: fbCOGS, type: "variable" as const, category: "operations" as const },
         { name: "Staff Costs", value: data.costs.staffCount * data.costs.staffCostPerPerson, type: "recurring" as const, category: "staffing" as const },
         { name: "Management Costs", value: data.costs.managementCosts, type: "recurring" as const, category: "operations" as const },
       ];
 
-      // Create growth model
       const growthModel = {
         type: "linear" as const,
         rate: data.growth.attendanceGrowthRate / 100,
@@ -227,17 +220,18 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
         } : undefined,
       };
 
-      // Add metadata for the weekly event
       const eventMetadata = {
         type: "WeeklyEvent",
         weeks: data.weeks,
         initialWeeklyAttendance: data.initialWeeklyAttendance,
         perCustomer: data.perCustomer,
-        costs: data.costs,
+        costs: {
+          ...data.costs,
+          spreadSetupCosts: !!data.costs.spreadSetupCosts,
+        },
         growth: data.growth,
       };
 
-      // Updated model structure
       const modelData = {
         projectId,
         name: data.name,
@@ -250,7 +244,9 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
         updatedAt: new Date(),
       };
 
-      // If editing existing model, update it, otherwise create new
+      console.log("Saving model with setup costs spread:", data.costs.spreadSetupCosts);
+      console.log("Setup cost type:", setupCostType);
+
       if (existingModel) {
         await db.financialModels.update(existingModel.id, modelData);
         
@@ -270,7 +266,7 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
         });
       }
 
-      onCancel(); // Navigate back
+      onCancel();
     } catch (error) {
       console.error("Error saving event model:", error);
       toast({
@@ -522,6 +518,9 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
                                 <Input type="number" min={0} step={0.01} {...field} />
                               </FormControl>
                               <FormMessage />
+                              <FormDescription>
+                                One-time costs that apply only to the first week unless spread
+                              </FormDescription>
                             </FormItem>
                           )}
                         />
@@ -539,7 +538,12 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
                                   onCheckedChange={field.onChange}
                                 />
                               </FormControl>
-                              <FormLabel>Spread setup costs across all weeks</FormLabel>
+                              <div>
+                                <FormLabel>Spread setup costs across all weeks</FormLabel>
+                                <FormDescription>
+                                  When checked, setup costs will be divided evenly across all weeks
+                                </FormDescription>
+                              </div>
                               <FormMessage />
                             </FormItem>
                           )}

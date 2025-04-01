@@ -22,6 +22,9 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
   const [timePoints, setTimePoints] = useState<number>(12);
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
+  
+  const shouldSpreadSetupCosts = isWeeklyEvent && 
+    model.assumptions.metadata?.costs?.spreadSetupCosts === true;
 
   const calculateCostTrends = () => {
     try {
@@ -32,53 +35,45 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
         const metadata = model.assumptions.metadata;
         const weeks = Math.min(metadata.weeks || 12, timePoints);
         
-        // Map cost types to colors
         const colorMap = {
           fixed: "#FF8042",
           variable: "#8884D8",
           recurring: "#82CA9D"
         };
         
-        // Generate data for each week
         for (let week = 1; week <= weeks; week++) {
           const point: any = { point: `Week ${week}` };
           let weeklyTotal = 0;
           
-          // Process each cost item separately
           costs.forEach(cost => {
             const costType = cost.type?.toLowerCase();
             const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
             let costValue = 0;
             
-            // Handle different cost types with proper week calculation
             if (costType === "fixed") {
-              // Fixed costs ONLY in first week
-              costValue = week === 1 ? cost.value : 0;
+              if (cost.name === "Setup Costs" && shouldSpreadSetupCosts) {
+                costValue = cost.value / weeks;
+              } else {
+                costValue = week === 1 ? cost.value : 0;
+              }
             } else if (costType === "variable") {
-              // Variable costs grow with revenue/attendance over time
               costValue = cost.value;
               if (week > 1) {
-                // Use FB growth rate if available, otherwise use model growth rate
                 const growthRate = metadata.growth?.fbSpendGrowth / 100 || model.assumptions.growthModel.rate;
                 costValue *= Math.pow(1 + growthRate, week - 1);
               }
             } else if (costType === "recurring") {
-              // Recurring costs remain the same each week
               costValue = cost.value;
             } else {
-              // Default case - treat as recurring if type not specified
               costValue = cost.value;
             }
             
-            // Add the cost to the data point and total
             point[safeName] = Math.ceil(costValue);
             weeklyTotal += costValue;
           });
           
-          // Add totals for this period
           point.costs = Math.ceil(weeklyTotal);
           
-          // Calculate cumulative total across all periods
           if (week === 1) {
             point.cumulativeCosts = Math.ceil(weeklyTotal);
           } else {
@@ -87,11 +82,11 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           
           data.push(point);
         }
+        
+        console.log("Cost data calculated:", data.slice(0, 3));
       } else {
-        // Monthly model calculation
         const months = timePoints;
         
-        // Generate data for each month
         for (let month = 1; month <= months; month++) {
           const point: any = { point: `Month ${month}` };
           let monthlyTotal = 0;
@@ -101,22 +96,17 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
             const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
             let costValue = 0;
             
-            // Handle different cost types for monthly model
             if (costType === "fixed") {
-              // Fixed costs are only applied in month 1
               costValue = month === 1 ? cost.value : 0;
             } else if (costType === "variable") {
-              // Variable costs grow with the model's growth rate
               costValue = cost.value;
               if (month > 1) {
                 const { rate } = model.assumptions.growthModel;
                 costValue *= Math.pow(1 + rate, month - 1);
               }
             } else if (costType === "recurring") {
-              // Recurring costs remain constant each month
               costValue = cost.value;
             } else {
-              // Default case - treat as recurring if type not specified
               costValue = cost.value;
             }
             
@@ -126,7 +116,6 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           
           point.total = Math.ceil(monthlyTotal);
           
-          // Calculate cumulative total
           if (month === 1) {
             point.cumulativeTotal = Math.ceil(monthlyTotal);
           } else {
@@ -137,9 +126,6 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
         }
       }
       
-      // Log the data for debugging
-      console.log("Cost data calculated:", data.slice(0, 3));
-      
       return data;
     } catch (error) {
       console.error("Error calculating cost trends:", error);
@@ -149,7 +135,6 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
 
   const trendData = calculateCostTrends();
   
-  // Use useEffect to update combined data to prevent infinite render loops
   useEffect(() => {
     if (onUpdateCostData && trendData.length > 0) {
       onUpdateCostData(trendData);
@@ -238,12 +223,12 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
         </ResponsiveContainer>
       </div>
 
-      {/* Only render the FinancialMatrix when we're not in combined view */}
       {!combinedData && (
         <FinancialMatrix 
           model={model} 
           trendData={trendData} 
           costData={true} 
+          shouldSpreadSetupCosts={shouldSpreadSetupCosts}
         />
       )}
     </div>
