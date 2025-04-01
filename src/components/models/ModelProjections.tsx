@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
@@ -56,40 +57,55 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
         for (let week = 0; week <= weeks; week++) {
           if (week > timePoints - 1) break;
           
+          // Calculate attendance with compounding growth rate
           let currentAttendance = metadata.initialWeeklyAttendance;
           if (week > 0) {
+            // Use compound growth formula: initialValue * (1 + rate)^time
+            const growthRate = metadata.growth.attendanceGrowthRate / 100;
             currentAttendance = metadata.initialWeeklyAttendance * 
-              (1 + (metadata.growth.attendanceGrowthRate / 100) * week);
+              Math.pow(1 + growthRate, week);
           }
           
-          totalAttendance += Math.round(currentAttendance);
+          // Round and add to total attendance
+          const roundedAttendance = Math.round(currentAttendance);
+          totalAttendance += roundedAttendance;
           
+          // Handle per-customer metrics with proper growth rates
           let currentPerCustomer = { ...metadata.perCustomer };
           if (week > 0 && metadata.growth.useCustomerSpendGrowth) {
+            const ticketGrowthRate = metadata.growth.ticketPriceGrowth / 100;
+            const fbSpendGrowthRate = metadata.growth.fbSpendGrowth / 100;
+            const merchGrowthRate = metadata.growth.merchandiseSpendGrowth / 100;
+            const onlineGrowthRate = metadata.growth.onlineSpendGrowth / 100;
+            const miscGrowthRate = metadata.growth.miscSpendGrowth / 100;
+            
+            // Apply compound growth to each revenue stream
             currentPerCustomer = {
               ticketPrice: metadata.perCustomer.ticketPrice * 
-                (1 + (metadata.growth.ticketPriceGrowth / 100) * week),
+                Math.pow(1 + ticketGrowthRate, week),
               fbSpend: metadata.perCustomer.fbSpend * 
-                (1 + (metadata.growth.fbSpendGrowth / 100) * week),
+                Math.pow(1 + fbSpendGrowthRate, week),
               merchandiseSpend: metadata.perCustomer.merchandiseSpend * 
-                (1 + (metadata.growth.merchandiseSpendGrowth / 100) * week),
+                Math.pow(1 + merchGrowthRate, week),
               onlineSpend: metadata.perCustomer.onlineSpend * 
-                (1 + (metadata.growth.onlineSpendGrowth / 100) * week),
+                Math.pow(1 + onlineGrowthRate, week),
               miscSpend: metadata.perCustomer.miscSpend * 
-                (1 + (metadata.growth.miscSpendGrowth / 100) * week),
+                Math.pow(1 + miscGrowthRate, week),
             };
           }
           
+          // Calculate revenue based on attendance and per-customer values
           const weeklyRevenue = {
-            ticketSales: currentAttendance * (currentPerCustomer.ticketPrice || 0),
-            fbSales: currentAttendance * (currentPerCustomer.fbSpend || 0),
-            merchandiseSales: currentAttendance * (currentPerCustomer.merchandiseSpend || 0),
-            onlineSales: currentAttendance * (currentPerCustomer.onlineSpend || 0),
-            miscRevenue: currentAttendance * (currentPerCustomer.miscSpend || 0),
+            ticketSales: roundedAttendance * (currentPerCustomer.ticketPrice || 0),
+            fbSales: roundedAttendance * (currentPerCustomer.fbSpend || 0),
+            merchandiseSales: roundedAttendance * (currentPerCustomer.merchandiseSpend || 0),
+            onlineSales: roundedAttendance * (currentPerCustomer.onlineSpend || 0),
+            miscRevenue: roundedAttendance * (currentPerCustomer.miscSpend || 0),
           };
           
           const totalWeeklyRevenue = Object.values(weeklyRevenue).reduce((sum, val) => sum + val, 0);
           
+          // Calculate costs that depend on revenue
           const fbCOGS = (weeklyRevenue.fbSales * (metadata.costs.fbCOGSPercent || 30)) / 100;
           const staffCosts = (metadata.costs.staffCount || 0) * (metadata.costs.staffCostPerPerson || 0);
           
@@ -112,7 +128,7 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
             revenue: Math.round(totalWeeklyRevenue * 100) / 100,
             costs: Math.round(totalWeeklyCosts * 100) / 100,
             profit: Math.round(weeklyProfit * 100) / 100,
-            attendance: Math.round(currentAttendance),
+            attendance: roundedAttendance,
             cumulativeRevenue: Math.round(totalCumulativeRevenue * 100) / 100,
             cumulativeCosts: Math.round(totalCumulativeCosts * 100) / 100,
             cumulativeProfit: Math.round(totalCumulativeProfit * 100) / 100,
@@ -131,7 +147,8 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
           
           if (month > 0) {
             if (type === "linear") {
-              currentRevenue = totalInitialRevenue * (1 + rate * month);
+              // For linear models, apply the compound growth rate correctly
+              currentRevenue = totalInitialRevenue * Math.pow(1 + rate, month);
             } else if (type === "exponential") {
               currentRevenue = totalInitialRevenue * Math.pow(1 + rate, month);
             } else if (type === "seasonal" && seasonalFactors && seasonalFactors.length > 0) {
@@ -139,10 +156,12 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
               const seasonFactor = seasonalFactors[seasonIndex];
               currentRevenue = totalInitialRevenue * Math.pow(1 + rate, month) * seasonFactor;
             } else {
-              currentRevenue = totalInitialRevenue * (1 + rate * month);
+              // Default to compound growth
+              currentRevenue = totalInitialRevenue * Math.pow(1 + rate, month);
             }
 
-            currentCosts = totalInitialCosts * (1 + (rate * 0.7) * month);
+            // Apply compounding growth to costs as well, using 70% of the rate
+            currentCosts = totalInitialCosts * Math.pow(1 + (rate * 0.7), month);
           }
 
           const profit = currentRevenue - currentCosts;
