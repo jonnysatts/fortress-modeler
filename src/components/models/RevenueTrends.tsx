@@ -43,22 +43,24 @@ const RevenueTrends = ({ model }: RevenueTrendsProps) => {
           "Miscellaneous Revenue": "#0088fe",
         };
         
-        for (let week = 0; week <= weeks; week++) {
-          const point: any = { point: week === 0 ? "Start" : `Week ${week}` };
+        let cumulativeTotal = 0;
+        
+        for (let week = 1; week <= weeks; week++) {
+          const point: any = { point: `Week ${week}` };
           
           // Calculate attendance with compounding growth
           let currentAttendance = metadata.initialWeeklyAttendance;
-          if (week > 0) {
+          if (week > 1) {
             const growthRate = metadata.growth?.attendanceGrowthRate / 100 || model.assumptions.growthModel.rate;
-            currentAttendance = metadata.initialWeeklyAttendance * Math.pow(1 + growthRate, week);
+            currentAttendance = metadata.initialWeeklyAttendance * Math.pow(1 + growthRate, week - 1);
           }
           
           // Calculate each revenue stream with growth
           let totalRevenue = 0;
           revenueStreams.forEach(stream => {
             let streamRevenue = stream.value;
-            if (week > 0) {
-              streamRevenue = stream.value * Math.pow(1 + model.assumptions.growthModel.rate, week);
+            if (week > 1) {
+              streamRevenue = stream.value * Math.pow(1 + model.assumptions.growthModel.rate, week - 1);
             }
             
             const safeName = stream.name.replace(/[^a-zA-Z0-9]/g, "");
@@ -68,27 +70,30 @@ const RevenueTrends = ({ model }: RevenueTrendsProps) => {
           });
           
           point.total = Math.round(totalRevenue * 100) / 100;
+          cumulativeTotal += totalRevenue;
+          point.cumulativeTotal = Math.round(cumulativeTotal * 100) / 100;
           data.push(point);
         }
       } else {
         const months = timePoints;
+        let cumulativeTotal = 0;
         
-        for (let month = 0; month <= months; month++) {
-          const point: any = { point: month === 0 ? "Start" : `Month ${month}` };
+        for (let month = 1; month <= months; month++) {
+          const point: any = { point: `Month ${month}` };
           
           let totalRevenue = 0;
           revenueStreams.forEach(stream => {
             let streamRevenue = stream.value;
-            if (month > 0) {
+            if (month > 1) {
               // Apply growth model
               const { type, rate } = model.assumptions.growthModel;
               if (type === "linear") {
-                streamRevenue = stream.value * (1 + rate * month);
+                streamRevenue = stream.value * (1 + rate * (month - 1));
               } else if (type === "exponential") {
-                streamRevenue = stream.value * Math.pow(1 + rate, month);
+                streamRevenue = stream.value * Math.pow(1 + rate, month - 1);
               } else {
                 // Default
-                streamRevenue = stream.value * Math.pow(1 + rate, month);
+                streamRevenue = stream.value * Math.pow(1 + rate, month - 1);
               }
             }
             
@@ -98,6 +103,8 @@ const RevenueTrends = ({ model }: RevenueTrendsProps) => {
           });
           
           point.total = Math.round(totalRevenue * 100) / 100;
+          cumulativeTotal += totalRevenue;
+          point.cumulativeTotal = Math.round(cumulativeTotal * 100) / 100;
           data.push(point);
         }
       }
@@ -170,7 +177,6 @@ const RevenueTrends = ({ model }: RevenueTrendsProps) => {
             <XAxis 
               dataKey="point" 
               tick={{ fontSize: 12 }}
-              tickFormatter={(value) => value === "Start" ? value : value.split(" ")[1]}
             />
             <YAxis 
               tick={{ fontSize: 12 }}
@@ -214,6 +220,7 @@ const RevenueTrends = ({ model }: RevenueTrendsProps) => {
                   <th key={idx} className="text-right py-2 px-3">{stream.name}</th>
                 ))}
                 <th className="text-right py-2 px-3 font-bold">Total Revenue</th>
+                <th className="text-right py-2 px-3 font-bold">Cumulative Revenue</th>
               </tr>
             </thead>
             <tbody>
@@ -230,6 +237,9 @@ const RevenueTrends = ({ model }: RevenueTrendsProps) => {
                   })}
                   <td className="text-right py-2 px-3 font-bold">
                     ${period.total.toLocaleString()}
+                  </td>
+                  <td className="text-right py-2 px-3 font-bold text-green-700">
+                    ${period.cumulativeTotal.toLocaleString()}
                   </td>
                 </tr>
               ))}
