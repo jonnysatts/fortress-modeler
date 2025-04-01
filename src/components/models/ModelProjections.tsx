@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
@@ -13,9 +14,10 @@ import {
 
 interface ModelProjectionsProps {
   model: FinancialModel;
+  shouldSpreadSetupCosts?: boolean;
 }
 
-const ModelProjections = ({ model }: ModelProjectionsProps) => {
+const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsProps) => {
   const [projectionMonths, setProjectionMonths] = useState<number>(12);
   const [showCumulative, setShowCumulative] = useState<boolean>(true);
 
@@ -47,7 +49,6 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
         const metadata = model.assumptions.metadata;
         const weeks = metadata.weeks || 12;
         const timePoints = Math.min(weeks, projectionMonths) + 1; // +1 for starting point
-        const shouldSpreadSetupCosts = metadata.costs?.spreadSetupCosts === true;
         
         let totalCumulativeRevenue = 0;
         let totalCumulativeCosts = 0;
@@ -237,7 +238,7 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
               onChange={(e) => setShowCumulative(e.target.value === "cumulative")}
             >
               <option value="cumulative">Cumulative Totals</option>
-              <option value="period">Per {timeUnit}</option>
+              <option value="period">Per {isWeeklyEvent ? "Week" : "Month"}</option>
             </select>
           </div>
           <div className="flex items-center space-x-2">

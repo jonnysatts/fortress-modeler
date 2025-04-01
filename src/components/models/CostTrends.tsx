@@ -16,16 +16,14 @@ interface CostTrendsProps {
   model: FinancialModel;
   combinedData?: any[];
   onUpdateCostData?: (data: any[]) => void;
+  shouldSpreadSetupCosts?: boolean;
 }
 
-const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) => {
+const CostTrends = ({ model, combinedData, onUpdateCostData, shouldSpreadSetupCosts }: CostTrendsProps) => {
   const [timePoints, setTimePoints] = useState<number>(12);
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
   
-  const shouldSpreadSetupCosts = isWeeklyEvent && 
-    model.assumptions.metadata?.costs?.spreadSetupCosts === true;
-
   const calculateCostTrends = () => {
     try {
       const data = [];
