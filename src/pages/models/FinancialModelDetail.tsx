@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, BarChart3, ChartLine, Edit, Trash2 } from "lucide-react";
@@ -6,14 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +23,7 @@ import ModelProjections from "@/components/models/ModelProjections";
 import RevenueTrends from "@/components/models/RevenueTrends"; 
 import CostTrends from "@/components/models/CostTrends";
 import CategoryBreakdown from "@/components/models/CategoryBreakdown";
+import FinancialMatrix from "@/components/models/FinancialMatrix";
 
 const FinancialModelDetail = () => {
   const { projectId, modelId } = useParams<{ projectId: string; modelId: string }>();
@@ -39,6 +31,37 @@ const FinancialModelDetail = () => {
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState<FinancialModel | null>(null);
   const { loadProjectById, currentProject, setCurrentProject } = useStore();
+
+  const [combinedFinancialData, setCombinedFinancialData] = useState<any[]>([]);
+  const [revenueData, setRevenueData] = useState<any[]>([]);
+  const [costData, setCostData] = useState<any[]>([]);
+
+  const combineFinancialData = () => {
+    if (revenueData.length === 0 || costData.length === 0) return;
+    
+    const periodMap = new Map();
+    
+    revenueData.forEach(revPeriod => {
+      const periodKey = revPeriod.point;
+      periodMap.set(periodKey, {
+        point: periodKey,
+        ...revPeriod
+      });
+    });
+    
+    costData.forEach(costPeriod => {
+      const periodKey = costPeriod.point;
+      const existingPeriod = periodMap.get(periodKey) || {};
+      
+      periodMap.set(periodKey, {
+        ...existingPeriod,
+        ...costPeriod
+      });
+    });
+    
+    const combined = Array.from(periodMap.values());
+    setCombinedFinancialData(combined);
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -54,7 +77,6 @@ const FinancialModelDetail = () => {
 
       setLoading(true);
       try {
-        // Load the project if it's not already loaded
         if (!currentProject || currentProject.id !== parseInt(projectId)) {
           const project = await loadProjectById(parseInt(projectId));
           if (!project) {
@@ -69,7 +91,6 @@ const FinancialModelDetail = () => {
           setCurrentProject(project);
         }
 
-        // Load the financial model
         const financialModel = await db.financialModels.get(parseInt(modelId));
         if (financialModel) {
           setModel(financialModel);
@@ -125,7 +146,6 @@ const FinancialModelDetail = () => {
     );
   }
 
-  // Format date
   const formatDate = (date: Date): string => {
     return new Date(date).toLocaleDateString("en-US", {
       year: "numeric",
@@ -134,7 +154,6 @@ const FinancialModelDetail = () => {
     });
   };
 
-  // Check if all required data is available in the model
   const hasRequiredData = model && 
     model.assumptions && 
     model.assumptions.revenue && 
@@ -235,6 +254,7 @@ const FinancialModelDetail = () => {
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="financial-matrix">Financial Matrix</TabsTrigger>
           <TabsTrigger value="trends">Trends</TabsTrigger>
           <TabsTrigger value="breakdown">Breakdown</TabsTrigger>
           <TabsTrigger value="projections">Projections</TabsTrigger>
@@ -364,6 +384,32 @@ const FinancialModelDetail = () => {
           </div>
         </TabsContent>
 
+        <TabsContent value="financial-matrix">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <BarChart3 className="mr-2 h-5 w-5" />
+                Combined Financial Matrix
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {combinedFinancialData.length > 0 ? (
+                <FinancialMatrix 
+                  model={model} 
+                  trendData={combinedFinancialData} 
+                  combinedView={true} 
+                />
+              ) : (
+                <div className="flex justify-center items-center py-10">
+                  <p className="text-muted-foreground">
+                    Loading financial data...
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="trends">
           <div className="space-y-8">
             <Card>
@@ -374,7 +420,10 @@ const FinancialModelDetail = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <RevenueTrends model={model} />
+                <RevenueTrends 
+                  model={model} 
+                  setCombinedData={setRevenueData} 
+                />
               </CardContent>
             </Card>
 
@@ -386,7 +435,10 @@ const FinancialModelDetail = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <CostTrends model={model} />
+                <CostTrends 
+                  model={model} 
+                  onUpdateCostData={setCostData} 
+                />
               </CardContent>
             </Card>
           </div>
@@ -418,7 +470,6 @@ const FinancialModelDetail = () => {
   );
 };
 
-// Helper functions for calculating estimated totals
 const calculateTotalRevenue = (model: FinancialModel): number => {
   try {
     if (model.assumptions.metadata?.type !== "WeeklyEvent") return 0;

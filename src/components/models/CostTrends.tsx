@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
   AreaChart,
@@ -11,12 +10,15 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import FinancialMatrix from "./FinancialMatrix";
 
 interface CostTrendsProps {
   model: FinancialModel;
+  combinedData?: any[];
+  onUpdateCostData?: (data: any[]) => void;
 }
 
-const CostTrends = ({ model }: CostTrendsProps) => {
+const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) => {
   const [timePoints, setTimePoints] = useState<number>(12);
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
@@ -72,9 +74,9 @@ const CostTrends = ({ model }: CostTrendsProps) => {
             totalCost += costValue;
           });
           
-          point.total = Math.round(totalCost * 100) / 100;
+          point.costs = Math.round(totalCost * 100) / 100; // Changed from 'total' to 'costs'
           cumulativeTotal += totalCost;
-          point.cumulativeTotal = Math.round(cumulativeTotal * 100) / 100;
+          point.cumulativeCosts = Math.round(cumulativeTotal * 100) / 100; // Changed from 'cumulativeTotal' to 'cumulativeCosts'
           data.push(point);
         }
       } else {
@@ -120,6 +122,12 @@ const CostTrends = ({ model }: CostTrendsProps) => {
   };
 
   const trendData = calculateCostTrends();
+  
+  useEffect(() => {
+    if (onUpdateCostData && trendData.length > 0) {
+      onUpdateCostData(trendData);
+    }
+  }, [trendData, onUpdateCostData]);
   
   if (!trendData || trendData.length === 0) {
     return (
@@ -203,44 +211,19 @@ const CostTrends = ({ model }: CostTrendsProps) => {
         </ResponsiveContainer>
       </div>
 
-      <div className="mt-4">
-        <h4 className="text-sm font-medium mb-2">Period-by-Period Cost Details</h4>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left py-2 px-3">{timeUnit}</th>
-                {model.assumptions.costs.map((cost, idx) => (
-                  <th key={idx} className="text-right py-2 px-3">{cost.name}</th>
-                ))}
-                <th className="text-right py-2 px-3 font-bold">Total Costs</th>
-                <th className="text-right py-2 px-3 font-bold">Cumulative Costs</th>
-              </tr>
-            </thead>
-            <tbody>
-              {trendData.map((period, idx) => (
-                <tr key={idx} className={idx % 2 === 0 ? "bg-gray-50" : ""}>
-                  <td className="py-2 px-3">{period.point}</td>
-                  {model.assumptions.costs.map((cost, costIdx) => {
-                    const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
-                    return (
-                      <td key={costIdx} className="text-right py-2 px-3">
-                        ${period[safeName]?.toLocaleString() || "0"}
-                      </td>
-                    );
-                  })}
-                  <td className="text-right py-2 px-3 font-bold">
-                    ${period.total.toLocaleString()}
-                  </td>
-                  <td className="text-right py-2 px-3 font-bold text-red-700">
-                    ${period.cumulativeTotal.toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {combinedData ? (
+        <FinancialMatrix 
+          model={model} 
+          trendData={combinedData} 
+          combinedView={true} 
+        />
+      ) : (
+        <FinancialMatrix 
+          model={model} 
+          trendData={trendData} 
+          costData={true} 
+        />
+      )}
     </div>
   );
 };
