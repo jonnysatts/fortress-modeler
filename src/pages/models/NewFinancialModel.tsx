@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { db, getProject } from "@/lib/db";
+import { db, getProject, RevenueAssumption, CostAssumption } from "@/lib/db";
 import useStore from "@/store/useStore";
 import { toast } from "@/hooks/use-toast";
 
@@ -45,18 +45,18 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 // Default revenue assumption
-const defaultRevenueAssumption = {
+const defaultRevenueAssumption: RevenueAssumption = {
   name: "",
   value: 0,
-  type: "recurring",
+  type: "recurring", // Now explicitly using the union type
   frequency: "monthly",
 };
 
 // Default cost assumption
-const defaultCostAssumption = {
+const defaultCostAssumption: CostAssumption = {
   name: "",
   value: 0,
-  type: "fixed",
+  type: "fixed", // Now explicitly using the union type
   category: "operations",
 };
 
@@ -64,10 +64,10 @@ const NewFinancialModel = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { currentProject } = useStore();
-  const [revenueAssumptions, setRevenueAssumptions] = useState([
+  const [revenueAssumptions, setRevenueAssumptions] = useState<RevenueAssumption[]>([
     { ...defaultRevenueAssumption, name: "Monthly Subscription" },
   ]);
-  const [costAssumptions, setCostAssumptions] = useState([
+  const [costAssumptions, setCostAssumptions] = useState<CostAssumption[]>([
     { ...defaultCostAssumption, name: "Cloud Infrastructure" },
   ]);
 
@@ -148,7 +148,13 @@ const NewFinancialModel = () => {
     value: string | number
   ) => {
     const updated = [...revenueAssumptions];
-    updated[index] = { ...updated[index], [field]: value };
+    if (field === 'type' && (value === 'fixed' || value === 'variable' || value === 'recurring')) {
+      updated[index] = { ...updated[index], [field]: value };
+    } else if (field === 'frequency' && (value === 'monthly' || value === 'quarterly' || value === 'annually' || value === 'one-time')) {
+      updated[index] = { ...updated[index], [field]: value };
+    } else {
+      updated[index] = { ...updated[index], [field]: value };
+    }
     setRevenueAssumptions(updated);
   };
 
@@ -173,7 +179,13 @@ const NewFinancialModel = () => {
     value: string | number
   ) => {
     const updated = [...costAssumptions];
-    updated[index] = { ...updated[index], [field]: value };
+    if (field === 'type' && (value === 'fixed' || value === 'variable' || value === 'recurring')) {
+      updated[index] = { ...updated[index], [field]: value };
+    } else if (field === 'category' && (value === 'staffing' || value === 'marketing' || value === 'operations' || value === 'other')) {
+      updated[index] = { ...updated[index], [field]: value };
+    } else {
+      updated[index] = { ...updated[index], [field]: value };
+    }
     setCostAssumptions(updated);
   };
 
