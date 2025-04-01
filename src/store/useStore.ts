@@ -15,6 +15,12 @@ interface AppState {
   addProject: (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => Promise<number>;
   updateProject: (id: number, updates: Partial<Project>) => Promise<void>;
   deleteProject: (id: number) => Promise<void>;
+  
+  // New financial model methods
+  loadModelsForProject: (projectId: number) => Promise<FinancialModel[]>;
+  addFinancialModel: (model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>) => Promise<number>;
+  updateFinancialModel: (id: number, updates: Partial<FinancialModel>) => Promise<void>;
+  deleteFinancialModel: (id: number) => Promise<void>;
 }
 
 const useStore = create<AppState>((set, get) => ({
@@ -93,6 +99,79 @@ const useStore = create<AppState>((set, get) => ({
     } catch (error) {
       console.error('Error deleting project:', error);
       set({ error: 'Failed to delete project', isLoading: false });
+    }
+  },
+
+  // New financial model methods
+  loadModelsForProject: async (projectId) => {
+    set({ isLoading: true, error: null });
+    try {
+      const models = await db.financialModels
+        .where('projectId')
+        .equals(projectId)
+        .toArray();
+      set({ isLoading: false });
+      return models;
+    } catch (error) {
+      console.error('Error loading financial models:', error);
+      set({ error: 'Failed to load financial models', isLoading: false });
+      return [];
+    }
+  },
+
+  addFinancialModel: async (model) => {
+    set({ isLoading: true, error: null });
+    try {
+      const id = await db.financialModels.add({
+        ...model,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      set({ isLoading: false });
+      return id;
+    } catch (error) {
+      console.error('Error adding financial model:', error);
+      set({ error: 'Failed to add financial model', isLoading: false });
+      return -1;
+    }
+  },
+
+  updateFinancialModel: async (id, updates) => {
+    set({ isLoading: true, error: null });
+    try {
+      await db.financialModels.update(id, { ...updates, updatedAt: new Date() });
+      
+      // Update current model if it's the one being edited
+      const currentModel = get().currentModel;
+      if (currentModel && currentModel.id === id) {
+        const updatedModel = await db.financialModels.get(id);
+        if (updatedModel) {
+          set({ currentModel: updatedModel });
+        }
+      }
+      
+      set({ isLoading: false });
+    } catch (error) {
+      console.error('Error updating financial model:', error);
+      set({ error: 'Failed to update financial model', isLoading: false });
+    }
+  },
+
+  deleteFinancialModel: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      await db.financialModels.delete(id);
+      
+      // Reset current model if it's the one being deleted
+      const currentModel = get().currentModel;
+      if (currentModel && currentModel.id === id) {
+        set({ currentModel: null });
+      }
+      
+      set({ isLoading: false });
+    } catch (error) {
+      console.error('Error deleting financial model:', error);
+      set({ error: 'Failed to delete financial model', isLoading: false });
     }
   },
 }));

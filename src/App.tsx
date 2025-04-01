@@ -9,6 +9,8 @@ import Dashboard from "./pages/Dashboard";
 import ProjectsList from "./pages/projects/ProjectsList";
 import NewProject from "./pages/projects/NewProject";
 import ProjectDetail from "./pages/projects/ProjectDetail";
+import NewFinancialModel from "./pages/models/NewFinancialModel";
+import FinancialModelDetail from "./pages/models/FinancialModelDetail";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -26,6 +28,9 @@ const App = () => (
             <Route path="projects" element={<ProjectsList />} />
             <Route path="projects/new" element={<NewProject />} />
             <Route path="projects/:projectId" element={<ProjectDetail />} />
+            <Route path="projects/:projectId/edit" element={<ProjectDetail />} />
+            <Route path="projects/:projectId/models/new" element={<NewFinancialModel />} />
+            <Route path="projects/:projectId/models/:modelId" element={<FinancialModelDetail />} />
             <Route path="modeling" element={<Dashboard />} />
             <Route path="performance" element={<Dashboard />} />
             <Route path="risks" element={<Dashboard />} />

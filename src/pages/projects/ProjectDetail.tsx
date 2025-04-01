@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { ArrowLeft, Edit, Trash2, PlusCircle, BarChart3, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,13 +18,22 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import useStore from "@/store/useStore";
-import { db, getProject } from "@/lib/db";
+import { db, getProject, FinancialModel } from "@/lib/db";
 import { toast } from "@/hooks/use-toast";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const ProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [financialModels, setFinancialModels] = useState<FinancialModel[]>([]);
   const { currentProject, setCurrentProject, deleteProject } = useStore();
 
   useEffect(() => {
@@ -36,6 +45,14 @@ const ProjectDetail = () => {
         const project = await getProject(parseInt(projectId));
         if (project) {
           setCurrentProject(project);
+          
+          // Load financial models for this project
+          const models = await db.financialModels
+            .where('projectId')
+            .equals(parseInt(projectId))
+            .toArray();
+          
+          setFinancialModels(models);
         } else {
           toast({
             variant: "destructive",
@@ -86,6 +103,11 @@ const ProjectDetail = () => {
       </div>
     );
   }
+
+  // Format date for display
+  const formatDate = (date: Date) => {
+    return new Date(date).toLocaleDateString();
+  };
 
   return (
     <div className="space-y-6">
@@ -196,7 +218,7 @@ const ProjectDetail = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <p className="text-sm text-muted-foreground">Financial Models</p>
-                    <p className="text-2xl font-bold">0</p>
+                    <p className="text-2xl font-bold">{financialModels.length}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-sm text-muted-foreground">Performance Entries</p>
@@ -220,37 +242,126 @@ const ProjectDetail = () => {
               <CardTitle className="text-lg">Recently Updated</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-10 text-muted-foreground">
-                <p>No recent activity for this project.</p>
-              </div>
+              {financialModels.length > 0 ? (
+                <div className="space-y-4">
+                  <h3 className="font-medium">Financial Models</h3>
+                  <ul className="space-y-2">
+                    {financialModels
+                      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                      .slice(0, 3)
+                      .map((model) => (
+                        <li key={model.id} className="border-b pb-2">
+                          <Link 
+                            to={`/projects/${projectId}/models/${model.id}`}
+                            className="text-fortress-blue hover:underline"
+                          >
+                            {model.name}
+                          </Link>
+                          <p className="text-xs text-muted-foreground">
+                            Updated {formatDate(model.updatedAt)}
+                          </p>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="text-center py-10 text-muted-foreground">
+                  <p>No recent activity for this project.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
         
         <TabsContent value="models" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Financial Models</CardTitle>
-              <CardDescription>
-                Create and manage financial models for this project
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Financial Models</CardTitle>
+                <CardDescription>
+                  Create and manage financial models for this project
+                </CardDescription>
+              </div>
+              <Button 
+                className="bg-fortress-emerald hover:bg-fortress-emerald/90"
+                onClick={() => navigate(`/projects/${projectId}/models/new`)}
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                New Model
+              </Button>
             </CardHeader>
             <CardContent className="pt-6">
-              <div className="text-center py-10">
-                <div className="mb-4 flex justify-center">
-                  <div className="rounded-full bg-muted p-4">
-                    <BarChart3 className="h-6 w-6 text-muted-foreground" />
+              {financialModels.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Growth Model</TableHead>
+                      <TableHead>Revenue Streams</TableHead>
+                      <TableHead>Cost Categories</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {financialModels.map((model) => (
+                      <TableRow key={model.id} className="cursor-pointer hover:bg-muted/50">
+                        <TableCell className="font-medium">
+                          <Link 
+                            to={`/projects/${projectId}/models/${model.id}`}
+                            className="text-fortress-blue hover:underline"
+                          >
+                            {model.name}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="capitalize">
+                          {model.assumptions.growthModel.type}{" "}
+                          ({(model.assumptions.growthModel.rate * 100).toFixed(0)}%)
+                        </TableCell>
+                        <TableCell>{model.assumptions.revenue.length}</TableCell>
+                        <TableCell>{model.assumptions.costs.length}</TableCell>
+                        <TableCell>{formatDate(model.createdAt)}</TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-8 w-8 p-0"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                navigate(`/projects/${projectId}/models/${model.id}`);
+                              }}
+                            >
+                              <BarChart3 className="h-4 w-4" />
+                              <span className="sr-only">View</span>
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-10">
+                  <div className="mb-4 flex justify-center">
+                    <div className="rounded-full bg-muted p-4">
+                      <BarChart3 className="h-6 w-6 text-muted-foreground" />
+                    </div>
                   </div>
+                  <h3 className="mb-1 text-lg font-medium">No financial models yet</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Create your first financial model to start projecting revenue and costs.
+                  </p>
+                  <Button 
+                    className="bg-fortress-emerald hover:bg-fortress-emerald/90"
+                    onClick={() => navigate(`/projects/${projectId}/models/new`)}
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    New Financial Model
+                  </Button>
                 </div>
-                <h3 className="mb-1 text-lg font-medium">No financial models yet</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Create your first financial model to start projecting revenue and costs.
-                </p>
-                <Button className="bg-fortress-emerald hover:bg-fortress-emerald/90">
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  New Financial Model
-                </Button>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
