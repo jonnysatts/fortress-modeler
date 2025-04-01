@@ -228,6 +228,14 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
               tick={{ fontSize: 12 }}
               tickFormatter={(value) => `$${value.toLocaleString()}`}
             />
+            {isWeeklyEvent && 'attendance' in finalDataPoint && (
+              <YAxis 
+                yAxisId="right" 
+                orientation="right"
+                tick={{ fontSize: 12 }}
+                tickFormatter={(value) => value.toLocaleString()}
+              />
+            )}
             <Tooltip 
               formatter={(value: number, name: string) => {
                 if (name === "attendance" && typeof value === "number") {
@@ -266,7 +274,7 @@ const ModelProjections = ({ model }: ModelProjectionsProps) => {
                 name="Attendance"
                 stroke="#9C27B0"
                 strokeWidth={2}
-                yAxisId="right"
+                yAxisId="right" // Add this missing yAxisId to match the YAxis
               />
             )}
           </LineChart>
