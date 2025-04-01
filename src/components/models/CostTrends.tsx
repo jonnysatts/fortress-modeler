@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
@@ -57,6 +58,8 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
                 costValue = cost.value / weeks; // Spread evenly
               } else if (week === 1) {
                 costValue = cost.value; // Apply only in first week
+              } else {
+                costValue = 0; // No cost for subsequent weeks if not spreading
               }
             } else if (costType === "variable") {
               // Variable costs like F&B COGS grow with revenue
@@ -98,6 +101,8 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
               // Fixed costs are only applied in month 1
               if (month === 1) {
                 costValue = cost.value;
+              } else {
+                costValue = 0; // No cost for subsequent months
               }
             } else if (costType === "variable") {
               // Variable costs grow with the model's growth rate
