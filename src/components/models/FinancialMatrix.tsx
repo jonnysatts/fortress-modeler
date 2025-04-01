@@ -35,6 +35,7 @@ const FinancialMatrix = ({
   
   // Debug the incoming data
   console.log("FinancialMatrix received data:", trendData[0]);
+  console.log("shouldSpreadSetupCosts:", shouldSpreadSetupCosts);
   
   // Combined data view - both revenue and cost data in one table
   if (combinedView) {
@@ -131,9 +132,16 @@ const FinancialMatrix = ({
                   {/* Cost columns */}
                   {model.assumptions.costs.map((cost, costIdx) => {
                     const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
+                    
+                    // Special handling for setup costs based on shouldSpreadSetupCosts
+                    let costValue = period[safeName] || 0;
+                    if (cost.name === "Setup Costs" && idx > 0 && !shouldSpreadSetupCosts) {
+                      costValue = 0;
+                    }
+                    
                     return (
                       <td key={costIdx} className="text-right py-2 px-3 text-red-600">
-                        ${Math.ceil(period[safeName] || 0).toLocaleString()}
+                        ${Math.ceil(costValue).toLocaleString()}
                       </td>
                     );
                   })}
@@ -200,9 +208,16 @@ const FinancialMatrix = ({
               })}
               {costData && model.assumptions.costs.map((cost, costIdx) => {
                 const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
+                
+                // Special handling for setup costs
+                let costValue = period[safeName] || 0;
+                if (cost.name === "Setup Costs" && idx > 0 && !shouldSpreadSetupCosts) {
+                  costValue = 0;
+                }
+                
                 return (
                   <td key={costIdx} className="text-right py-2 px-3">
-                    ${Math.ceil(period[safeName] || 0).toLocaleString()}
+                    ${Math.ceil(costValue).toLocaleString()}
                   </td>
                 );
               })}

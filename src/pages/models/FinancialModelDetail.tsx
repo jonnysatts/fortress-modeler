@@ -348,6 +348,11 @@ const FinancialModelDetail = () => {
                         Attendance growth: {model.assumptions.metadata.growth.attendanceGrowthRate}% per week
                       </p>
                     )}
+                    {shouldSpreadSetupCosts && (
+                      <p className="text-sm text-muted-foreground">
+                        Setup costs are spread across all weeks
+                      </p>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -533,8 +538,12 @@ const calculateTotalCosts = (model: FinancialModel): number => {
     
     const shouldSpreadSetupCosts = metadata.costs?.spreadSetupCosts === true;
     
-    const fixedCosts = model.assumptions.costs
-      .filter(cost => cost.type?.toLowerCase() === "fixed")
+    const setupCosts = model.assumptions.costs
+      .filter(cost => cost.type?.toLowerCase() === "fixed" && cost.name === "Setup Costs")
+      .reduce((sum, cost) => sum + cost.value, 0);
+      
+    const otherFixedCosts = model.assumptions.costs
+      .filter(cost => cost.type?.toLowerCase() === "fixed" && cost.name !== "Setup Costs")
       .reduce((sum, cost) => sum + cost.value, 0);
     
     const recurringAndVariableCosts = model.assumptions.costs
@@ -543,19 +552,19 @@ const calculateTotalCosts = (model: FinancialModel): number => {
     
     let totalCosts = 0;
     
-    if (shouldSpreadSetupCosts) {
-      totalCosts += fixedCosts;
-    } else {
-      totalCosts += fixedCosts;
+    if (!shouldSpreadSetupCosts) {
+      totalCosts += setupCosts;
     }
+    
+    totalCosts += otherFixedCosts;
     
     for (let week = 0; week < weeks; week++) {
       const growthFactor = Math.pow(1 + ((model.assumptions.growthModel.rate || 0) * 0.7), week);
       
       const weekCosts = recurringAndVariableCosts * growthFactor;
       
-      if (shouldSpreadSetupCosts && week > 0) {
-        totalCosts += weekCosts + (fixedCosts / weeks);
+      if (shouldSpreadSetupCosts) {
+        totalCosts += weekCosts + (setupCosts / weeks);
       } else {
         totalCosts += weekCosts;
       }
