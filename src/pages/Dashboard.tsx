@@ -1,11 +1,13 @@
-
 import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, PlusCircle, TrendingUp, AlertTriangle } from "lucide-react";
+import { BarChart3, PlusCircle, TrendingUp, AlertTriangle, FolderIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import useStore from "@/store/useStore";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from "recharts";
+import ChartContainer from "@/components/common/ChartContainer";
+import ContentCard from "@/components/common/ContentCard";
+import { format } from "date-fns";
 
 const Dashboard = () => {
   const { projects, loadProjects } = useStore();
@@ -45,86 +47,67 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-fortress-blue">Dashboard</h1>
-        <Button onClick={() => navigate("/projects/new")} className="bg-fortress-emerald hover:bg-fortress-emerald/90">
-          <PlusCircle className="mr-2 h-4 w-4" />
-          New Project
-        </Button>
-      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Total Projects</CardTitle>
-            <CardDescription>Currently active projects</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-3xl font-bold">{projects.length}</div>
-              <BarChart3 className="h-8 w-8 text-fortress-emerald" />
-            </div>
-          </CardContent>
-        </Card>
+        <ContentCard
+          title="Total Projects"
+          description="Currently active projects"
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-3xl font-bold">{projects.length}</div>
+            <BarChart3 className="h-8 w-8 text-fortress-emerald" />
+          </div>
+        </ContentCard>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Total Revenue (YTD)</CardTitle>
-            <CardDescription>Across all projects</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-3xl font-bold">$103,489</div>
-              <TrendingUp className="h-8 w-8 text-fortress-emerald" />
-            </div>
-          </CardContent>
-        </Card>
+        <ContentCard
+          title="Total Revenue (YTD)"
+          description="Across all projects"
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-3xl font-bold">$103,489</div>
+            <TrendingUp className="h-8 w-8 text-fortress-emerald" />
+          </div>
+        </ContentCard>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Active Risks</CardTitle>
-            <CardDescription>Identified risks across projects</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-3xl font-bold">10</div>
-              <AlertTriangle className="h-8 w-8 text-amber-500" />
-            </div>
-          </CardContent>
-        </Card>
+        <ContentCard
+          title="Active Risks"
+          description="Identified risks across projects"
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-3xl font-bold">10</div>
+            <AlertTriangle className="h-8 w-8 text-amber-500" />
+          </div>
+        </ContentCard>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>Recent Performance</CardTitle>
-            <CardDescription>Revenue over the last 6 months</CardDescription>
-          </CardHeader>
-          <CardContent className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dummyPerformanceData}>
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip 
-                  formatter={(value) => [`$${value}`, 'Revenue']} 
-                  contentStyle={{ 
-                    backgroundColor: '#f8fafc', 
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '6px'
-                  }}
-                />
-                <Bar dataKey="value" fill="#10B981" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        <ChartContainer
+          title="Recent Performance"
+          description="Revenue over the last 6 months"
+          height={320}
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={dummyPerformanceData}>
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip
+                formatter={(value) => [`$${value}`, 'Revenue']}
+                contentStyle={{
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px'
+                }}
+              />
+              <Bar dataKey="value" fill="#10B981" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartContainer>
 
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>Risk Distribution</CardTitle>
-            <CardDescription>By category across all projects</CardDescription>
-          </CardHeader>
-          <CardContent className="h-80">
+        <ChartContainer
+          title="Risk Distribution"
+          description="By category across all projects"
+          height={320}
+        >
             <div className="flex items-center justify-center h-full">
               <div className="w-full h-full flex flex-col">
                 <div className="flex-1">
@@ -143,12 +126,12 @@ const Dashboard = () => {
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip 
-                        formatter={(value) => [`${value} risks`, '']} 
-                        contentStyle={{ 
-                          backgroundColor: '#f8fafc', 
+                      <Tooltip
+                        formatter={(value) => [`${value} risks`, '']}
+                        contentStyle={{
+                          backgroundColor: '#f8fafc',
                           border: '1px solid #e2e8f0',
-                          borderRadius: '6px' 
+                          borderRadius: '6px'
                         }}
                       />
                     </PieChart>
@@ -167,25 +150,24 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ChartContainer>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Revenue Forecast</CardTitle>
-          <CardDescription>Projected vs actual revenue for the next 6 months</CardDescription>
-        </CardHeader>
-        <CardContent className="h-80">
+      <ChartContainer
+        title="Revenue Forecast"
+        description="Projected vs actual revenue for the next 6 months"
+        height={320}
+      >
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={dummyForecastData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="name" />
               <YAxis />
-              <Tooltip 
-                formatter={(value) => [`$${value}`, value === null ? 'Forecast' : 'Actual']} 
-                contentStyle={{ 
-                  backgroundColor: '#f8fafc', 
+              <Tooltip
+                formatter={(value) => [`$${value}`, value === null ? 'Forecast' : 'Actual']}
+                contentStyle={{
+                  backgroundColor: '#f8fafc',
                   border: '1px solid #e2e8f0',
                   borderRadius: '6px'
                 }}
@@ -194,21 +176,18 @@ const Dashboard = () => {
               <Line type="monotone" dataKey="forecast" stroke="#10B981" strokeWidth={2} strokeDasharray="5 5" />
             </LineChart>
           </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      </ChartContainer>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Projects</CardTitle>
-            <CardDescription>Your most recently created projects</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ContentCard
+          title="Recent Projects"
+          description="Your most recently created projects"
+        >
             {projects.length > 0 ? (
               <ul className="space-y-2">
                 {projects.slice(0, 5).map((project) => (
-                  <li 
-                    key={project.id} 
+                  <li
+                    key={project.id}
                     className="p-3 border rounded-md hover:bg-gray-50 cursor-pointer"
                     onClick={() => {
                       useStore.getState().setCurrentProject(project);
@@ -230,8 +209,8 @@ const Dashboard = () => {
             ) : (
               <div className="text-center py-6">
                 <p className="text-muted-foreground">No projects yet.</p>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="mt-2"
                   onClick={() => navigate("/projects/new")}
                 >
@@ -239,15 +218,12 @@ const Dashboard = () => {
                 </Button>
               </div>
             )}
-          </CardContent>
-        </Card>
+        </ContentCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Data Backup Reminder</CardTitle>
-            <CardDescription>It's important to regularly export your data</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ContentCard
+          title="Data Backup Reminder"
+          description="It's important to regularly export your data"
+        >
             <div className="bg-amber-50 border border-amber-200 rounded-md p-4 mb-4">
               <div className="flex items-start">
                 <AlertTriangle className="h-5 w-5 text-amber-500 mr-2 mt-0.5" />
@@ -262,8 +238,7 @@ const Dashboard = () => {
             <Button variant="outline" className="w-full">
               Export All Data
             </Button>
-          </CardContent>
-        </Card>
+        </ContentCard>
       </div>
     </div>
   );

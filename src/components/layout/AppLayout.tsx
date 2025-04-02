@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
+import AppHeader from "./AppHeader";
+import ResponsiveContainer from "./ResponsiveContainer";
 import { Toaster } from "@/components/ui/toaster";
 import { db, addDemoData } from "@/lib/db";
 import useStore from "@/store/useStore";
+import ErrorBoundary from "@/components/common/ErrorBoundary";
 
 const AppLayout = () => {
   const [initializing, setInitializing] = useState(true);
@@ -45,16 +48,21 @@ const AppLayout = () => {
 
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
-      <Sidebar 
-        isCollapsed={isSidebarCollapsed} 
+      <Sidebar
+        isCollapsed={isSidebarCollapsed}
         toggleSidebar={toggleSidebar}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <main 
-          className={`flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 p-6 transition-all duration-300 ease-in-out 
+        <main
+          className={`flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 transition-all duration-300 ease-in-out
                      ${isSidebarCollapsed ? 'ml-20' : 'ml-64'}`}
         >
-          <Outlet />
+          <ResponsiveContainer className="py-6">
+            <ErrorBoundary>
+              <AppHeader />
+              <Outlet />
+            </ErrorBoundary>
+          </ResponsiveContainer>
         </main>
       </div>
       <Toaster />

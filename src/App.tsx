@@ -44,7 +44,7 @@ const App = () => (
               <Route path="projects/:projectId/models/new" element={<NewFinancialModel />} />
               <Route path="projects/:projectId/models/:modelId" element={<FinancialModelDetail />} />
               <Route path="projects/:projectId/models/:modelId/edit" element={<EditFinancialModel />} />
-              <Route path="modeling" element={<Dashboard />} />
+              <Route path="dashboard" element={<Dashboard />} />
               <Route path="performance" element={<Dashboard />} />
               <Route path="risks" element={<Dashboard />} />
               <Route path="settings" element={<Settings />} />
