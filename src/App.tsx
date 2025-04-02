@@ -4,16 +4,25 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ErrorBoundary from "@/components/common/ErrorBoundary";
-import AppLayout from "./components/layout/AppLayout";
-import Dashboard from "./pages/Dashboard";
+
+// Layouts
+import PortfolioLayout from "@/layouts/PortfolioLayout";
+import ProductLayout from "@/layouts/ProductLayout";
+
+// Portfolio Pages
+import PortfolioDashboard from "@/pages/portfolio";
 import ProjectsList from "./pages/projects/ProjectsList";
 import NewProject from "./pages/projects/NewProject";
+import Settings from "./pages/Settings";
+
+// Product Pages
+import ProductSummary from "@/pages/product/summary";
 import ProjectDetail from "./pages/projects/ProjectDetail";
 import EditProject from "./pages/projects/EditProject";
 import NewFinancialModel from "./pages/models/NewFinancialModel";
 import FinancialModelDetail from "./pages/models/FinancialModelDetail";
 import EditFinancialModel from "./pages/models/EditFinancialModel";
-import Settings from "./pages/Settings";
+
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -35,20 +44,30 @@ const App = () => (
       <BrowserRouter>
         <ErrorBoundary>
           <Routes>
-            <Route path="/" element={<AppLayout />}>
-              <Route index element={<Dashboard />} />
+            {/* Portfolio Layout Routes */}
+            <Route path="/*" element={<PortfolioLayout />}>
+              <Route index element={<PortfolioDashboard />} />
               <Route path="projects" element={<ProjectsList />} />
               <Route path="projects/new" element={<NewProject />} />
-              <Route path="projects/:projectId" element={<ProjectDetail />} />
-              <Route path="projects/:projectId/edit" element={<EditProject />} />
-              <Route path="projects/:projectId/models/new" element={<NewFinancialModel />} />
-              <Route path="projects/:projectId/models/:modelId" element={<FinancialModelDetail />} />
-              <Route path="projects/:projectId/models/:modelId/edit" element={<EditFinancialModel />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="performance" element={<Dashboard />} />
-              <Route path="risks" element={<Dashboard />} />
               <Route path="settings" element={<Settings />} />
             </Route>
+
+            {/* Product Layout Routes */}
+            <Route path="/products/:id/*" element={<ProductLayout />}>
+              <Route path="summary" element={<ProductSummary />} />
+              <Route path="assumptions" element={<ProjectDetail />} />
+              <Route path="inputs" element={<FinancialModelDetail />} />
+              <Route path="forecast" element={<FinancialModelDetail />} />
+              <Route path="actuals" element={<FinancialModelDetail />} />
+              <Route path="analysis" element={<FinancialModelDetail />} />
+              <Route path="risks" element={<FinancialModelDetail />} />
+              <Route path="edit" element={<EditProject />} />
+              <Route path="models/new" element={<NewFinancialModel />} />
+              <Route path="models/:modelId" element={<FinancialModelDetail />} />
+              <Route path="models/:modelId/edit" element={<EditFinancialModel />} />
+            </Route>
+
+            {/* Fallback Route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </ErrorBoundary>

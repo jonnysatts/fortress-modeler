@@ -150,7 +150,6 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
-          </div>
         </ChartContainer>
       </div>
 
@@ -159,23 +158,23 @@ const Dashboard = () => {
         description="Projected vs actual revenue for the next 6 months"
         height={320}
       >
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={dummyForecastData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip
-                formatter={(value) => [`$${value}`, value === null ? 'Forecast' : 'Actual']}
-                contentStyle={{
-                  backgroundColor: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px'
-                }}
-              />
-              <Line type="monotone" dataKey="actual" stroke="#1A2942" strokeWidth={2} dot={{ r: 4 }} />
-              <Line type="monotone" dataKey="forecast" stroke="#10B981" strokeWidth={2} strokeDasharray="5 5" />
-            </LineChart>
-          </ResponsiveContainer>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={dummyForecastData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <XAxis dataKey="name" />
+            <YAxis />
+            <Tooltip
+              formatter={(value) => [`$${value}`, value === null ? 'Forecast' : 'Actual']}
+              contentStyle={{
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px'
+              }}
+            />
+            <Line type="monotone" dataKey="actual" stroke="#1A2942" strokeWidth={2} dot={{ r: 4 }} />
+            <Line type="monotone" dataKey="forecast" stroke="#10B981" strokeWidth={2} strokeDasharray="5 5" />
+          </LineChart>
+        </ResponsiveContainer>
       </ChartContainer>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -183,40 +182,40 @@ const Dashboard = () => {
           title="Recent Projects"
           description="Your most recently created projects"
         >
-            {projects.length > 0 ? (
-              <ul className="space-y-2">
-                {projects.slice(0, 5).map((project) => (
-                  <li
-                    key={project.id}
-                    className="p-3 border rounded-md hover:bg-gray-50 cursor-pointer"
-                    onClick={() => {
-                      useStore.getState().setCurrentProject(project);
-                      navigate(`/projects/${project.id}`);
-                    }}
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <h3 className="font-medium">{project.name}</h3>
-                        <p className="text-sm text-muted-foreground">{project.productType}</p>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(project.updatedAt).toLocaleDateString()}
-                      </span>
+          {projects.length > 0 ? (
+            <ul className="space-y-2">
+              {projects.slice(0, 5).map((project) => (
+                <li
+                  key={project.id}
+                  className="p-3 border rounded-md hover:bg-gray-50 cursor-pointer"
+                  onClick={() => {
+                    useStore.getState().setCurrentProject(project);
+                    navigate(`/projects/${project.id}`);
+                  }}
+                >
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="font-medium">{project.name}</h3>
+                      <p className="text-sm text-muted-foreground">{project.productType}</p>
                     </div>
-                  </li>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(project.updatedAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </li>
                 ))}
               </ul>
             ) : (
-              <div className="text-center py-6">
-                <p className="text-muted-foreground">No projects yet.</p>
-                <Button
-                  variant="outline"
-                  className="mt-2"
-                  onClick={() => navigate("/projects/new")}
-                >
-                  Create Your First Project
-                </Button>
-              </div>
+            <div className="text-center py-6">
+              <p className="text-muted-foreground">No projects yet.</p>
+              <Button
+                variant="outline"
+                className="mt-2"
+                onClick={() => navigate("/projects/new")}
+              >
+                Create Your First Project
+              </Button>
+            </div>
             )}
         </ContentCard>
 
@@ -224,20 +223,20 @@ const Dashboard = () => {
           title="Data Backup Reminder"
           description="It's important to regularly export your data"
         >
-            <div className="bg-amber-50 border border-amber-200 rounded-md p-4 mb-4">
-              <div className="flex items-start">
-                <AlertTriangle className="h-5 w-5 text-amber-500 mr-2 mt-0.5" />
-                <div>
-                  <h4 className="font-medium text-amber-800">Never backed up</h4>
-                  <p className="text-sm text-amber-700">
-                    You haven't exported your data yet. We recommend doing this regularly to prevent data loss.
-                  </p>
-                </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-md p-4 mb-4">
+            <div className="flex items-start">
+              <AlertTriangle className="h-5 w-5 text-amber-500 mr-2 mt-0.5" />
+              <div>
+                <h4 className="font-medium text-amber-800">Never backed up</h4>
+                <p className="text-sm text-amber-700">
+                  You haven't exported your data yet. We recommend doing this regularly to prevent data loss.
+                </p>
               </div>
             </div>
-            <Button variant="outline" className="w-full">
-              Export All Data
-            </Button>
+          </div>
+          <Button variant="outline" className="w-full">
+            Export All Data
+          </Button>
         </ContentCard>
       </div>
     </div>
