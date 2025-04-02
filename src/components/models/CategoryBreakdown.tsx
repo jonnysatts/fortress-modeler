@@ -16,6 +16,11 @@ import {
 import RevenueBreakdownView from "./RevenueBreakdownView";
 import CostBreakdownView from "./CostBreakdownView";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Add Select imports
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from 'recharts';
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatCurrency } from "@/lib/utils";
 
 interface CategoryBreakdownProps {
   model: FinancialModel;
@@ -23,7 +28,16 @@ interface CategoryBreakdownProps {
   costTrendData: any[]; // Add prop for full cost trend data
 }
 
-const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8", "#82ca9d", "#ffc658", "#8dd1e1"];
+// Define consistent colors, adding Marketing Budget
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#a855f7', '#ef4444', '#f97316', '#eab308', '#84cc16', '#14b8a6']; 
+const COST_COLOR_MAP: Record<string, string> = {
+  "Setup Costs": "#ef4444",
+  "Marketing Budget": "#a855f7",
+  "F&B COGS": "#f97316",
+  "Staff Costs": "#eab308",
+  "Management Costs": "#22c55e",
+};
+
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const dataItem = payload[0].payload;
@@ -48,7 +62,11 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
   const [selectedWeek, setSelectedWeek] = useState<number>(1); // Default to week 1
   
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
+  const timeUnit = isWeeklyEvent ? "Week" : "Month"; // Define timeUnit here
   const totalWeeks = model.assumptions.metadata?.weeks || 0;
+
+  // Log the received cost data prop
+  console.log(`[CategoryBreakdown Render] Received costTrendData:`, costTrendData);
 
   console.log(`[CategoryBreakdown] View: ${breakdownView}, Selected Week: ${selectedWeek}`);
 
@@ -57,20 +75,26 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
   const selectedRevenuePoint = revenueTrendData?.[selectedWeek - 1] || null;
   const selectedCostPoint = costTrendData?.[selectedWeek - 1] || null;
   
+  // Log the selected data point
+  console.log(`[CategoryBreakdown Render] Selected cost point for ${timeUnit} ${selectedWeek}:`, selectedCostPoint);
+  
   // Calculate breakdown data for the selected week
   const revenueData = useMemo(() => 
     prepareRevenueDataForWeek(selectedRevenuePoint), 
     [selectedRevenuePoint]
   );
   const costData = useMemo(() => 
-    prepareCostDataForWeek(selectedCostPoint, model), // Pass model for base cost info
+    prepareCostDataForWeek(selectedCostPoint, model), 
     [selectedCostPoint, model]
   );
   const typeCategorizedData = useMemo(() => 
-    prepareTypeCategorizedDataForWeek(selectedCostPoint, model), // Pass model for base cost info
+    prepareTypeCategorizedDataForWeek(selectedCostPoint, model), 
     [selectedCostPoint, model]
   );
 
+  // Log the costData just before rendering
+  console.log("[CategoryBreakdown Render] costData state before JSX:", costData);
+  
   const weeklyTotals = useMemo(() => {
     if (!isWeeklyEvent) return null;
     const totalRevenue = calculateTotalRevenue(model);
@@ -80,12 +104,9 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
     return { totalRevenue, totalCosts, profit, profitMargin: profitMarginPercentage };
   }, [model, isWeeklyEvent]);
   
-  const getTypeColor = (type: string) => {
-    const typeLowerCase = type.toLowerCase();
-    if (typeLowerCase === "fixed") return "#FF8042";
-    if (typeLowerCase === "variable") return "#8884D8";
-    if (typeLowerCase === "recurring") return "#82CA9D";
-    return "#CCCCCC";
+  // Function to get color for cost category, falling back to COLORS array
+  const getCostColor = (name: string, index: number): string => {
+    return COST_COLOR_MAP[name] || COLORS[index % COLORS.length];
   };
   
   const tooltipElement = <Tooltip content={<CustomTooltip />} />;
@@ -149,15 +170,104 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
         />
       )}
 
+      {/* --- Costs View --- */}
       {breakdownView === "costs" && (
-        <CostBreakdownView 
-          costData={costData} 
-          typeData={typeCategorizedData} 
-          colors={COLORS} 
-          tooltip={tooltipElement}
-          getTypeColor={getTypeColor}
-          selectedWeek={selectedWeek} 
-        />
+        <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Cost Distribution Pie Chart */}
+          <Card>
+            <CardHeader><CardTitle className="text-base font-semibold">Cost Distribution for {timeUnit} {selectedWeek}</CardTitle></CardHeader>
+            <CardContent className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={costData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    nameKey="name"
+                    label={(entry) => `${entry.percentage}%`}
+                  >
+                    {costData.map((entry, index) => (
+                      <Cell key={`pie-cell-${entry.name}`} fill={getCostColor(entry.name, index)} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                  <Legend 
+                     formatter={(value, entry) => <span style={{ color: entry.color }}>{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+          
+          {/* Cost Categories Bar Chart */}
+          <Card>
+            <CardHeader><CardTitle className="text-base font-semibold">Cost Categories By Amount for {timeUnit} {selectedWeek}</CardTitle></CardHeader>
+            <CardContent className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={costData} layout="vertical" margin={{ left: 100 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" tickFormatter={formatCurrency} />
+                  <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
+                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                  <Bar dataKey="value" name="Amount">
+                     {costData.map((entry, index) => (
+                         <Cell key={`bar-cell-${entry.name}`} fill={getCostColor(entry.name, index)} />
+                     ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+          
+          {/* Costs By Type Bar Chart */}
+          <Card>
+            <CardHeader><CardTitle className="text-base font-semibold">Costs By Type for {timeUnit} {selectedWeek}</CardTitle></CardHeader>
+            <CardContent className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={typeCategorizedData} layout="vertical" margin={{ left: 100 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" tickFormatter={formatCurrency} />
+                  <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
+                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                  <Bar dataKey="value" name="Amount">
+                     {typeCategorizedData.map((entry, index) => (
+                         <Cell key={`type-bar-cell-${entry.name}`} fill={getCostColor(entry.name, index)} />
+                     ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+          
+          {/* Cost Category Details Table */}
+          <Card className="lg:col-span-2">
+            <CardHeader><CardTitle className="text-base font-semibold">Cost Category Details for {timeUnit} {selectedWeek}</CardTitle></CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Percentage</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {costData.map((entry, index) => (
+                    <TableRow key={entry.name}>
+                      <TableCell>{entry.name}</TableCell>
+                      <TableCell>{formatCurrency(entry.value)}</TableCell>
+                      <TableCell>{entry.percentage}%</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {isWeeklyEvent && weeklyTotals && (

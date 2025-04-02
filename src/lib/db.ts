@@ -1,5 +1,5 @@
 import Dexie, { Table } from 'dexie';
-import { MarketingSetup } from '@/types/models';
+import { MarketingSetup, ActualsPeriodEntry } from '@/types/models';
 
 // Define interfaces for our database tables
 export interface Project {
@@ -98,9 +98,30 @@ export class FortressDB extends Dexie {
   actualPerformance!: Table<ActualPerformance, number>;
   risks!: Table<Risk, number>;
   scenarios!: Table<Scenario, number>;
+  actuals!: Table<ActualsPeriodEntry, number>;
 
   constructor() {
     super('FortressDB');
+    this.version(3).stores({
+      projects: '++id, name, productType, createdAt, updatedAt',
+      financialModels: '++id, projectId, name, createdAt, updatedAt',
+      actualPerformance: '++id, projectId, date',
+      risks: '++id, projectId, type, likelihood, impact, status',
+      scenarios: '++id, projectId, modelId, name, createdAt',
+      actuals: '++id, &[projectId+period], projectId, period'
+    }).upgrade(tx => {
+      console.log("Upgrading DB schema to version 3, changing index for 'actuals' table.");
+    });
+    
+    this.version(2).stores({
+      projects: '++id, name, productType, createdAt, updatedAt',
+      financialModels: '++id, projectId, name, createdAt, updatedAt',
+      actualPerformance: '++id, projectId, date',
+      risks: '++id, projectId, type, likelihood, impact, status',
+      scenarios: '++id, projectId, modelId, name, createdAt',
+      actuals: '++id, &[modelId+period], modelId, period'
+    });
+
     this.version(1).stores({
       projects: '++id, name, productType, createdAt, updatedAt',
       financialModels: '++id, projectId, name, createdAt, updatedAt',
@@ -145,6 +166,24 @@ export const deleteProject = async (id: number): Promise<void> => {
 
 export const getModelsForProject = async (projectId: number): Promise<FinancialModel[]> => {
   return await db.financialModels.where('projectId').equals(projectId).toArray();
+};
+
+export const getActualsForProject = async (projectId: number): Promise<ActualsPeriodEntry[]> => {
+  return await db.actuals.where({ projectId: projectId }).toArray();
+};
+
+export const upsertActualsPeriod = async (actualEntry: Omit<ActualsPeriodEntry, 'id'>): Promise<number> => {
+  const existing = await db.actuals.get({ 
+    projectId: actualEntry.projectId, 
+    period: actualEntry.period 
+  });
+  
+  if (existing?.id) {
+    await db.actuals.update(existing.id, actualEntry);
+    return existing.id;
+  } else {
+    return await db.actuals.add(actualEntry as ActualsPeriodEntry);
+  }
 };
 
 export const addDemoData = async (): Promise<void> => {

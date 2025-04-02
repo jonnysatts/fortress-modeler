@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Model, RevenueStream, CostCategory } from "@/types/models";
+import { Model, RevenueStream, CostCategory, ActualsPeriodEntry } from "@/types/models";
 import { formatCurrency } from "@/lib/utils";
 import { useEffect, useState, useMemo } from "react";
 import {
@@ -16,6 +16,7 @@ import { useNavigate } from "react-router-dom";
 interface ModelOverviewProps {
   model: Model;
   projectId: string | undefined; // Need projectId for navigation
+  actualsData?: ActualsPeriodEntry[]; // Add actuals data prop
 }
 
 interface SimulationPeriod {
@@ -30,7 +31,7 @@ interface SimulationPeriod {
   attendance?: number;
 }
 
-export const ModelOverview = ({ model, projectId }: ModelOverviewProps) => {
+export const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverviewProps) => {
   const navigate = useNavigate();
   // Calculate isWeekly here, outside useMemo
   const isWeekly = model?.assumptions?.metadata?.type === "WeeklyEvent"; 
@@ -233,8 +234,53 @@ export const ModelOverview = ({ model, projectId }: ModelOverviewProps) => {
     const fixedCostRatio = (totalFixedCosts + totalOtherCosts) > 0 ? 
                            (totalFixedCosts / (totalFixedCosts + totalOtherCosts)) * 100 : 0;
 
+    // --- NEW: Process Actuals --- 
+    let latestActualPeriod = 0;
+    let totalActualRevenue = 0;
+    let totalActualCosts = 0;
+    let finalPeriodActualRevenue = 0;
+    let finalPeriodActualCosts = 0;
+
+    const actualsMap = new Map(actualsData.map(a => [a.period, a]));
+
+    // Integrate actuals into periodicData and calculate actual totals
+    const processedPeriodicData = periodicData.map(forecastPeriod => {
+        const actualEntry = actualsMap.get(forecastPeriod.period);
+        let periodActualRevenue = 0;
+        let periodActualCost = 0;
+        let hasActuals = false;
+
+        if (actualEntry) {
+            hasActuals = true;
+            latestActualPeriod = Math.max(latestActualPeriod, forecastPeriod.period);
+            // Sum actuals from the records
+            periodActualRevenue = Object.values(actualEntry.revenueActuals || {}).reduce((s, v) => s + v, 0);
+            periodActualCost = Object.values(actualEntry.costActuals || {}).reduce((s, v) => s + v, 0);
+            
+            totalActualRevenue += periodActualRevenue;
+            totalActualCosts += periodActualCost;
+            finalPeriodActualRevenue = periodActualRevenue; // Keep track of last actual period
+            finalPeriodActualCosts = periodActualCost;
+        }
+
+        return {
+            ...forecastPeriod,
+            revenueActual: hasActuals ? Math.ceil(periodActualRevenue) : undefined,
+            costActual: hasActuals ? Math.ceil(periodActualCost) : undefined,
+            profitActual: hasActuals ? Math.ceil(periodActualRevenue - periodActualCost) : undefined,
+            hasActuals: hasActuals
+        };
+    });
+    // --- End Process Actuals --- 
+    
+    // Calculate actual profit totals and margins
+    const totalActualProfit = totalActualRevenue - totalActualCosts;
+    const finalActualProfit = finalPeriodActualRevenue - finalPeriodActualCosts;
+    const finalActualMargin = finalPeriodActualRevenue > 0 ? (finalActualProfit / finalPeriodActualRevenue) * 100 : 0;
+
+    // Return both forecast and actual summary data
     return {
-      periodicData,
+      periodicData: processedPeriodicData, // Now includes actuals
       duration,
       timeUnit,
       initialRevenue: initialPeriod?.revenue || 0,
@@ -254,8 +300,16 @@ export const ModelOverview = ({ model, projectId }: ModelOverviewProps) => {
       totalAttendance: Math.round(totalAttendance),
       revenueConcentration, // Percentage
       fixedCostRatio, // Percentage
+      latestActualPeriod,
+      totalActualRevenue,
+      totalActualCosts,
+      totalActualProfit,
+      finalPeriodActualRevenue,
+      finalPeriodActualCosts,
+      finalActualProfit,
+      finalActualMargin,
     };
-  }, [model, isWeekly]);
+  }, [model, isWeekly, actualsData]); // Add actualsData to dependency array
 
   if (!simulationResults) return <p className="text-red-500">Unable to load overview: Simulation failed due to incomplete model data.</p>;
 
@@ -279,7 +333,15 @@ export const ModelOverview = ({ model, projectId }: ModelOverviewProps) => {
     largestInitialCost,
     totalAttendance,
     revenueConcentration,
-    fixedCostRatio
+    fixedCostRatio,
+    latestActualPeriod,
+    totalActualRevenue,
+    totalActualCosts,
+    totalActualProfit,
+    finalPeriodActualRevenue,
+    finalPeriodActualCosts,
+    finalActualProfit,
+    finalActualMargin,
   } = simulationResults;
 
   // Simplified Tooltip for Sparklines
@@ -325,13 +387,11 @@ export const ModelOverview = ({ model, projectId }: ModelOverviewProps) => {
           </Button>
        </div>
 
-      {/* Key Metrics Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Key Metrics Dashboard - Update to show Actual vs Forecast */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Revenue Card */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-primary">Revenue</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-lg font-semibold text-primary">Revenue</CardTitle></CardHeader>
           <CardContent className="space-y-3">
              <div className="flex justify-between items-baseline">
                 <span className="text-sm text-muted-foreground">Initial {timeUnit}</span>
@@ -343,8 +403,15 @@ export const ModelOverview = ({ model, projectId }: ModelOverviewProps) => {
              </div>
               <div className="border-t pt-3 mt-3 flex justify-between items-baseline">
                 <span className="text-sm font-medium text-muted-foreground">Total Projected</span>
-                <span className="text-2xl font-bold text-green-600">{formatCurrency(totalRevenue)}</span>
+                <span className="text-2xl font-bold text-green-700">{formatCurrency(totalRevenue)}</span>
              </div>
+             {/* NEW: Actual Total Revenue */} 
+             {latestActualPeriod > 0 && (
+               <div className="flex justify-between items-baseline">
+                 <span className="text-sm text-green-600">Total Actual ({timeUnit} 1-{latestActualPeriod})</span>
+                 <span className="text-lg font-semibold text-green-600">{formatCurrency(totalActualRevenue)}</span>
+               </div>
+             )}
              <div className="pt-2">
                 <p className="text-xs text-muted-foreground">Highest Initial Stream</p>
                 <p className="text-sm font-medium">{highestInitialRevenue.name} ({formatCurrency(highestInitialRevenue.value)})</p>
@@ -354,52 +421,68 @@ export const ModelOverview = ({ model, projectId }: ModelOverviewProps) => {
 
         {/* Costs Card */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-primary">Costs</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-             <div className="flex justify-between items-baseline">
-                <span className="text-sm text-muted-foreground">Initial {timeUnit}</span>
-                <span className="text-lg font-semibold">{formatCurrency(initialCosts)}</span>
-             </div>
-             <div className="flex justify-between items-baseline">
-                <span className="text-sm text-muted-foreground">Final {timeUnit}</span>
-                <span className="text-lg font-semibold">{formatCurrency(finalWeekCosts)}</span>
-             </div>
-             <div className="border-t pt-3 mt-3 flex justify-between items-baseline">
-                <span className="text-sm font-medium text-muted-foreground">Total Projected</span>
-                <span className="text-2xl font-bold text-red-600">{formatCurrency(totalCosts)}</span>
-             </div>
+           <CardHeader><CardTitle className="text-lg font-semibold text-primary">Costs</CardTitle></CardHeader>
+           <CardContent className="space-y-3">
+              <div className="flex justify-between items-baseline">
+                 <span className="text-sm text-muted-foreground">Initial {timeUnit}</span>
+                 <span className="text-lg font-semibold">{formatCurrency(initialCosts)}</span>
+              </div>
+              <div className="flex justify-between items-baseline">
+                 <span className="text-sm text-muted-foreground">Final {timeUnit}</span>
+                 <span className="text-lg font-semibold">{formatCurrency(finalWeekCosts)}</span>
+              </div>
+              <div className="border-t pt-3 mt-3 flex justify-between items-baseline">
+                 <span className="text-sm font-medium text-muted-foreground">Total Projected</span>
+                 <span className="text-2xl font-bold text-red-700">{formatCurrency(totalCosts)}</span>
+              </div>
+               {/* NEW: Actual Total Costs */} 
+               {latestActualPeriod > 0 && (
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-sm text-red-600">Total Actual ({timeUnit} 1-{latestActualPeriod})</span>
+                    <span className="text-lg font-semibold text-red-600">{formatCurrency(totalActualCosts)}</span>
+                  </div>
+               )}
               <div className="pt-2">
                 <p className="text-xs text-muted-foreground">Largest Initial Cost</p>
                 <p className="text-sm font-medium">{largestInitialCost.name} ({formatCurrency(largestInitialCost.value)})</p>
               </div>
-          </CardContent>
+           </CardContent>
         </Card>
 
         {/* Profitability Card */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-primary">Profitability</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-             <div className="flex justify-between items-baseline">
-                <span className="text-sm text-muted-foreground">Initial Margin</span>
-                <span className="text-lg font-semibold">{initialMargin.toFixed(1)}%</span>
-             </div>
-             <div className="flex justify-between items-baseline">
-                <span className="text-sm text-muted-foreground">Final {timeUnit} Margin</span>
-                 <span className="text-lg font-semibold">{finalWeekMargin.toFixed(1)}%</span>
-             </div>
-             <div className="border-t pt-3 mt-3 flex justify-between items-baseline">
-                <span className="text-sm font-medium text-muted-foreground">Total Projected Profit</span>
-                 <span className="text-2xl font-bold text-blue-600">{formatCurrency(totalProfit)}</span>
-             </div>
-              <div className="pt-2">
-                 <p className="text-xs text-muted-foreground">Break-even Point</p>
-                 <p className="text-sm font-medium">{breakEvenPoint ? `${timeUnit} ${breakEvenPoint}` : 'Never'}</p>
-             </div>
-          </CardContent>
+           <CardHeader><CardTitle className="text-lg font-semibold text-primary">Profitability</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+                <div className="flex justify-between items-baseline">
+                   <span className="text-sm text-muted-foreground">Initial Margin</span>
+                   <span className="text-lg font-semibold">{initialMargin.toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between items-baseline">
+                   <span className="text-sm text-muted-foreground">Final {timeUnit} Margin</span>
+                    <span className="text-lg font-semibold">{finalWeekMargin.toFixed(1)}%</span>
+                </div>
+                <div className="border-t pt-3 mt-3 flex justify-between items-baseline">
+                   <span className="text-sm font-medium text-muted-foreground">Total Projected Profit</span>
+                    <span className="text-2xl font-bold text-blue-700">{formatCurrency(totalProfit)}</span>
+                </div>
+                {/* NEW: Actual Total Profit & Margin */} 
+                {latestActualPeriod > 0 && (
+                 <>
+                   <div className="flex justify-between items-baseline">
+                     <span className="text-sm text-blue-600">Total Actual Profit ({timeUnit} 1-{latestActualPeriod})</span>
+                     <span className="text-lg font-semibold text-blue-600">{formatCurrency(totalActualProfit)}</span>
+                   </div>
+                   <div className="flex justify-between items-baseline">
+                      <span className="text-sm text-purple-600">Actual Margin ({timeUnit} {latestActualPeriod})</span>
+                      <span className="text-lg font-semibold text-purple-600">{finalActualMargin.toFixed(1)}%</span>
+                   </div>
+                 </>
+                )}
+                <div className="pt-2">
+                   <p className="text-xs text-muted-foreground">Break-even Point</p>
+                   <p className="text-sm font-medium">{breakEvenPoint ? `${timeUnit} ${breakEvenPoint}` : 'Never'}</p>
+               </div>
+            </CardContent>
         </Card>
       </div>
 

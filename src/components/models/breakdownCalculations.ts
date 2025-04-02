@@ -55,30 +55,52 @@ export const prepareRevenueDataForWeek = (weekDataPoint: any | null): RevenueDat
 // Prepare Cost Breakdown Data for a SPECIFIC week's data point
 export const prepareCostDataForWeek = (weekDataPoint: any | null, model: FinancialModel): CostData[] => {
   if (!weekDataPoint) return [];
+  console.log("[BreakdownCalc] Input weekDataPoint:", weekDataPoint); // Log the input
 
   const costItems: CostData[] = [];
-  let totalWeeklyCosts = weekDataPoint.costs || 0; // Get total cost for this week
+  // Get total cost for this week BEFORE potentially adding marketing
+  // Recalculate total AFTER adding all items for accurate percentage
+  // let totalWeeklyCosts = weekDataPoint.costs || 0; 
 
-  // Map base costs to their calculated values for the week
+  // Map base costs
   model.assumptions.costs.forEach(baseCost => {
     const safeName = baseCost.name.replace(/[^a-zA-Z0-9]/g, "");
-    const weeklyValue = weekDataPoint[safeName] || 0; // Get calculated value for this week
+    const weeklyValue = weekDataPoint[safeName] || 0; 
     const costType = baseCost.type?.toLowerCase() || "recurring";
     
-    costItems.push({
-      name: baseCost.name,
-      value: weeklyValue,
-      type: costType.charAt(0).toUpperCase() + costType.slice(1),
-    });
+    // Only add if value is > 0 for cleaner breakdown
+    if (weeklyValue > 0) {
+        costItems.push({
+          name: baseCost.name,
+          value: weeklyValue,
+          type: costType.charAt(0).toUpperCase() + costType.slice(1),
+        });
+    }
   });
 
-  // Calculate percentage based on this week's total cost
+  // Add Marketing Budget if it exists and is > 0
+  const marketingBudgetCost = weekDataPoint.MarketingBudget || 0;
+  console.log(`[BreakdownCalc] Found MarketingBudget value: ${marketingBudgetCost}`); // Log detected value
+  if (marketingBudgetCost > 0) {
+      console.log("[BreakdownCalc] Adding Marketing Budget to costItems"); // Log if added
+      costItems.push({
+          name: "Marketing Budget",
+          value: marketingBudgetCost,
+          type: "Recurring", // Treat marketing budget as recurring for categorization
+      });
+  }
+
+  // Calculate total cost *from the items we've included*
+  const totalWeeklyCosts = costItems.reduce((sum, item) => sum + item.value, 0);
+
+  // Calculate percentage based on the derived total weekly cost
   costItems.forEach(item => {
     const percentage = totalWeeklyCosts > 0 ? Math.round((item.value / totalWeeklyCosts) * 100) : 0;
     item.percentage = percentage;
     item.nameAndPercentage = `${item.name} (${percentage}%)`; 
   });
 
+  console.log("[BreakdownCalc] Final costItems before return:", costItems); // Log final array
   return costItems.sort((a, b) => b.value - a.value);
 };
 
@@ -92,16 +114,22 @@ export const prepareTypeCategorizedDataForWeek = (weekDataPoint: any | null, mod
     recurring: { name: "Recurring Costs", value: 0 }
   };
 
-  // Sum weekly values by type
+  // Sum base costs by type
   model.assumptions.costs.forEach(baseCost => {
     const safeName = baseCost.name.replace(/[^a-zA-Z0-9]/g, "");
     const weeklyValue = weekDataPoint[safeName] || 0;
     const costType = (baseCost.type || "recurring").toLowerCase();
 
-    if (typeCategories[costType]) {
+    if (typeCategories[costType] && weeklyValue > 0) {
       typeCategories[costType].value += weeklyValue;
     }
   });
+
+  // Add Marketing Budget to the appropriate category (Recurring)
+  const marketingBudgetCost = weekDataPoint.MarketingBudget || 0;
+  if (marketingBudgetCost > 0) {
+      typeCategories.recurring.value += marketingBudgetCost;
+  }
 
   return Object.values(typeCategories).filter(category => category.value > 0);
 };

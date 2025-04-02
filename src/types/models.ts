@@ -78,7 +78,21 @@ export interface Model {
   id?: string | number;
   name: string;
   description?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
   assumptions: ModelAssumptions;
-} 
+}
+
+// --- NEW: Actuals Data Interface ---
+export interface ActualsPeriodEntry {
+  id?: number; // Auto-incrementing primary key from Dexie
+  projectId: number; // Changed from modelId to projectId
+  period: number; // Week or Month number
+  periodType: 'Week' | 'Month'; // Type of period
+  // Use Record<string, number> for flexibility
+  revenueActuals: Record<string, number>; 
+  costActuals: Record<string, number>; 
+  attendanceActual?: number; // NEW: Actual attendance for the period
+  notes?: string;
+}
+// --- End NEW --- 

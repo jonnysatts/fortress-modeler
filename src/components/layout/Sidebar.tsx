@@ -1,78 +1,68 @@
-
-import { Link, useLocation } from "react-router-dom";
+import React from 'react';
+import { NavLink } from "react-router-dom";
+import { Home, FolderKanban, LineChart, ShieldAlert, Settings, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { BarChart3, Home, FolderOpen, LineChart, AlertTriangle, Settings } from "lucide-react";
 
-const navItems = [
-  {
-    name: "Dashboard",
-    path: "/",
-    icon: Home,
-  },
-  {
-    name: "Projects",
-    path: "/projects",
-    icon: FolderOpen,
-  },
-  {
-    name: "Financial Modeling",
-    path: "/modeling",
-    icon: LineChart,
-  },
-  {
-    name: "Performance",
-    path: "/performance",
-    icon: BarChart3,
-  },
-  {
-    name: "Risk Management",
-    path: "/risks",
-    icon: AlertTriangle,
-  },
-  {
-    name: "Settings",
-    path: "/settings",
-    icon: Settings,
-  },
-];
+// Define props interface
+interface SidebarProps {
+  isCollapsed: boolean;
+  toggleSidebar: () => void;
+}
 
-const Sidebar = () => {
-  const location = useLocation();
+const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
+  const navItems = [
+    { name: "Dashboard", path: "/dashboard", icon: Home },
+    { name: "Projects", path: "/projects", icon: FolderKanban },
+    // Add other top-level sections if needed
+    // { name: "Performance", path: "/performance", icon: LineChart },
+    // { name: "Risk Management", path: "/risk", icon: ShieldAlert },
+    { name: "Settings", path: "/settings", icon: Settings },
+  ];
 
   return (
-    <aside className="bg-sidebar w-64 min-h-screen flex flex-col border-r border-sidebar-border sticky top-0">
-      <div className="p-4 border-b border-sidebar-border">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-fortress-emerald rounded-md flex items-center justify-center">
-            <BarChart3 className="text-white h-5 w-5" />
-          </div>
-          <h1 className="text-sidebar-foreground font-bold text-lg">Fortress Financial</h1>
-        </div>
+    // Adjust width based on collapsed state
+    <aside 
+      className={cn(
+          "flex flex-col h-screen bg-gray-800 text-gray-100 transition-all duration-300 ease-in-out",
+          isCollapsed ? "w-20" : "w-64"
+      )}
+    >
+      <div className="flex items-center justify-center h-16 border-b border-gray-700">
+        <span className={cn("font-bold text-xl", isCollapsed && "hidden")}>Fortress</span>
+        {/* Optional: Show small logo when collapsed */}
+         <LineChart className={cn("h-6 w-6", !isCollapsed && "hidden")} />
       </div>
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 px-2 py-4 space-y-2">
         {navItems.map((item) => (
-          <Link
-            key={item.path}
+          <NavLink
+            key={item.name}
             to={item.path}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
-              location.pathname === item.path
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-            )}
+            className={({ isActive }) =>
+              cn(
+                "flex items-center px-4 py-2.5 rounded-md text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-gray-700 text-white"
+                  : "text-gray-300 hover:bg-gray-700 hover:text-white",
+                 isCollapsed ? "justify-center" : ""
+              )
+            }
           >
-            <item.icon className="h-4 w-4" />
-            <span>{item.name}</span>
-          </Link>
+            <item.icon className={cn("h-5 w-5", !isCollapsed && "mr-3")} />
+            <span className={cn(isCollapsed && "hidden")}>{item.name}</span>
+          </NavLink>
         ))}
       </nav>
-      <div className="p-4 border-t border-sidebar-border">
-        <p className="text-xs text-sidebar-foreground/70">
-          Fortress Financial Modeler v1.0
-        </p>
-        <p className="text-xs text-sidebar-foreground/70 mt-1">
-          Local Data Last Backed Up: Never
-        </p>
+      {/* Collapse Toggle Button */}
+      <div className="mt-auto p-4 border-t border-gray-700">
+         <Button 
+            variant="ghost" 
+            className="w-full justify-center text-gray-300 hover:bg-gray-700 hover:text-white"
+            onClick={toggleSidebar}
+         >
+            {isCollapsed ? <ChevronsRight size={20} /> : <ChevronsLeft size={20} />}
+            <span className="sr-only">{isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}</span>
+         </Button>
       </div>
     </aside>
   );

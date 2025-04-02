@@ -41,7 +41,7 @@ const FinancialModelDetail = () => {
   const [costData, setCostData] = useState<any[]>([]);
   const [combinedFinancialData, setCombinedFinancialData] = useState<any[]>([]);
   const [isFinancialDataReady, setIsFinancialDataReady] = useState<boolean>(false);
-
+  
   // Memoize assumption props (call unconditionally)
   const assumptions = model?.assumptions;
   const memoizedCosts = useMemo(() => assumptions?.costs || [], [assumptions?.costs]);
@@ -83,6 +83,13 @@ const FinancialModelDetail = () => {
       if (!newAssumptions.marketing) newAssumptions.marketing = { channels: [] };
       if (!newAssumptions.marketing.channels) newAssumptions.marketing.channels = [];
 
+      // *** Add specific log for marketing object before save ***
+      if (newAssumptions.marketing) {
+          console.log("[FinancialModelDetail] Marketing object being saved:", JSON.stringify(newAssumptions.marketing));
+      } else {
+          console.log("[FinancialModelDetail] No marketing object to save.");
+      }
+      
       const assumptionsToSave = newAssumptions as FinancialModel['assumptions'];
 
       console.log("[FinancialModelDetail] Attempting to save assumptions:", JSON.stringify(assumptionsToSave));
@@ -114,32 +121,51 @@ const FinancialModelDetail = () => {
     }
     
     try {
-      const periodMap = new Map();
+      const periodMap = new Map<string, any>();
       
+      // Process revenue first
       revenueData.forEach(revPeriod => {
         const periodKey = revPeriod.point;
-        periodMap.set(periodKey, {
-          point: periodKey,
-          ...revPeriod
-        });
+        periodMap.set(periodKey, { ...revPeriod });
       });
       
+      // Merge cost data
       costData.forEach(costPeriod => {
         const periodKey = costPeriod.point;
-        const existingPeriod = periodMap.get(periodKey) || {};
+        const existingPeriod = periodMap.get(periodKey) || { point: periodKey }; // Ensure base object exists
         
+        // Merge cost properties, potentially overwriting if keys overlap (like 'point')
         periodMap.set(periodKey, {
           ...existingPeriod,
           ...costPeriod
         });
       });
       
-      const combined = Array.from(periodMap.values());
+      let combined = Array.from(periodMap.values());
       combined.sort((a, b) => {
         const aNum = parseInt(a.point.replace(/[^0-9]/g, '')) || 0;
         const bNum = parseInt(b.point.replace(/[^0-9]/g, '')) || 0;
         return aNum - bNum;
       });
+      
+      // --- Recalculate Profit and Cumulative Profit --- 
+      let cumulativeProfit = 0;
+      combined = combined.map(period => {
+          const revenue = period.revenue || period.total || 0; // Handle different keys if necessary
+          const costs = period.costs || period.total || 0; // Handle different keys
+          const profit = revenue - costs;
+          cumulativeProfit += profit;
+          
+          // Ensure standard keys exist for the matrix
+          return {
+              ...period,
+              revenue: revenue, // Standardize key
+              costs: costs,     // Standardize key
+              profit: profit,
+              cumulativeProfit: cumulativeProfit
+          };
+      });
+      // --- End Recalculation ---
       
       setCombinedFinancialData(combined);
       setIsFinancialDataReady(true);
@@ -171,7 +197,8 @@ const FinancialModelDetail = () => {
 
   // Effects (call unconditionally)
   useEffect(() => {
-    const loadData = async () => {
+    let isMounted = true; // Flag to prevent state updates on unmounted component
+    const loadModelData = async () => {
       if (!projectId || !modelId) {
         toast({
           variant: "destructive",
@@ -199,15 +226,17 @@ const FinancialModelDetail = () => {
         }
 
         const financialModel = await db.financialModels.get(parseInt(modelId));
-        if (financialModel) {
-          setModel(financialModel);
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Model not found",
-            description: "The requested financial model could not be found.",
-          });
-          navigate(`/projects/${projectId}`);
+        if (isMounted) {
+          if (financialModel) {
+            setModel(financialModel);
+          } else {
+            toast({
+              variant: "destructive",
+              title: "Model not found",
+              description: "The requested financial model could not be found.",
+            });
+            navigate(`/projects/${projectId}`);
+          }
         }
       } catch (error) {
         console.error("Error loading financial model:", error);
@@ -218,19 +247,19 @@ const FinancialModelDetail = () => {
         });
         navigate(`/projects/${projectId}`);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
-    loadData();
-  }, [projectId, modelId, navigate, currentProject, loadProjectById, setCurrentProject]);
+    loadModelData();
+    return () => { isMounted = false; }; // Cleanup function
+  }, [projectId, modelId, navigate, currentProject, loadProjectById, setCurrentProject]); // Dependencies
 
   useEffect(() => {
     if (revenueData.length > 0 && costData.length > 0) {
       combineFinancialData();
     }
   }, [revenueData, costData, combineFinancialData]);
-  // --- End Top Level Hooks --- 
 
   // Helper functions (can be defined here)
   const formatDate = (dateString: string | Date | undefined): string => {

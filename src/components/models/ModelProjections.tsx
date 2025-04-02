@@ -10,6 +10,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { formatCurrency } from "@/lib/utils";
 
 interface ModelProjectionsProps {
   model: FinancialModel;
@@ -342,9 +343,7 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
             {showCumulative ? "Total Revenue" : `Revenue (${timeUnit} ${projectionMonths})`}
           </h4>
           <p className="text-2xl font-bold text-green-800">
-            ${showCumulative 
-              ? finalDataPoint.cumulativeRevenue.toLocaleString()
-              : finalDataPoint.revenue.toLocaleString()}
+            {formatCurrency(showCumulative ? finalDataPoint.cumulativeRevenue : finalDataPoint.revenue)}
           </p>
           <p className="text-xs text-green-600">
             {showCumulative ? "Cumulative across all " : "Last "} 
@@ -357,9 +356,7 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
             {showCumulative ? "Total Costs" : `Costs (${timeUnit} ${projectionMonths})`}
           </h4>
           <p className="text-2xl font-bold text-red-800">
-            ${showCumulative 
-              ? finalDataPoint.cumulativeCosts.toLocaleString()
-              : finalDataPoint.costs.toLocaleString()}
+            {formatCurrency(showCumulative ? finalDataPoint.cumulativeCosts : finalDataPoint.costs)}
           </p>
           <p className="text-xs text-red-600">
             {showCumulative ? "Cumulative across all " : "Last "}
@@ -372,9 +369,7 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
             {showCumulative ? "Total Profit" : `Profit (${timeUnit} ${projectionMonths})`}
           </h4>
           <p className="text-2xl font-bold text-blue-800">
-            ${showCumulative
-              ? finalDataPoint.cumulativeProfit.toLocaleString()
-              : finalDataPoint.profit.toLocaleString()}
+            {formatCurrency(showCumulative ? finalDataPoint.cumulativeProfit : finalDataPoint.profit)}
           </p>
           <p className="text-xs text-blue-600">
             {showCumulative ? "Cumulative across all " : "Last "}

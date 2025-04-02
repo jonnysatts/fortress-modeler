@@ -179,6 +179,13 @@ export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({
         
         {allocationMode === 'channels' && (
           <div className="space-y-4 pt-4 border-t">
+             <div className="flex justify-between items-center mb-4"> 
+                <h3 className="text-lg font-semibold">Channel Breakdown</h3>
+                <Button size="sm" onClick={handleAddChannel} disabled={!!editingChannel}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Channel
+                </Button>
+             </div>
+             
              {editingChannel && (
                <div className="border p-4 rounded-md mb-6 bg-muted/40 space-y-4">
                  <h3 className="text-lg font-semibold mb-2">{isAdding ? 'Add New Channel' : 'Edit Channel'}</h3>

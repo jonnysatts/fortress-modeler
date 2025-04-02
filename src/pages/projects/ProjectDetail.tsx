@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { useNavigate, useParams, Link, Outlet } from "react-router-dom";
 import { ArrowLeft, Edit, Trash2, PlusCircle, BarChart3, AlertTriangle, Building } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +18,15 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import useStore from "@/store/useStore";
-import { db, getProject, FinancialModel } from "@/lib/db";
+import { 
+    Project, 
+    db, 
+    getProject, 
+    FinancialModel, 
+    getActualsForProject, 
+    upsertActualsPeriod
+} from "@/lib/db";
+import { ActualsPeriodEntry } from "@/types/models";
 import { toast } from "@/hooks/use-toast";
 import {
   Table,
@@ -28,6 +36,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ActualsInputForm } from "@/components/models/ActualsInputForm";
+import { ModelOverview } from "@/components/models/ModelOverview";
+import { ActualsDisplayTable } from "@/components/models/ActualsDisplayTable";
+import { PerformanceAnalysis } from "@/components/models/PerformanceAnalysis";
 
 const ProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -35,24 +47,34 @@ const ProjectDetail = () => {
   const [loading, setLoading] = useState(true);
   const [financialModels, setFinancialModels] = useState<FinancialModel[]>([]);
   const { currentProject, setCurrentProject, deleteProject } = useStore();
+  const [activeTab, setActiveTab] = useState("overview");
+
+  const [actualsData, setActualsData] = useState<ActualsPeriodEntry[]>([]);
+  const fetchActualsData = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      console.log(`Fetching actuals for project ID: ${projectId}`);
+      const data = await getActualsForProject(parseInt(projectId));
+      console.log("Fetched actuals data:", data);
+      setActualsData(data);
+    } catch (error) {
+      console.error("Error fetching actuals data:", error);
+      toast({ variant: "destructive", title: "Error Loading Actuals", description: "Could not load performance data." });
+      setActualsData([]);
+    }
+  }, [projectId]);
 
   useEffect(() => {
-    const fetchProject = async () => {
+    const fetchProjectAndRelatedData = async () => {
       if (!projectId) return;
-      
       setLoading(true);
       try {
         const project = await getProject(parseInt(projectId));
         if (project) {
           setCurrentProject(project);
-          
-          // Load financial models for this project
-          const models = await db.financialModels
-            .where('projectId')
-            .equals(parseInt(projectId))
-            .toArray();
-          
+          const models = await db.financialModels.where('projectId').equals(parseInt(projectId)).toArray();
           setFinancialModels(models);
+          fetchActualsData();
         } else {
           toast({
             variant: "destructive",
@@ -72,9 +94,12 @@ const ProjectDetail = () => {
         setLoading(false);
       }
     };
+    fetchProjectAndRelatedData();
+  }, [projectId, setCurrentProject, navigate, fetchActualsData]);
 
-    fetchProject();
-  }, [projectId, setCurrentProject, navigate]);
+  const handleActualsSaved = () => {
+    fetchActualsData();
+  };
 
   const handleDeleteProject = async () => {
     if (!currentProject?.id) return;
@@ -104,7 +129,6 @@ const ProjectDetail = () => {
     );
   }
 
-  // Format date for display
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString();
   };
@@ -172,111 +196,27 @@ const ProjectDetail = () => {
         </Card>
       )}
 
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="models">Financial Models</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
+          <TabsTrigger value="analysis">Analysis</TabsTrigger>
           <TabsTrigger value="risks">Risk Assessment</TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Project Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Product Type</p>
-                    <p className="font-medium">{currentProject.productType}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Target Audience</p>
-                    <p className="font-medium">{currentProject.targetAudience || "Not specified"}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Start Date</p>
-                    <p className="font-medium">
-                      {currentProject.timeline?.startDate
-                        ? new Date(currentProject.timeline.startDate).toLocaleDateString()
-                        : "Not specified"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">End Date</p>
-                    <p className="font-medium">
-                      {currentProject.timeline?.endDate
-                        ? new Date(currentProject.timeline.endDate).toLocaleDateString()
-                        : "Not specified"}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Key Metrics</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Financial Models</p>
-                    <p className="text-2xl font-bold">{financialModels.length}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Performance Entries</p>
-                    <p className="text-2xl font-bold">0</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Identified Risks</p>
-                    <p className="text-2xl font-bold">0</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Scenarios</p>
-                    <p className="text-2xl font-bold">0</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Recently Updated</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {financialModels.length > 0 ? (
-                <div className="space-y-4">
-                  <h3 className="font-medium">Financial Models</h3>
-                  <ul className="space-y-2">
-                    {financialModels
-                      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-                      .slice(0, 3)
-                      .map((model) => (
-                        <li key={model.id} className="border-b pb-2">
-                          <Link 
-                            to={`/projects/${projectId}/models/${model.id}`}
-                            className="text-fortress-blue hover:underline"
-                          >
-                            {model.name}
-                          </Link>
-                          <p className="text-xs text-muted-foreground">
-                            Updated {formatDate(model.updatedAt)}
-                          </p>
-                        </li>
-                      ))}
-                  </ul>
-                </div>
-              ) : (
-                <div className="text-center py-10 text-muted-foreground">
-                  <p>No recent activity for this project.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {currentProject && financialModels.length > 0 ? (
+             <ModelOverview 
+                model={financialModels[0]} // Pass directly, types should match now
+                projectId={projectId} 
+                actualsData={actualsData} 
+             />
+          ) : (
+              <div className="text-center py-10 text-muted-foreground">
+                 {loading ? "Loading..." : "Create a financial model to see an overview."}
+              </div>
+          )}
         </TabsContent>
         
         <TabsContent value="models" className="space-y-4">
@@ -373,31 +313,32 @@ const ProjectDetail = () => {
         </TabsContent>
         
         <TabsContent value="performance" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Performance Tracking</CardTitle>
-              <CardDescription>
-                Record and analyze actual performance data
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="text-center py-10">
-                <div className="mb-4 flex justify-center">
-                  <div className="rounded-full bg-muted p-4">
-                    <BarChart3 className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                </div>
-                <h3 className="mb-1 text-lg font-medium">No performance data yet</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Add performance data to track actual results against projections.
-                </p>
-                <Button className="bg-fortress-emerald hover:bg-fortress-emerald/90">
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Add Performance Data
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          {financialModels.length > 0 ? (
+            <>
+               <ActualsInputForm 
+                  model={financialModels[0]} 
+                  existingActuals={actualsData} 
+                  onActualsSaved={handleActualsSaved} 
+               />
+               <ActualsDisplayTable 
+                  model={financialModels[0]}
+                  actualsData={actualsData} 
+               />
+            </>
+          ) : (
+            <Card>
+              <CardHeader><CardTitle>Performance Tracking</CardTitle></CardHeader>
+              <CardContent><p className="text-muted-foreground">Create a financial model first to enable performance tracking.</p></CardContent>
+            </Card>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="analysis" className="space-y-4">
+           <PerformanceAnalysis 
+              financialModels={financialModels} 
+              actualsData={actualsData} 
+              projectId={projectId} 
+           />
         </TabsContent>
         
         <TabsContent value="risks" className="space-y-4">

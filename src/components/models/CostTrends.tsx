@@ -117,7 +117,9 @@ const CostTrends = ({
           // --- Calculate Marketing Cost based on mode ---
           let periodMarketingCost = 0;
           if (currentMarketingSetup.allocationMode === 'channels') {
+             console.log("[CostTrends Week Calc] Mode: Channels, Setup:", JSON.stringify(currentMarketingSetup)); // Log setup
              periodMarketingCost = currentMarketingSetup.channels.reduce((sum, ch) => sum + (ch.weeklyBudget || 0), 0);
+             console.log("[CostTrends Week Calc] Calculated Channel Cost:", periodMarketingCost); // Log result
           } else if (currentMarketingSetup.allocationMode === 'highLevel' && currentMarketingSetup.totalBudget) {
              const totalBudget = currentMarketingSetup.totalBudget;
              const application = currentMarketingSetup.budgetApplication || 'spreadEvenly';

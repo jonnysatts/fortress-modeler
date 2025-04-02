@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import { Toaster } from "@/components/ui/toaster";
@@ -9,6 +8,7 @@ import useStore from "@/store/useStore";
 const AppLayout = () => {
   const [initializing, setInitializing] = useState(true);
   const loadProjects = useStore((state) => state.loadProjects);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Initialize the database and load projects
   useEffect(() => {
@@ -26,6 +26,10 @@ const AppLayout = () => {
     init();
   }, [loadProjects]);
 
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed(!isSidebarCollapsed);
+  };
+
   if (initializing) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -40,13 +44,19 @@ const AppLayout = () => {
   }
 
   return (
-    <div className="min-h-screen flex">
-      <Sidebar />
-      <main className="flex-1 overflow-auto">
-        <div className="container mx-auto py-6">
+    <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
+      <Sidebar 
+        isCollapsed={isSidebarCollapsed} 
+        toggleSidebar={toggleSidebar}
+      />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <main 
+          className={`flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 p-6 transition-all duration-300 ease-in-out 
+                     ${isSidebarCollapsed ? 'ml-20' : 'ml-64'}`}
+        >
           <Outlet />
-        </div>
-      </main>
+        </main>
+      </div>
       <Toaster />
     </div>
   );

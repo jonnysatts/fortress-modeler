@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { FinancialModel } from "@/lib/db";
+import { formatCurrency } from "@/lib/utils";
 
 interface FinancialMatrixProps {
   model: FinancialModel;
@@ -134,6 +135,39 @@ const FinancialMatrix = ({
     }).filter(Boolean);
   };
 
+  // Determine headers dynamically based on data keys present
+  const revenueKeys = useMemo(() => {
+      if (!trendData || trendData.length === 0) return model.assumptions.revenue.map(r => r.name.replace(/[^a-zA-Z0-9]/g, ""));
+      // Get keys from the first data point, excluding known non-revenue keys
+      const firstPointKeys = Object.keys(trendData[0]);
+      const knownCostKeys = new Set(model.assumptions.costs.map(c => c.name.replace(/[^a-zA-Z0-9]/g, "")));
+      knownCostKeys.add('MarketingBudget').add('costs').add('cumulativeCosts').add('profit').add('cumulativeProfit').add('point').add('attendance');
+      return firstPointKeys.filter(key => !knownCostKeys.has(key) && !key.endsWith('Color') && key !== 'revenue' && key !== 'cumulativeRevenue');
+  }, [trendData, model.assumptions.revenue, model.assumptions.costs]);
+  
+  const costKeys = useMemo(() => {
+      if (!trendData || trendData.length === 0) return model.assumptions.costs.map(c => c.name.replace(/[^a-zA-Z0-9]/g, ""));
+      // Get keys from the first data point, filter for likely cost keys
+      const firstPointKeys = Object.keys(trendData[0]);
+      const knownRevenueKeys = new Set(model.assumptions.revenue.map(r => r.name.replace(/[^a-zA-Z0-9]/g, "")));
+      knownRevenueKeys.add('revenue').add('cumulativeRevenue').add('profit').add('cumulativeProfit').add('point').add('attendance');
+      // Include MarketingBudget if present
+      const potentialCostKeys = firstPointKeys.filter(key => !knownRevenueKeys.has(key) && !key.endsWith('Color') && key !== 'costs' && key !== 'cumulativeCosts');
+      // Basic check: include if it's in original costs OR it's MarketingBudget
+      const costAssumptionKeys = new Set(model.assumptions.costs.map(c => c.name.replace(/[^a-zA-Z0-9]/g, "")));
+      const finalKeys = potentialCostKeys.filter(key => costAssumptionKeys.has(key) || key === 'MarketingBudget');
+      
+      // Sort these keys like in CostTrends
+       const costRenderOrder = ["SetupCosts", "MarketingBudget", "FBCOGS", "StaffCosts", "ManagementCosts"];
+       finalKeys.sort((a, b) => {
+           let indexA = costRenderOrder.indexOf(a); let indexB = costRenderOrder.indexOf(b);
+           if (indexA === -1) indexA = costRenderOrder.length; if (indexB === -1) indexB = costRenderOrder.length;
+           return indexA - indexB;
+       });
+       
+      return finalKeys;
+  }, [trendData, model.assumptions.costs, model.assumptions.revenue]);
+
   // Combined data view - both revenue and cost data in one table
   if (combinedView) {
     // Validate that we have the required properties
@@ -163,39 +197,39 @@ const FinancialMatrix = ({
             <tr className="border-b">
               <th className="text-left py-2 px-3">{timeUnit}</th>
               
-              {/* Revenue columns */}
-              {model.assumptions.revenue.map((stream, idx) => (
-                <th key={`rev-${idx}`} className="text-right py-2 px-3 text-green-700">
-                  {stream.name}
+              {/* Revenue columns - Use dynamic keys */}
+              {revenueKeys.map((key) => (
+                <th key={`rev-h-${key}`} className="text-right py-2 px-3 text-green-700">
+                  {key.replace(/([A-Z])/g, ' $1').trim()} {/* Format name */}
                 </th>
               ))}
-              <th className="text-right py-2 px-3 font-bold text-green-800 border-r">
+              <th className="text-right py-2 px-3 font-bold text-green-800 border-l border-r">
                 Total Revenue
               </th>
               <th className="text-right py-2 px-3 font-bold text-green-800">
                 Cum. Revenue
               </th>
               
-              {/* --- Add Attendance Header --- */}
+              {/* Attendance Header */}
               <th className="text-right py-2 px-3 font-bold text-blue-800 border-l">
                 Attendance 
               </th>
 
-              {/* Cost columns */}
-              {model.assumptions.costs.map((cost, idx) => (
-                <th key={`cost-${idx}`} className="text-right py-2 px-3 text-red-700">
-                  {cost.name}
+              {/* Cost columns - Use dynamic keys */}
+              {costKeys.map((key) => (
+                <th key={`cost-h-${key}`} className="text-right py-2 px-3 text-red-700 border-l">
+                  {key === 'MarketingBudget' ? 'Marketing Budget' : key.replace(/([A-Z])/g, ' $1').trim()} {/* Format name */}
                 </th>
               ))}
-              <th className="text-right py-2 px-3 font-bold text-red-800 border-r">
+              <th className="text-right py-2 px-3 font-bold text-red-800 border-l border-r">
                 Total Costs
               </th>
               <th className="text-right py-2 px-3 font-bold text-red-800">
                 Cum. Costs
               </th>
               
-              {/* Profit/Loss column */}
-              <th className="text-right py-2 px-3 font-bold bg-gray-50">
+              {/* Profit/Loss */}
+              <th className="text-right py-2 px-3 font-bold bg-gray-50 border-l">
                 Profit/Loss
               </th>
               <th className="text-right py-2 px-3 font-bold bg-gray-100">
@@ -204,69 +238,32 @@ const FinancialMatrix = ({
             </tr>
           </thead>
           <tbody>
-            {trendData.map((period, idx) => {
-              // Calculate per-period profit/loss with fallbacks for missing data
-              const periodRevenue = period.revenue || 0;
-              const periodCosts = period.costs || 0;
-              const cumulativeRevenue = period.cumulativeRevenue || 0;
-              const cumulativeCosts = period.cumulativeCosts || 0;
-              
-              const periodProfit = periodRevenue - periodCosts;
-              const cumulativeProfit = cumulativeRevenue - cumulativeCosts;
+            {trendData.map((row, index) => (
+              <tr key={index} className="border-b last:border-b-0">
+                <td className="py-2 px-3">{row.point}</td>
+                
+                {/* Revenue data cells - Use dynamic keys */}
+                {revenueKeys.map((key) => (
+                  <td key={`rev-d-${key}-${index}`} className="py-2 px-3 text-right">{formatCurrency(row[key] || 0)}</td>
+                ))}
+                <td className="py-2 px-3 text-right font-medium text-green-800 border-l border-r">{formatCurrency(row.revenue || 0)}</td>
+                <td className="py-2 px-3 text-right font-medium text-green-800">{formatCurrency(row.cumulativeRevenue || 0)}</td>
+                
+                {/* Attendance data cell */}
+                <td className="py-2 px-3 text-right font-medium text-blue-800 border-l">{(row.attendance !== undefined && row.attendance !== null) ? Math.round(row.attendance).toLocaleString() : 'N/A'}</td>
 
-              return (
-                <tr key={idx} className={idx % 2 === 0 ? "bg-gray-50" : ""}>
-                  <td className="py-2 px-3">{period.point || `Period ${idx+1}`}</td>
-                  
-                  {/* Revenue columns */}
-                  {model.assumptions.revenue.map((stream, streamIdx) => {
-                    const safeName = stream.name.replace(/[^a-zA-Z0-9]/g, "");
-                    return (
-                      <td key={streamIdx} className="text-right py-2 px-3 text-green-600">
-                        ${Math.ceil(period[safeName] || 0).toLocaleString()}
-                      </td>
-                    );
-                  })}
-                  <td className="text-right py-2 px-3 font-medium text-green-700 border-r">
-                    ${Math.ceil(periodRevenue).toLocaleString()}
-                  </td>
-                  <td className="text-right py-2 px-3 font-medium text-green-800">
-                    ${Math.ceil(cumulativeRevenue).toLocaleString()}
-                  </td>
-                  
-                  {/* --- Add Attendance Cell --- */}
-                  <td className="text-right py-2 px-3 font-medium text-blue-700 border-l">
-                    {(period.attendance || 0).toLocaleString()} 
-                  </td>
-
-                  {/* Cost columns */}
-                  {model.assumptions.costs.map((cost, costIdx) => {
-                    const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
-                    return (
-                      <td key={costIdx} className="text-right py-2 px-3 text-red-600">
-                        ${Math.ceil(period[safeName] || 0).toLocaleString()}
-                      </td>
-                    );
-                  })}
-                  <td className="text-right py-2 px-3 font-medium text-red-700 border-r">
-                    ${Math.ceil(periodCosts).toLocaleString()}
-                  </td>
-                  <td className="text-right py-2 px-3 font-medium text-red-800">
-                    ${Math.ceil(cumulativeCosts).toLocaleString()}
-                  </td>
-                  
-                  {/* Profit/Loss column */}
-                  <td className={`text-right py-2 px-3 font-medium ${periodProfit >= 0 ? 'text-black' : 'text-red-600'} bg-gray-50`}>
-                    ${Math.ceil(Math.abs(periodProfit)).toLocaleString()}
-                    {periodProfit < 0 && ' (Loss)'}
-                  </td>
-                  <td className={`text-right py-2 px-3 font-bold ${cumulativeProfit >= 0 ? 'text-black' : 'text-red-600'} bg-gray-100`}>
-                    ${Math.ceil(Math.abs(cumulativeProfit)).toLocaleString()}
-                    {cumulativeProfit < 0 && ' (Loss)'}
-                  </td>
-                </tr>
-              );
-            })}
+                {/* Cost data cells - Use dynamic keys */}
+                {costKeys.map((key) => (
+                  <td key={`cost-d-${key}-${index}`} className="py-2 px-3 text-right border-l">{formatCurrency(row[key] || 0)}</td>
+                ))}
+                <td className="py-2 px-3 text-right font-medium text-red-800 border-l border-r">{formatCurrency(row.costs || 0)}</td>
+                <td className="py-2 px-3 text-right font-medium text-red-800">{formatCurrency(row.cumulativeCosts || 0)}</td>
+                
+                {/* Profit/Loss data cells */}
+                <td className={`py-2 px-3 text-right font-medium bg-gray-50 border-l ${row.profit < 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(row.profit || 0)}</td>
+                <td className={`py-2 px-3 text-right font-medium bg-gray-100 ${row.cumulativeProfit < 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(row.cumulativeProfit || 0)}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
