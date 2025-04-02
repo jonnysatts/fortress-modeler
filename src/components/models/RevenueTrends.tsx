@@ -58,7 +58,7 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
             let streamBaseValue = 0;
             let streamRevenue = 0;
             
-            // Calculate revenue based on per-customer spending
+            // Calculate revenue based on per-customer spending for specific streams
             if (stream.name === "F&B Sales") {
               let fbSpendPerCustomer = metadata.perCustomer?.fbSpend || 0;
               if (week > 1 && metadata.growth?.useCustomerSpendGrowth) {
@@ -66,21 +66,37 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
                 fbSpendPerCustomer *= Math.pow(1 + fbSpendGrowthRate, week - 1);
               }
               streamRevenue = currentAttendance * fbSpendPerCustomer;
+            } else if (stream.name === "Merchandise Sales") {
+              let merchSpendPerCustomer = metadata.perCustomer?.merchandiseSpend || 0;
+              if (week > 1 && metadata.growth?.useCustomerSpendGrowth) {
+                const merchSpendGrowthRate = (metadata.growth.merchandiseSpendGrowth || 0) / 100;
+                merchSpendPerCustomer *= Math.pow(1 + merchSpendGrowthRate, week - 1);
+              }
+              streamRevenue = currentAttendance * merchSpendPerCustomer;
             } else {
-              streamBaseValue = stream.value;
+              // Handle other revenue streams (Ticket, Online, Misc)
+              streamBaseValue = stream.value; 
               streamRevenue = streamBaseValue;
               
               if (week > 1) {
                 let growthRateToApply = 0;
+                // Apply specific growth rates if useCustomerSpendGrowth is enabled
+                // Note: For streams like Ticket Sales, this applies growth to the *base value*,
+                // which might need adjustment if Ticket Sales should also be per-customer based.
+                // Assuming Ticket Sales value represents initial total, not per customer.
                 if (metadata.growth?.useCustomerSpendGrowth) {
                   switch(stream.name) {
                     case "Ticket Sales": growthRateToApply = (metadata.growth.ticketPriceGrowth || 0) / 100; break;
-                    case "Merchandise Sales": growthRateToApply = (metadata.growth.merchandiseSpendGrowth || 0) / 100; break;
+                    // Merchandise Sales is handled above
                     case "Online Sales": growthRateToApply = (metadata.growth.onlineSpendGrowth || 0) / 100; break;
                     case "Miscellaneous Revenue": growthRateToApply = (metadata.growth.miscSpendGrowth || 0) / 100; break;
                   }
+                  streamRevenue = streamBaseValue * Math.pow(1 + growthRateToApply, week - 1);
+                } else {
+                   // If not using customer spend growth, potentially apply a general growth rate?
+                   // Current logic doesn't explicitly handle this case for these streams.
+                   // For now, they remain flat unless useCustomerSpendGrowth is true.
                 }
-                streamRevenue = streamBaseValue * Math.pow(1 + growthRateToApply, week - 1);
               }
             }
             

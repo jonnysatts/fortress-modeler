@@ -25,6 +25,7 @@ import CostTrends from "@/components/models/CostTrends";
 import CategoryBreakdown from "@/components/models/CategoryBreakdown";
 import FinancialMatrix from "@/components/models/FinancialMatrix";
 import { calculateTotalRevenue, calculateTotalCosts } from "@/lib/financialCalculations";
+import { ModelOverview } from "@/components/models/ModelOverview";
 
 const FinancialModelDetail = () => {
   const { projectId, modelId } = useParams<{ projectId: string; modelId: string }>();
@@ -172,12 +173,20 @@ const FinancialModelDetail = () => {
     );
   }
 
-  const formatDate = (date: Date): string => {
-    return new Date(date).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+  const formatDate = (dateString: string | undefined): string => {
+    if (!dateString) return "N/A";
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return "Invalid Date";
+        return date.toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+        });
+    } catch (error) {
+        console.error("Error formatting date:", dateString, error);
+        return "Error Date";
+    }
   };
 
   const hasRequiredData = model && 
@@ -222,6 +231,8 @@ const FinancialModelDetail = () => {
   
   console.log("Model metadata:", model.assumptions.metadata);
 
+  const overviewModel = model as any;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -236,8 +247,8 @@ const FinancialModelDetail = () => {
           <div>
             <h1 className="text-3xl font-bold text-fortress-blue">{model.name}</h1>
             <p className="text-muted-foreground">
-              Created on {formatDate(model.createdAt)} • Last updated on{" "}
-              {formatDate(model.updatedAt)}
+              Created on {formatDate(model.createdAt?.toISOString())} • Last updated on{" "}
+              {formatDate(model.updatedAt?.toISOString())}
             </p>
           </div>
         </div>
@@ -288,128 +299,8 @@ const FinancialModelDetail = () => {
           <TabsTrigger value="projections">Projections</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Model Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-medium">Growth Model</h3>
-                  <div className="flex items-center mt-1">
-                    <Badge variant="outline" className="capitalize">
-                      {model.assumptions.growthModel.type}
-                    </Badge>
-                    <span className="ml-2">
-                      Rate: {model.assumptions.growthModel.rate * 100}%
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium">Revenue Streams</h3>
-                  <div className="mt-1">
-                    <p className="mb-1">{model.assumptions.revenue.length} streams</p>
-                    <div className="space-y-1">
-                      {model.assumptions.revenue.map((rev, idx) => (
-                        <div key={idx} className="text-sm flex justify-between">
-                          <span>{rev.name}</span>
-                          <span className="font-medium">${rev.value.toLocaleString()}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium">Cost Categories</h3>
-                  <div className="mt-1">
-                    <p className="mb-1">{model.assumptions.costs.length} categories</p>
-                    <div className="space-y-1">
-                      {model.assumptions.costs.map((cost, idx) => (
-                        <div key={idx} className="text-sm flex justify-between">
-                          <span>{cost.name}</span>
-                          <span className="font-medium">${cost.value.toLocaleString()}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {model.assumptions.metadata?.type === "WeeklyEvent" && (
-                  <div>
-                    <h3 className="text-sm font-medium">Event Type</h3>
-                    <p className="mt-1">Weekly Event Series</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {model.assumptions.metadata.weeks} weeks, {" "}
-                      {model.assumptions.metadata.initialWeeklyAttendance} initial attendees per week
-                    </p>
-                    {model.assumptions.metadata.growth?.attendanceGrowthRate > 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        Attendance growth: {model.assumptions.metadata.growth.attendanceGrowthRate}% per week
-                      </p>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-lg">Key Metrics</CardTitle>
-                <BarChart3 className="h-5 w-5 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Initial Revenue</p>
-                    <p className="text-2xl font-bold">
-                      $
-                      {model.assumptions.revenue
-                        .reduce((sum, item) => sum + item.value, 0)
-                        .toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Initial Costs</p>
-                    <p className="text-2xl font-bold">
-                      $
-                      {model.assumptions.costs
-                        .reduce((sum, item) => sum + item.value, 0)
-                        .toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-
-                {isWeeklyEvent && (
-                  <div className="pt-2 border-t">
-                    <h3 className="text-sm font-medium mb-2">Estimated Totals (All Periods)</h3>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="p-2 bg-green-50 rounded">
-                        <p className="text-xs text-green-700">Total Revenue</p>
-                        <p className="text-lg font-bold text-green-800">
-                          ${calculateTotalRevenue(model).toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="p-2 bg-red-50 rounded">
-                        <p className="text-xs text-red-700">Total Costs</p>
-                        <p className="text-lg font-bold text-red-800">
-                          ${calculateTotalCosts(model).toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="p-2 bg-blue-50 rounded">
-                        <p className="text-xs text-blue-700">Total Profit</p>
-                        <p className="text-lg font-bold text-blue-800">
-                          ${(calculateTotalRevenue(model) - calculateTotalCosts(model)).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+        <TabsContent value="overview" className="space-y-4">
+          <ModelOverview model={overviewModel} />
         </TabsContent>
 
         <TabsContent value="financial-matrix">

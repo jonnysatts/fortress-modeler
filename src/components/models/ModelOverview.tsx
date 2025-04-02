@@ -1,0 +1,521 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Model, RevenueStream, CostCategory } from "@/types/models";
+import { formatCurrency } from "@/lib/utils";
+import { useEffect, useState, useMemo } from "react";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  Tooltip,
+  XAxis, // Keep XAxis if we want period labels on tooltips
+} from "recharts";
+import { Button } from "@/components/ui/button";
+import { Edit, Download, Share2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
+interface ModelOverviewProps {
+  model: Model;
+  projectId: string | undefined; // Need projectId for navigation
+}
+
+interface SimulationPeriod {
+  period: number;
+  point: string;
+  revenue: number;
+  costs: number;
+  profit: number;
+  cumulativeRevenue: number;
+  cumulativeCosts: number;
+  cumulativeProfit: number;
+  attendance?: number;
+}
+
+export const ModelOverview = ({ model, projectId }: ModelOverviewProps) => {
+  const navigate = useNavigate();
+  // Calculate isWeekly here, outside useMemo
+  const isWeekly = model?.assumptions?.metadata?.type === "WeeklyEvent"; 
+
+  // Run simulation to get period-by-period data and totals
+  const simulationResults = useMemo(() => {
+    if (!model?.assumptions?.metadata || !model?.assumptions?.revenue || !model?.assumptions?.costs) {
+      console.warn("Incomplete model data for overview simulation.");
+      return null;
+    }
+
+    const metadata = model.assumptions.metadata;
+    // Use the isWeekly calculated outside
+    const duration = isWeekly ? metadata.weeks || 12 : 12;
+    const timeUnit = isWeekly ? "Week" : "Month";
+
+    const revenueStreams = model.assumptions.revenue;
+    const costs = model.assumptions.costs;
+
+    let cumulativeRevenue = 0;
+    let cumulativeCosts = 0;
+    let cumulativeProfit = 0;
+    let totalAttendance = 0;
+    let totalFixedCosts = 0;
+    let totalOtherCosts = 0;
+    const revenueTotalsPerStream: Record<string, number> = {};
+    revenueStreams.forEach(s => revenueTotalsPerStream[s.name] = 0);
+
+    const periodicData: SimulationPeriod[] = [];
+
+    for (let period = 1; period <= duration; period++) {
+      const point = `${timeUnit} ${period}`;
+      
+      let currentAttendance = metadata.initialWeeklyAttendance || 0;
+      if (isWeekly && period > 1 && metadata.growth) {
+         const attendanceGrowthRate = (metadata.growth.attendanceGrowthRate || 0) / 100;
+         currentAttendance = (metadata.initialWeeklyAttendance || 0) * Math.pow(1 + attendanceGrowthRate, period - 1);
+      }
+      if (isWeekly) { // Only sum attendance if it's meaningful weekly data
+         totalAttendance += currentAttendance;
+      }
+      
+      let periodRevenue = 0;
+      revenueStreams.forEach(stream => {
+          let streamRevenue = 0;
+          const baseValue = stream.value;
+          
+          if (isWeekly) {
+              if (stream.name === "F&B Sales") {
+                  let spend = metadata.perCustomer?.fbSpend || 0;
+                  if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
+                      spend *= Math.pow(1 + (metadata.growth.fbSpendGrowth || 0) / 100, period - 1);
+                  }
+                  streamRevenue = currentAttendance * spend;
+              } else if (stream.name === "Merchandise Sales") {
+                  let spend = metadata.perCustomer?.merchandiseSpend || 0;
+                  if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
+                      spend *= Math.pow(1 + (metadata.growth.merchandiseSpendGrowth || 0) / 100, period - 1);
+                  }
+                  streamRevenue = currentAttendance * spend;
+              } else { // Other streams (Ticket, Online, Misc)
+                  streamRevenue = baseValue;
+                  if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
+                      let growthRate = 0;
+                      switch(stream.name) {
+                          case "Ticket Sales": growthRate = (metadata.growth.ticketPriceGrowth || 0) / 100; break;
+                          case "Online Sales": growthRate = (metadata.growth.onlineSpendGrowth || 0) / 100; break;
+                          case "Miscellaneous Revenue": growthRate = (metadata.growth.miscSpendGrowth || 0) / 100; break;
+                      }
+                      streamRevenue *= Math.pow(1 + growthRate, period - 1);
+                  }
+              }
+          } else { // Non-weekly
+               streamRevenue = baseValue;
+               if (period > 1) {
+                   const { type, rate } = model.assumptions.growthModel;
+                   if (type === "linear") streamRevenue = baseValue * (1 + rate * (period - 1));
+                   else streamRevenue = baseValue * Math.pow(1 + rate, period - 1);
+               }
+          }
+          periodRevenue += streamRevenue;
+          revenueTotalsPerStream[stream.name] = (revenueTotalsPerStream[stream.name] || 0) + streamRevenue; // Track total per stream
+      });
+
+      let periodCosts = 0;
+      costs.forEach(cost => {
+          let costValue = 0;
+          const costType = cost.type?.toLowerCase();
+          const baseValue = cost.value;
+
+          if (isWeekly) {
+              if (costType === "fixed") {
+                  costValue = period === 1 ? baseValue : 0;
+                  if (period === 1) totalFixedCosts += costValue;
+                  else totalOtherCosts += costValue; // Technically adds 0, but logically correct
+              } else if (costType === "variable") {
+                  if (cost.name === "F&B COGS") {
+                       const cogsPct = metadata.costs?.fbCOGSPercent || 30;
+                       let fbRevenueThisPeriod = 0;
+                       let fbSpend = metadata.perCustomer?.fbSpend || 0;
+                       if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
+                           fbSpend *= Math.pow(1 + (metadata.growth.fbSpendGrowth || 0) / 100, period - 1);
+                       }
+                       fbRevenueThisPeriod = currentAttendance * fbSpend;
+                       costValue = (fbRevenueThisPeriod * cogsPct) / 100;
+                  } else {
+                     costValue = baseValue; 
+                  }
+                   totalOtherCosts += costValue; // Variable costs are not fixed
+              } else { // Recurring or Unspecified
+                 costValue = baseValue;
+                 // Handle Setup Costs spreading if recurring
+                 if(cost.name === "Setup Costs" && metadata.weeks && metadata.weeks > 0) {
+                    // Check if setup cost was also marked fixed - avoid double counting/spreading
+                    const setupIsFixed = costs.find(c => c.name === "Setup Costs")?.type?.toLowerCase() === 'fixed';
+                    if (!setupIsFixed) { // Only spread if NOT fixed
+                       costValue = baseValue / metadata.weeks; 
+                    }
+                 }
+                  totalOtherCosts += costValue; // Recurring costs are not fixed
+              }
+          } else { // Non-weekly cost calculation
+               if (costType === "fixed") {
+                 costValue = period === 1 ? baseValue : 0;
+                 if (period === 1) totalFixedCosts += costValue;
+                 else totalOtherCosts += costValue;
+               } else {
+                  costValue = baseValue; // Assume recurring/variable are flat monthly
+                  totalOtherCosts += costValue;
+               }
+          }
+          periodCosts += costValue;
+      }); // End cost calculation loop - Ensure this is line 161
+      
+      const periodProfit = periodRevenue - periodCosts;
+      cumulativeRevenue += periodRevenue;
+      cumulativeCosts += periodCosts;
+      cumulativeProfit += periodProfit;
+
+      periodicData.push({
+        period,
+        point,
+        revenue: Math.ceil(periodRevenue),
+        costs: Math.ceil(periodCosts),
+        profit: Math.ceil(periodProfit),
+        cumulativeRevenue: Math.ceil(cumulativeRevenue),
+        cumulativeCosts: Math.ceil(cumulativeCosts),
+        cumulativeProfit: Math.ceil(cumulativeProfit),
+        attendance: isWeekly ? Math.round(currentAttendance) : undefined,
+      });
+    } // End simulation loop
+
+    const initialPeriod = periodicData[0];
+    const finalPeriod = periodicData[periodicData.length - 1];
+    
+    let breakEvenPoint: number | null = null;
+    for(const p of periodicData) {
+        if (p.cumulativeProfit >= 0) {
+            breakEvenPoint = p.period;
+            break;
+        }
+    }
+
+    const totalRevenue = finalPeriod?.cumulativeRevenue || 0;
+    const totalCosts = finalPeriod?.cumulativeCosts || 0;
+    const totalProfit = finalPeriod?.cumulativeProfit || 0;
+    
+    const initialHighestRevenue = [...model.assumptions.revenue].sort((a, b) => (b?.value || 0) - (a?.value || 0))[0];
+    const initialLargestCost = [...model.assumptions.costs].sort((a, b) => (b?.value || 0) - (a?.value || 0))[0];
+
+    // Calculate Risk Metrics
+    const highestStreamTotal = Math.max(0, ...Object.values(revenueTotalsPerStream)); // Ensure non-negative
+    const revenueConcentration = totalRevenue > 0 ? (highestStreamTotal / totalRevenue) * 100 : 0;
+    const fixedCostRatio = totalCosts > 0 ? (totalFixedCosts / totalCosts) * 100 : 0;
+
+    return {
+      periodicData,
+      duration,
+      timeUnit,
+      initialRevenue: initialPeriod?.revenue || 0,
+      initialCosts: initialPeriod?.costs || 0,
+      initialProfit: initialPeriod?.profit || 0,
+      initialMargin: initialPeriod?.revenue ? (initialPeriod.profit / initialPeriod.revenue) * 100 : 0,
+      finalWeekRevenue: finalPeriod?.revenue || 0,
+      finalWeekCosts: finalPeriod?.costs || 0,
+      finalWeekProfit: finalPeriod?.profit || 0,
+      finalWeekMargin: finalPeriod?.revenue ? (finalPeriod.profit / finalPeriod.revenue) * 100 : 0,
+      totalRevenue,
+      totalCosts,
+      totalProfit,
+      breakEvenPoint,
+      highestInitialRevenue: initialHighestRevenue || { name: 'N/A', value: 0 },
+      largestInitialCost: initialLargestCost || { name: 'N/A', value: 0 },
+      totalAttendance: Math.round(totalAttendance),
+      revenueConcentration, // Percentage
+      fixedCostRatio, // Percentage
+    };
+  }, [model, isWeekly]);
+
+  if (!simulationResults) return <p className="text-red-500">Unable to load overview: Simulation failed due to incomplete model data.</p>;
+
+  const {
+    periodicData,
+    duration,
+    timeUnit,
+    initialRevenue,
+    initialCosts,
+    initialProfit,
+    initialMargin,
+    finalWeekRevenue,
+    finalWeekCosts,
+    finalWeekProfit,
+    finalWeekMargin,
+    totalRevenue,
+    totalCosts,
+    totalProfit,
+    breakEvenPoint,
+    highestInitialRevenue,
+    largestInitialCost,
+    totalAttendance,
+    revenueConcentration,
+    fixedCostRatio
+  } = simulationResults;
+
+  // Simplified Tooltip for Sparklines
+  const SparklineTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload; // Access the full data point
+      return (
+        <div className="bg-background border px-2 py-1 rounded shadow-lg text-xs">
+          <p className="font-semibold">{data.point}</p>
+          {payload[0].dataKey === 'attendance' ? (
+             <p>{`Attendance: ${Math.round(payload[0].value).toLocaleString()}`}</p>
+          ) : (
+             <p>{`${payload[0].name}: ${formatCurrency(payload[0].value)}`}</p>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const handleEdit = () => {
+    if (projectId && model.id) {
+        navigate(`/projects/${projectId}/models/${model.id}/edit`);
+    }
+  };
+  
+  // Placeholder functions for Download/Share
+  const handleDownload = () => alert("Download report functionality not implemented yet.");
+  const handleShare = () => alert("Share model functionality not implemented yet.");
+
+  return (
+    <div className="space-y-6">
+      {/* Quick Actions Bar */}
+       <div className="flex space-x-2 mb-4 border-b pb-4">
+          <Button variant="outline" size="sm" onClick={handleEdit} disabled={!projectId || !model.id}>
+              <Edit className="mr-1 h-4 w-4" /> Edit Model
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleDownload}>
+              <Download className="mr-1 h-4 w-4" /> Download Report
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleShare}>
+              <Share2 className="mr-1 h-4 w-4" /> Share Model
+          </Button>
+       </div>
+
+      {/* Key Metrics Dashboard */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Revenue Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-primary">Revenue</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+             <div className="flex justify-between items-baseline">
+                <span className="text-sm text-muted-foreground">Initial {timeUnit}</span>
+                <span className="text-lg font-semibold">{formatCurrency(initialRevenue)}</span>
+             </div>
+             <div className="flex justify-between items-baseline">
+                <span className="text-sm text-muted-foreground">Final {timeUnit}</span>
+                <span className="text-lg font-semibold">{formatCurrency(finalWeekRevenue)}</span>
+             </div>
+              <div className="border-t pt-3 mt-3 flex justify-between items-baseline">
+                <span className="text-sm font-medium text-muted-foreground">Total Projected</span>
+                <span className="text-2xl font-bold text-green-600">{formatCurrency(totalRevenue)}</span>
+             </div>
+             <div className="pt-2">
+                <p className="text-xs text-muted-foreground">Highest Initial Stream</p>
+                <p className="text-sm font-medium">{highestInitialRevenue.name} ({formatCurrency(highestInitialRevenue.value)})</p>
+              </div>
+          </CardContent>
+        </Card>
+
+        {/* Costs Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-primary">Costs</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+             <div className="flex justify-between items-baseline">
+                <span className="text-sm text-muted-foreground">Initial {timeUnit}</span>
+                <span className="text-lg font-semibold">{formatCurrency(initialCosts)}</span>
+             </div>
+             <div className="flex justify-between items-baseline">
+                <span className="text-sm text-muted-foreground">Final {timeUnit}</span>
+                <span className="text-lg font-semibold">{formatCurrency(finalWeekCosts)}</span>
+             </div>
+             <div className="border-t pt-3 mt-3 flex justify-between items-baseline">
+                <span className="text-sm font-medium text-muted-foreground">Total Projected</span>
+                <span className="text-2xl font-bold text-red-600">{formatCurrency(totalCosts)}</span>
+             </div>
+              <div className="pt-2">
+                <p className="text-xs text-muted-foreground">Largest Initial Cost</p>
+                <p className="text-sm font-medium">{largestInitialCost.name} ({formatCurrency(largestInitialCost.value)})</p>
+              </div>
+          </CardContent>
+        </Card>
+
+        {/* Profitability Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-primary">Profitability</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+             <div className="flex justify-between items-baseline">
+                <span className="text-sm text-muted-foreground">Initial Margin</span>
+                <span className="text-lg font-semibold">{initialMargin.toFixed(1)}%</span>
+             </div>
+             <div className="flex justify-between items-baseline">
+                <span className="text-sm text-muted-foreground">Final {timeUnit} Margin</span>
+                 <span className="text-lg font-semibold">{finalWeekMargin.toFixed(1)}%</span>
+             </div>
+             <div className="border-t pt-3 mt-3 flex justify-between items-baseline">
+                <span className="text-sm font-medium text-muted-foreground">Total Projected Profit</span>
+                 <span className="text-2xl font-bold text-blue-600">{formatCurrency(totalProfit)}</span>
+             </div>
+              <div className="pt-2">
+                 <p className="text-xs text-muted-foreground">Break-even Point</p>
+                 <p className="text-sm font-medium">{breakEvenPoint ? `${timeUnit} ${breakEvenPoint}` : 'Never'}</p>
+             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* --- NEW: Growth Indicators Section --- */}
+      <Card>
+          <CardHeader>
+              <CardTitle className="text-lg font-semibold text-primary">Growth Indicators</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+              {/* Revenue Trend Sparkline */}
+              <div className="text-center">
+                  <p className="text-sm font-medium mb-1">Revenue Trend</p>
+                  <div className="h-20 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={periodicData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                              <Tooltip content={<SparklineTooltip />} cursor={{ fill: 'transparent' }} />
+                              <Line type="monotone" dataKey="revenue" stroke="#16a34a" strokeWidth={2} dot={false} name="Revenue"/>
+                          </LineChart>
+                      </ResponsiveContainer>
+                  </div>
+              </div>
+              {/* Cost Trend Sparkline */}
+              <div className="text-center">
+                  <p className="text-sm font-medium mb-1">Cost Trend</p>
+                  <div className="h-20 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={periodicData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                              <Tooltip content={<SparklineTooltip />} cursor={{ fill: 'transparent' }}/>
+                              <Line type="monotone" dataKey="costs" stroke="#dc2626" strokeWidth={2} dot={false} name="Costs"/>
+                          </LineChart>
+                      </ResponsiveContainer>
+                  </div>
+              </div>
+              {/* Attendance Trend / Total */}
+              <div className="text-center">
+                  <p className="text-sm font-medium mb-1">Attendance</p>
+                   <div className="h-20 w-full">
+                      {isWeekly ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={periodicData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                                <Tooltip content={<SparklineTooltip />} cursor={{ fill: 'transparent' }}/>
+                                <Line type="monotone" dataKey="attendance" stroke="#6366f1" strokeWidth={2} dot={false} name="Attendance"/>
+                          </LineChart>
+                      </ResponsiveContainer>
+                      ) : (
+                          <p className="text-xs text-muted-foreground h-full flex items-center justify-center">(Weekly Only)</p>
+                      )}
+                   </div>
+                   {isWeekly && (
+                        <p className="text-xs text-muted-foreground mt-1">Total Est. Attendance: {totalAttendance.toLocaleString()}</p>
+                   )}
+              </div>
+          </CardContent>
+      </Card>
+
+      {/* --- NEW: Risk Indicators Section --- */}
+      <Card>
+        <CardHeader>
+            <CardTitle className="text-lg font-semibold text-primary">Risk Indicators</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+                <p className="text-sm font-medium text-muted-foreground">Revenue Concentration</p>
+                <p className="text-2xl font-bold">{revenueConcentration.toFixed(1)}%</p>
+                <p className="text-xs text-muted-foreground">From highest stream ({highestInitialRevenue.name})</p>
+            </div>
+            <div>
+                <p className="text-sm font-medium text-muted-foreground">Fixed Cost Ratio</p>
+                <p className="text-2xl font-bold">{fixedCostRatio.toFixed(1)}%</p>
+                <p className="text-xs text-muted-foreground">Percentage of total costs</p>
+            </div>
+             <div>
+                <p className="text-sm font-medium text-muted-foreground">Sensitivity Analysis</p>
+                <p className="text-sm italic text-muted-foreground">(Not Implemented)</p>
+                <p className="text-xs text-muted-foreground">e.g., Impact of ±10% attendance</p>
+            </div>
+        </CardContent>
+      </Card>
+
+      {/* Critical Assumptions */}
+      <Card>
+         <CardHeader>
+           <CardTitle className="text-lg font-semibold text-primary">Critical Assumptions</CardTitle>
+         </CardHeader>
+         <CardContent>
+            {/* Existing Assumptions Content */}
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+             <div>
+               <h3 className="font-medium mb-2">Event Structure</h3>
+               <div className="space-y-1">
+                 <p className="text-sm">
+                   <span className="text-muted-foreground">Duration: </span>
+                   {duration} {timeUnit}s
+                 </p>
+                 <p className="text-sm">
+                   <span className="text-muted-foreground">Initial Attendance: </span>
+                   {model.assumptions.metadata?.initialWeeklyAttendance ? model.assumptions.metadata.initialWeeklyAttendance.toLocaleString() : 'N/A'} {isWeekly ? 'per week' : ''}
+                 </p>
+               </div>
+             </div>
+             <div>
+               <h3 className="font-medium mb-2">Growth Rates</h3>
+               <div className="space-y-1">
+                 <p className="text-sm">
+                   <span className="text-muted-foreground">Attendance Growth: </span>
+                   {model.assumptions.metadata?.growth?.attendanceGrowthRate ?? 'N/A'}% {isWeekly ? 'weekly' : 'N/A'}
+                 </p>
+                 {model.assumptions.metadata?.growth?.useCustomerSpendGrowth ? (
+                   <>
+                     <p className="text-sm">
+                       <span className="text-muted-foreground">F&B Spend Growth: </span>
+                       {model.assumptions.metadata?.growth?.fbSpendGrowth ?? 'N/A'}% {isWeekly ? 'weekly' : 'N/A'}
+                     </p>
+                      <p className="text-sm">
+                       <span className="text-muted-foreground">Merch Spend Growth: </span>
+                       {model.assumptions.metadata?.growth?.merchandiseSpendGrowth ?? 'N/A'}% {isWeekly ? 'weekly' : 'N/A'}
+                     </p>
+                   </>
+                 ) : (
+                   <p className="text-sm text-muted-foreground">Customer spend growth not applied.</p>
+                 )}
+               </div>
+             </div>
+             <div>
+               <h3 className="font-medium mb-2">Cost Factors</h3>
+               <div className="space-y-1">
+                  <p className="text-sm">
+                   <span className="text-muted-foreground">Setup Costs: </span>
+                   {formatCurrency(model.assumptions.costs.find(c => c.name === "Setup Costs")?.value || 0)}
+                 </p>
+                 <p className="text-sm">
+                   <span className="text-muted-foreground">F&B COGS %: </span>
+                   {model.assumptions.metadata?.costs?.fbCOGSPercent ?? 'N/A'}%
+                 </p>
+                 <p className="text-sm">
+                   <span className="text-muted-foreground">Staff Count: </span>
+                   {model.assumptions.metadata?.costs?.staffCount ?? 'N/A'}
+                 </p>
+               </div>
+             </div>
+           </div>
+         </CardContent>
+      </Card>
+    </div>
+  );
+}; 
