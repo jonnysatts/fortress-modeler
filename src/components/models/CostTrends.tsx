@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { FinancialModel } from "@/lib/db";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { FinancialModel, CostAssumption } from "@/lib/db";
 import {
   AreaChart,
   Area,
@@ -11,25 +11,42 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import FinancialMatrix from "./FinancialMatrix";
+import { MarketingSetup, ModelMetadata, GrowthModel } from "@/types/models";
 
 interface CostTrendsProps {
+  costs: CostAssumption[];
+  marketingSetup?: MarketingSetup;
+  metadata?: ModelMetadata;
+  growthModel?: GrowthModel;
   model: FinancialModel;
-  combinedData?: any[];
-  onUpdateCostData?: (data: any[]) => void;
+  onUpdateCostData: (data: any[]) => void;
 }
 
-const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) => {
+const CostTrends = ({ 
+  costs, 
+  marketingSetup, 
+  metadata, 
+  growthModel, 
+  model,
+  onUpdateCostData 
+}: CostTrendsProps) => {
   const [timePoints, setTimePoints] = useState<number>(12);
-  const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
+  const isWeeklyEvent = metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
   
-  const calculateCostData = () => {
+  // Memoize the cost data calculation
+  const costData = useMemo(() => {
+    console.log("[CostTrends] Recalculating costData...");
     try {
       const data = [];
-      const costs = model.assumptions.costs;
+      // Use passed props directly
+      if (!costs || !metadata) return []; 
       
-      if (isWeeklyEvent && model.assumptions.metadata) {
-        const metadata = model.assumptions.metadata;
+      const currentMarketingSetup = marketingSetup || { allocationMode: 'channels', channels: [] }; 
+      const isWeekly = isWeeklyEvent; 
+      const duration = isWeekly ? (metadata?.weeks || 12) : 12;
+      
+      if (isWeeklyEvent && metadata) {
         const weeks = Math.min(metadata.weeks || 12, timePoints);
         
         for (let week = 1; week <= weeks; week++) {
@@ -54,6 +71,7 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           }
           const fbRevenue = currentAttendance * fbSpendPerCustomer;
           
+          // Add regular costs
           costs.forEach(cost => {
             const costType = cost.type?.toLowerCase();
             const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
@@ -72,7 +90,7 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
                 if (week > 1) {
                   const growthRate = metadata.growth?.useCustomerSpendGrowth 
                     ? metadata.growth?.fbSpendGrowth / 100 
-                    : (model.assumptions.growthModel.rate || 0);
+                    : (growthModel?.rate || 0);
                   costValue *= Math.pow(1 + growthRate, week - 1);
                 }
               }
@@ -96,6 +114,31 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
             weeklyTotal += costValue;
           });
           
+          // --- Calculate Marketing Cost based on mode ---
+          let periodMarketingCost = 0;
+          if (currentMarketingSetup.allocationMode === 'channels') {
+             periodMarketingCost = currentMarketingSetup.channels.reduce((sum, ch) => sum + (ch.weeklyBudget || 0), 0);
+          } else if (currentMarketingSetup.allocationMode === 'highLevel' && currentMarketingSetup.totalBudget) {
+             const totalBudget = currentMarketingSetup.totalBudget;
+             const application = currentMarketingSetup.budgetApplication || 'spreadEvenly';
+             const modelDuration = duration; // Use calculated model duration
+             
+             if (application === 'upfront') {
+                periodMarketingCost = (week === 1) ? totalBudget : 0;
+             } else if (application === 'spreadEvenly') {
+                periodMarketingCost = totalBudget / modelDuration; 
+             } else if (application === 'spreadCustom' && currentMarketingSetup.spreadDuration && currentMarketingSetup.spreadDuration > 0) {
+                const spreadDuration = currentMarketingSetup.spreadDuration;
+                periodMarketingCost = (week <= spreadDuration) ? (totalBudget / spreadDuration) : 0;
+             }
+          }
+          
+          // Add calculated marketing cost
+          if (periodMarketingCost > 0) {
+             point["MarketingBudget"] = Math.ceil(periodMarketingCost);
+             weeklyTotal += periodMarketingCost;
+          }
+          
           point.costs = Math.ceil(weeklyTotal);
           
           // Add attendance for merging later
@@ -110,63 +153,107 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
           data.push(point);
         }
       } else {
-        const months = timePoints;
-        
-        for (let month = 1; month <= months; month++) {
-          const point: any = { point: `Month ${month}` };
-          let monthlyTotal = 0;
-          
-          costs.forEach(cost => {
-            const costType = cost.type?.toLowerCase();
-            const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
-            let costValue = 0;
-            
-            if (costType === "fixed") {
-              costValue = month === 1 ? cost.value : 0;
-            } else if (costType === "variable") {
-              costValue = cost.value;
-              if (month > 1) {
-                const { rate } = model.assumptions.growthModel;
-                costValue *= Math.pow(1 + rate, month - 1);
+        // Non-Weekly Event (Monthly)
+         const months = timePoints;
+         const modelDuration = duration; // Use calculated model duration (likely 12 months)
+
+         for (let month = 1; month <= months; month++) {
+           const point: any = { point: `Month ${month}` };
+           let monthlyTotal = 0;
+           // Add regular costs
+           costs.forEach(cost => {
+              const costType = cost.type?.toLowerCase();
+              const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
+              let costValue = 0;
+              
+              if (costType === "fixed") {
+                costValue = month === 1 ? cost.value : 0;
+              } else if (costType === "variable") {
+                costValue = cost.value;
+                if (month > 1) {
+                  const { rate } = growthModel || { rate: 0 };
+                  costValue *= Math.pow(1 + rate, month - 1);
+                }
+              } else if (costType === "recurring") {
+                costValue = cost.value;
+              } else {
+                costValue = cost.value;
               }
-            } else if (costType === "recurring") {
-              costValue = cost.value;
-            } else {
-              costValue = cost.value;
-            }
-            
-            point[safeName] = Math.ceil(costValue);
-            monthlyTotal += costValue;
-          });
-          
-          point.total = Math.ceil(monthlyTotal);
-          
-          if (month === 1) {
-            point.cumulativeTotal = Math.ceil(monthlyTotal);
-          } else {
-            point.cumulativeTotal = Math.ceil(data[month - 2].cumulativeTotal + monthlyTotal);
-          }
-          
-          data.push(point);
-        }
+              
+              point[safeName] = Math.ceil(costValue);
+              monthlyTotal += costValue;
+           });
+
+           // Calculate Monthly Marketing Cost 
+           let periodMarketingCost = 0;
+           if (currentMarketingSetup.allocationMode === 'channels') {
+               const totalWeeklyBudget = currentMarketingSetup.channels.reduce((sum, ch) => sum + (ch.weeklyBudget || 0), 0);
+               periodMarketingCost = totalWeeklyBudget * (365.25 / 7 / 12); 
+           } else if (currentMarketingSetup.allocationMode === 'highLevel' && currentMarketingSetup.totalBudget) {
+               const totalBudget = currentMarketingSetup.totalBudget;
+               const application = currentMarketingSetup.budgetApplication || 'spreadEvenly';
+              
+               if (application === 'upfront') {
+                 periodMarketingCost = (month === 1) ? totalBudget : 0;
+               } else if (application === 'spreadEvenly') {
+                 periodMarketingCost = totalBudget / modelDuration; 
+               } else if (application === 'spreadCustom' && currentMarketingSetup.spreadDuration && currentMarketingSetup.spreadDuration > 0) {
+                 const spreadDuration = currentMarketingSetup.spreadDuration;
+                 periodMarketingCost = (month <= spreadDuration) ? (totalBudget / spreadDuration) : 0;
+               }
+           }
+
+           // Add calculated marketing cost
+           if (periodMarketingCost > 0) {
+             point["MarketingBudget"] = Math.ceil(periodMarketingCost);
+             monthlyTotal += periodMarketingCost;
+           }
+           
+           point.total = Math.ceil(monthlyTotal);
+           
+           if (month === 1) {
+             point.cumulativeTotal = Math.ceil(monthlyTotal);
+           } else {
+             point.cumulativeTotal = Math.ceil(data[month - 2].cumulativeTotal + monthlyTotal);
+           }
+           
+           data.push(point);
+         }
       }
-      
       return data;
     } catch (error) {
       console.error("Error calculating cost trends:", error);
       return [];
     }
-  };
+  }, [
+      costs, 
+      marketingSetup, 
+      metadata, 
+      growthModel, 
+      timePoints, 
+      isWeeklyEvent
+  ]);
 
-  const trendData = calculateCostData();
+  // Ref to store the previous costData string representation
+  const prevCostDataStringRef = useRef<string | null>(null);
   
   useEffect(() => {
-    if (onUpdateCostData && trendData.length > 0) {
-      onUpdateCostData(trendData);
+    if (onUpdateCostData && costData) { 
+      const currentCostDataString = JSON.stringify(costData);
+      // Only call update if the stringified data has actually changed
+      if (currentCostDataString !== prevCostDataStringRef.current) {
+          console.log("[CostTrends] Data changed, calling onUpdateCostData");
+          onUpdateCostData(costData);
+          // Update the ref to the current stringified data
+          prevCostDataStringRef.current = currentCostDataString;
+      } else {
+          // console.log("[CostTrends] Data reference changed but content is the same, skipping update.");
+      }
     }
-  }, [trendData, timePoints, onUpdateCostData]);
+    // Dependencies remain costData (the result of useMemo) and the callback
+  }, [costData, onUpdateCostData]);
   
-  if (!trendData || trendData.length === 0) {
+  if (!costData || costData.length === 0) {
     return (
       <div className="p-4 border border-red-200 rounded-md bg-red-50">
         <p className="text-red-600">
@@ -176,6 +263,56 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
     );
   }
   
+  // Dynamically generate the cost keys for the chart
+  const costKeys = useMemo(() => {
+    const keys = new Set<string>();
+    costs.forEach(cost => {
+        keys.add(cost.name.replace(/[^a-zA-Z0-9]/g, ""));
+    });
+    if (costData.some(point => point.hasOwnProperty('MarketingBudget'))) {
+        keys.add("MarketingBudget");
+    }
+    const presentKeys = Array.from(keys);
+
+    const costRenderOrder = [
+        "SetupCosts",       
+        "MarketingBudget",  
+        "FBCOGS",
+        "StaffCosts",
+        "ManagementCosts",
+    ];
+
+    const sortedKeys = presentKeys.sort((a, b) => {
+        let indexA = costRenderOrder.indexOf(a);
+        let indexB = costRenderOrder.indexOf(b);
+        if (indexA === -1) indexA = costRenderOrder.length;
+        if (indexB === -1) indexB = costRenderOrder.length;
+        return indexA - indexB;
+    });
+    
+    // Log the final sorted order
+    console.log("[CostTrends] Sorted Keys for Rendering:", sortedKeys);
+
+    return sortedKeys; 
+
+  }, [costs, costData]);
+
+  // Define a color mapping function or object
+  const getColor = (key: string): string => { // Removed index param, not needed with map lookup
+     const colorMap: Record<string, string> = {
+         "MarketingBudget": "#a855f7", // Purple 
+         "SetupCosts": "#ef4444",      // Red
+         "FBCOGS": "#f97316",          // Orange
+         "StaffCosts": "#eab308",      // Yellow
+         "ManagementCosts": "#22c55e",  // Green
+     };
+     const fallbackColor = '#9ca3af'; // Gray fallback
+     const color = colorMap[key] || fallbackColor;
+     // Log color assignment
+     // console.log(`[CostTrends] getColor for key: ${key}, assigned: ${color}`);
+     return color;
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -209,7 +346,7 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
       <div className="w-full h-[400px]">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
-            data={trendData}
+            data={costData}
             margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
@@ -222,36 +359,41 @@ const CostTrends = ({ model, combinedData, onUpdateCostData }: CostTrendsProps) 
               tickFormatter={(value) => `$${Math.ceil(value).toLocaleString()}`}
             />
             <Tooltip 
-              formatter={(value: number) => [`$${Math.ceil(value).toLocaleString()}`, ""]} 
+              formatter={(value: number, name: string) => [
+                  `$${Math.ceil(value).toLocaleString()}`,
+                  name
+              ]}
               labelFormatter={(label) => `${label}`}
             />
             <Legend />
-            {model.assumptions.costs.map((cost, index) => {
-              const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
-              const colors = [
-                "#ff8042", "#8884d8", "#82ca9d", "#ffc658", "#0088fe", 
-                "#00c49f", "#ffbb28", "#9370db", "#3366cc"
-              ];
-              return (
-                <Area
-                  key={index}
-                  type="monotone"
-                  dataKey={safeName}
-                  name={cost.name}
-                  stackId="1"
-                  stroke={colors[index % colors.length]}
-                  fill={colors[index % colors.length]}
-                />
-              );
+
+            {/* Map over the SORTED costKeys */}
+            {costKeys.map((key) => { 
+                const color = getColor(key);
+                console.log(`[CostTrends] Rendering Area - Key: ${key}, Color: ${color}`);
+                
+                return (
+                  <Area
+                    key={key} 
+                    type="monotone"
+                    dataKey={key}
+                    name={key === 'MarketingBudget' ? 'Marketing Budget' : key.replace(/([A-Z])/g, ' $1').trim()} 
+                    stackId="1" 
+                    stroke={color}
+                    fill={color}
+                    fillOpacity={0.6}
+                  />
+                );
             })}
           </AreaChart>
         </ResponsiveContainer>
       </div>
 
-      {!combinedData && (
+      {/* FinancialMatrix rendering */}
+      {!marketingSetup?.channels && (
         <FinancialMatrix 
-          model={model} 
-          trendData={trendData} 
+          model={model}
+          trendData={costData} 
           costData={true} 
         />
       )}

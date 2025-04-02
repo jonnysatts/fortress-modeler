@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
   AreaChart,
@@ -15,7 +15,7 @@ import FinancialMatrix from "./FinancialMatrix";
 interface RevenueTrendsProps {
   model: FinancialModel;
   combinedData?: any[];
-  setCombinedData?: (data: any[]) => void;
+  setCombinedData: (data: any[]) => void;
 }
 
 const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsProps) => {
@@ -23,9 +23,12 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
 
-  const calculateRevenueData = () => {
+  const trendData = useMemo(() => {
+    console.log("[RevenueTrends] Recalculating trendData...");
     try {
       const data = [];
+      if (!model?.assumptions?.revenue || !model?.assumptions?.metadata) return [];
+      
       const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
       const revenueStreams = model.assumptions.revenue;
       
@@ -46,11 +49,10 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
         for (let week = 1; week <= weeks; week++) {
           const point: any = { point: `Week ${week}` };
           
-          let currentAttendance = metadata.initialWeeklyAttendance;
-          let attendanceGrowthRate = 0;
+          let currentAttendance = metadata.initialWeeklyAttendance || 0;
           if (week > 1 && metadata.growth) { 
-            attendanceGrowthRate = metadata.growth.attendanceGrowthRate / 100;
-            currentAttendance = metadata.initialWeeklyAttendance * Math.pow(1 + attendanceGrowthRate, week - 1);
+            const attendanceGrowthRate = (metadata.growth.attendanceGrowthRate || 0) / 100;
+            currentAttendance = (metadata.initialWeeklyAttendance || 0) * Math.pow(1 + attendanceGrowthRate, week - 1);
           }
           
           let totalRevenue = 0;
@@ -58,7 +60,6 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
             let streamBaseValue = 0;
             let streamRevenue = 0;
             
-            // Calculate revenue based on per-customer spending for specific streams
             if (stream.name === "F&B Sales") {
               let fbSpendPerCustomer = metadata.perCustomer?.fbSpend || 0;
               if (week > 1 && metadata.growth?.useCustomerSpendGrowth) {
@@ -74,29 +75,18 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
               }
               streamRevenue = currentAttendance * merchSpendPerCustomer;
             } else {
-              // Handle other revenue streams (Ticket, Online, Misc)
               streamBaseValue = stream.value; 
               streamRevenue = streamBaseValue;
-              
               if (week > 1) {
                 let growthRateToApply = 0;
-                // Apply specific growth rates if useCustomerSpendGrowth is enabled
-                // Note: For streams like Ticket Sales, this applies growth to the *base value*,
-                // which might need adjustment if Ticket Sales should also be per-customer based.
-                // Assuming Ticket Sales value represents initial total, not per customer.
                 if (metadata.growth?.useCustomerSpendGrowth) {
                   switch(stream.name) {
                     case "Ticket Sales": growthRateToApply = (metadata.growth.ticketPriceGrowth || 0) / 100; break;
-                    // Merchandise Sales is handled above
                     case "Online Sales": growthRateToApply = (metadata.growth.onlineSpendGrowth || 0) / 100; break;
                     case "Miscellaneous Revenue": growthRateToApply = (metadata.growth.miscSpendGrowth || 0) / 100; break;
                   }
                   streamRevenue = streamBaseValue * Math.pow(1 + growthRateToApply, week - 1);
-                } else {
-                   // If not using customer spend growth, potentially apply a general growth rate?
-                   // Current logic doesn't explicitly handle this case for these streams.
-                   // For now, they remain flat unless useCustomerSpendGrowth is true.
-                }
+                } 
               }
             }
             
@@ -113,12 +103,12 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
           data.push(point);
         }
       } else {
+        if (!model.assumptions.growthModel) return [];
         const months = timePoints;
         let cumulativeTotal = 0;
         
         for (let month = 1; month <= months; month++) {
           const point: any = { point: `Month ${month}` };
-          
           let totalRevenue = 0;
           revenueStreams.forEach(stream => {
             let streamRevenue = stream.value;
@@ -126,13 +116,10 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
               const { type, rate } = model.assumptions.growthModel;
               if (type === "linear") {
                 streamRevenue = stream.value * (1 + rate * (month - 1));
-              } else if (type === "exponential") {
-                streamRevenue = stream.value * Math.pow(1 + rate, month - 1);
               } else {
                 streamRevenue = stream.value * Math.pow(1 + rate, month - 1);
               }
             }
-            
             const safeName = stream.name.replace(/[^a-zA-Z0-9]/g, "");
             point[safeName] = Math.ceil(streamRevenue);
             totalRevenue += streamRevenue;
@@ -144,22 +131,19 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
           data.push(point);
         }
       }
-      
       return data;
     } catch (error) {
       console.error("Error calculating revenue trends:", error);
       return [];
     }
-  };
+  }, [model, timePoints]);
 
-  const trendData = calculateRevenueData();
-  
-  // Use useEffect to update combined data to prevent infinite render loops
   useEffect(() => {
-    if (setCombinedData && trendData.length > 0) {
+    if (setCombinedData && trendData) {
+      console.log("[RevenueTrends] Calling setCombinedData");
       setCombinedData(trendData);
     }
-  }, [trendData, timePoints, setCombinedData]);
+  }, [trendData, setCombinedData]);
   
   if (!trendData || trendData.length === 0) {
     return (

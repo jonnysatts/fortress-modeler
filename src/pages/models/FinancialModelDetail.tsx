@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, BarChart3, ChartLine, Edit, Trash2 } from "lucide-react";
+import { ArrowLeft, BarChart3, ChartLine, Edit, Trash2, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,18 +26,87 @@ import CategoryBreakdown from "@/components/models/CategoryBreakdown";
 import FinancialMatrix from "@/components/models/FinancialMatrix";
 import { calculateTotalRevenue, calculateTotalCosts } from "@/lib/financialCalculations";
 import { ModelOverview } from "@/components/models/ModelOverview";
+import { MarketingChannelsForm } from "@/components/models/MarketingChannelsForm";
+import { ModelAssumptions, MarketingSetup, RevenueStream, CostCategory } from "@/types/models";
 
 const FinancialModelDetail = () => {
   const { projectId, modelId } = useParams<{ projectId: string; modelId: string }>();
   const navigate = useNavigate();
+  
+  // --- Call ALL hooks at the top level --- 
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState<FinancialModel | null>(null);
   const { loadProjectById, currentProject, setCurrentProject } = useStore();
-
-  const [combinedFinancialData, setCombinedFinancialData] = useState<any[]>([]);
   const [revenueData, setRevenueData] = useState<any[]>([]);
   const [costData, setCostData] = useState<any[]>([]);
+  const [combinedFinancialData, setCombinedFinancialData] = useState<any[]>([]);
   const [isFinancialDataReady, setIsFinancialDataReady] = useState<boolean>(false);
+
+  // Memoize assumption props (call unconditionally)
+  const assumptions = model?.assumptions;
+  const memoizedCosts = useMemo(() => assumptions?.costs || [], [assumptions?.costs]);
+  const memoizedMarketingSetup = useMemo(() => assumptions?.marketing || { allocationMode: 'channels' as 'channels' | 'highLevel', channels: [] }, [assumptions?.marketing]);
+  const memoizedMetadata = useMemo(() => assumptions?.metadata, [assumptions?.metadata]);
+  const memoizedGrowthModel = useMemo(() => assumptions?.growthModel, [assumptions?.growthModel]);
+  const isWeeklyEvent = useMemo(() => memoizedMetadata?.type === "WeeklyEvent", [memoizedMetadata]);
+
+  // Callbacks (call unconditionally)
+  const updateModelAssumptions = useCallback(async (updatedFields: Partial<ModelAssumptions>) => {
+    console.log("[FinancialModelDetail] updateModelAssumptions called with:", JSON.stringify(updatedFields));
+    
+    if (!model || !model.id) {
+        console.log("[FinancialModelDetail] updateModelAssumptions skipped: no model or model.id");
+        return;
+    }
+    
+    try {
+      const currentAssumptions = model?.assumptions || { 
+          revenue: [], 
+          costs: [], 
+          growthModel: { type: 'linear', rate: 0 }, 
+          marketing: { channels: [] }
+      };
+
+      const newAssumptions = { ...currentAssumptions, ...updatedFields };
+
+      if (updatedFields.marketing) {
+         newAssumptions.marketing = {
+            channels: [],
+            ...currentAssumptions.marketing,
+            ...updatedFields.marketing,
+         };
+      }
+      
+      if (!newAssumptions.revenue) newAssumptions.revenue = [];
+      if (!newAssumptions.costs) newAssumptions.costs = [];
+      if (!newAssumptions.growthModel) newAssumptions.growthModel = { type: 'linear', rate: 0 };
+      if (!newAssumptions.marketing) newAssumptions.marketing = { channels: [] };
+      if (!newAssumptions.marketing.channels) newAssumptions.marketing.channels = [];
+
+      const assumptionsToSave = newAssumptions as FinancialModel['assumptions'];
+
+      console.log("[FinancialModelDetail] Attempting to save assumptions:", JSON.stringify(assumptionsToSave));
+
+      await db.financialModels.update(model.id, { 
+          assumptions: assumptionsToSave, 
+          updatedAt: new Date() 
+      });
+      
+      console.log("[FinancialModelDetail] db.financialModels.update successful for ID:", model.id);
+
+      setModel(prevModel => prevModel ? { 
+          ...prevModel, 
+          assumptions: assumptionsToSave, 
+          updatedAt: new Date() 
+      } : null);
+      
+      toast({ title: "Assumptions Updated", description: "Marketing changes saved." });
+      
+    } catch (error) {
+      console.error("[FinancialModelDetail] Error saving assumptions:", error);
+      toast({ variant: "destructive", title: "Error Saving", description: "Could not save marketing changes." });
+    }
+  }, [model]); // Dependency might need refinement if model reference changes too often
 
   const combineFinancialData = useCallback(() => {
     if (revenueData.length === 0 || costData.length === 0) {
@@ -84,6 +153,23 @@ const FinancialModelDetail = () => {
     }
   }, [revenueData, costData]);
 
+  const handleDeleteModel = useCallback(async () => {
+    // Ensure modelId is defined before attempting delete
+    if (!modelId) {
+        toast({ variant: "destructive", title: "Error", description: "Model ID is missing, cannot delete." });
+        return;
+    }
+    try {
+      await db.financialModels.delete(parseInt(modelId));
+      toast({ title: "Model deleted", description: "The financial model has been successfully deleted." });
+      navigate(`/projects/${projectId}`);
+    } catch (error) {
+      console.error("Error deleting model:", error);
+      toast({ variant: "destructive", title: "Error deleting model", description: "There was an error deleting the financial model." });
+    }
+  }, [modelId, projectId, navigate]);
+
+  // Effects (call unconditionally)
   useEffect(() => {
     const loadData = async () => {
       if (!projectId || !modelId) {
@@ -144,44 +230,17 @@ const FinancialModelDetail = () => {
       combineFinancialData();
     }
   }, [revenueData, costData, combineFinancialData]);
+  // --- End Top Level Hooks --- 
 
-  const handleDeleteModel = async () => {
-    if (!modelId) return;
-
-    try {
-      await db.financialModels.delete(parseInt(modelId));
-      toast({
-        title: "Model deleted",
-        description: "The financial model has been successfully deleted.",
-      });
-      navigate(`/projects/${projectId}`);
-    } catch (error) {
-      console.error("Error deleting model:", error);
-      toast({
-        variant: "destructive",
-        title: "Error deleting model",
-        description: "There was an error deleting the financial model.",
-      });
-    }
-  };
-
-  if (loading || !model || !currentProject) {
-    return (
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <div className="h-10 w-10 border-4 border-fortress-emerald border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  const formatDate = (dateString: string | undefined): string => {
+  // Helper functions (can be defined here)
+  const formatDate = (dateString: string | Date | undefined): string => {
     if (!dateString) return "N/A";
     try {
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return "Invalid Date";
+        // Handle both string and Date objects
+        const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+        if (isNaN(date.getTime())) return "Invalid Date"; 
         return date.toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
+            year: "numeric", month: "short", day: "numeric",
         });
     } catch (error) {
         console.error("Error formatting date:", dateString, error);
@@ -189,221 +248,157 @@ const FinancialModelDetail = () => {
     }
   };
 
-  const hasRequiredData = model && 
-    model.assumptions && 
+  // --- Conditional Returns (AFTER all hooks) --- 
+  if (loading || !currentProject) { // Check currentProject as well for header info
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+         <div className="h-10 w-10 border-4 border-fortress-emerald border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+  
+  // Check specifically for model after loading finishes
+  if (!model) {
+      return (
+        <div className="text-center py-10 text-red-500">Model not found or failed to load.</div>
+      );
+  }
+
+  // Check for required assumptions AFTER confirming model exists
+  const hasRequiredData = model.assumptions && 
     model.assumptions.revenue && 
     model.assumptions.costs && 
     model.assumptions.growthModel;
 
   if (!hasRequiredData) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(`/projects/${projectId}`)}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h1 className="text-3xl font-bold text-fortress-blue">{model?.name || "Model"}</h1>
-        </div>
-        <Card>
-          <CardContent className="py-6">
-            <div className="text-center py-10">
-              <p className="text-lg font-medium text-red-500">
-                This financial model data appears to be corrupted or incomplete.
-              </p>
-              <Button 
-                className="mt-4" 
-                onClick={() => navigate(`/projects/${projectId}`)}
-              >
-                Return to Project
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+      return (
+          <div className="text-center py-10 text-orange-500">Model data is incomplete. Please edit the model.</div>
+      );
   }
+  // --- End Conditional Returns ---
 
-  const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
-  
-  console.log("Model metadata:", model.assumptions.metadata);
-
-  const overviewModel = model as any;
+  // Now it's safe to use the data and memoized props
+  console.log("[FinancialModelDetail Render] Passing marketingSetup:", memoizedMarketingSetup);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-start gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(`/projects/${projectId}`)}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-fortress-blue">{model.name}</h1>
-            <p className="text-muted-foreground">
-              Created on {formatDate(model.createdAt?.toISOString())} • Last updated on{" "}
-              {formatDate(model.updatedAt?.toISOString())}
-            </p>
+         <div className="flex items-start gap-2">
+            <Button variant="ghost" size="icon" onClick={() => navigate(`/projects/${projectId}`)}><ArrowLeft className="h-4 w-4" /></Button>
+            <div>
+               <h1 className="text-3xl font-bold text-fortress-blue">{model.name}</h1>
+               <p className="text-muted-foreground">
+                 Created on {formatDate(model.createdAt)} • Last updated on{" "}
+                 {formatDate(model.updatedAt)}
+               </p>
+            </div>
+         </div>
+          <div className="flex space-x-2">
+            <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/models/${model.id}/edit`)} disabled={!model.id}><Edit className="mr-1 h-4 w-4" /> Edit</Button>
+            <AlertDialog>
+               <AlertDialogTrigger asChild><Button variant="destructive" size="sm" disabled={!model.id}><Trash2 className="mr-1 h-4 w-4" /> Delete</Button></AlertDialogTrigger>
+               <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>This action cannot be undone. This will permanently delete the financial model.</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                     <AlertDialogCancel>Cancel</AlertDialogCancel>
+                     <AlertDialogAction onClick={handleDeleteModel} className="bg-red-500 hover:bg-red-600">Delete</AlertDialogAction>
+                  </AlertDialogFooter>
+               </AlertDialogContent>
+            </AlertDialog>
           </div>
-        </div>
-        <div className="flex space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(`/projects/${projectId}/models/${modelId}/edit`)}
-          >
-            <Edit className="mr-1 h-4 w-4" />
-            Edit
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm">
-                <Trash2 className="mr-1 h-4 w-4" />
-                Delete
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete the
-                  financial model and all associated data.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDeleteModel}
-                  className="bg-red-500 hover:bg-red-600"
-                >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </div>
+       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="financial-matrix">Financial Matrix</TabsTrigger>
-          <TabsTrigger value="trends">Trends</TabsTrigger>
-          <TabsTrigger value="breakdown">Breakdown</TabsTrigger>
-          <TabsTrigger value="projections">Projections</TabsTrigger>
-        </TabsList>
+         <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="marketing">Marketing</TabsTrigger>
+            <TabsTrigger value="financial-matrix">Financial Matrix</TabsTrigger>
+            <TabsTrigger value="trends">Trends</TabsTrigger>
+            <TabsTrigger value="breakdown">Breakdown</TabsTrigger>
+            <TabsTrigger value="projections">Projections</TabsTrigger>
+         </TabsList>
 
-        <TabsContent value="overview" className="space-y-4">
-          <ModelOverview model={overviewModel} />
-        </TabsContent>
+         <TabsContent value="overview" className="space-y-4">
+           <ModelOverview model={model as any} projectId={projectId} /> 
+         </TabsContent>
 
-        <TabsContent value="financial-matrix">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <BarChart3 className="mr-2 h-5 w-5" />
-                Combined Financial Matrix
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isFinancialDataReady ? (
-                <FinancialMatrix 
-                  model={model} 
-                  trendData={combinedFinancialData} 
-                  combinedView={true}
-                />
-              ) : (
-                <div className="flex justify-center items-center py-10">
-                  <div className="flex flex-col items-center">
-                    <div className="h-8 w-8 border-4 border-fortress-emerald border-t-transparent rounded-full animate-spin mb-4"></div>
-                    <p className="text-muted-foreground">
-                      Loading financial data...
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      (Please view the Trends tab first if this takes too long)
-                    </p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+         <TabsContent value="marketing">
+           <MarketingChannelsForm 
+             marketingSetup={memoizedMarketingSetup} 
+             updateAssumptions={updateModelAssumptions} 
+             modelTimeUnit={isWeeklyEvent ? 'Week' : 'Month'} 
+           />
+         </TabsContent>
 
-        <TabsContent value="trends">
-          <div className="space-y-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <ChartLine className="mr-2 h-5 w-5" />
-                  Revenue Trends Over Time
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <RevenueTrends 
-                  model={model} 
-                  setCombinedData={setRevenueData} 
-                />
-              </CardContent>
-            </Card>
+         <TabsContent value="financial-matrix">
+             <Card>
+               <CardHeader><CardTitle className="flex items-center"><BarChart3 className="mr-2 h-5 w-5" />Combined Financial Matrix</CardTitle></CardHeader>
+               <CardContent>
+                  {isFinancialDataReady ? (
+                     <FinancialMatrix 
+                       model={model} 
+                       trendData={combinedFinancialData} 
+                       combinedView={true}
+                     />
+                  ) : (
+                     <div className="text-center py-10 text-muted-foreground">Loading financial data...</div> 
+                  )}
+               </CardContent>
+             </Card>
+         </TabsContent>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <ChartLine className="mr-2 h-5 w-5" />
-                  Cost Trends Over Time
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CostTrends 
-                  model={model} 
-                  onUpdateCostData={setCostData} 
-                />
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
+         <TabsContent value="trends">
+           <div className="space-y-8">
+             <Card>
+                <CardHeader><CardTitle className="flex items-center"><ChartLine className="mr-2 h-5 w-5" />Revenue Trends Over Time</CardTitle></CardHeader>
+                <CardContent>
+                   <RevenueTrends model={model} setCombinedData={setRevenueData} />
+                </CardContent>
+             </Card>
+             <Card>
+                <CardHeader><CardTitle className="flex items-center"><ChartLine className="mr-2 h-5 w-5" />Cost Trends Over Time</CardTitle></CardHeader>
+                <CardContent>
+                   <CostTrends 
+                      costs={memoizedCosts}
+                      marketingSetup={memoizedMarketingSetup}
+                      metadata={memoizedMetadata}
+                      growthModel={memoizedGrowthModel}
+                      model={model} 
+                      onUpdateCostData={setCostData} 
+                   />
+                </CardContent>
+             </Card>
+           </div>
+         </TabsContent>
 
-        <TabsContent value="breakdown">
-          <Card>
-            <CardHeader>
-              <CardTitle>Category Breakdown</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isFinancialDataReady ? (
-                <CategoryBreakdown 
-                  model={model} 
-                  revenueTrendData={revenueData}
-                  costTrendData={costData}
-                />
-              ) : (
-                <div className="flex justify-center items-center py-10">
-                  <p className="text-muted-foreground">
-                    Loading breakdown data... (Requires Trends data)
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+          <TabsContent value="breakdown">
+             <Card>
+               <CardHeader><CardTitle>Category Breakdown</CardTitle></CardHeader>
+               <CardContent>
+                  {isFinancialDataReady ? (
+                     <CategoryBreakdown 
+                        model={model} 
+                        revenueTrendData={revenueData}
+                        costTrendData={costData}
+                     />
+                  ) : (
+                     <div className="text-center py-10 text-muted-foreground">Loading breakdown data...</div> 
+                  )}
+               </CardContent>
+             </Card>
+         </TabsContent>
 
-        <TabsContent value="projections">
-          <Card>
-            <CardHeader>
-              <CardTitle>Financial Projections</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ModelProjections 
-                model={model} 
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
+          <TabsContent value="projections">
+             <Card>
+               <CardHeader><CardTitle>Financial Projections</CardTitle></CardHeader>
+               <CardContent>
+                  <ModelProjections model={model} />
+               </CardContent>
+             </Card>
+         </TabsContent>
       </Tabs>
     </div>
   );

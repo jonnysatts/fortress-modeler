@@ -1,4 +1,5 @@
 import Dexie, { Table } from 'dexie';
+import { MarketingSetup } from '@/types/models';
 
 // Define interfaces for our database tables
 export interface Project {
@@ -24,6 +25,7 @@ export interface FinancialModel {
     revenue: RevenueAssumption[];
     costs: CostAssumption[];
     growthModel: GrowthModel;
+    marketing?: MarketingSetup;
     metadata?: any; // For product-specific data
   };
   createdAt: Date;

@@ -49,6 +49,7 @@ export const ModelOverview = ({ model, projectId }: ModelOverviewProps) => {
 
     const revenueStreams = model.assumptions.revenue;
     const costs = model.assumptions.costs;
+    const marketingSetup = model.assumptions.marketing || { allocationMode: 'channels', channels: [] };
 
     let cumulativeRevenue = 0;
     let cumulativeCosts = 0;
@@ -116,6 +117,7 @@ export const ModelOverview = ({ model, projectId }: ModelOverviewProps) => {
       });
 
       let periodCosts = 0;
+      // Regular Costs
       costs.forEach(cost => {
           let costValue = 0;
           const costType = cost.type?.toLowerCase();
@@ -125,7 +127,7 @@ export const ModelOverview = ({ model, projectId }: ModelOverviewProps) => {
               if (costType === "fixed") {
                   costValue = period === 1 ? baseValue : 0;
                   if (period === 1) totalFixedCosts += costValue;
-                  else totalOtherCosts += costValue; // Technically adds 0, but logically correct
+                  else totalOtherCosts += costValue; 
               } else if (costType === "variable") {
                   if (cost.name === "F&B COGS") {
                        const cogsPct = metadata.costs?.fbCOGSPercent || 30;
@@ -139,18 +141,16 @@ export const ModelOverview = ({ model, projectId }: ModelOverviewProps) => {
                   } else {
                      costValue = baseValue; 
                   }
-                   totalOtherCosts += costValue; // Variable costs are not fixed
+                   totalOtherCosts += costValue; 
               } else { // Recurring or Unspecified
                  costValue = baseValue;
-                 // Handle Setup Costs spreading if recurring
                  if(cost.name === "Setup Costs" && metadata.weeks && metadata.weeks > 0) {
-                    // Check if setup cost was also marked fixed - avoid double counting/spreading
                     const setupIsFixed = costs.find(c => c.name === "Setup Costs")?.type?.toLowerCase() === 'fixed';
-                    if (!setupIsFixed) { // Only spread if NOT fixed
+                    if (!setupIsFixed) {
                        costValue = baseValue / metadata.weeks; 
                     }
                  }
-                  totalOtherCosts += costValue; // Recurring costs are not fixed
+                  totalOtherCosts += costValue;
               }
           } else { // Non-weekly cost calculation
                if (costType === "fixed") {
@@ -158,12 +158,38 @@ export const ModelOverview = ({ model, projectId }: ModelOverviewProps) => {
                  if (period === 1) totalFixedCosts += costValue;
                  else totalOtherCosts += costValue;
                } else {
-                  costValue = baseValue; // Assume recurring/variable are flat monthly
+                  costValue = baseValue; 
                   totalOtherCosts += costValue;
                }
           }
           periodCosts += costValue;
-      }); // End cost calculation loop - Ensure this is line 161
+      });
+
+      // --- Calculate Marketing Cost based on mode --- 
+      let periodMarketingCost = 0;
+      if (marketingSetup.allocationMode === 'channels') {
+         const totalWeeklyBudget = marketingSetup.channels.reduce((sum, ch) => sum + (ch.weeklyBudget || 0), 0);
+         periodMarketingCost = isWeekly ? totalWeeklyBudget : totalWeeklyBudget * (365.25 / 7 / 12);
+      } else if (marketingSetup.allocationMode === 'highLevel' && marketingSetup.totalBudget) {
+         const totalBudget = marketingSetup.totalBudget;
+         const application = marketingSetup.budgetApplication || 'spreadEvenly';
+         const modelDuration = duration; // Use duration calculated at start of useMemo
+             
+         if (application === 'upfront') {
+            periodMarketingCost = (period === 1) ? totalBudget : 0;
+         } else if (application === 'spreadEvenly') {
+            periodMarketingCost = totalBudget / modelDuration;
+         } else if (application === 'spreadCustom' && marketingSetup.spreadDuration && marketingSetup.spreadDuration > 0) {
+            const spreadDuration = marketingSetup.spreadDuration;
+            periodMarketingCost = (period <= spreadDuration) ? (totalBudget / spreadDuration) : 0;
+         }
+      }
+      
+      // Add Marketing Cost to Period Costs & totalOtherCosts
+      if (periodMarketingCost > 0) {
+         periodCosts += periodMarketingCost;
+         totalOtherCosts += periodMarketingCost; 
+      }
       
       const periodProfit = periodRevenue - periodCosts;
       cumulativeRevenue += periodRevenue;
@@ -204,7 +230,8 @@ export const ModelOverview = ({ model, projectId }: ModelOverviewProps) => {
     // Calculate Risk Metrics
     const highestStreamTotal = Math.max(0, ...Object.values(revenueTotalsPerStream)); // Ensure non-negative
     const revenueConcentration = totalRevenue > 0 ? (highestStreamTotal / totalRevenue) * 100 : 0;
-    const fixedCostRatio = totalCosts > 0 ? (totalFixedCosts / totalCosts) * 100 : 0;
+    const fixedCostRatio = (totalFixedCosts + totalOtherCosts) > 0 ? 
+                           (totalFixedCosts / (totalFixedCosts + totalOtherCosts)) * 100 : 0;
 
     return {
       periodicData,
