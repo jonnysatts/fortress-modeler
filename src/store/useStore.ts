@@ -8,7 +8,7 @@ interface AppState {
   currentModel: FinancialModel | null;
   isLoading: boolean;
   error: string | null;
-  
+
   loadProjects: () => Promise<void>;
   loadProjectById: (id: number) => Promise<Project | null>;
   setCurrentProject: (project: Project | null) => void;
@@ -16,13 +16,16 @@ interface AppState {
   addProject: (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => Promise<number>;
   updateProject: (id: number, updates: Partial<Project>) => Promise<void>;
   deleteProject: (id: number) => Promise<void>;
-  
+
   // Financial model methods
   loadModelsForProject: (projectId: number) => Promise<FinancialModel[]>;
   loadModelById: (id: number) => Promise<FinancialModel | null>;
   addFinancialModel: (model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>) => Promise<number>;
   updateFinancialModel: (id: number, updates: Partial<FinancialModel>) => Promise<void>;
   deleteFinancialModel: (id: number) => Promise<void>;
+
+  // Actuals methods
+  loadActualsForProject: (projectId: number) => Promise<any[]>;
 }
 
 const useStore = create<AppState>((set, get) => ({
@@ -31,7 +34,7 @@ const useStore = create<AppState>((set, get) => ({
   currentModel: null,
   isLoading: false,
   error: null,
-  
+
   loadProjects: async () => {
     set({ isLoading: true, error: null });
     try {
@@ -42,7 +45,7 @@ const useStore = create<AppState>((set, get) => ({
       set({ error: 'Failed to load projects', isLoading: false });
     }
   },
-  
+
   loadProjectById: async (id) => {
     set({ isLoading: true, error: null });
     try {
@@ -60,11 +63,11 @@ const useStore = create<AppState>((set, get) => ({
       return null;
     }
   },
-  
+
   setCurrentProject: (project) => set({ currentProject: project }),
-  
+
   setCurrentModel: (model) => set({ currentModel: model }),
-  
+
   addProject: async (project) => {
     set({ isLoading: true, error: null });
     try {
@@ -82,13 +85,13 @@ const useStore = create<AppState>((set, get) => ({
       return -1;
     }
   },
-  
+
   updateProject: async (id, updates) => {
     set({ isLoading: true, error: null });
     try {
       await db.projects.update(id, { ...updates, updatedAt: new Date() });
       await get().loadProjects();
-      
+
       // Update current project if it's the one being edited
       const currentProject = get().currentProject;
       if (currentProject && currentProject.id === id) {
@@ -97,25 +100,25 @@ const useStore = create<AppState>((set, get) => ({
           set({ currentProject: updatedProject });
         }
       }
-      
+
       set({ isLoading: false });
     } catch (error) {
       console.error('Error updating project:', error);
       set({ error: 'Failed to update project', isLoading: false });
     }
   },
-  
+
   deleteProject: async (id) => {
     set({ isLoading: true, error: null });
     try {
       await db.projects.delete(id);
-      
+
       // Reset current project if it's the one being deleted
       const currentProject = get().currentProject;
       if (currentProject && currentProject.id === id) {
         set({ currentProject: null });
       }
-      
+
       await get().loadProjects();
       set({ isLoading: false });
     } catch (error) {
@@ -178,7 +181,7 @@ const useStore = create<AppState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       await db.financialModels.update(id, { ...updates, updatedAt: new Date() });
-      
+
       // Update current model if it's the one being edited
       const currentModel = get().currentModel;
       if (currentModel && currentModel.id === id) {
@@ -187,7 +190,7 @@ const useStore = create<AppState>((set, get) => ({
           set({ currentModel: updatedModel });
         }
       }
-      
+
       set({ isLoading: false });
     } catch (error) {
       console.error('Error updating financial model:', error);
@@ -199,17 +202,32 @@ const useStore = create<AppState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       await db.financialModels.delete(id);
-      
+
       // Reset current model if it's the one being deleted
       const currentModel = get().currentModel;
       if (currentModel && currentModel.id === id) {
         set({ currentModel: null });
       }
-      
+
       set({ isLoading: false });
     } catch (error) {
       console.error('Error deleting financial model:', error);
       set({ error: 'Failed to delete financial model', isLoading: false });
+    }
+  },
+
+  loadActualsForProject: async (projectId) => {
+    set({ isLoading: true, error: null });
+    try {
+      // For now, return an empty array since we don't have an actuals table yet
+      // In a real implementation, you would query the actuals table
+      // const actuals = await db.actuals.where('projectId').equals(projectId).toArray();
+      set({ isLoading: false });
+      return [];
+    } catch (error) {
+      console.error('Error loading actuals:', error);
+      set({ error: 'Failed to load actuals', isLoading: false });
+      return [];
     }
   },
 }));

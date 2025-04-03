@@ -17,6 +17,11 @@ import Settings from "./pages/Settings";
 
 // Product Pages
 import ProductSummary from "@/pages/product/summary";
+import ProductAssumptions from "@/pages/product/assumptions";
+import ProductInputs from "@/pages/product/inputs";
+import ProductForecast from "@/pages/product/forecast";
+import ProductActuals from "@/pages/product/actuals";
+import ProductAnalysis from "@/pages/product/analysis";
 import ProjectDetail from "./pages/projects/ProjectDetail";
 import EditProject from "./pages/projects/EditProject";
 import NewFinancialModel from "./pages/models/NewFinancialModel";
@@ -55,11 +60,11 @@ const App = () => (
             {/* Product Layout Routes */}
             <Route path="/products/:id/*" element={<ProductLayout />}>
               <Route path="summary" element={<ProductSummary />} />
-              <Route path="assumptions" element={<ProjectDetail />} />
-              <Route path="inputs" element={<FinancialModelDetail />} />
-              <Route path="forecast" element={<FinancialModelDetail />} />
-              <Route path="actuals" element={<FinancialModelDetail />} />
-              <Route path="analysis" element={<FinancialModelDetail />} />
+              <Route path="assumptions" element={<ProductAssumptions />} />
+              <Route path="inputs" element={<ProductInputs />} />
+              <Route path="forecast" element={<ProductForecast />} />
+              <Route path="actuals" element={<ProductActuals />} />
+              <Route path="analysis" element={<ProductAnalysis />} />
               <Route path="risks" element={<FinancialModelDetail />} />
               <Route path="edit" element={<EditProject />} />
               <Route path="models/new" element={<NewFinancialModel />} />

@@ -2,7 +2,6 @@ import React, { useEffect } from "react";
 import { Outlet, NavLink, useParams, useNavigate, useLocation } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Toaster } from "@/components/ui/toaster";
 import useStore from "@/store/useStore";
 import ErrorBoundary from "@/components/common/ErrorBoundary";
 import { TypographyH3 } from "@/components/ui/typography";
@@ -12,12 +11,12 @@ const ProductLayout: React.FC = () => {
   const { id: productId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentProject, loadProject, setCurrentProject } = useStore();
-  
+  const { currentProject, loadProjectById, setCurrentProject } = useStore();
+
   useEffect(() => {
     if (productId) {
       const id = parseInt(productId);
-      loadProject(id).then(project => {
+      loadProjectById(id).then(project => {
         if (project) {
           setCurrentProject(project);
         } else {
@@ -26,7 +25,7 @@ const ProductLayout: React.FC = () => {
         }
       });
     }
-  }, [productId, loadProject, setCurrentProject, navigate]);
+  }, [productId, loadProjectById, setCurrentProject, navigate]);
 
   const steps = [
     { path: "summary", label: "Product Summary" },
@@ -40,25 +39,23 @@ const ProductLayout: React.FC = () => {
 
   // Get current step from URL
   const currentPath = location.pathname.split('/').pop() || 'summary';
-  
+
   // Generate breadcrumb items
   const breadcrumbItems = [
     { label: "Portfolio Overview", href: "/" },
     { label: "Products", href: "/products" },
-    { 
-      label: currentProject?.name || `Product ${productId}`, 
-      href: `/products/${productId}/summary` 
+    {
+      label: currentProject?.name || `Product ${productId}`,
+      href: `/products/${productId}/summary`
     },
-    { 
+    {
       label: steps.find(step => step.path === currentPath)?.label || "Details"
     }
   ];
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
-      <Toaster />
-      
-      <header className="bg-white dark:bg-gray-800 border-b">
+    <div className="w-full">
+      <header className="bg-white dark:bg-gray-800 border-b mb-6">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
@@ -67,9 +64,9 @@ const ProductLayout: React.FC = () => {
                 {currentProject?.name || "Product Details"}
               </TypographyH3>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => navigate("/")}
             >
               <ChevronLeft className="mr-2 h-4 w-4" />
@@ -78,8 +75,8 @@ const ProductLayout: React.FC = () => {
           </div>
         </div>
       </header>
-      
-      <div className="container mx-auto px-4 py-6">
+
+      <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row gap-6">
           <aside className="w-full md:w-60 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
             <nav>
@@ -90,8 +87,8 @@ const ProductLayout: React.FC = () => {
                       to={`/products/${productId}/${step.path}`}
                       className={({ isActive }) =>
                         `block px-4 py-2 rounded-md transition-colors ${
-                          isActive 
-                            ? "bg-fortress-blue text-white font-medium" 
+                          isActive
+                            ? "bg-fortress-blue text-white font-medium"
                             : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                         }`
                       }
@@ -103,7 +100,7 @@ const ProductLayout: React.FC = () => {
               </ul>
             </nav>
           </aside>
-          
+
           <main className="flex-1 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm">
             <ErrorBoundary>
               <Outlet />
