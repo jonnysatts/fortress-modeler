@@ -47,7 +47,7 @@ const PortfolioDashboard: React.FC = () => {
         let revenueConcentration = 0;
         let breakeven = false;
         let sparklineData: number[] = [];
-
+        
         if (latestModel) {
           // Generate forecast using the new function
           const timeSeriesData = generateForecastTimeSeries(latestModel);
@@ -56,8 +56,8 @@ const PortfolioDashboard: React.FC = () => {
             const finalPeriod = timeSeriesData[timeSeriesData.length - 1];
             totalRevenue = finalPeriod.cumulativeRevenue;
             totalProfit = finalPeriod.cumulativeProfit;
-            profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-            breakeven = totalProfit >= 0;
+          profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+          breakeven = totalProfit >= 0;
             // Use cumulative profit for sparkline
             sparklineData = timeSeriesData.map(p => p.cumulativeProfit);
             

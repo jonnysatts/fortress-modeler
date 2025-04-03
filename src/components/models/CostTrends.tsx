@@ -73,7 +73,7 @@ const CostTrends = ({
           
           // Calculate attendance with growth if applicable
           // Check for metadata.growth before accessing its properties
-          if (week > 1 && metadata.growth) { 
+          if (week > 1 && metadata.growth) {
             const growthRate = (metadata.growth.attendanceGrowthRate ?? 0) / 100; // Default growth rate to 0
             currentAttendance = initialAttendance * Math.pow(1 + growthRate, week - 1);
           } else if (week > 1) {
@@ -269,7 +269,7 @@ const CostTrends = ({
           console.log("[CostTrends] Data changed, calling onUpdateCostData");
           onUpdateCostData(costData);
           prevCostDataStringRef.current = currentCostDataString;
-      } 
+      }
     }
     // Dependencies remain costData (the result of useMemo) and the callback
   }, [costData, onUpdateCostData]);
@@ -317,7 +317,7 @@ const CostTrends = ({
       </div>
     );
   }
-  
+
   // Define a color mapping function or object
   const getColor = (key: string): string => { // Removed index param, not needed with map lookup
      const colorMap: Record<string, string> = {

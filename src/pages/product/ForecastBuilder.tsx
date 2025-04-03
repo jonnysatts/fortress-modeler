@@ -111,7 +111,7 @@ const assumptionsSchema = z.object({
 });
 
 const ForecastBuilder: React.FC = () => {
-  const { id: projectId } = useParams<{ id: string }>();
+  const { projectId } = useParams<{ projectId: string }>();
   const [model, setModel] = useState<FinancialModel | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -171,20 +171,18 @@ const ForecastBuilder: React.FC = () => {
   // --- Data Fetching and Initial State Setting ---
   useEffect(() => {
     const fetchModel = async () => {
-      if (isNaN(projectIdNum)) {
-          // ... error handling ...
-          return;
-      }
-      // Ensure currentProject is available before fetching models
-      if (!currentProject || currentProject.id !== projectIdNum) {
-          console.log("Waiting for currentProject to load or match...");
-          // Optionally set loading, but rely on parent layout/store to provide project
-          // Or trigger project load here if needed: await loadProjectById(projectIdNum);
-          // For now, assume parent handles project loading.
-          // We might need a loading state specifically for the project context.
-          return; 
+      // GUARD CLAUSE: Ensure projectIdNum is valid AND currentProject is loaded and matches
+      if (isNaN(projectIdNum) || !currentProject || currentProject.id !== projectIdNum) {
+        console.log(`[ForecastBuilder Effect] Waiting: projectIdNum=${projectIdNum}, currentProject loaded=${!!currentProject}, project match=${currentProject?.id === projectIdNum}`);
+        // Set loading true here ONLY if not already loading, 
+        // or handle potential infinite loops if project never loads.
+        // For now, just return and wait for parent layout/store to provide correct project.
+        // If this component *should* trigger project loading, add it here.
+        // setLoading(true); // Cautious about setting loading here
+        return; 
       }
       
+      console.log(`[ForecastBuilder Effect] Running fetch for projectId: ${projectIdNum} (Project Type: ${currentProject.productType})`);
       setLoading(true);
       setError(null);
       try {
@@ -259,12 +257,12 @@ const ForecastBuilder: React.FC = () => {
         setInitialAssumptionsString(JSON.stringify(defaultAssumptions));
       } finally {
         setLoading(false);
+        console.log(`[ForecastBuilder Effect] Finished fetch for ${projectIdNum}`);
       }
     };
-    // Only run fetchModel when projectIdNum changes
-    if (projectIdNum) fetchModel(); 
-    // Removed reset and currentProject from dependencies
-  }, [projectIdNum, reset, currentProject]);
+    
+    fetchModel();
+  }, [projectIdNum, reset, currentProject]); // Keep currentProject in dependencies
 
   // Define timeUnit and watch other values AFTER useForm
   const modelType = watch("metadata.type");

@@ -179,17 +179,26 @@ export const getActualsForProject = async (projectId: number): Promise<ActualsPe
   return await db.actuals.where({ projectId: projectId }).toArray();
 };
 
-export const upsertActualsPeriod = async (actualEntry: Omit<ActualsPeriodEntry, 'id'>): Promise<number> => {
-  const existing = await db.actuals.get({ 
-    projectId: actualEntry.projectId, 
-    period: actualEntry.period 
-  });
-  
-  if (existing?.id) {
-    await db.actuals.update(existing.id, actualEntry);
-    return existing.id;
-  } else {
-    return await db.actuals.add(actualEntry as ActualsPeriodEntry);
+export const upsertActualsPeriod = async (actualEntry: Omit<ActualsPeriodEntry, 'id'>): Promise<ActualsPeriodEntry | null> => {
+  try {
+      const existing = await db.actuals.get({ 
+        projectId: actualEntry.projectId, 
+        period: actualEntry.period 
+      });
+      
+      let savedId: number;
+      if (existing?.id) {
+        await db.actuals.update(existing.id, actualEntry);
+        savedId = existing.id;
+      } else {
+        savedId = await db.actuals.add(actualEntry as ActualsPeriodEntry);
+      }
+      // Fetch the saved record to return it
+      return await db.actuals.get(savedId) ?? null;
+  } catch (error) {
+      console.error("Error in upsertActualsPeriod:", error);
+      // Optionally re-throw or handle differently
+      return null; 
   }
 };
 

@@ -7,83 +7,92 @@ import useStore from '@/store/useStore';
 import GlobalSearch from '@/components/common/GlobalSearch';
 import { TypographyH3 } from '@/components/ui/typography';
 
+// Define the type for breadcrumb items explicitly
+interface BreadcrumbItem {
+    label: string;
+    href?: string; // Make href optional
+}
+
 const AppHeader: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { projectId, modelId, id: productId } = useParams();
+  const { projectId, modelId } = useParams<{ projectId?: string; modelId?: string }>();
   const { currentProject, currentModel } = useStore();
 
-  // Generate breadcrumb items based on current route
-  const getBreadcrumbItems = () => {
-    const items = [{ label: 'Portfolio Overview', href: '/' }];
+  // Generate breadcrumb items based on current route (using /projects)
+  const getBreadcrumbItems = (): BreadcrumbItem[] => { // Use the explicit type
+    const items: BreadcrumbItem[] = [{ label: 'Portfolio Overview', href: '/' }];
 
     if (location.pathname.startsWith('/projects')) {
-      items.push({ label: 'Products', href: '/projects' });
+      items.push({ label: 'Projects', href: '/projects' }); 
 
       if (projectId) {
         items.push({
-          label: currentProject?.name || `Product ${projectId}`,
-          href: `/products/${projectId}/summary`
+          label: currentProject?.name || `Project ${projectId}`,
+          href: `/projects/${projectId}/summary` 
         });
 
         if (location.pathname.includes('/models/new')) {
-          items.push({ label: 'New Forecast' });
+          items.push({ label: 'New Forecast' }); // No href needed
         } else if (modelId) {
           items.push({
-            label: currentModel?.name || 'Product Forecast',
-            href: `/products/${projectId}/models/${modelId}`
+            label: currentModel?.name || 'Forecast Detail', 
+            href: `/projects/${projectId}/models/${modelId}` 
           });
-
           if (location.pathname.includes('/edit')) {
-            items.push({ label: 'Edit' });
+            items.push({ label: 'Edit Forecast' }); // No href needed
           }
-        } else if (location.pathname.includes('/edit')) {
-          items.push({ label: 'Edit Product' });
+        } else if (location.pathname.includes('/edit-project')) { 
+          items.push({ label: 'Edit Project' }); // No href needed
+        } else {
+            const pathSegments = location.pathname.split('/');
+            const lastSegment = pathSegments[pathSegments.length - 1];
+            if (lastSegment && lastSegment !== projectId && !['summary', 'forecast-builder', 'actuals-tracker', 'performance-analysis', 'risks-scenarios'].includes(lastSegment)) {
+                 // Only add if it's not one of the main views already covered
+                 // and not the projectId itself
+                 const viewLabel = lastSegment.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                 items.push({ label: viewLabel }); // No href needed
+            }
         }
       } else if (location.pathname === '/projects/new') {
-        items.push({ label: 'New Product' });
-      }
-    } else if (location.pathname.startsWith('/products')) {
-      items.push({ label: 'Products', href: '/projects' });
-
-      if (productId) {
-        items.push({
-          label: currentProject?.name || `Product ${productId}`,
-          href: `/products/${productId}/summary`
-        });
+        items.push({ label: 'New Project' }); // No href needed
       }
     } else if (location.pathname === '/settings') {
-      items.push({ label: 'Settings' });
-    } else if (location.pathname.startsWith('/performance')) {
-      items.push({ label: 'Performance' });
-    } else if (location.pathname.startsWith('/risks')) {
-      items.push({ label: 'Risks' });
+      items.push({ label: 'Settings' }); // No href needed
     }
 
-    return items;
+    return items.filter(item => item.label);
   };
 
-  // Get page title based on current route
+  // Get page title based on current route (using /projects)
   const getPageTitle = () => {
     if (location.pathname === '/') return 'Portfolio Overview';
-    if (location.pathname === '/projects') return 'Products';
-    if (location.pathname === '/projects/new') return 'New Product';
-    if (projectId && !modelId && !location.pathname.includes('/new') && !location.pathname.includes('/edit')) {
-      return currentProject?.name || 'Product Details';
-    }
-    if (productId && location.pathname.includes('/summary')) {
-      return currentProject?.name || 'Product Summary';
-    }
-    if (location.pathname.includes('/models/new')) return 'New Product Forecast';
-    if (modelId && !location.pathname.includes('/edit')) return currentModel?.name || 'Product Forecast';
-    if (modelId && location.pathname.includes('/edit')) return 'Edit Product Forecast';
-    if (projectId && location.pathname.includes('/edit')) return 'Edit Product';
-    if (productId && location.pathname.includes('/edit')) return 'Edit Product';
-    if (location.pathname === '/settings') return 'Settings';
-    if (location.pathname.startsWith('/performance')) return 'Performance';
-    if (location.pathname.startsWith('/risks')) return 'Risk Management';
+    if (location.pathname === '/projects') return 'Projects'; // Standardized
+    if (location.pathname === '/projects/new') return 'New Project';
+    
+    // Extract the last part of the path for specific views
+    const pathSegments = location.pathname.split('/');
+    const view = pathSegments[pathSegments.length - (location.pathname.endsWith('/edit') ? 2 : 1)];
+    const isEdit = location.pathname.endsWith('/edit');
+    const isNewModel = location.pathname.includes('/models/new');
 
-    return '';
+    if (projectId) {
+        const baseName = currentProject?.name || `Project ${projectId}`;
+        if (isNewModel) return `New Forecast for ${baseName}`;
+        if (modelId) {
+            const modelName = currentModel?.name || 'Forecast';
+            return isEdit ? `Edit ${modelName}` : modelName;
+        }
+        if (view === 'edit-project') return `Edit ${baseName}`;
+        // Derive title from view segment if available
+        if (view && view !== projectId) {
+            return `${baseName}: ${view.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
+        }
+        return baseName; // Default to project name (summary)
+    }
+    if (location.pathname === '/settings') return 'Settings';
+
+    return 'Fortress'; // Fallback title
   };
 
   // Render appropriate action button based on context
@@ -95,15 +104,16 @@ const AppHeader: React.FC = () => {
           className="bg-fortress-emerald hover:bg-fortress-emerald/90"
         >
           <PlusCircle className="mr-2 h-4 w-4" />
-          New Product
+          New Project
         </Button>
       );
     }
-
-    if (projectId && !location.pathname.includes('/new') && !location.pathname.includes('/edit')) {
+    // Show "New Forecast" on project-level pages (summary, builder, etc.) 
+    // but not on model-specific pages or edit pages.
+    if (projectId && !modelId && !location.pathname.includes('/edit') && !location.pathname.includes('models/new')) {
       return (
         <Button
-          onClick={() => navigate(`/products/${projectId}/models/new`)}
+          onClick={() => navigate(`/projects/${projectId}/models/new`)} // Use standardized path
           className="bg-fortress-emerald hover:bg-fortress-emerald/90"
         >
           <PlusCircle className="mr-2 h-4 w-4" />
@@ -111,19 +121,7 @@ const AppHeader: React.FC = () => {
         </Button>
       );
     }
-
-    if (productId && !location.pathname.includes('/new') && !location.pathname.includes('/edit')) {
-      return (
-        <Button
-          onClick={() => navigate(`/products/${productId}/models/new`)}
-          className="bg-fortress-emerald hover:bg-fortress-emerald/90"
-        >
-          <PlusCircle className="mr-2 h-4 w-4" />
-          New Forecast
-        </Button>
-      );
-    }
-
+    // Removed duplicate condition
     return null;
   };
 

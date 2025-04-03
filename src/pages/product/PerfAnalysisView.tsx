@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { FinancialModel, ActualsPeriodEntry } from '@/lib/db';
 import useStore from '@/store/useStore';
-import { PerformanceAnalysis } from '@/components/product/PerformanceAnalysis';
+import { PerformanceAnalysis as PerformanceAnalysisComponent } from '@/components/product/PerformanceAnalysis';
 import { TypographyH4, TypographyMuted } from '@/components/ui/typography';
 import { AlertTriangle } from 'lucide-react';
 
-const ProductAnalysis: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+// Restore original name
+const PerfAnalysisView: React.FC = () => {
+  console.log("[PerfAnalysisPage] Component attempting to mount/render"); 
+  const { projectId } = useParams<{ projectId: string }>();
   const { currentProject, loadModelsForProject, loadActualsForProject } = useStore();
   const [models, setModels] = useState<FinancialModel[]>([]);
   const [actuals, setActuals] = useState<ActualsPeriodEntry[]>([]);
@@ -15,26 +17,45 @@ const ProductAnalysis: React.FC = () => {
   
   useEffect(() => {
     const loadData = async () => {
-      if (id) {
-        setIsLoading(true);
+      console.log(`[PerfAnalysisPage Effect] Running for projectId: ${projectId}`);
+      if (projectId) { 
+        setIsLoading(true); 
         try {
-          const projectId = parseInt(id);
-          const loadedModels = await loadModelsForProject(projectId);
-          const loadedActuals = await loadActualsForProject(projectId);
+          const projectIdNum = parseInt(projectId);
+          if (isNaN(projectIdNum)) {
+            console.error('[PerfAnalysisPage Effect] Invalid projectId:', projectId);
+            setIsLoading(false); 
+            return;
+          }
+          console.log(`[PerfAnalysisPage Effect] Fetching models for projectId: ${projectIdNum}`);
+          const loadedModels = await loadModelsForProject(projectIdNum);
+          console.log(`[PerfAnalysisPage Effect] Fetched ${loadedModels.length} models.`);
+          console.log(`[PerfAnalysisPage Effect] Fetching actuals for projectId: ${projectIdNum}`);
+          const loadedActuals = await loadActualsForProject(projectIdNum);
+          console.log(`[PerfAnalysisPage Effect] Fetched ${loadedActuals.length} actuals.`);
           
           setModels(loadedModels);
           setActuals(loadedActuals);
-        } catch (error) {
-          console.error('Error loading data:', error);
-        } finally {
+          console.log(`[PerfAnalysisPage Effect] State updated.`);
           setIsLoading(false);
+        } catch (error) {
+          console.error('[PerfAnalysisPage Effect] Error loading data:', error);
+          setIsLoading(false); 
+        } finally {
+          // Ensure loading is always set to false
+          setIsLoading(false);
+          console.log(`[PerfAnalysisPage Effect] Finished (finally), isLoading set to false.`);
         }
+      } else {
+          console.log(`[PerfAnalysisPage Effect] No projectId provided.`);
+          setIsLoading(false);
       }
     };
-    
     loadData();
-  }, [id, loadModelsForProject, loadActualsForProject]);
+  }, [projectId, loadModelsForProject, loadActualsForProject]); 
   
+  console.log(`[PerfAnalysisPage Render] isLoading: ${isLoading}, Project: ${currentProject?.id}, Models: ${models.length}, Actuals: ${actuals.length}`);
+
   if (isLoading) {
     return <div className="py-8 text-center">Loading analysis data...</div>;
   }
@@ -76,13 +97,16 @@ const ProductAnalysis: React.FC = () => {
         </TypographyMuted>
       </div>
       
-      <PerformanceAnalysis 
+      {/* Render the actual component */}
+      <PerformanceAnalysisComponent 
         financialModels={models} 
         actualsData={actuals} 
-        projectId={id} 
+        projectId={projectId} 
       />
+      
     </div>
   );
 };
 
-export default ProductAnalysis;
+// Restore original export
+export default PerfAnalysisView;

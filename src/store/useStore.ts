@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { Project, FinancialModel, db } from '@/lib/db';
 
@@ -217,16 +216,15 @@ const useStore = create<AppState>((set, get) => ({
   },
 
   loadActualsForProject: async (projectId) => {
-    set({ isLoading: true, error: null });
+    set({ error: null });
     try {
-      // For now, return an empty array since we don't have an actuals table yet
-      // In a real implementation, you would query the actuals table
-      // const actuals = await db.actuals.where('projectId').equals(projectId).toArray();
-      set({ isLoading: false });
-      return [];
+      console.log(`[Store] Loading actuals for projectId: ${projectId}`);
+      const actuals = await db.actuals.where('projectId').equals(projectId).toArray();
+      console.log(`[Store] Found ${actuals.length} actuals entries.`);
+      return actuals;
     } catch (error) {
       console.error('Error loading actuals:', error);
-      set({ error: 'Failed to load actuals', isLoading: false });
+      set({ error: 'Failed to load actuals'});
       return [];
     }
   },

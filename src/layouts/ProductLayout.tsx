@@ -8,26 +8,26 @@ import { TypographyH3 } from "@/components/ui/typography";
 import Breadcrumbs from "@/components/common/Breadcrumbs";
 
 const ProductLayout: React.FC = () => {
-  const { id: productId } = useParams<{ id: string }>();
+  const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const { currentProject, loadProjectById, setCurrentProject } = useStore();
 
   useEffect(() => {
-    if (productId) {
-      const id = parseInt(productId);
-      loadProjectById(id).then(project => {
+    const projectIdNum = projectId ? parseInt(projectId) : NaN;
+    if (!isNaN(projectIdNum)) {
+      loadProjectById(projectIdNum).then(project => {
         if (project) {
           setCurrentProject(project);
         } else {
-          // Handle case where project doesn't exist
           navigate("/");
         }
       });
+    } else {
+      navigate("/");
     }
-  }, [productId, loadProjectById, setCurrentProject, navigate]);
+  }, [projectId, loadProjectById, setCurrentProject, navigate]);
 
-  // Updated steps for the new navigation structure
   const steps = [
     { path: "summary", label: "Product Summary" },
     { path: "forecast-builder", label: "Forecast Builder" },
@@ -36,16 +36,16 @@ const ProductLayout: React.FC = () => {
     { path: "risks-scenarios", label: "Risks & Scenarios" }
   ];
 
-  // Get current step from URL
+  const projectIdNum = projectId ? parseInt(projectId) : NaN;
+
   const currentPath = location.pathname.split('/').pop() || 'summary';
 
-  // Generate breadcrumb items
   const breadcrumbItems = [
     { label: "Portfolio Overview", href: "/" },
     { label: "Projects", href: "/projects" },
     {
-      label: currentProject?.name || `Project ${productId}`,
-      href: `/projects/${productId}/summary`
+      label: currentProject?.name || `Project ${projectId}`,
+      href: `/projects/${projectId}/summary`
     },
     {
       label: steps.find(step => step.path === currentPath)?.label || "Details"
@@ -83,7 +83,7 @@ const ProductLayout: React.FC = () => {
                 {steps.map(step => (
                   <li key={step.path}>
                     <NavLink
-                      to={`/products/${productId}/${step.path}`}
+                      to={`/projects/${projectId}/${step.path}`}
                       className={({ isActive }) =>
                         `block px-4 py-2 rounded-md transition-colors ${
                           isActive
@@ -100,7 +100,7 @@ const ProductLayout: React.FC = () => {
             </nav>
           </aside>
 
-          <main className="flex-1 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm">
+          <main className="flex-1 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm min-w-0">
             <ErrorBoundary>
               <Outlet />
             </ErrorBoundary>

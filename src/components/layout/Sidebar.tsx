@@ -111,7 +111,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
                     {projects.slice(0, 5).map(project => (
                       <NavLink
                         key={project.id}
-                        to={`/products/${project.id}/summary`}
+                        to={`/projects/${project.id}/summary`}
                         className={({ isActive }) =>
                           cn(
                             "flex items-center px-4 py-2 rounded-md text-sm transition-colors",

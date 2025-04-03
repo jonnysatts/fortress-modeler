@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { FinancialModel, ActualsPeriodEntry } from '@/lib/db';
+import { generateForecastTimeSeries, ForecastPeriodData } from '@/lib/financialCalculations';
 
-// Interface for the combined analysis data for a period
-interface AnalysisPeriodData {
+// Export this interface
+export interface AnalysisPeriodData {
   period: number;
   point: string; // e.g., "Week 1"
   revenueForecast: number;
@@ -20,10 +21,16 @@ interface AnalysisPeriodData {
   attendanceForecast?: number;
   attendanceActual?: number;
   attendanceVariance?: number;
+  cumulativeRevenueForecast?: number;
+  cumulativeCostForecast?: number;
+  cumulativeProfitForecast?: number;
+  cumulativeRevenueActual?: number;
+  cumulativeCostActual?: number;
+  cumulativeProfitActual?: number;
 }
 
-// Interface for the summary KPIs
-interface AnalysisSummary {
+// Export this interface too
+export interface AnalysisSummary {
   totalRevenueForecast: number;
   totalCostForecast: number;
   totalProfitForecast: number;
@@ -54,191 +61,203 @@ export const useForecastAnalysis = (
   actualsData: ActualsPeriodEntry[],
   selectedModelId?: number
 ): ForecastAnalysisResult => {
+  console.log("[useForecastAnalysis Hook] Running"); // Log hook entry
+  
   // Find the selected model object
   const selectedModel = useMemo(() => {
+    console.log("[useForecastAnalysis Hook] Calculating selectedModel");
     return financialModels.find(m => m.id === selectedModelId);
   }, [selectedModelId, financialModels]);
 
   // Calculate combined forecast, actuals, and variance data
   const analysisData = useMemo(() => {
-    if (!selectedModel?.assumptions) return null;
-    
-    console.log(`[useForecastAnalysis] Calculating for Model ID: ${selectedModelId}`);
-    
-    const { assumptions } = selectedModel;
-    const metadata = assumptions.metadata;
-    const isWeekly = metadata?.type === "WeeklyEvent";
-    const duration = isWeekly ? metadata?.weeks || 12 : 12;
-    const timeUnit = isWeekly ? "Week" : "Month";
+    if (!selectedModel) return null;
+    console.log(`[useForecastAnalysis Hook] Calculating for Model ID: ${selectedModelId}`);
 
-    const revenueStreams = assumptions.revenue || [];
-    const costs = assumptions.costs || [];
-    const marketingSetup = assumptions.marketing || { allocationMode: 'channels', channels: [] };
-
-    const periodicAnalysisData: AnalysisPeriodData[] = [];
-    const actualsMap = new Map(actualsData.map(a => [a.period, a]));
-    let latestActualPeriod = 0;
-
-    let cumulativeRevenueForecast = 0;
-    let cumulativeCostForecast = 0;
-    let cumulativeRevenueActual = 0;
-    let cumulativeCostActual = 0;
-    let cumulativeAttendanceForecast = 0;
-    let cumulativeAttendanceActual = 0;
-
-    // --- Run Forecast Simulation & Merge Actuals Period-by-Period ---
-    for (let period = 1; period <= duration; period++) {
-      const point = `${timeUnit} ${period}`;
-      
-      // --- Forecast Calculations (similar to ModelOverview) ---
-      let currentAttendance = metadata?.initialWeeklyAttendance || 0;
-      if (isWeekly && period > 1 && metadata?.growth) {
-         const rate = (metadata.growth.attendanceGrowthRate || 0) / 100;
-         currentAttendance = (metadata.initialWeeklyAttendance || 0) * Math.pow(1 + rate, period - 1);
-      }
-
-      let periodRevenueForecast = 0;
-      // ... (Calculate periodRevenueForecast based on assumptions) ...
-      revenueStreams.forEach(stream => {
-          let streamRevenue = 0;
-          const baseValue = stream.value;
-          if (isWeekly && metadata) {
-             if (stream.name === "F&B Sales") { let spend = metadata.perCustomer?.fbSpend || 0; if (period > 1 && metadata.growth?.useCustomerSpendGrowth) { spend *= Math.pow(1 + (metadata.growth.fbSpendGrowth || 0) / 100, period - 1); } streamRevenue = currentAttendance * spend; } 
-             else if (stream.name === "Merchandise Sales") { let spend = metadata.perCustomer?.merchandiseSpend || 0; if (period > 1 && metadata.growth?.useCustomerSpendGrowth) { spend *= Math.pow(1 + (metadata.growth.merchandiseSpendGrowth || 0) / 100, period - 1); } streamRevenue = currentAttendance * spend; } 
-             else { streamRevenue = baseValue; if (period > 1 && metadata.growth?.useCustomerSpendGrowth) { let growthRate = 0; switch(stream.name) { case "Ticket Sales": growthRate = (metadata.growth.ticketPriceGrowth || 0) / 100; break; case "Online Sales": growthRate = (metadata.growth.onlineSpendGrowth || 0) / 100; break; case "Miscellaneous Revenue": growthRate = (metadata.growth.miscSpendGrowth || 0) / 100; break; } streamRevenue *= Math.pow(1 + growthRate, period - 1); } }
-          } else { streamRevenue = baseValue; if (period > 1 && assumptions.growthModel) { const { type, rate } = assumptions.growthModel; if (type === "linear") streamRevenue = baseValue * (1 + rate * (period - 1)); else streamRevenue = baseValue * Math.pow(1 + rate, period - 1); } }
-          periodRevenueForecast += streamRevenue;
-      });
-
-      let periodCostForecast = 0;
-      // ... (Calculate periodCostForecast based on assumptions, including marketing mode) ...
-       costs.forEach(cost => { let costValue = 0; const costType = cost.type?.toLowerCase(); const baseValue = cost.value; if (isWeekly && metadata) { if (costType === "fixed") { costValue = period === 1 ? baseValue : 0; } else if (costType === "variable") { if (cost.name === "F&B COGS") { const cogsPct = metadata.costs?.fbCOGSPercent || 30; let fbRevenueThisPeriod = 0; let fbSpend = metadata.perCustomer?.fbSpend || 0; if (period > 1 && metadata.growth?.useCustomerSpendGrowth) { fbSpend *= Math.pow(1 + (metadata.growth.fbSpendGrowth || 0) / 100, period - 1); } fbRevenueThisPeriod = currentAttendance * fbSpend; costValue = (fbRevenueThisPeriod * cogsPct) / 100; } else { costValue = baseValue; } } else { costValue = baseValue; if(cost.name === "Setup Costs" && metadata.weeks && metadata.weeks > 0) { const setupIsFixed = costs.find(c => c.name === "Setup Costs")?.type?.toLowerCase() === 'fixed'; if (!setupIsFixed) { costValue = baseValue / metadata.weeks; } } } } else { if (costType === "fixed") costValue = period === 1 ? baseValue : 0; else costValue = baseValue; } periodCostForecast += costValue; });
-       let periodMarketingCost = 0; if (marketingSetup.allocationMode === 'channels') { const budget = marketingSetup.channels.reduce((s, ch) => s + (ch.weeklyBudget || 0), 0); periodMarketingCost = isWeekly ? budget : budget * (365.25 / 7 / 12); } else if (marketingSetup.allocationMode === 'highLevel' && marketingSetup.totalBudget) { const tb = marketingSetup.totalBudget; const app = marketingSetup.budgetApplication || 'spreadEvenly'; const sd = marketingSetup.spreadDuration; const md = duration; if (app === 'upfront') periodMarketingCost = (period === 1) ? tb : 0; else if (app === 'spreadEvenly') periodMarketingCost = tb / md; else if (app === 'spreadCustom' && sd && sd > 0) periodMarketingCost = (period <= sd) ? (tb / sd) : 0; } if (periodMarketingCost > 0) periodCostForecast += periodMarketingCost;
-       
-      const periodProfitForecast = periodRevenueForecast - periodCostForecast;
-      cumulativeRevenueForecast += periodRevenueForecast;
-      cumulativeCostForecast += periodCostForecast;
-
-      // --- Get Actuals for the period ---
-      const actualEntry = actualsMap.get(period);
-      let periodRevenueActual: number | undefined = undefined;
-      let periodCostActual: number | undefined = undefined;
-      let periodProfitActual: number | undefined = undefined;
-      let periodAttendanceActual: number | undefined = undefined;
-
-      if (actualEntry) {
-          latestActualPeriod = Math.max(latestActualPeriod, period);
-          periodRevenueActual = Object.values(actualEntry.revenueActuals || {}).reduce((s: number, v: number) => s + v, 0);
-          periodCostActual = Object.values(actualEntry.costActuals || {}).reduce((s: number, v: number) => s + v, 0);
-          periodProfitActual = (typeof periodRevenueActual === 'number' && typeof periodCostActual === 'number') 
-                             ? periodRevenueActual - periodCostActual 
-                             : undefined;
-          cumulativeRevenueActual += periodRevenueActual ?? 0;
-          cumulativeCostActual += periodCostActual ?? 0;
-          if (isWeekly && actualEntry.attendanceActual !== undefined && actualEntry.attendanceActual !== null) {
-              periodAttendanceActual = actualEntry.attendanceActual;
-              cumulativeAttendanceActual += periodAttendanceActual;
-          }
-      }
-
-      // --- Calculate Variances ---
-      const revenueVariance = periodRevenueActual !== undefined ? periodRevenueActual - periodRevenueForecast : undefined;
-      const costVariance = periodCostActual !== undefined ? periodCostActual - periodCostForecast : undefined; // Higher actual cost is negative variance
-      const profitVariance = periodProfitActual !== undefined ? periodProfitActual - periodProfitForecast : undefined;
-      const revenueVariancePercent = periodRevenueForecast !== 0 && revenueVariance !== undefined ? (revenueVariance / periodRevenueForecast) * 100 : undefined;
-      const costVariancePercent = periodCostForecast !== 0 && costVariance !== undefined ? (costVariance / periodCostForecast) * 100 : undefined;
-      const profitVariancePercent = periodProfitForecast !== 0 && profitVariance !== undefined ? (profitVariance / periodProfitForecast) * 100 : undefined;
-      
-      let currentAttendanceForecast = 0;
-      if (isWeekly && metadata) {
-          currentAttendanceForecast = metadata.initialWeeklyAttendance || 0;
-          if (period > 1 && metadata.growth) {
-              const rate = (metadata.growth.attendanceGrowthRate || 0) / 100;
-              currentAttendanceForecast = (metadata.initialWeeklyAttendance || 0) * Math.pow(1 + rate, period - 1);
-          }
-          currentAttendanceForecast = Math.round(currentAttendanceForecast);
-          cumulativeAttendanceForecast += currentAttendanceForecast;
-      }
-
-      const attendanceVariance = periodAttendanceActual !== undefined ? periodAttendanceActual - currentAttendanceForecast : undefined;
-
-      periodicAnalysisData.push({
-          period,
-          point,
-          revenueForecast: Math.ceil(periodRevenueForecast),
-          costForecast: Math.ceil(periodCostForecast),
-          profitForecast: Math.ceil(periodProfitForecast),
-          revenueActual: periodRevenueActual !== undefined ? Math.ceil(periodRevenueActual) : undefined,
-          costActual: periodCostActual !== undefined ? Math.ceil(periodCostActual) : undefined,
-          profitActual: periodProfitActual !== undefined ? Math.ceil(periodProfitActual) : undefined,
-          revenueVariance, costVariance, profitVariance,
-          revenueVariancePercent, costVariancePercent, profitVariancePercent,
-          attendanceForecast: isWeekly ? currentAttendanceForecast : undefined,
-          attendanceActual: periodAttendanceActual,
-          attendanceVariance,
-      });
-    }
-    // --- End Loop ---
-
-    // --- Calculate Summary Metrics ---
-    const totalRevenueForecast = cumulativeRevenueForecast;
-    const totalCostForecast = cumulativeCostForecast;
-    const totalProfitForecast = totalRevenueForecast - totalCostForecast;
-    const totalRevenueActual = cumulativeRevenueActual;
-    const totalCostActual = cumulativeCostActual;
-    const totalProfitActual = totalRevenueActual - totalCostActual;
-    const avgProfitMarginForecast = totalRevenueForecast > 0 ? (totalProfitForecast / totalRevenueForecast) * 100 : 0;
-    const avgProfitMarginActual = totalRevenueActual > 0 ? (totalProfitActual / totalRevenueActual) * 100 : 0;
-
-    // Calculate Revised Outlook Totals
-    let revisedTotalRevenue = 0;
-    let revisedTotalCost = 0;
-    let revisedTotalProfit = 0;
-    let revisedAvgProfitMargin = 0;
-
-    for (let period = 1; period <= duration; period++) {
-        const p = periodicAnalysisData[period - 1];
-        if (p.revenueActual !== undefined && period <= latestActualPeriod) {
-            revisedTotalRevenue += p.revenueActual;
-            revisedTotalCost += p.costActual!;
-            revisedTotalProfit += p.profitActual!;
-        } else {
-            revisedTotalRevenue += p.revenueForecast;
-            revisedTotalCost += p.costForecast;
-            revisedTotalProfit += p.profitForecast;
+    try { 
+        // 1. Generate the base forecast using the central function
+        const forecastTrendData: ForecastPeriodData[] = generateForecastTimeSeries(selectedModel);
+        if (forecastTrendData.length === 0) {
+            console.warn("[useForecastAnalysis Hook] generateForecastTimeSeries returned empty data.");
+            // Return null or a default state if forecast generation fails?
+             return null; 
         }
+
+        const duration = forecastTrendData.length;
+        const timeUnit = forecastTrendData[0]?.point.split(' ')[0] as 'Week' | 'Month' || 'Period';
+        const isWeekly = timeUnit === 'Week';
+
+        // 2. Process Actuals
+        const actualsMap = new Map(actualsData.map(a => [a.period, a]));
+        let latestActualPeriod = 0;
+        let cumulativeRevenueActual = 0;
+        let cumulativeCostActual = 0;
+        let cumulativeAttendanceActual = 0;
+
+        // Initialize cumulative trackers for forecast (already present)
+        let cumulativeRevenueForecast = 0;
+        let cumulativeCostForecast = 0;
+        let cumulativeProfitForecast = 0;
+
+        // 3. Merge Forecast and Actuals
+        const periodicAnalysisData: AnalysisPeriodData[] = forecastTrendData.map(forecastPeriod => {
+            const actualEntry = actualsMap.get(forecastPeriod.period);
+            let periodRevenueActual: number | undefined = undefined;
+            let periodCostActual: number | undefined = undefined; // Will use calculated actual cost including COGS
+            let periodProfitActual: number | undefined = undefined;
+            let periodAttendanceActual: number | undefined = undefined;
+
+            if (actualEntry) {
+                latestActualPeriod = Math.max(latestActualPeriod, forecastPeriod.period);
+                // Sum recorded revenue streams
+                const recordedRevenue = actualEntry.revenueActuals || {};
+                periodRevenueActual = Object.values(recordedRevenue).reduce((s, v) => s + v, 0);
+                cumulativeRevenueActual += periodRevenueActual;
+                
+                // --- Calculate Actual Costs (including COGS derived from actual revenue) ---
+                let calculatedVariableCosts = 0;
+                let calculatedFixedCosts = 0;
+                let calculatedRecurringCosts = 0;
+                let calculatedMarketingCosts = 0;
+                
+                // COGS based on Actual Revenue
+                const fbRevenueActual = recordedRevenue["F&B Sales"] ?? 0;
+                const merchRevenueActual = recordedRevenue["Merchandise Sales"] ?? 0;
+                const fbCogsPercent = selectedModel.assumptions?.metadata?.costs?.fbCOGSPercent ?? 0;
+                const merchCogsPercent = selectedModel.assumptions?.metadata?.costs?.merchandiseCogsPercent ?? 0;
+                calculatedVariableCosts += (fbRevenueActual * fbCogsPercent) / 100;
+                calculatedVariableCosts += (merchRevenueActual * merchCogsPercent) / 100;
+                
+                // Other costs entered by user
+                const recordedCosts = actualEntry.costActuals || {};
+                for (const [costName, costValue] of Object.entries(recordedCosts)) {
+                    const value = costValue ?? 0;
+                    if (costName === "F&B COGS" || costName === "Merchandise COGS") continue; // Skip COGS
+                    
+                    const assumption = selectedModel.assumptions?.costs?.find(c => c.name === costName);
+                    if (costName === "Marketing Budget") calculatedMarketingCosts += value;
+                    else if (assumption?.type === 'fixed' || costName === "Setup Costs") calculatedFixedCosts += value;
+                    else if (assumption?.type === 'recurring') calculatedRecurringCosts += value;
+                    // Handle other 'variable' costs if necessary
+                }
+                periodCostActual = calculatedVariableCosts + calculatedFixedCosts + calculatedRecurringCosts + calculatedMarketingCosts;
+                cumulativeCostActual += periodCostActual;
+                // --- End Actual Cost Calculation ---
+
+                periodProfitActual = periodRevenueActual - periodCostActual;
+                
+                if (isWeekly && actualEntry.attendanceActual !== undefined && actualEntry.attendanceActual !== null) {
+                    periodAttendanceActual = actualEntry.attendanceActual;
+                    cumulativeAttendanceActual += periodAttendanceActual;
+                }
+            }
+            
+            // Rename forecast fields to match AnalysisPeriodData interface
+            const revenueForecast = forecastPeriod.revenue;
+            const costForecast = forecastPeriod.cost;
+            const profitForecast = forecastPeriod.profit;
+            const attendanceForecast = forecastPeriod.attendance;
+
+            // Calculate Variances
+            const revenueVariance = periodRevenueActual !== undefined ? periodRevenueActual - revenueForecast : undefined;
+            const costVariance = periodCostActual !== undefined ? periodCostActual - costForecast : undefined;
+            const profitVariance = periodProfitActual !== undefined ? periodProfitActual - profitForecast : undefined;
+            const revenueVariancePercent = revenueForecast !== 0 && revenueVariance !== undefined ? (revenueVariance / revenueForecast) * 100 : undefined;
+            const costVariancePercent = costForecast !== 0 && costVariance !== undefined ? (costVariance / costForecast) * 100 : undefined;
+            const profitVariancePercent = profitForecast !== 0 && profitVariance !== undefined ? (profitVariance / profitForecast) * 100 : undefined;
+            const attendanceVariance = periodAttendanceActual !== undefined && attendanceForecast !== undefined ? periodAttendanceActual - attendanceForecast : undefined;
+
+            // --- Accumulate Cumulative Values (Corrected) ---
+            const cumulativeRevenueForecast = forecastPeriod.cumulativeRevenue;
+            const cumulativeCostForecast = forecastPeriod.cumulativeCost;
+            const cumulativeProfitForecast = forecastPeriod.cumulativeProfit;
+            // Use the CORRECT cumulative actuals calculated earlier
+            const currentCumulativeRevenueActual = actualEntry ? cumulativeRevenueActual : undefined;
+            const currentCumulativeCostActual = actualEntry ? cumulativeCostActual : undefined;
+            const currentCumulativeProfitActual = (currentCumulativeRevenueActual !== undefined && currentCumulativeCostActual !== undefined) 
+                                                  ? currentCumulativeRevenueActual - currentCumulativeCostActual 
+                                                  : undefined;
+
+            const periodResult = {
+                period: forecastPeriod.period,
+                point: forecastPeriod.point,
+                revenueForecast,
+                costForecast,
+                profitForecast,
+                revenueActual: periodRevenueActual !== undefined ? Math.ceil(periodRevenueActual) : undefined,
+                costActual: periodCostActual !== undefined ? Math.ceil(periodCostActual) : undefined,
+                profitActual: periodProfitActual !== undefined ? Math.ceil(periodProfitActual) : undefined,
+                revenueVariance, costVariance, profitVariance,
+                revenueVariancePercent, costVariancePercent, profitVariancePercent,
+                attendanceForecast,
+                attendanceActual: periodAttendanceActual,
+                attendanceVariance,
+                cumulativeRevenueForecast,
+                cumulativeCostForecast,
+                cumulativeProfitForecast,
+                cumulativeRevenueActual: currentCumulativeRevenueActual,
+                cumulativeCostActual: currentCumulativeCostActual,
+                cumulativeProfitActual: currentCumulativeProfitActual,
+            };
+
+            // Log the data for the first period
+            if (forecastPeriod.period === 1) {
+                console.log("[useForecastAnalysis Hook] Period 1 Merged Data Point:", periodResult);
+            }
+
+            return periodResult;
+        });
+
+        // 4. Calculate Summary Metrics using merged data
+        const { cumulativeRevenue: totalRevenueForecast, cumulativeCost: totalCostForecast, cumulativeProfit: totalProfitForecast, attendance: lastPeriodAttendanceForecast } = forecastTrendData[duration - 1] || { cumulativeRevenue: 0, cumulativeCost: 0, cumulativeProfit: 0 };
+        const totalAttendanceForecast = isWeekly ? forecastTrendData.reduce((sum, p) => sum + (p.attendance ?? 0), 0) : undefined;
+        const avgProfitMarginForecast = totalRevenueForecast > 0 ? (totalProfitForecast / totalRevenueForecast) * 100 : 0;
+
+        // Calculate Revised Outlook Totals
+        let revisedTotalRevenue = 0;
+        let revisedTotalCost = 0;
+        for (let period = 1; period <= duration; period++) {
+            const p = periodicAnalysisData[period - 1];
+            revisedTotalRevenue += p.revenueActual ?? p.revenueForecast;
+            revisedTotalCost += p.costActual ?? p.costForecast;
+        }
+        const revisedTotalProfit = revisedTotalRevenue - revisedTotalCost;
+        const revisedAvgProfitMargin = revisedTotalRevenue > 0 ? (revisedTotalProfit / revisedTotalRevenue) * 100 : 0;
+        
+        // Calculate Variance between Original Forecast and Revised Outlook
+        const totalRevenueVariance = revisedTotalRevenue - totalRevenueForecast;
+        const totalCostVariance = revisedTotalCost - totalCostForecast;
+        const totalProfitVariance = revisedTotalProfit - totalProfitForecast;
+        const totalAttendanceVariance = cumulativeAttendanceActual - (totalAttendanceForecast ?? 0);
+        
+        const summary: AnalysisSummary = {
+           totalRevenueForecast, totalCostForecast, totalProfitForecast,
+           revisedTotalRevenue, revisedTotalCost, revisedTotalProfit, 
+           totalRevenueVariance, totalCostVariance, totalProfitVariance,
+           avgProfitMarginForecast, revisedAvgProfitMargin, latestActualPeriod, 
+           timeUnit, 
+           totalAttendanceForecast: totalAttendanceForecast ?? 0, // Ensure number
+           totalAttendanceActual: cumulativeAttendanceActual,
+           totalAttendanceVariance,
+        };
+        
+        // Log summary before returning
+        console.log("[useForecastAnalysis Hook] Calculated Summary:", summary);
+        
+        console.log("[useForecastAnalysis Hook] Calculation finished successfully.");
+        return {
+            summary: summary,
+            trendData: periodicAnalysisData 
+        };
+    } catch (error) {
+        console.error("[useForecastAnalysis Hook] Error during calculation:", error);
+        return null; // Return null on error
     }
-    revisedAvgProfitMargin = revisedTotalRevenue > 0 ? (revisedTotalProfit / revisedTotalRevenue) * 100 : 0;
-
-    // Calculate Variance between Original Forecast and Revised Outlook
-    const totalRevenueVariance = revisedTotalRevenue - totalRevenueForecast;
-    const totalCostVariance = revisedTotalCost - totalCostForecast;
-    const totalProfitVariance = revisedTotalProfit - totalProfitForecast;
-    const totalAttendanceVariance = cumulativeAttendanceActual - cumulativeAttendanceForecast;
-
-    const summary: AnalysisSummary = {
-       totalRevenueForecast, totalCostForecast, totalProfitForecast,
-       revisedTotalRevenue, revisedTotalCost, revisedTotalProfit, 
-       totalRevenueVariance,
-       totalCostVariance,
-       totalProfitVariance,
-       avgProfitMarginForecast, 
-       revisedAvgProfitMargin,
-       latestActualPeriod, 
-       timeUnit,
-       totalAttendanceForecast: cumulativeAttendanceForecast,
-       totalAttendanceActual: cumulativeAttendanceActual,
-       totalAttendanceVariance,
-    };
-    
-    return {
-        summary: summary,
-        trendData: periodicAnalysisData 
-    };
 
   }, [selectedModel, actualsData, selectedModelId]);
 
   const isWeeklyEvent = selectedModel?.assumptions?.metadata?.type === "WeeklyEvent";
+  console.log(`[useForecastAnalysis Hook] Returning data. Summary exists: ${!!analysisData?.summary}, Trend length: ${analysisData?.trendData?.length ?? 0}`);
 
   return {
     summary: analysisData?.summary || null,
