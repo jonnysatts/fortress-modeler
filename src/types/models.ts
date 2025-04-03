@@ -9,11 +9,11 @@ export interface CostCategory {
   name: string;
   value: number;
   type: 'fixed' | 'variable' | 'recurring';
-  category?: 'staffing' | 'marketing' | 'operations' | 'other';
+  category: 'staffing' | 'marketing' | 'operations' | 'other';
 }
 
 export interface GrowthModel {
-  type: string;
+  type: 'linear' | 'exponential' | 'seasonal';
   rate: number;
   seasonalFactors?: number[];
   individualRates?: {
@@ -43,6 +43,7 @@ export interface ModelMetadata {
   };
   costs?: {
     fbCOGSPercent?: number;
+    merchandiseCogsPercent?: number;
     staffCount?: number;
     staffCostPerPerson?: number;
     managementCosts?: number;

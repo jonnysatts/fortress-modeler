@@ -13,13 +13,22 @@ import {
 import FinancialMatrix from "./FinancialMatrix";
 import { MarketingSetup, ModelMetadata, GrowthModel } from "@/types/models";
 
+// Define a type for the data points generated in costData
+interface CostDataPoint {
+  point: string; // e.g., "Week 1", "Month 1"
+  costs: number; // Total cost for the period
+  cumulativeCosts: number; // Cumulative cost up to this period
+  attendance?: number; // Optional attendance number
+  [key: string]: string | number | undefined; // Allow dynamic keys for cost names like 'SetupCosts', 'MarketingBudget'
+}
+
 interface CostTrendsProps {
   costs: CostAssumption[];
   marketingSetup?: MarketingSetup;
   metadata?: ModelMetadata;
   growthModel?: GrowthModel;
   model: FinancialModel;
-  onUpdateCostData: (data: any[]) => void;
+  onUpdateCostData: (data: CostDataPoint[]) => void; // Use specific type
 }
 
 const CostTrends = ({ 
@@ -35,38 +44,48 @@ const CostTrends = ({
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
   
   // Memoize the cost data calculation
-  const costData = useMemo(() => {
+  const costData: CostDataPoint[] = useMemo(() => {
     console.log("[CostTrends] Recalculating costData...");
     try {
-      const data = [];
-      // Use passed props directly
-      if (!costs || !metadata) return []; 
+      const data: CostDataPoint[] = [];
+      // Ensure required base data exists
+      if (!costs || !metadata) { 
+          console.warn("[CostTrends] Missing costs or metadata, cannot calculate.");
+          return []; 
+      }
       
       const currentMarketingSetup = marketingSetup || { allocationMode: 'channels', channels: [] }; 
       const isWeekly = isWeeklyEvent; 
-      const duration = isWeekly ? (metadata?.weeks || 12) : 12;
+      // Provide default for duration if metadata.weeks is missing
+      const duration = isWeekly ? (metadata.weeks ?? 12) : 12; // Use nullish coalescing
       
-      if (isWeeklyEvent && metadata) {
-        const weeks = Math.min(metadata.weeks || 12, timePoints);
+      if (isWeeklyEvent) {
+        // Use the calculated duration (which has a default)
+        const weeks = Math.min(duration, timePoints); 
         
         for (let week = 1; week <= weeks; week++) {
-          const point: any = { point: `Week ${week}` };
+          const point: CostDataPoint = { point: `Week ${week}`, costs: 0, cumulativeCosts: 0 };
           let weeklyTotal = 0;
           
-          // Get week 1 attendance and current attendance
-          const initialAttendance = metadata.initialWeeklyAttendance;
+          // Provide default for initial attendance
+          const initialAttendance = metadata.initialWeeklyAttendance ?? 0; // Use nullish coalescing
           let currentAttendance = initialAttendance;
           
           // Calculate attendance with growth if applicable
-          if (week > 1 && metadata.growth) {
-            const growthRate = metadata.growth.attendanceGrowthRate / 100;
+          // Check for metadata.growth before accessing its properties
+          if (week > 1 && metadata.growth) { 
+            const growthRate = (metadata.growth.attendanceGrowthRate ?? 0) / 100; // Default growth rate to 0
             currentAttendance = initialAttendance * Math.pow(1 + growthRate, week - 1);
+          } else if (week > 1) {
+              // Handle case where week > 1 but no growth info exists - attendance stays initial?
+              // Or apply some default? For now, it stays initialAttendance.
           }
 
           // Calculate F&B revenue for this week
-          let fbSpendPerCustomer = metadata.perCustomer?.fbSpend || 0;
+          let fbSpendPerCustomer = metadata.perCustomer?.fbSpend ?? 0;
+          // Check metadata.growth before accessing fbSpendGrowth
           if (week > 1 && metadata.growth?.useCustomerSpendGrowth) {
-            const fbSpendGrowthRate = (metadata.growth.fbSpendGrowth || 0) / 100;
+            const fbSpendGrowthRate = (metadata.growth.fbSpendGrowth ?? 0) / 100; // Default growth rate to 0
             fbSpendPerCustomer *= Math.pow(1 + fbSpendGrowthRate, week - 1);
           }
           const fbRevenue = currentAttendance * fbSpendPerCustomer;
@@ -78,35 +97,29 @@ const CostTrends = ({
             let costValue = 0;
             
             if (costType === "fixed") {
-              // Fixed costs only apply in the first period (week 1 or month 1)
               costValue = week === 1 ? cost.value : 0;
             } else if (costType === "variable") {
-              // Special handling for F&B COGS - should be exactly the percentage of F&B revenue
               if (cost.name === "F&B COGS") {
-                const cogsPct = metadata.costs?.fbCOGSPercent || 30;
+                const cogsPct = metadata.costs?.fbCOGSPercent ?? 30; // Default COGS % if needed
                 costValue = (fbRevenue * cogsPct) / 100;
               } else {
                 costValue = cost.value;
+                // Check metadata.growth before accessing fbSpendGrowth
                 if (week > 1) {
                   const growthRate = metadata.growth?.useCustomerSpendGrowth 
-                    ? metadata.growth?.fbSpendGrowth / 100 
-                    : (growthModel?.rate || 0);
+                    ? (metadata.growth?.fbSpendGrowth ?? 0) / 100 // Default growth rate
+                    : (growthModel?.rate ?? 0); // Default growth rate
                   costValue *= Math.pow(1 + growthRate, week - 1);
                 }
               }
             } else if (costType === "recurring") {
-              // Recurring costs apply every week
-              // Special handling for Setup Costs if they are marked as recurring
-              if (cost.name === "Setup Costs" && metadata.weeks > 0) { 
-                 // Spread the setup cost evenly across all weeks (based on type being recurring)
-                 costValue = cost.value / metadata.weeks;
+              // Check metadata.weeks before dividing
+              if (cost.name === "Setup Costs" && duration > 0) { // Use duration (has default)
+                 costValue = cost.value / duration;
               } else {
-                 // Regular recurring cost (or Setup Cost if metadata.weeks <= 0), apply the full value
                  costValue = cost.value;
               }
             } else {
-              // Default behavior for unknown types (maybe log a warning?)
-              // For now, treat as recurring for safety, but might need refinement
               costValue = cost.value;
             }
             
@@ -117,21 +130,25 @@ const CostTrends = ({
           // --- Calculate Marketing Cost based on mode ---
           let periodMarketingCost = 0;
           if (currentMarketingSetup.allocationMode === 'channels') {
-             console.log("[CostTrends Week Calc] Mode: Channels, Setup:", JSON.stringify(currentMarketingSetup)); // Log setup
-             periodMarketingCost = currentMarketingSetup.channels.reduce((sum, ch) => sum + (ch.weeklyBudget || 0), 0);
-             console.log("[CostTrends Week Calc] Calculated Channel Cost:", periodMarketingCost); // Log result
-          } else if (currentMarketingSetup.allocationMode === 'highLevel' && currentMarketingSetup.totalBudget) {
-             const totalBudget = currentMarketingSetup.totalBudget;
+             periodMarketingCost = currentMarketingSetup.channels.reduce((sum, ch) => sum + (ch.weeklyBudget ?? 0), 0); // Default weeklyBudget to 0
+          } else if (currentMarketingSetup.allocationMode === 'highLevel') {
+             // Check for totalBudget before using it
+             const totalBudget = currentMarketingSetup.totalBudget ?? 0;
              const application = currentMarketingSetup.budgetApplication || 'spreadEvenly';
-             const modelDuration = duration; // Use calculated model duration
+             const modelDuration = duration; // Use calculated duration (has default)
              
              if (application === 'upfront') {
                 periodMarketingCost = (week === 1) ? totalBudget : 0;
-             } else if (application === 'spreadEvenly') {
+             } else if (application === 'spreadEvenly' && modelDuration > 0) { // Avoid division by zero
                 periodMarketingCost = totalBudget / modelDuration; 
-             } else if (application === 'spreadCustom' && currentMarketingSetup.spreadDuration && currentMarketingSetup.spreadDuration > 0) {
-                const spreadDuration = currentMarketingSetup.spreadDuration;
-                periodMarketingCost = (week <= spreadDuration) ? (totalBudget / spreadDuration) : 0;
+             } else if (application === 'spreadCustom') {
+                // Check spreadDuration before using it
+                const spreadDuration = currentMarketingSetup.spreadDuration ?? 0;
+                if (spreadDuration > 0 && week <= spreadDuration) { // Avoid division by zero
+                  periodMarketingCost = totalBudget / spreadDuration;
+                } else {
+                  periodMarketingCost = 0;
+                }
              }
           }
           
@@ -157,10 +174,10 @@ const CostTrends = ({
       } else {
         // Non-Weekly Event (Monthly)
          const months = timePoints;
-         const modelDuration = duration; // Use calculated model duration (likely 12 months)
+         const modelDuration = duration; // Use calculated duration (default is 12)
 
          for (let month = 1; month <= months; month++) {
-           const point: any = { point: `Month ${month}` };
+           const point: CostDataPoint = { point: `Month ${month}`, costs: 0, cumulativeCosts: 0 };
            let monthlyTotal = 0;
            // Add regular costs
            costs.forEach(cost => {
@@ -173,7 +190,7 @@ const CostTrends = ({
               } else if (costType === "variable") {
                 costValue = cost.value;
                 if (month > 1) {
-                  const { rate } = growthModel || { rate: 0 };
+                  const rate = growthModel?.rate ?? 0; // Default rate
                   costValue *= Math.pow(1 + rate, month - 1);
                 }
               } else if (costType === "recurring") {
@@ -189,19 +206,23 @@ const CostTrends = ({
            // Calculate Monthly Marketing Cost 
            let periodMarketingCost = 0;
            if (currentMarketingSetup.allocationMode === 'channels') {
-               const totalWeeklyBudget = currentMarketingSetup.channels.reduce((sum, ch) => sum + (ch.weeklyBudget || 0), 0);
+               const totalWeeklyBudget = currentMarketingSetup.channels.reduce((sum, ch) => sum + (ch.weeklyBudget ?? 0), 0); // Default weeklyBudget
                periodMarketingCost = totalWeeklyBudget * (365.25 / 7 / 12); 
-           } else if (currentMarketingSetup.allocationMode === 'highLevel' && currentMarketingSetup.totalBudget) {
-               const totalBudget = currentMarketingSetup.totalBudget;
+           } else if (currentMarketingSetup.allocationMode === 'highLevel') {
+               const totalBudget = currentMarketingSetup.totalBudget ?? 0; // Default totalBudget
                const application = currentMarketingSetup.budgetApplication || 'spreadEvenly';
               
                if (application === 'upfront') {
                  periodMarketingCost = (month === 1) ? totalBudget : 0;
-               } else if (application === 'spreadEvenly') {
+               } else if (application === 'spreadEvenly' && modelDuration > 0) { // Avoid division by zero
                  periodMarketingCost = totalBudget / modelDuration; 
-               } else if (application === 'spreadCustom' && currentMarketingSetup.spreadDuration && currentMarketingSetup.spreadDuration > 0) {
-                 const spreadDuration = currentMarketingSetup.spreadDuration;
-                 periodMarketingCost = (month <= spreadDuration) ? (totalBudget / spreadDuration) : 0;
+               } else if (application === 'spreadCustom') {
+                 const spreadDuration = currentMarketingSetup.spreadDuration ?? 0; // Default spreadDuration
+                 if (spreadDuration > 0 && month <= spreadDuration) { // Avoid division by zero
+                   periodMarketingCost = (totalBudget / spreadDuration);
+                 } else {
+                   periodMarketingCost = 0;
+                 }
                }
            }
 
@@ -211,17 +232,19 @@ const CostTrends = ({
              monthlyTotal += periodMarketingCost;
            }
            
-           point.total = Math.ceil(monthlyTotal);
+           // Rename keys for monthly consistency
+           point.costs = Math.ceil(monthlyTotal); 
            
            if (month === 1) {
-             point.cumulativeTotal = Math.ceil(monthlyTotal);
+             point.cumulativeCosts = Math.ceil(monthlyTotal);
            } else {
-             point.cumulativeTotal = Math.ceil(data[month - 2].cumulativeTotal + monthlyTotal);
+             point.cumulativeCosts = Math.ceil(data[month - 2].cumulativeCosts + monthlyTotal); 
            }
            
            data.push(point);
          }
       }
+      console.log("[CostTrends] Finished calculating costData.");
       return data;
     } catch (error) {
       console.error("Error calculating cost trends:", error);
@@ -233,7 +256,7 @@ const CostTrends = ({
       metadata, 
       growthModel, 
       timePoints, 
-      isWeeklyEvent
+      isWeeklyEvent // Dependency needed as it affects calculation logic
   ]);
 
   // Ref to store the previous costData string representation
@@ -242,36 +265,23 @@ const CostTrends = ({
   useEffect(() => {
     if (onUpdateCostData && costData) { 
       const currentCostDataString = JSON.stringify(costData);
-      // Only call update if the stringified data has actually changed
       if (currentCostDataString !== prevCostDataStringRef.current) {
           console.log("[CostTrends] Data changed, calling onUpdateCostData");
           onUpdateCostData(costData);
-          // Update the ref to the current stringified data
           prevCostDataStringRef.current = currentCostDataString;
-      } else {
-          // console.log("[CostTrends] Data reference changed but content is the same, skipping update.");
-      }
+      } 
     }
     // Dependencies remain costData (the result of useMemo) and the callback
   }, [costData, onUpdateCostData]);
   
-  if (!costData || costData.length === 0) {
-    return (
-      <div className="p-4 border border-red-200 rounded-md bg-red-50">
-        <p className="text-red-600">
-          Unable to generate cost trends. There might be an issue with the model data.
-        </p>
-      </div>
-    );
-  }
-  
-  // Dynamically generate the cost keys for the chart
+  // MOVED: costKeys calculation before the early return
   const costKeys = useMemo(() => {
     const keys = new Set<string>();
     costs.forEach(cost => {
         keys.add(cost.name.replace(/[^a-zA-Z0-9]/g, ""));
     });
-    if (costData.some(point => point.hasOwnProperty('MarketingBudget'))) {
+    // Check costData safely - it might be empty but shouldn't be null/undefined here
+    if (costData.some(point => Object.prototype.hasOwnProperty.call(point, 'MarketingBudget'))) {
         keys.add("MarketingBudget");
     }
     const presentKeys = Array.from(keys);
@@ -292,13 +302,22 @@ const CostTrends = ({
         return indexA - indexB;
     });
     
-    // Log the final sorted order
     console.log("[CostTrends] Sorted Keys for Rendering:", sortedKeys);
-
     return sortedKeys; 
 
-  }, [costs, costData]);
-
+  }, [costs, costData]); // costData is now a dependency
+  
+  // Early return if data calculation failed or resulted in empty array
+  if (!costData || costData.length === 0) {
+    return (
+      <div className="p-4 border border-red-200 rounded-md bg-red-50">
+        <p className="text-red-600">
+          Unable to generate cost trends. There might be an issue with the model data.
+        </p>
+      </div>
+    );
+  }
+  
   // Define a color mapping function or object
   const getColor = (key: string): string => { // Removed index param, not needed with map lookup
      const colorMap: Record<string, string> = {

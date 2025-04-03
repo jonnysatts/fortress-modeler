@@ -27,14 +27,13 @@ const ProductLayout: React.FC = () => {
     }
   }, [productId, loadProjectById, setCurrentProject, navigate]);
 
+  // Updated steps for the new navigation structure
   const steps = [
     { path: "summary", label: "Product Summary" },
-    { path: "assumptions", label: "Assumptions" },
-    { path: "inputs", label: "Revenue & Costs" },
-    { path: "forecast", label: "Forecast" },
-    { path: "actuals", label: "Actuals" },
-    { path: "analysis", label: "Performance vs Forecast" },
-    { path: "risks", label: "Risks & Scenarios" }
+    { path: "forecast-builder", label: "Forecast Builder" },
+    { path: "actuals-tracker", label: "Actuals Tracker" },
+    { path: "performance-analysis", label: "Performance Analysis" },
+    { path: "risks-scenarios", label: "Risks & Scenarios" }
   ];
 
   // Get current step from URL
@@ -43,10 +42,10 @@ const ProductLayout: React.FC = () => {
   // Generate breadcrumb items
   const breadcrumbItems = [
     { label: "Portfolio Overview", href: "/" },
-    { label: "Products", href: "/products" },
+    { label: "Projects", href: "/projects" },
     {
-      label: currentProject?.name || `Product ${productId}`,
-      href: `/products/${productId}/summary`
+      label: currentProject?.name || `Project ${productId}`,
+      href: `/projects/${productId}/summary`
     },
     {
       label: steps.find(step => step.path === currentPath)?.label || "Details"
@@ -61,7 +60,7 @@ const ProductLayout: React.FC = () => {
             <div>
               <Breadcrumbs items={breadcrumbItems} className="mb-2" />
               <TypographyH3 className="text-fortress-blue">
-                {currentProject?.name || "Product Details"}
+                {currentProject?.name || "Project Details"}
               </TypographyH3>
             </div>
             <Button

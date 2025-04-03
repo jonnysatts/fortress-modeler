@@ -11,19 +11,23 @@ import { TypographyH4, TypographyMuted } from '@/components/ui/typography';
 import { Project, FinancialModel } from '@/lib/db';
 import { Badge } from '@/components/ui/badge';
 import { Sparkline, SparklinePoint } from '@/components/ui/sparkline';
+import { generateForecastTimeSeries, ForecastPeriodData } from '@/lib/financialCalculations';
+
+// Define type for projects with calculated metrics
+interface ProjectWithMetrics extends Project {
+  totalRevenue: number;
+  totalProfit: number;
+  profitMargin: number;
+  hasActuals: boolean;
+  revenueConcentration: number; // Keep this for now, might be removed later
+  breakeven: boolean;
+  sparklineData: number[]; // Use profit for sparkline
+}
 
 const PortfolioDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { projects, loadProjects } = useStore();
-  const [projectsWithMetrics, setProjectsWithMetrics] = useState<Array<Project & { 
-    totalRevenue: number;
-    totalProfit: number;
-    profitMargin: number;
-    hasActuals: boolean;
-    revenueConcentration: number;
-    breakeven: boolean;
-    sparklineData: number[];
-  }>>([]);
+  const [projectsWithMetrics, setProjectsWithMetrics] = useState<ProjectWithMetrics[]>([]);
   
   useEffect(() => {
     loadProjects();
@@ -31,50 +35,41 @@ const PortfolioDashboard: React.FC = () => {
   
   useEffect(() => {
     const getProjectMetrics = async () => {
-      const projectMetrics = await Promise.all(projects.map(async (project) => {
-        // Load models for this project
+      const projectMetricsPromises = projects.map(async (project) => {
         const models = await useStore.getState().loadModelsForProject(project.id!);
         const actuals = await useStore.getState().loadActualsForProject(project.id!);
         
-        // Get the latest model
         const latestModel = models.length > 0 ? models[0] : null;
         
-        // Calculate metrics
         let totalRevenue = 0;
         let totalProfit = 0;
         let profitMargin = 0;
         let revenueConcentration = 0;
         let breakeven = false;
         let sparklineData: number[] = [];
-        
-        if (latestModel?.assumptions) {
-          // Calculate total revenue from the model
-          const { revenue = [], costs = [] } = latestModel.assumptions;
+
+        if (latestModel) {
+          // Generate forecast using the new function
+          const timeSeriesData = generateForecastTimeSeries(latestModel);
           
-          // Calculate total revenue
-          totalRevenue = revenue.reduce((sum, stream) => sum + stream.value, 0);
-          
-          // Calculate revenue concentration (highest revenue source as % of total)
-          if (totalRevenue > 0) {
-            const highestRevenue = Math.max(...revenue.map(stream => stream.value));
-            revenueConcentration = (highestRevenue / totalRevenue) * 100;
-          }
-          
-          // Calculate total costs
-          const totalCosts = costs.reduce((sum, cost) => sum + cost.value, 0);
-          
-          // Calculate profit and margin
-          totalProfit = totalRevenue - totalCosts;
-          profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-          
-          // Determine if project breaks even
-          breakeven = totalProfit >= 0;
-          
-          // Generate sparkline data (simplified for demo)
-          sparklineData = Array.from({ length: 12 }, (_, i) => {
-            const growth = latestModel.assumptions.growthModel?.rate || 0.05;
-            return totalRevenue * Math.pow(1 + growth, i);
-          });
+          if (timeSeriesData.length > 0) {
+            const finalPeriod = timeSeriesData[timeSeriesData.length - 1];
+            totalRevenue = finalPeriod.cumulativeRevenue;
+            totalProfit = finalPeriod.cumulativeProfit;
+            profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+            breakeven = totalProfit >= 0;
+            // Use cumulative profit for sparkline
+            sparklineData = timeSeriesData.map(p => p.cumulativeProfit);
+            
+            // Keep revenue concentration calculation for now, though its basis might need review
+            const { revenue = [] } = latestModel.assumptions;
+            if (totalRevenue > 0 && revenue.length > 0) {
+               const highestInitialRevenue = Math.max(...revenue.map(stream => stream.value));
+               // This concentration is based on initial values, not forecast totals - might need revision
+               revenueConcentration = (highestInitialRevenue / totalRevenue) * 100; 
+            }
+          } 
+          // else: handle case where forecast generation returns empty (e.g., due to error or no duration)
         }
         
         return {
@@ -87,12 +82,11 @@ const PortfolioDashboard: React.FC = () => {
           breakeven,
           sparklineData
         };
-      }));
+      });
       
-      // Sort by profit (descending)
-      projectMetrics.sort((a, b) => b.totalProfit - a.totalProfit);
-      
-      setProjectsWithMetrics(projectMetrics);
+      const calculatedMetrics = await Promise.all(projectMetricsPromises);
+      calculatedMetrics.sort((a, b) => b.totalProfit - a.totalProfit);
+      setProjectsWithMetrics(calculatedMetrics);
     };
     
     if (projects.length > 0) {

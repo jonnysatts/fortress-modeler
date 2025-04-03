@@ -1,5 +1,17 @@
 import { FinancialModel } from "@/lib/db";
 
+// Re-use or define a compatible type for data points
+// Assuming CostDataPoint from CostTrends.tsx is suitable or define similarly:
+interface DataPoint {
+  point: string;
+  revenue?: number;
+  cumulativeRevenue?: number;
+  costs?: number;
+  cumulativeCosts?: number;
+  attendance?: number;
+  [key: string]: string | number | undefined;
+}
+
 // Define interfaces for our data objects
 export interface RevenueData {
   name: string;
@@ -22,23 +34,20 @@ export interface TypeCategoryData {
 }
 
 // Prepare Revenue Breakdown Data for a SPECIFIC week's data point
-export const prepareRevenueDataForWeek = (weekDataPoint: any | null): RevenueData[] => {
+export const prepareRevenueDataForWeek = (weekDataPoint: DataPoint | null): RevenueData[] => {
   if (!weekDataPoint) return [];
 
   const revenueStreams: RevenueData[] = [];
-  let totalWeeklyRevenue = weekDataPoint.revenue || 0; // Get total revenue for this week
+  const totalWeeklyRevenue = weekDataPoint.revenue ?? 0;
 
   // Extract individual revenue stream values from the data point
-  // Assumes keys match original revenue stream names (e.g., 'Ticket Sales')
-  // or their safeName versions (e.g., 'TicketSales')
   for (const key in weekDataPoint) {
-    if (key !== 'point' && key !== 'revenue' && key !== 'cumulativeRevenue' && 
-        key !== 'costs' && key !== 'cumulativeCosts' && key !== 'attendance' && 
-        !key.endsWith('Color')) { // Exclude known non-revenue keys
-      // Attempt to map safeName back to original name if possible, or use key
-      // This part might need refinement depending on exact keys in weekDataPoint
-      const name = key.replace(/([A-Z])/g, ' $1').trim(); // Simple split for potential safeName
-      revenueStreams.push({ name: name, value: weekDataPoint[key] });
+    const value = weekDataPoint[key];
+    if (typeof value === 'number' && 
+        key !== 'point' && key !== 'revenue' && key !== 'cumulativeRevenue' && 
+        key !== 'costs' && key !== 'cumulativeCosts' && key !== 'attendance') {
+      const name = key.replace(/([A-Z])/g, ' $1').trim();
+      revenueStreams.push({ name: name, value: value });
     }
   }
 
@@ -53,7 +62,7 @@ export const prepareRevenueDataForWeek = (weekDataPoint: any | null): RevenueDat
 };
 
 // Prepare Cost Breakdown Data for a SPECIFIC week's data point
-export const prepareCostDataForWeek = (weekDataPoint: any | null, model: FinancialModel): CostData[] => {
+export const prepareCostDataForWeek = (weekDataPoint: DataPoint | null, model: FinancialModel): CostData[] => {
   if (!weekDataPoint) return [];
   console.log("[BreakdownCalc] Input weekDataPoint:", weekDataPoint); // Log the input
 
@@ -65,7 +74,7 @@ export const prepareCostDataForWeek = (weekDataPoint: any | null, model: Financi
   // Map base costs
   model.assumptions.costs.forEach(baseCost => {
     const safeName = baseCost.name.replace(/[^a-zA-Z0-9]/g, "");
-    const weeklyValue = weekDataPoint[safeName] || 0; 
+    const weeklyValue = (weekDataPoint[safeName] as number) ?? 0; 
     const costType = baseCost.type?.toLowerCase() || "recurring";
     
     // Only add if value is > 0 for cleaner breakdown
@@ -79,7 +88,7 @@ export const prepareCostDataForWeek = (weekDataPoint: any | null, model: Financi
   });
 
   // Add Marketing Budget if it exists and is > 0
-  const marketingBudgetCost = weekDataPoint.MarketingBudget || 0;
+  const marketingBudgetCost = (weekDataPoint.MarketingBudget as number) ?? 0;
   console.log(`[BreakdownCalc] Found MarketingBudget value: ${marketingBudgetCost}`); // Log detected value
   if (marketingBudgetCost > 0) {
       console.log("[BreakdownCalc] Adding Marketing Budget to costItems"); // Log if added
@@ -105,7 +114,7 @@ export const prepareCostDataForWeek = (weekDataPoint: any | null, model: Financi
 };
 
 // Prepare Cost Data Categorized by Type for a SPECIFIC week's data point
-export const prepareTypeCategorizedDataForWeek = (weekDataPoint: any | null, model: FinancialModel): TypeCategoryData[] => {
+export const prepareTypeCategorizedDataForWeek = (weekDataPoint: DataPoint | null, model: FinancialModel): TypeCategoryData[] => {
   if (!weekDataPoint) return [];
 
   const typeCategories: Record<string, TypeCategoryData> = {
@@ -117,7 +126,7 @@ export const prepareTypeCategorizedDataForWeek = (weekDataPoint: any | null, mod
   // Sum base costs by type
   model.assumptions.costs.forEach(baseCost => {
     const safeName = baseCost.name.replace(/[^a-zA-Z0-9]/g, "");
-    const weeklyValue = weekDataPoint[safeName] || 0;
+    const weeklyValue = (weekDataPoint[safeName] as number) ?? 0;
     const costType = (baseCost.type || "recurring").toLowerCase();
 
     if (typeCategories[costType] && weeklyValue > 0) {
@@ -126,7 +135,7 @@ export const prepareTypeCategorizedDataForWeek = (weekDataPoint: any | null, mod
   });
 
   // Add Marketing Budget to the appropriate category (Recurring)
-  const marketingBudgetCost = weekDataPoint.MarketingBudget || 0;
+  const marketingBudgetCost = (weekDataPoint.MarketingBudget as number) ?? 0;
   if (marketingBudgetCost > 0) {
       typeCategories.recurring.value += marketingBudgetCost;
   }

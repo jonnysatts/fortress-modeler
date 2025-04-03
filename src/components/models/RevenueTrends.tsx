@@ -12,10 +12,21 @@ import {
 } from "recharts";
 import FinancialMatrix from "./FinancialMatrix";
 
+// Define a type for the trend data points
+interface TrendDataPoint {
+  point: string; // e.g., "Week 1", "Month 1"
+  revenue?: number; // Total revenue for the period
+  cumulativeRevenue?: number; // Cumulative revenue
+  total?: number; // For monthly models, might use 'total' instead of 'revenue'
+  cumulativeTotal?: number; // For monthly models
+  attendance?: number; // Optional attendance
+  [key: string]: string | number | undefined; // Allow dynamic keys for revenue streams like 'TicketSales', 'FBSales'
+}
+
 interface RevenueTrendsProps {
   model: FinancialModel;
-  combinedData?: any[];
-  setCombinedData: (data: any[]) => void;
+  combinedData?: TrendDataPoint[]; // Use specific type
+  setCombinedData: (data: TrendDataPoint[]) => void; // Use specific type
 }
 
 const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsProps) => {
@@ -23,10 +34,10 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
 
-  const trendData = useMemo(() => {
+  const trendData: TrendDataPoint[] = useMemo(() => {
     console.log("[RevenueTrends] Recalculating trendData...");
     try {
-      const data = [];
+      const data: TrendDataPoint[] = []; // Use specific type
       if (!model?.assumptions?.revenue || !model?.assumptions?.metadata) return [];
       
       const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
@@ -47,7 +58,7 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
         let cumulativeTotal = 0;
         
         for (let week = 1; week <= weeks; week++) {
-          const point: any = { point: `Week ${week}` };
+          const point: TrendDataPoint = { point: `Week ${week}` }; // Initialize with type
           
           let currentAttendance = metadata.initialWeeklyAttendance || 0;
           if (week > 1 && metadata.growth) { 
@@ -108,7 +119,7 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
         let cumulativeTotal = 0;
         
         for (let month = 1; month <= months; month++) {
-          const point: any = { point: `Month ${month}` };
+          const point: TrendDataPoint = { point: `Month ${month}` }; // Initialize with type
           let totalRevenue = 0;
           revenueStreams.forEach(stream => {
             let streamRevenue = stream.value;
@@ -156,7 +167,8 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
   }
 
   const revenueStreams = model.assumptions.revenue;
-  const chartConfig = {};
+  // Define chartConfig type
+  const chartConfig: Record<string, { label: string }> = {}; 
   
   revenueStreams.forEach(stream => {
     const safeName = stream.name.replace(/[^a-zA-Z0-9]/g, "");

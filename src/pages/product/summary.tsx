@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { FinancialModel, ActualsPeriodEntry } from '@/lib/db';
 import useStore from '@/store/useStore';
 import { formatCurrency, formatPercent } from '@/lib/utils';
+import { generateForecastTimeSeries, ForecastPeriodData } from '@/lib/financialCalculations';
 import { TypographyH4, TypographyMuted } from '@/components/ui/typography';
 import ContentCard from '@/components/common/ContentCard';
 import ChartContainer from '@/components/common/ChartContainer';
@@ -18,6 +19,49 @@ const ProductSummary: React.FC = () => {
   const [actuals, setActuals] = useState<ActualsPeriodEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
+  // Get the latest model (might be null initially)
+  const latestModel = models.length > 0 ? models[0] : null;
+
+  // Generate the forecast time series using useMemo
+  const timeSeriesData: ForecastPeriodData[] = useMemo(() => {
+    if (!latestModel) return [];
+    return generateForecastTimeSeries(latestModel);
+  }, [latestModel]);
+
+  // Calculate key metrics from the generated time series
+  const summaryMetrics = useMemo(() => {
+      if (timeSeriesData.length === 0) {
+          return { totalRevenue: 0, totalCosts: 0, totalProfit: 0, profitMargin: 0, breakeven: false };
+      }
+      const finalPeriod = timeSeriesData[timeSeriesData.length - 1];
+      const totalRevenue = finalPeriod.cumulativeRevenue;
+      const totalCosts = finalPeriod.cumulativeCost;
+      const totalProfit = finalPeriod.cumulativeProfit;
+      const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+      const breakeven = totalProfit >= 0;
+      return { totalRevenue, totalCosts, totalProfit, profitMargin, breakeven };
+  }, [timeSeriesData]);
+
+  // Calculate warnings
+  const { revenueConcentration, warnings } = useMemo(() => {
+      const { totalRevenue, profitMargin, breakeven } = summaryMetrics;
+      const revenueStreams = latestModel?.assumptions.revenue || [];
+      let revenueConcentration = 0;
+      if (totalRevenue > 0 && revenueStreams.length > 0) {
+          const highestInitialRevenue = Math.max(0, ...revenueStreams.map(stream => stream.value ?? 0));
+          revenueConcentration = (highestInitialRevenue / totalRevenue) * 100; 
+      }
+      
+      const warnings = [];
+      if (revenueConcentration > 80) warnings.push({ type: 'Revenue Concentration', message: 'Over 80% of revenue comes from a single source', severity: 'warning' });
+      if (profitMargin < 20) warnings.push({ type: 'Low Profit Margin', message: 'Profit margin is below 20%', severity: 'warning' });
+      if (!breakeven) warnings.push({ type: 'No Breakeven', message: 'Product does not reach breakeven point', severity: 'error' });
+      if (actuals.length === 0) warnings.push({ type: 'No Actuals', message: 'No actual performance data has been recorded', severity: 'info' });
+
+      return { revenueConcentration, warnings };
+  }, [summaryMetrics, actuals, latestModel]);
+  
+  // Data loading useEffect remains here
   useEffect(() => {
     const loadData = async () => {
       if (id) {
@@ -48,7 +92,7 @@ const ProductSummary: React.FC = () => {
     return <div className="py-8 text-center">Product not found</div>;
   }
   
-  if (models.length === 0) {
+  if (!latestModel) {
     return (
       <div className="py-8 text-center">
         <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
@@ -60,86 +104,19 @@ const ProductSummary: React.FC = () => {
     );
   }
   
-  // Get the latest model
-  const latestModel = models[0];
-  const { assumptions } = latestModel;
+  // Use summaryMetrics values directly
+  const { totalRevenue, totalCosts, totalProfit, profitMargin } = summaryMetrics;
   
-  // Calculate key metrics
-  const revenueStreams = assumptions.revenue || [];
-  const costs = assumptions.costs || [];
-  
-  const totalRevenue = revenueStreams.reduce((sum, stream) => sum + stream.value, 0);
-  const totalCosts = costs.reduce((sum, cost) => sum + cost.value, 0);
-  const totalProfit = totalRevenue - totalCosts;
-  const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-  
-  // Calculate revenue concentration
-  const highestRevenue = Math.max(...revenueStreams.map(stream => stream.value));
-  const revenueConcentration = totalRevenue > 0 ? (highestRevenue / totalRevenue) * 100 : 0;
-  
-  // Determine if project breaks even
-  const breakeven = totalProfit >= 0;
-  
-  // Prepare data for charts
-  const revenueData = revenueStreams.map(stream => ({
+  // Simplified breakdown data (can be enhanced later)
+  const revenueData = (latestModel.assumptions.revenue || []).map(stream => ({
     name: stream.name,
     value: stream.value
   }));
-  
-  const costData = costs.map(cost => ({
+  const costData = (latestModel.assumptions.costs || []).map(cost => ({
     name: cost.name,
     value: cost.value
   }));
-  
-  // Generate forecast data (simplified for demo)
-  const forecastData = Array.from({ length: 12 }, (_, i) => {
-    const growth = assumptions.growthModel?.rate || 0.05;
-    const periodRevenue = totalRevenue * Math.pow(1 + growth, i);
-    const periodCosts = totalCosts * (1 + (growth / 2)); // Costs grow slower than revenue
-    const periodProfit = periodRevenue - periodCosts;
-    
-    return {
-      name: `Month ${i + 1}`,
-      revenue: Math.round(periodRevenue),
-      costs: Math.round(periodCosts),
-      profit: Math.round(periodProfit)
-    };
-  });
-  
-  // Check for warnings
-  const warnings = [];
-  if (revenueConcentration > 80) {
-    warnings.push({
-      type: 'Revenue Concentration',
-      message: 'Over 80% of revenue comes from a single source',
-      severity: 'warning'
-    });
-  }
-  
-  if (profitMargin < 20) {
-    warnings.push({
-      type: 'Low Profit Margin',
-      message: 'Profit margin is below 20%',
-      severity: 'warning'
-    });
-  }
-  
-  if (!breakeven) {
-    warnings.push({
-      type: 'No Breakeven',
-      message: 'Product does not reach breakeven point',
-      severity: 'error'
-    });
-  }
-  
-  if (actuals.length === 0) {
-    warnings.push({
-      type: 'No Actuals',
-      message: 'No actual performance data has been recorded',
-      severity: 'info'
-    });
-  }
-  
+
   return (
     <div className="space-y-6">
       {/* Key Metrics */}
@@ -223,8 +200,8 @@ const ProductSummary: React.FC = () => {
       {/* Revenue & Cost Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <ChartContainer
-          title="Revenue Breakdown"
-          description="By revenue stream"
+          title="Revenue Breakdown (Base Values)"
+          description="By revenue stream assumption"
           height={300}
         >
           <ResponsiveContainer width="100%" height="100%">
@@ -239,8 +216,8 @@ const ProductSummary: React.FC = () => {
         </ChartContainer>
         
         <ChartContainer
-          title="Cost Breakdown"
-          description="By cost category"
+          title="Cost Breakdown (Base Values)"
+          description="By cost category assumption"
           height={300}
         >
           <ResponsiveContainer width="100%" height="100%">
@@ -262,14 +239,14 @@ const ProductSummary: React.FC = () => {
         height={400}
       >
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={forecastData}>
+          <LineChart data={timeSeriesData}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
+            <XAxis dataKey="point" />
             <YAxis tickFormatter={val => formatCurrency(val)} />
             <Tooltip formatter={(value) => [formatCurrency(value as number), '']} />
             <Legend />
             <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#10B981" strokeWidth={2} />
-            <Line type="monotone" dataKey="costs" name="Costs" stroke="#EF4444" strokeWidth={2} />
+            <Line type="monotone" dataKey="cost" name="Costs" stroke="#EF4444" strokeWidth={2} />
             <Line type="monotone" dataKey="profit" name="Profit" stroke="#1A2942" strokeWidth={2} />
           </LineChart>
         </ResponsiveContainer>
@@ -309,19 +286,19 @@ const ProductSummary: React.FC = () => {
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Growth Model</dt>
-                <dd className="font-medium">{assumptions.growthModel?.type || 'Not specified'}</dd>
+                <dd className="font-medium">{latestModel.assumptions.growthModel?.type || 'Not specified'}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Growth Rate</dt>
-                <dd className="font-medium">{formatPercent(assumptions.growthModel?.rate || 0)}</dd>
+                <dd className="font-medium">{formatPercent(latestModel.assumptions.growthModel?.rate || 0)}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Revenue Streams</dt>
-                <dd className="font-medium">{revenueStreams.length}</dd>
+                <dd className="font-medium">{latestModel.assumptions.revenue?.length || 0}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Cost Categories</dt>
-                <dd className="font-medium">{costs.length}</dd>
+                <dd className="font-medium">{latestModel.assumptions.costs?.length || 0}</dd>
               </div>
             </dl>
           </div>

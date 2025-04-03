@@ -128,11 +128,13 @@ export const useForecastAnalysis = (
 
       if (actualEntry) {
           latestActualPeriod = Math.max(latestActualPeriod, period);
-          periodRevenueActual = Object.values(actualEntry.revenueActuals || {}).reduce((s, v) => s + v, 0);
-          periodCostActual = Object.values(actualEntry.costActuals || {}).reduce((s, v) => s + v, 0);
-          periodProfitActual = periodRevenueActual - periodCostActual;
-          cumulativeRevenueActual += periodRevenueActual;
-          cumulativeCostActual += periodCostActual;
+          periodRevenueActual = Object.values(actualEntry.revenueActuals || {}).reduce((s: number, v: number) => s + v, 0);
+          periodCostActual = Object.values(actualEntry.costActuals || {}).reduce((s: number, v: number) => s + v, 0);
+          periodProfitActual = (typeof periodRevenueActual === 'number' && typeof periodCostActual === 'number') 
+                             ? periodRevenueActual - periodCostActual 
+                             : undefined;
+          cumulativeRevenueActual += periodRevenueActual ?? 0;
+          cumulativeCostActual += periodCostActual ?? 0;
           if (isWeekly && actualEntry.attendanceActual !== undefined && actualEntry.attendanceActual !== null) {
               periodAttendanceActual = actualEntry.attendanceActual;
               cumulativeAttendanceActual += periodAttendanceActual;
@@ -234,7 +236,7 @@ export const useForecastAnalysis = (
         trendData: periodicAnalysisData 
     };
 
-  }, [selectedModel, actualsData]);
+  }, [selectedModel, actualsData, selectedModelId]);
 
   const isWeeklyEvent = selectedModel?.assumptions?.metadata?.type === "WeeklyEvent";
 

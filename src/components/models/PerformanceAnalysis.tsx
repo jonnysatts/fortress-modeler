@@ -215,8 +215,8 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
         const p = periodicAnalysisData[period - 1];
         if (p.revenueActual !== undefined && period <= latestActualPeriod) {
             revisedTotalRevenue += p.revenueActual;
-            revisedTotalCost += p.costActual;
-            revisedTotalProfit += p.profitActual;
+            revisedTotalCost += p.costActual ?? 0;
+            revisedTotalProfit += p.profitActual ?? 0;
         } else {
             revisedTotalRevenue += p.revenueForecast;
             revisedTotalCost += p.costForecast;
@@ -251,7 +251,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
         trendData: periodicAnalysisData 
     };
 
-  }, [selectedModel, actualsData]);
+  }, [selectedModel, actualsData, selectedModelId]);
 
   if (financialModels.length === 0) {
      return <p className="text-muted-foreground">No financial models exist for this project to analyze performance against.</p>;

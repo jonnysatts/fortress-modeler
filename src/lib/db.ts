@@ -1,5 +1,8 @@
 import Dexie, { Table } from 'dexie';
-import { MarketingSetup, ActualsPeriodEntry } from '@/types/models';
+import type { MarketingSetup, ActualsPeriodEntry } from '@/types/models';
+
+// Use export type for re-exporting
+export type { ActualsPeriodEntry };
 
 // Define interfaces for our database tables
 export interface Project {
@@ -27,6 +30,10 @@ export interface FinancialModel {
     growthModel: GrowthModel;
     marketing?: MarketingSetup;
     metadata?: any; // For product-specific data
+    cogsPercentages?: {
+      fbCogsPercent?: number;
+      merchandiseCogsPercent?: number;
+    };
   };
   createdAt: Date;
   updatedAt: Date;

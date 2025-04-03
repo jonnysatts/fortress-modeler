@@ -49,8 +49,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
   const mainNavItems = [
     { name: "Dashboard", path: "/", icon: Home },
     { name: "Projects", path: "/projects", icon: FolderKanban, expandable: true },
-    { name: "Performance", path: "/performance", icon: LineChart },
-    { name: "Risk Management", path: "/risks", icon: ShieldAlert },
     { name: "Settings", path: "/settings", icon: Settings },
   ];
 

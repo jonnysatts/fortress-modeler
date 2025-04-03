@@ -25,7 +25,7 @@ import {
   Line
 } from 'recharts';
 
-const ProductActuals: React.FC = () => {
+const ActualsTracker: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { currentProject, loadModelsForProject, loadActualsForProject } = useStore();
   const [models, setModels] = useState<FinancialModel[]>([]);
@@ -501,4 +501,4 @@ const ProductActuals: React.FC = () => {
   );
 };
 
-export default ProductActuals;
+export default ActualsTracker;
