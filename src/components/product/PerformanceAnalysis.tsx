@@ -263,7 +263,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                 <VarianceCard
                     title="Total Revenue"
                     forecast={comparisonMode === 'period' ? periodSpecificRevenueForecast :
-                             comparisonMode === 'cumulative' ? actualTotalRevenue + periodSpecificRevenueForecast :
+                             comparisonMode === 'cumulative' ? periodSpecificRevenueForecast :
                              totalRevenueForecast}
                     actual={actualTotalRevenue}
                     variance={comparisonMode === 'period' ? periodRevenueVariance :
@@ -282,7 +282,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                  <VarianceCard
                     title="Total Costs"
                     forecast={comparisonMode === 'period' ? periodSpecificCostForecast :
-                             comparisonMode === 'cumulative' ? actualTotalCost + periodSpecificCostForecast :
+                             comparisonMode === 'cumulative' ? periodSpecificCostForecast :
                              totalCostForecast}
                     actual={actualTotalCost}
                     variance={comparisonMode === 'period' ? periodCostVariance :
@@ -302,7 +302,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                  <VarianceCard
                     title="Total Profit"
                     forecast={comparisonMode === 'period' ? periodSpecificProfitForecast :
-                             comparisonMode === 'cumulative' ? actualTotalProfit + periodSpecificProfitForecast :
+                             comparisonMode === 'cumulative' ? periodSpecificProfitForecast :
                              totalProfitForecast}
                     actual={actualTotalProfit}
                     variance={comparisonMode === 'period' ? periodProfitVariance :
@@ -321,11 +321,11 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                  <VarianceCard
                     title="Avg. Profit Margin"
                     forecast={comparisonMode === 'period' ? periodSpecificProfitMargin :
-                             comparisonMode === 'cumulative' ? (actualAvgProfitMargin + periodSpecificProfitMargin) / 2 :
+                             comparisonMode === 'cumulative' ? periodSpecificProfitMargin :
                              avgProfitMarginForecast}
                     actual={actualAvgProfitMargin}
                     variance={comparisonMode === 'period' ? actualAvgProfitMargin - periodSpecificProfitMargin :
-                             comparisonMode === 'cumulative' ? actualAvgProfitMargin - ((actualAvgProfitMargin + periodSpecificProfitMargin) / 2) :
+                             comparisonMode === 'cumulative' ? actualAvgProfitMargin - periodSpecificProfitMargin :
                              actualAvgProfitMargin - avgProfitMarginForecast}
                     actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     isPercentage={true}
@@ -343,13 +343,13 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                         forecast={comparisonMode === 'period' ?
                                  (totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * periodsWithActuals : 0 :
                                  comparisonMode === 'cumulative' ?
-                                 (totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * (periodsWithActuals + 1) : 0 :
+                                 (totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * periodsWithActuals : 0 :
                                  totalAttendanceForecast}
                         actual={totalAttendanceActual}
                         variance={comparisonMode === 'period' ?
                                  totalAttendanceActual - ((totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * periodsWithActuals : 0) :
                                  comparisonMode === 'cumulative' ?
-                                 totalAttendanceActual - ((totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * (periodsWithActuals + 1) : 0) :
+                                 totalAttendanceActual - ((totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * periodsWithActuals : 0) :
                                  totalAttendanceActual - totalAttendanceForecast}
                         actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                         isUnits={true}
