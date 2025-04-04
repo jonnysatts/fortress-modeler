@@ -93,7 +93,9 @@ export const VarianceCard: React.FC<VarianceCardProps> = ({
     previousLabel = "Previous",
     description,
     className,
-    footer
+    footer,
+    secondaryValue,
+    secondaryLabel
 }) => {
 
   const variance = actual - forecast;
