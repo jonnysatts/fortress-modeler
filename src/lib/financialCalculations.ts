@@ -23,11 +23,11 @@ export const calculateTotalRevenue = (model: FinancialModel): number => {
     const metadata = model.assumptions.metadata;
     const weeks = metadata.weeks || 12;
     let totalRevenue = 0;
-    
+
     // Calculate initial revenue from all streams
     const initialAttendance = metadata.initialWeeklyAttendance;
     const perCustomer = metadata.perCustomer;
-    
+
     // Calculate week by week, starting from week 1 (not 0)
     for (let week = 1; week <= weeks; week++) {
       // Calculate attendance for this week
@@ -40,21 +40,21 @@ export const calculateTotalRevenue = (model: FinancialModel): number => {
       let currentPerCustomer = { ...perCustomer };
       if (metadata.growth.useCustomerSpendGrowth) {
         currentPerCustomer = {
-          ticketPrice: perCustomer.ticketPrice * 
+          ticketPrice: perCustomer.ticketPrice *
             Math.pow(1 + (metadata.growth.ticketPriceGrowth / 100), week - 1),
-          fbSpend: perCustomer.fbSpend * 
+          fbSpend: perCustomer.fbSpend *
             Math.pow(1 + (metadata.growth.fbSpendGrowth / 100), week - 1),
-          merchandiseSpend: perCustomer.merchandiseSpend * 
+          merchandiseSpend: perCustomer.merchandiseSpend *
             Math.pow(1 + (metadata.growth.merchandiseSpendGrowth / 100), week - 1),
-          onlineSpend: perCustomer.onlineSpend * 
+          onlineSpend: perCustomer.onlineSpend *
             Math.pow(1 + (metadata.growth.onlineSpendGrowth / 100), week - 1),
-          miscSpend: perCustomer.miscSpend * 
+          miscSpend: perCustomer.miscSpend *
             Math.pow(1 + (metadata.growth.miscSpendGrowth / 100), week - 1),
         };
       }
 
       // Calculate revenue for this week
-      const weekRevenue = 
+      const weekRevenue =
         (currentAttendance * currentPerCustomer.ticketPrice) +
         (currentAttendance * currentPerCustomer.fbSpend) +
         (currentAttendance * currentPerCustomer.merchandiseSpend) +
@@ -102,7 +102,7 @@ export const calculateTotalCosts = (model: FinancialModel): number => {
         currentFBSpend *= Math.pow(1 + (metadata.growth.fbSpendGrowth / 100), week - 1);
       }
       const fbRevenue = currentAttendance * currentFBSpend;
-      
+
       // Calculate costs for this week
       const fbCOGS = (fbRevenue * (metadata.costs.fbCOGSPercent || 30)) / 100;
       const staffCosts = (metadata.costs.staffCount || 0) * (metadata.costs.staffCostPerPerson || 0);
@@ -159,14 +159,28 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
         if (period === 1) {
           currentAttendance = initialAttendance;
         } else {
-          const rate = (metadata.growth?.attendanceGrowthRate ?? 0) / 100;
+          // Use the overall growth model rate if attendance growth rate is not set
+          let rate = (metadata.growth?.attendanceGrowthRate ?? 0) / 100;
+
+          // If attendance growth rate is 0 but we have an overall growth model with exponential type,
+          // use that rate instead
+          if (rate === 0 && growthModel?.type === 'exponential' && growthModel?.rate > 0) {
+            rate = growthModel.rate / 100;
+            console.log(`[FinancialCalc] Using overall growth rate: ${rate * 100}% instead of attendance growth rate: 0%`);
+          }
+
           currentAttendance = initialAttendance * Math.pow(1 + rate, period - 1);
+
+          // Add debug logging
+          if (period === 2) { // Only log for the second period to avoid console spam
+            console.log(`[FinancialCalc] Attendance Growth: Initial=${initialAttendance}, Rate=${rate * 100}%, Period ${period}=${currentAttendance}`);
+          }
         }
         currentAttendance = Math.round(currentAttendance);
-      } 
+      }
       // else: Handle non-weekly attendance if needed
 
-      // --- Calculate Revenue --- 
+      // --- Calculate Revenue ---
       let periodFBCRevenue = 0; // Track F&B revenue specifically for COGS
       let periodMerchRevenue = 0; // Track Merch revenue specifically for COGS
       periodRevenue = 0; // Reset period total revenue
@@ -176,7 +190,7 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
           let currentTicketPrice = metadata.perCustomer.ticketPrice ?? 0;
           let currentFbSpend = metadata.perCustomer.fbSpend ?? 0;
           let currentMerchSpend = metadata.perCustomer.merchandiseSpend ?? 0;
-          
+
           // Apply growth if applicable
           if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
               currentTicketPrice *= Math.pow(1 + (metadata.growth.ticketPriceGrowth ?? 0) / 100, period - 1);
@@ -184,11 +198,11 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
               currentMerchSpend *= Math.pow(1 + (metadata.growth.merchandiseSpendGrowth ?? 0) / 100, period - 1);
               // Add growth for other per-customer spend if needed
           }
-          
+
           const ticketRevenue = currentAttendance * currentTicketPrice;
           periodFBCRevenue = currentAttendance * currentFbSpend; // Assign to specific var for COGS
           periodMerchRevenue = currentAttendance * currentMerchSpend; // Assign to specific var for COGS
-          
+
           periodRevenue += ticketRevenue + periodFBCRevenue + periodMerchRevenue;
           // Add other per-attendee based streams (e.g., online, misc if calculated similarly)
       }
@@ -197,12 +211,12 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
       revenueStreams.forEach(stream => {
         // Skip the standard per-attendee streams as they are calculated above
         if (isWeekly && ["Ticket Sales", "F&B Sales", "Merchandise Sales"].includes(stream.name)) {
-            return; 
+            return;
         }
-        
+
         let streamRevenue = 0;
         const baseValue = stream.value ?? 0;
-        
+
         // Apply growth model (non-weekly or non-per-attendee streams)
         streamRevenue = baseValue;
         if (period > 1 && growthModel) {
@@ -222,16 +236,16 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
       const merchCogsPercent = metadata?.costs?.merchandiseCogsPercent ?? 0;
       const fbCOGS = (periodFBCRevenue * fbCogsPercent) / 100;
       const merchCOGS = (periodMerchRevenue * merchCogsPercent) / 100;
-      
+
       // Add Logging for COGS
       if (period === 1) { // Log only for the first period to avoid flood
           console.log(`[ForecastCalc Period ${period}] F&B Revenue: ${periodFBCRevenue}, COGS %: ${fbCogsPercent}, Calculated F&B COGS: ${fbCOGS}`);
           console.log(`[ForecastCalc Period ${period}] Merch Revenue: ${periodMerchRevenue}, COGS %: ${merchCogsPercent}, Calculated Merch COGS: ${merchCOGS}`);
       }
-      
+
       periodCost += fbCOGS + merchCOGS;
-      let currentCostBreakdown: Record<string, number> = { fbCOGS, merchCOGS }; 
-      
+      let currentCostBreakdown: Record<string, number> = { fbCOGS, merchCOGS };
+
       // 2. Fixed/Recurring Costs from the list
       costs.forEach(cost => {
         let costValue = 0;
@@ -247,8 +261,8 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
           } else {
              costValue = baseValue;
           }
-        } 
-        
+        }
+
         periodCost += costValue;
         // Add to breakdown for logging
         if (costValue > 0) currentCostBreakdown[costName] = costValue; // Now allowed
@@ -281,7 +295,7 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
           console.log(`[ForecastCalc Period ${period}] Total Period Cost: ${periodCost}`, currentCostBreakdown);
       }
 
-      // --- Calculate Period Profit & Accumulate --- 
+      // --- Calculate Period Profit & Accumulate ---
       const periodProfit = periodRevenue - periodCost;
       cumulativeRevenue += periodRevenue;
       cumulativeCost += periodCost;
@@ -305,4 +319,4 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
     console.error("[generateForecastTimeSeries] Error during calculation:", error);
     return []; // Return empty array on error
   }
-}; 
+};
