@@ -181,6 +181,9 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
   return (
     <div className="space-y-6" style={{ border: '5px solid blue', padding: '20px', backgroundColor: 'lightblue' }}>
       <h1 style={{ color: 'red', fontSize: '24px', fontWeight: 'bold' }}>THIS IS THE UPDATED COMPONENT</h1>
+      <div style={{ backgroundColor: 'black', color: 'white', padding: '10px', marginBottom: '10px', fontSize: '18px' }}>
+        Current Comparison Mode: {comparisonMode.toUpperCase()}
+      </div>
       {/* Model Selector and View Mode */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center space-x-2 max-w-sm">
@@ -567,8 +570,10 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                     onClick={() => {
                       console.log('Setting comparison mode to period');
                       setComparisonMode('period');
+                      alert('Changed to Period mode');
                     }}
                     className={`px-3 py-1 text-sm rounded ${comparisonMode === 'period' ? 'bg-primary text-white' : 'bg-muted'}`}
+                    style={{ border: '2px solid green' }}
                   >
                     Period to Period
                   </button>
@@ -576,8 +581,10 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                     onClick={() => {
                       console.log('Setting comparison mode to cumulative');
                       setComparisonMode('cumulative');
+                      alert('Changed to Cumulative mode');
                     }}
                     className={`px-3 py-1 text-sm rounded ${comparisonMode === 'cumulative' ? 'bg-primary text-white' : 'bg-muted'}`}
+                    style={{ border: '2px solid green' }}
                   >
                     Cumulative
                   </button>
@@ -585,8 +592,10 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                     onClick={() => {
                       console.log('Setting comparison mode to projected');
                       setComparisonMode('projected');
+                      alert('Changed to Projected mode');
                     }}
                     className={`px-3 py-1 text-sm rounded ${comparisonMode === 'projected' ? 'bg-primary text-white' : 'bg-muted'}`}
+                    style={{ border: '2px solid green' }}
                   >
                     Projected Outcome
                   </button>

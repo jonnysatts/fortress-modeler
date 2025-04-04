@@ -96,6 +96,9 @@ export const SimpleVarianceCard: React.FC<SimpleVarianceCardProps> = ({
     <Card className={className} style={{ border: '3px solid red' }}>
       <CardHeader className="pb-2" style={{ backgroundColor: 'yellow' }}>
         <CardTitle className="text-sm font-medium">{title} - NEW CARD</CardTitle>
+        <div style={{ backgroundColor: 'black', color: 'white', padding: '5px', marginTop: '5px' }}>
+          Mode: {comparisonMode.toUpperCase()}
+        </div>
         {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
       </CardHeader>
       <CardContent className="space-y-3">
