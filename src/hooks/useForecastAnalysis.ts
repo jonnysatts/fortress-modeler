@@ -37,6 +37,12 @@ export interface AnalysisSummary {
   totalProfitForecast: number;
   avgProfitMarginForecast: number;
 
+  // Period-specific forecasts (for periods with actuals)
+  periodSpecificRevenueForecast: number;
+  periodSpecificCostForecast: number;
+  periodSpecificProfitForecast: number;
+  periodSpecificProfitMargin: number;
+
   // Actual totals (only from periods with actual data)
   actualTotalRevenue: number;
   actualTotalCost: number;
@@ -48,6 +54,14 @@ export interface AnalysisSummary {
   revisedTotalRevenue: number;
   revisedTotalCost: number;
   revisedTotalProfit: number;
+
+  // Period-specific variances
+  periodRevenueVariance: number;
+  periodCostVariance: number;
+  periodProfitVariance: number;
+  periodRevenueVariancePercent: number;
+  periodCostVariancePercent: number;
+  periodProfitVariancePercent: number;
   revisedAvgProfitMargin: number;
 
   // Variances
@@ -239,6 +253,11 @@ export const useForecastAnalysis = (
         let revisedTotalRevenue = 0;
         let revisedTotalCost = 0;
 
+        // Calculate period-specific forecasts (for the periods we have actuals for)
+        let periodSpecificRevenueForecast = 0;
+        let periodSpecificCostForecast = 0;
+        let periodSpecificProfitForecast = 0;
+
         console.log("[useForecastAnalysis Hook] Calculating actuals from periodicAnalysisData:", periodicAnalysisData);
 
         for (let period = 1; period <= duration; period++) {
@@ -257,11 +276,19 @@ export const useForecastAnalysis = (
                 actualTotalProfit += p.profitActual ?? (p.revenueActual - p.costActual);
                 periodsWithActuals++;
 
+                // Add to period-specific forecasts
+                periodSpecificRevenueForecast += p.revenueForecast;
+                periodSpecificCostForecast += p.costForecast;
+                periodSpecificProfitForecast += p.profitForecast;
+
                 console.log(`[useForecastAnalysis Hook] Added period ${period} to actuals. Running totals:`, {
                     actualTotalRevenue,
                     actualTotalCost,
                     actualTotalProfit,
-                    periodsWithActuals
+                    periodsWithActuals,
+                    periodSpecificRevenueForecast,
+                    periodSpecificCostForecast,
+                    periodSpecificProfitForecast
                 });
             }
 
@@ -288,6 +315,13 @@ export const useForecastAnalysis = (
            totalProfitForecast,
            avgProfitMarginForecast,
 
+           // Period-specific forecasts (for periods with actuals)
+           periodSpecificRevenueForecast,
+           periodSpecificCostForecast,
+           periodSpecificProfitForecast,
+           periodSpecificProfitMargin: periodSpecificRevenueForecast > 0 ?
+               (periodSpecificProfitForecast / periodSpecificRevenueForecast) * 100 : 0,
+
            // Actual totals (only from periods with actual data)
            actualTotalRevenue,
            actualTotalCost,
@@ -301,10 +335,21 @@ export const useForecastAnalysis = (
            revisedTotalProfit,
            revisedAvgProfitMargin,
 
-           // Variances
+           // Variances (between revised outlook and original forecast)
            totalRevenueVariance,
            totalCostVariance,
            totalProfitVariance,
+
+           // Period-specific variances (between actuals and period-specific forecasts)
+           periodRevenueVariance: actualTotalRevenue - periodSpecificRevenueForecast,
+           periodCostVariance: actualTotalCost - periodSpecificCostForecast,
+           periodProfitVariance: actualTotalProfit - periodSpecificProfitForecast,
+           periodRevenueVariancePercent: periodSpecificRevenueForecast > 0 ?
+               ((actualTotalRevenue - periodSpecificRevenueForecast) / periodSpecificRevenueForecast) * 100 : 0,
+           periodCostVariancePercent: periodSpecificCostForecast > 0 ?
+               ((actualTotalCost - periodSpecificCostForecast) / periodSpecificCostForecast) * 100 : 0,
+           periodProfitVariancePercent: periodSpecificProfitForecast > 0 ?
+               ((actualTotalProfit - periodSpecificProfitForecast) / periodSpecificProfitForecast) * 100 : 0,
 
            // Other metrics
            latestActualPeriod,

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useTheme } from '@/components/theme-provider';
 import { FinancialModel } from '@/lib/db';
 import { ActualsPeriodEntry } from '@/types/models';
 import {
@@ -46,6 +47,8 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
   );
 
   const [viewMode, setViewMode] = useState<'weekly' | 'cumulative'>('weekly');
+  const [comparisonMode, setComparisonMode] = useState<'period' | 'cumulative' | 'projected'>('period');
+  const { theme } = useTheme();
 
   // --- Restore the hook call ---
   // console.log("[PerfAnalysis Component] Bypassing useForecastAnalysis hook for testing.");
@@ -223,54 +226,86 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <VarianceCard
                     title="Total Revenue"
-                    forecast={totalRevenueForecast}
+                    forecast={comparisonMode === 'period' ? periodSpecificRevenueForecast :
+                             comparisonMode === 'cumulative' ? actualTotalRevenue + periodSpecificRevenueForecast :
+                             totalRevenueForecast}
                     actual={actualTotalRevenue}
                     actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     trend={trendData.slice(-10).map(d => d.revenueActual || 0).filter(Boolean)}
-                    description={`Actual revenue from ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}`}
+                    description={comparisonMode === 'period' ?
+                      `Comparing actual revenue to forecast for ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}` :
+                      comparisonMode === 'cumulative' ?
+                      `Comparing actual revenue to cumulative forecast` :
+                      `Comparing actual revenue to total forecast`}
                     secondaryValue={revisedTotalRevenue}
                     secondaryLabel="Revised Outlook"
                 />
                  <VarianceCard
                     title="Total Costs"
-                    forecast={totalCostForecast}
+                    forecast={comparisonMode === 'period' ? periodSpecificCostForecast :
+                             comparisonMode === 'cumulative' ? actualTotalCost + periodSpecificCostForecast :
+                             totalCostForecast}
                     actual={actualTotalCost}
                     actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     higherIsBad={true}
                     trend={trendData.slice(-10).map(d => d.costActual || 0).filter(Boolean)}
-                    description={`Actual costs from ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}`}
+                    description={comparisonMode === 'period' ?
+                      `Comparing actual costs to forecast for ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}` :
+                      comparisonMode === 'cumulative' ?
+                      `Comparing actual costs to cumulative forecast` :
+                      `Comparing actual costs to total forecast`}
                     secondaryValue={revisedTotalCost}
                     secondaryLabel="Revised Outlook"
                 />
                  <VarianceCard
                     title="Total Profit"
-                    forecast={totalProfitForecast}
+                    forecast={comparisonMode === 'period' ? periodSpecificProfitForecast :
+                             comparisonMode === 'cumulative' ? actualTotalProfit + periodSpecificProfitForecast :
+                             totalProfitForecast}
                     actual={actualTotalProfit}
                     actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     trend={trendData.slice(-10).map(d => d.profitActual || 0).filter(Boolean)}
-                    description={`Actual profit from ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}`}
+                    description={comparisonMode === 'period' ?
+                      `Comparing actual profit to forecast for ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}` :
+                      comparisonMode === 'cumulative' ?
+                      `Comparing actual profit to cumulative forecast` :
+                      `Comparing actual profit to total forecast`}
                     secondaryValue={revisedTotalProfit}
                     secondaryLabel="Revised Outlook"
                 />
                  <VarianceCard
                     title="Avg. Profit Margin"
-                    forecast={avgProfitMarginForecast}
+                    forecast={comparisonMode === 'period' ? periodSpecificProfitMargin :
+                             comparisonMode === 'cumulative' ? (actualAvgProfitMargin + periodSpecificProfitMargin) / 2 :
+                             avgProfitMarginForecast}
                     actual={actualAvgProfitMargin}
                     actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     isPercentage={true}
-                    description={`Actual profit margin from ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}`}
+                    description={comparisonMode === 'period' ?
+                      `Comparing actual margin to forecast for ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}` :
+                      comparisonMode === 'cumulative' ?
+                      `Comparing actual margin to cumulative forecast` :
+                      `Comparing actual margin to total forecast`}
                     secondaryValue={revisedAvgProfitMargin}
                     secondaryLabel="Revised Outlook"
                 />
                 {isWeeklyEvent && (
                     <VarianceCard
                         title="Total Attendance"
-                        forecast={totalAttendanceForecast}
+                        forecast={comparisonMode === 'period' ?
+                                 (totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * periodsWithActuals : 0 :
+                                 comparisonMode === 'cumulative' ?
+                                 (totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * (periodsWithActuals + 1) : 0 :
+                                 totalAttendanceForecast}
                         actual={totalAttendanceActual}
                         actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                         isUnits={true}
                         trend={trendData.slice(-10).map(d => d.attendanceActual || 0).filter(Boolean)}
-                        description={`Actual attendance from ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}`}
+                        description={comparisonMode === 'period' ?
+                          `Comparing actual attendance to forecast for ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}` :
+                          comparisonMode === 'cumulative' ?
+                          `Comparing actual attendance to cumulative forecast` :
+                          `Comparing actual attendance to total forecast`}
                     />
                 )}
             </div>
@@ -495,22 +530,48 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
               </ChartContainer>
             </div>
 
-            {/* View Mode Selector */}
-            <div className="flex justify-end items-center mb-6">
-              <Label htmlFor="view-mode" className="mr-2">View Mode:</Label>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => setViewMode('weekly')}
-                  className={`px-3 py-1 text-sm rounded ${viewMode === 'weekly' ? 'bg-primary text-white' : 'bg-muted'}`}
-                >
-                  Period by Period
-                </button>
-                <button
-                  onClick={() => setViewMode('cumulative')}
-                  className={`px-3 py-1 text-sm rounded ${viewMode === 'cumulative' ? 'bg-primary text-white' : 'bg-muted'}`}
-                >
-                  Cumulative
-                </button>
+            {/* Comparison and View Mode Selectors */}
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center">
+                <Label htmlFor="comparison-mode" className="mr-2">Compare:</Label>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setComparisonMode('period')}
+                    className={`px-3 py-1 text-sm rounded ${comparisonMode === 'period' ? 'bg-primary text-white' : 'bg-muted'}`}
+                  >
+                    Period to Period
+                  </button>
+                  <button
+                    onClick={() => setComparisonMode('cumulative')}
+                    className={`px-3 py-1 text-sm rounded ${comparisonMode === 'cumulative' ? 'bg-primary text-white' : 'bg-muted'}`}
+                  >
+                    Cumulative
+                  </button>
+                  <button
+                    onClick={() => setComparisonMode('projected')}
+                    className={`px-3 py-1 text-sm rounded ${comparisonMode === 'projected' ? 'bg-primary text-white' : 'bg-muted'}`}
+                  >
+                    Projected Outcome
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center">
+                <Label htmlFor="view-mode" className="mr-2">View Mode:</Label>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setViewMode('weekly')}
+                    className={`px-3 py-1 text-sm rounded ${viewMode === 'weekly' ? 'bg-primary text-white' : 'bg-muted'}`}
+                  >
+                    Period by Period
+                  </button>
+                  <button
+                    onClick={() => setViewMode('cumulative')}
+                    className={`px-3 py-1 text-sm rounded ${viewMode === 'cumulative' ? 'bg-primary text-white' : 'bg-muted'}`}
+                  >
+                    Cumulative
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -525,13 +586,21 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                 downloadData={radarData}
                 downloadFilename="performance-radar.csv"
               >
-                <RadarChart
-                  data={radarData}
-                  dataKeys={['Actual', 'Target', 'Previous']}
-                  height={300}
-                  isPercentage={true}
-                  maxValue={120}
-                />
+                {radarData && radarData.length > 0 ? (
+                  <div className="flex justify-center items-center h-full">
+                    <RadarChart
+                      data={radarData}
+                      dataKeys={['Actual', 'Target', 'Previous']}
+                      height={300}
+                      isPercentage={true}
+                      maxValue={120}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex justify-center items-center h-full">
+                    <p className="text-muted-foreground">No data available for radar chart</p>
+                  </div>
+                )}
               </ChartContainer>
 
               {/* Attendance Chart (if applicable) */}
@@ -545,24 +614,45 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                   downloadFilename="attendance-data.csv"
                 >
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={trendData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={dataColors.grid} />
-                      <XAxis dataKey="point" tick={{ fontSize: 10 }} />
-                      <YAxis tickFormatter={val => val.toLocaleString()} tick={{ fontSize: 10 }}/>
-                      <Tooltip content={renderEnhancedTooltip} />
-                      <Legend />
+                    <BarChart data={trendData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={dataColors.grid} strokeOpacity={0.5} />
+                      <XAxis
+                        dataKey="point"
+                        tick={{ fontSize: 11, fill: theme === 'dark' ? '#ccc' : '#333' }}
+                        axisLine={{ stroke: dataColors.grid, strokeOpacity: 0.8 }}
+                        tickLine={{ stroke: dataColors.grid, strokeOpacity: 0.8 }}
+                      />
+                      <YAxis
+                        tickFormatter={val => val.toLocaleString()}
+                        tick={{ fontSize: 11, fill: theme === 'dark' ? '#ccc' : '#333' }}
+                        axisLine={{ stroke: dataColors.grid, strokeOpacity: 0.8 }}
+                        tickLine={{ stroke: dataColors.grid, strokeOpacity: 0.8 }}
+                      />
+                      <Tooltip
+                        content={renderEnhancedTooltip}
+                        cursor={{ fill: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }}
+                      />
+                      <Legend
+                        wrapperStyle={{ paddingTop: 15 }}
+                        formatter={(value) => <span style={{ color: theme === 'dark' ? '#fff' : '#333', fontSize: 12 }}>{value}</span>}
+                      />
                       <Bar
                         dataKey="attendanceForecast"
                         name="Forecast"
                         fill={dataColors.forecast}
-                        fillOpacity={0.7}
+                        fillOpacity={0.8}
                         radius={[4, 4, 0, 0]}
+                        barSize={24}
+                        animationDuration={1000}
                       />
                       <Bar
                         dataKey="attendanceActual"
                         name="Actual"
                         fill={dataColors.attendance}
+                        fillOpacity={1}
                         radius={[4, 4, 0, 0]}
+                        barSize={24}
+                        animationDuration={1000}
                       />
                     </BarChart>
                   </ResponsiveContainer>
