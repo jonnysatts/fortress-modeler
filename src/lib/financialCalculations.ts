@@ -271,13 +271,25 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
       // 3. Marketing Costs
       let periodMarketingCost = 0;
       if (marketingSetup.allocationMode === 'channels') {
-        const budget = marketingSetup.channels.reduce((s, ch) => s + (ch.weeklyBudget ?? 0), 0);
+        // Sum up all channel weekly budgets
+        const budget = (marketingSetup.channels || []).reduce((s, ch) => s + (ch.weeklyBudget ?? 0), 0);
         periodMarketingCost = isWeekly ? budget : budget * (365.25 / 7 / 12); // Approx monthly
+
+        // Log channel budgets for debugging
+        if (period === 1) {
+          console.log(`[ForecastCalc] Marketing Channels:`, marketingSetup.channels);
+          console.log(`[ForecastCalc] Total Channel Budget: ${budget} per ${isWeekly ? 'week' : 'month'}`);
+        }
       } else if (marketingSetup.allocationMode === 'highLevel') {
         const totalBudget = marketingSetup.totalBudget ?? 0;
         const application = marketingSetup.budgetApplication || 'spreadEvenly';
         const spreadDuration = marketingSetup.spreadDuration ?? duration; // Default to full duration
         const modelDuration = duration;
+
+        // Log high-level budget for debugging
+        if (period === 1) {
+          console.log(`[ForecastCalc] Marketing Budget: ${totalBudget}, Application: ${application}, Duration: ${spreadDuration}/${modelDuration}`);
+        }
 
         if (application === 'upfront') {
           periodMarketingCost = (period === 1) ? totalBudget : 0;
@@ -287,8 +299,17 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
           periodMarketingCost = (period <= spreadDuration) ? (totalBudget / spreadDuration) : 0;
         }
       }
+
+      // Add marketing cost to period cost
       periodCost += periodMarketingCost;
-      if (periodMarketingCost > 0) currentCostBreakdown["MarketingCost"] = periodMarketingCost; // Now allowed
+      if (periodMarketingCost > 0) {
+        currentCostBreakdown["MarketingCost"] = periodMarketingCost;
+
+        // Log marketing cost for debugging
+        if (period === 1) {
+          console.log(`[ForecastCalc Period ${period}] Marketing Cost: ${periodMarketingCost}`);
+        }
+      }
 
       // Add Logging for Total Period Cost
       if (period === 1) {
