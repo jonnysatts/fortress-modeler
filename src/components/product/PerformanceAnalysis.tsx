@@ -572,10 +572,14 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                     onClick={() => {
                       console.log('Setting comparison mode to period');
                       setComparisonMode('period');
-                      alert('Changed to Period mode');
                     }}
                     className={`px-3 py-1 text-sm rounded ${comparisonMode === 'period' ? 'bg-primary text-white' : 'bg-muted'}`}
-                    style={{ border: '2px solid green' }}
+                    style={{
+                      border: comparisonMode === 'period' ? '3px solid green' : '1px solid gray',
+                      padding: '8px 16px',
+                      fontWeight: comparisonMode === 'period' ? 'bold' : 'normal',
+                      fontSize: '14px'
+                    }}
                   >
                     Period to Period
                   </button>
@@ -583,10 +587,14 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                     onClick={() => {
                       console.log('Setting comparison mode to cumulative');
                       setComparisonMode('cumulative');
-                      alert('Changed to Cumulative mode');
                     }}
                     className={`px-3 py-1 text-sm rounded ${comparisonMode === 'cumulative' ? 'bg-primary text-white' : 'bg-muted'}`}
-                    style={{ border: '2px solid green' }}
+                    style={{
+                      border: comparisonMode === 'cumulative' ? '3px solid green' : '1px solid gray',
+                      padding: '8px 16px',
+                      fontWeight: comparisonMode === 'cumulative' ? 'bold' : 'normal',
+                      fontSize: '14px'
+                    }}
                   >
                     Cumulative
                   </button>
@@ -594,10 +602,14 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                     onClick={() => {
                       console.log('Setting comparison mode to projected');
                       setComparisonMode('projected');
-                      alert('Changed to Projected mode');
                     }}
                     className={`px-3 py-1 text-sm rounded ${comparisonMode === 'projected' ? 'bg-primary text-white' : 'bg-muted'}`}
-                    style={{ border: '2px solid green' }}
+                    style={{
+                      border: comparisonMode === 'projected' ? '3px solid green' : '1px solid gray',
+                      padding: '8px 16px',
+                      fontWeight: comparisonMode === 'projected' ? 'bold' : 'normal',
+                      fontSize: '14px'
+                    }}
                   >
                     Projected Outcome
                   </button>
