@@ -286,9 +286,22 @@ const ForecastBuilder: React.FC = () => {
         setIsDirty(false);
         return;
     }
-    const currentValuesString = JSON.stringify(watchedValues);
-    const dirty = currentValuesString !== initialAssumptionsString;
-    // console.log("Manual Dirty Check:", dirty, "\nInitial:", initialAssumptionsString, "\nCurrent:", currentValuesString); // Verbose log if needed
+
+    // Create a deep copy of the current values to avoid reference issues
+    const currentValues = JSON.parse(JSON.stringify(watchedValues));
+
+    // Parse the initial values for comparison
+    const initialValues = JSON.parse(initialAssumptionsString);
+
+    // Compare the stringified values
+    const currentValuesString = JSON.stringify(currentValues);
+    const initialValuesStringAgain = JSON.stringify(initialValues);
+    const dirty = currentValuesString !== initialValuesStringAgain;
+
+    console.log("Manual Dirty Check:", dirty);
+    console.log("Marketing in current:", currentValues.marketing);
+    console.log("Marketing in initial:", initialValues.marketing);
+
     setIsDirty(dirty);
   }, [watchedValues, initialAssumptionsString]);
 
@@ -312,14 +325,51 @@ const ForecastBuilder: React.FC = () => {
         toast({ variant: "destructive", title: "Error", description: "Cannot save, model not loaded." });
         return;
     }
-    console.log("Saving assumptions:", data);
+
+    // Create a deep copy of the data to avoid reference issues
+    const dataToSave = JSON.parse(JSON.stringify(data));
+
+    // Ensure marketing data is properly structured
+    if (dataToSave.marketing) {
+      // Make sure allocationMode is one of the valid values
+      if (!['none', 'channels', 'highLevel'].includes(dataToSave.marketing.allocationMode)) {
+        dataToSave.marketing.allocationMode = 'none';
+      }
+
+      // For highLevel mode, ensure we have the required fields
+      if (dataToSave.marketing.allocationMode === 'highLevel') {
+        if (typeof dataToSave.marketing.totalBudget !== 'number') {
+          dataToSave.marketing.totalBudget = 0;
+        }
+        if (!['upfront', 'spreadEvenly', 'spreadCustom'].includes(dataToSave.marketing.budgetApplication)) {
+          dataToSave.marketing.budgetApplication = 'spreadEvenly';
+        }
+      }
+
+      // For channels mode, ensure channels array exists
+      if (dataToSave.marketing.allocationMode === 'channels' && !Array.isArray(dataToSave.marketing.channels)) {
+        dataToSave.marketing.channels = [];
+      }
+    }
+
+    console.log("Saving assumptions:", dataToSave);
+    console.log("Marketing data being saved:", dataToSave.marketing);
+
     try {
       // Update the assumptions field of the existing model document
-      await db.financialModels.update(model.id, { assumptions: data });
+      await db.financialModels.update(model.id, {
+        assumptions: dataToSave,
+        updatedAt: new Date()
+      });
+
       toast({ title: "Success", description: "Forecast assumptions saved." });
+
       // Update the initial state string to match the saved data
-      setInitialAssumptionsString(JSON.stringify(data));
+      const savedDataString = JSON.stringify(dataToSave);
+      setInitialAssumptionsString(savedDataString);
       setIsDirty(false); // Form is no longer dirty relative to saved state
+
+      console.log("Data saved successfully. New initial state set.");
     } catch (err) {
       console.error("Error saving assumptions:", err);
       toast({ variant: "destructive", title: "Save Error", description: "Could not save assumptions." });
@@ -752,36 +802,57 @@ const ForecastBuilder: React.FC = () => {
                            <Controller
                                 name="marketing.allocationMode"
                                 control={control}
-                                render={({ field }) => (
-                                    <RadioGroup
-                                        onValueChange={value => {
-                                            field.onChange(value);
-                                            console.log('Marketing allocation mode updated:', value);
+                                render={({ field }) => {
+                                    // Ensure field.value is one of the valid options
+                                    const validValue = ['none', 'channels', 'highLevel'].includes(field.value)
+                                        ? field.value
+                                        : 'none';
 
-                                            // Initialize default values when switching modes
-                                            if (value === 'highLevel' && !getValues('marketing.totalBudget')) {
-                                                // Set default budget and application method
-                                                setValue('marketing.totalBudget', 5000);
-                                                setValue('marketing.budgetApplication', 'spreadEvenly');
-                                            }
-                                        }}
-                                        value={field.value}
-                                        className="flex space-x-4"
-                                    >
-                                        <div className="flex items-center space-x-2">
-                                            <RadioGroupItem value="none" id="mode-none" />
-                                            <Label htmlFor="mode-none">None</Label>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <RadioGroupItem value="channels" id="mode-channels" />
-                                            <Label htmlFor="mode-channels">Detailed Channels</Label>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <RadioGroupItem value="highLevel" id="mode-highLevel" />
-                                            <Label htmlFor="mode-highLevel">High-Level Budget</Label>
-                                        </div>
-                                    </RadioGroup>
-                                )}
+                                    return (
+                                        <RadioGroup
+                                            onValueChange={value => {
+                                                // Update the form value
+                                                field.onChange(value);
+                                                console.log('Marketing allocation mode updated:', value);
+                                                setIsDirty(true); // Force dirty state
+
+                                                // Initialize default values when switching modes
+                                                if (value === 'highLevel') {
+                                                    // Set default budget and application method
+                                                    setValue('marketing.totalBudget', 5000);
+                                                    setValue('marketing.budgetApplication', 'spreadEvenly');
+                                                    console.log('Set default high-level budget values');
+                                                } else if (value === 'channels' && (!getValues('marketing.channels') || getValues('marketing.channels').length === 0)) {
+                                                    // Add a default channel if none exist
+                                                    appendChannel({
+                                                        id: crypto.randomUUID(),
+                                                        channelType: defaultChannelTypes[0],
+                                                        name: 'Default Channel',
+                                                        weeklyBudget: 500,
+                                                        targetAudience: '',
+                                                        description: ''
+                                                    });
+                                                    console.log('Added default marketing channel');
+                                                }
+                                            }}
+                                            value={validValue}
+                                            className="flex space-x-4"
+                                        >
+                                            <div className="flex items-center space-x-2">
+                                                <RadioGroupItem value="none" id="mode-none" />
+                                                <Label htmlFor="mode-none">None</Label>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <RadioGroupItem value="channels" id="mode-channels" />
+                                                <Label htmlFor="mode-channels">Detailed Channels</Label>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <RadioGroupItem value="highLevel" id="mode-highLevel" />
+                                                <Label htmlFor="mode-highLevel">High-Level Budget</Label>
+                                            </div>
+                                        </RadioGroup>
+                                    );
+                                }}
                             />
                         </div>
 
@@ -884,20 +955,32 @@ const ForecastBuilder: React.FC = () => {
                                         <Controller
                                             name="marketing.totalBudget"
                                             control={control}
-                                            render={({ field }) => (
-                                                <Input
-                                                    id="totalBudget"
-                                                    type="number"
-                                                    step="0.01"
-                                                    placeholder="e.g., 10000"
-                                                    value={field.value || ''}
-                                                    onChange={e => {
-                                                        const value = e.target.value === '' ? undefined : parseFloat(e.target.value) || 0;
-                                                        field.onChange(value);
-                                                        console.log('Marketing budget updated:', value);
-                                                    }}
-                                                />
-                                            )}
+                                            render={({ field }) => {
+                                                // Ensure we have a valid value
+                                                const displayValue = field.value !== undefined && field.value !== null ? field.value : '';
+
+                                                return (
+                                                    <Input
+                                                        id="totalBudget"
+                                                        type="number"
+                                                        step="0.01"
+                                                        placeholder="e.g., 10000"
+                                                        value={displayValue}
+                                                        onChange={e => {
+                                                            const value = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0;
+                                                            field.onChange(value);
+                                                            console.log('Marketing budget updated:', value);
+                                                            setIsDirty(true); // Force dirty state
+                                                        }}
+                                                        onBlur={() => {
+                                                            // Ensure we have a number on blur
+                                                            if (field.value === undefined || field.value === null) {
+                                                                field.onChange(0);
+                                                            }
+                                                        }}
+                                                    />
+                                                );
+                                            }}
                                         />
                                     </div>
                                     <div className="space-y-1">
@@ -905,24 +988,37 @@ const ForecastBuilder: React.FC = () => {
                                         <Controller
                                             name="marketing.budgetApplication"
                                             control={control}
-                                            render={({ field }) => (
-                                                <Select
-                                                    onValueChange={value => {
-                                                        field.onChange(value);
-                                                        console.log('Budget application updated:', value);
-                                                    }}
-                                                    value={field.value || 'spreadEvenly'}
-                                                >
-                                                    <SelectTrigger id="budgetApplication">
-                                                        <SelectValue placeholder="Select Application" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="spreadEvenly">Spread Evenly</SelectItem>
-                                                        <SelectItem value="upfront">Upfront (Period 1)</SelectItem>
-                                                        <SelectItem value="spreadCustom">Spread Over Custom Duration</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            )}
+                                            render={({ field }) => {
+                                                // Ensure we have a valid value
+                                                const validValue = ['spreadEvenly', 'upfront', 'spreadCustom'].includes(field.value)
+                                                    ? field.value
+                                                    : 'spreadEvenly';
+
+                                                return (
+                                                    <Select
+                                                        onValueChange={value => {
+                                                            field.onChange(value);
+                                                            console.log('Budget application updated:', value);
+                                                            setIsDirty(true); // Force dirty state
+
+                                                            // If switching to spreadCustom, set a default duration
+                                                            if (value === 'spreadCustom' && !getValues('marketing.spreadDuration')) {
+                                                                setValue('marketing.spreadDuration', 4);
+                                                            }
+                                                        }}
+                                                        value={validValue}
+                                                    >
+                                                        <SelectTrigger id="budgetApplication">
+                                                            <SelectValue placeholder="Select Application" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="spreadEvenly">Spread Evenly</SelectItem>
+                                                            <SelectItem value="upfront">Upfront (Period 1)</SelectItem>
+                                                            <SelectItem value="spreadCustom">Spread Over Custom Duration</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                );
+                                            }}
                                         />
                                     </div>
                                 </div>
@@ -932,19 +1028,32 @@ const ForecastBuilder: React.FC = () => {
                                         <Controller
                                             name="marketing.spreadDuration"
                                             control={control}
-                                            render={({ field }) => (
-                                                <Input
-                                                    id="spreadDuration"
-                                                    type="number"
-                                                    placeholder={`e.g., 3 for 3 ${timeUnit}s`}
-                                                    value={field.value || ''}
-                                                    onChange={e => {
-                                                        const value = e.target.value === '' ? undefined : parseInt(e.target.value) || 0;
-                                                        field.onChange(value);
-                                                        console.log('Spread duration updated:', value);
-                                                    }}
-                                                />
-                                            )}
+                                            render={({ field }) => {
+                                                // Ensure we have a valid value
+                                                const displayValue = field.value !== undefined && field.value !== null ? field.value : '';
+
+                                                return (
+                                                    <Input
+                                                        id="spreadDuration"
+                                                        type="number"
+                                                        min="1"
+                                                        placeholder={`e.g., 3 for 3 ${timeUnit}s`}
+                                                        value={displayValue}
+                                                        onChange={e => {
+                                                            const value = e.target.value === '' ? 1 : Math.max(1, parseInt(e.target.value) || 1);
+                                                            field.onChange(value);
+                                                            console.log('Spread duration updated:', value);
+                                                            setIsDirty(true); // Force dirty state
+                                                        }}
+                                                        onBlur={() => {
+                                                            // Ensure we have a valid number on blur
+                                                            if (!field.value || field.value < 1) {
+                                                                field.onChange(1);
+                                                            }
+                                                        }}
+                                                    />
+                                                );
+                                            }}
                                         />
                                     </div>
                                 )}

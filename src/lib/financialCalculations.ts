@@ -270,26 +270,34 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
 
       // 3. Marketing Costs
       let periodMarketingCost = 0;
-      if (marketingSetup.allocationMode === 'channels') {
+
+      // Ensure marketingSetup exists and has a valid allocationMode
+      const marketingMode = marketingSetup?.allocationMode || 'none';
+
+      console.log(`[ForecastCalc Period ${period}] Marketing Mode: ${marketingMode}`);
+
+      if (marketingMode === 'channels') {
         // Sum up all channel weekly budgets
-        const budget = (marketingSetup.channels || []).reduce((s, ch) => s + (ch.weeklyBudget ?? 0), 0);
+        const channels = Array.isArray(marketingSetup.channels) ? marketingSetup.channels : [];
+        const budget = channels.reduce((s, ch) => s + (typeof ch.weeklyBudget === 'number' ? ch.weeklyBudget : 0), 0);
         periodMarketingCost = isWeekly ? budget : budget * (365.25 / 7 / 12); // Approx monthly
 
         // Log channel budgets for debugging
-        if (period === 1) {
-          console.log(`[ForecastCalc] Marketing Channels:`, marketingSetup.channels);
-          console.log(`[ForecastCalc] Total Channel Budget: ${budget} per ${isWeekly ? 'week' : 'month'}`);
-        }
-      } else if (marketingSetup.allocationMode === 'highLevel') {
-        const totalBudget = marketingSetup.totalBudget ?? 0;
-        const application = marketingSetup.budgetApplication || 'spreadEvenly';
-        const spreadDuration = marketingSetup.spreadDuration ?? duration; // Default to full duration
+        console.log(`[ForecastCalc Period ${period}] Marketing Channels:`, channels);
+        console.log(`[ForecastCalc Period ${period}] Total Channel Budget: ${budget} per ${isWeekly ? 'week' : 'month'}`);
+      } else if (marketingMode === 'highLevel') {
+        // Ensure we have valid values for all required fields
+        const totalBudget = typeof marketingSetup.totalBudget === 'number' ? marketingSetup.totalBudget : 0;
+        const application = ['upfront', 'spreadEvenly', 'spreadCustom'].includes(marketingSetup.budgetApplication)
+          ? marketingSetup.budgetApplication
+          : 'spreadEvenly';
+        const spreadDuration = typeof marketingSetup.spreadDuration === 'number' && marketingSetup.spreadDuration > 0
+          ? marketingSetup.spreadDuration
+          : duration; // Default to full duration
         const modelDuration = duration;
 
         // Log high-level budget for debugging
-        if (period === 1) {
-          console.log(`[ForecastCalc] Marketing Budget: ${totalBudget}, Application: ${application}, Duration: ${spreadDuration}/${modelDuration}`);
-        }
+        console.log(`[ForecastCalc Period ${period}] Marketing Budget: ${totalBudget}, Application: ${application}, Duration: ${spreadDuration}/${modelDuration}`);
 
         if (application === 'upfront') {
           periodMarketingCost = (period === 1) ? totalBudget : 0;
@@ -306,9 +314,9 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
         currentCostBreakdown["MarketingCost"] = periodMarketingCost;
 
         // Log marketing cost for debugging
-        if (period === 1) {
-          console.log(`[ForecastCalc Period ${period}] Marketing Cost: ${periodMarketingCost}`);
-        }
+        console.log(`[ForecastCalc Period ${period}] Marketing Cost: ${periodMarketingCost}`);
+      } else {
+        console.log(`[ForecastCalc Period ${period}] No marketing cost applied.`);
       }
 
       // Add Logging for Total Period Cost
