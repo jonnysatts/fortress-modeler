@@ -62,6 +62,9 @@ export interface AnalysisSummary {
   periodRevenueVariancePercent: number;
   periodCostVariancePercent: number;
   periodProfitVariancePercent: number;
+
+  // Other metrics
+  duration: number;
   revisedAvgProfitMargin: number;
 
   // Variances
@@ -354,6 +357,7 @@ export const useForecastAnalysis = (
            // Other metrics
            latestActualPeriod,
            timeUnit,
+           duration,
 
            // Attendance metrics
            totalAttendanceForecast: totalAttendanceForecast ?? 0, // Ensure number

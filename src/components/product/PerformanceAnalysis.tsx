@@ -74,6 +74,20 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
     totalProfitForecast = 0,
     avgProfitMarginForecast = 0,
 
+    // Period-specific forecasts
+    periodSpecificRevenueForecast = 0,
+    periodSpecificCostForecast = 0,
+    periodSpecificProfitForecast = 0,
+    periodSpecificProfitMargin = 0,
+
+    // Period-specific variances
+    periodRevenueVariance = 0,
+    periodCostVariance = 0,
+    periodProfitVariance = 0,
+    periodRevenueVariancePercent = 0,
+    periodCostVariancePercent = 0,
+    periodProfitVariancePercent = 0,
+
     // Actual totals (with fallbacks to use revised values if not available)
     actualTotalRevenue = 0,
     actualTotalCost = 0,
@@ -95,6 +109,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
     // Other metrics
     latestActualPeriod = 0,
     timeUnit = 'Period', // Default timeUnit
+    duration = 12, // Default duration
 
     // Attendance metrics
     totalAttendanceForecast = 0,
