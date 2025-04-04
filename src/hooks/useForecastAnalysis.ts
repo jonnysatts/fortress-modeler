@@ -31,19 +31,35 @@ export interface AnalysisPeriodData {
 
 // Export this interface too
 export interface AnalysisSummary {
+  // Forecast totals (original forecast)
   totalRevenueForecast: number;
   totalCostForecast: number;
   totalProfitForecast: number;
+  avgProfitMarginForecast: number;
+
+  // Actual totals (only from periods with actual data)
+  actualTotalRevenue: number;
+  actualTotalCost: number;
+  actualTotalProfit: number;
+  periodsWithActuals: number;
+  actualAvgProfitMargin: number;
+
+  // Revised outlook (blend of actuals + forecast)
   revisedTotalRevenue: number;
   revisedTotalCost: number;
   revisedTotalProfit: number;
+  revisedAvgProfitMargin: number;
+
+  // Variances
   totalRevenueVariance: number;
   totalCostVariance: number;
   totalProfitVariance: number;
-  avgProfitMarginForecast: number;
-  revisedAvgProfitMargin: number;
+
+  // Other metrics
   latestActualPeriod: number;
   timeUnit: 'Week' | 'Month';
+
+  // Attendance metrics
   totalAttendanceForecast: number;
   totalAttendanceActual: number;
   totalAttendanceVariance: number;
@@ -62,7 +78,7 @@ export const useForecastAnalysis = (
   selectedModelId?: number
 ): ForecastAnalysisResult => {
   console.log("[useForecastAnalysis Hook] Running"); // Log hook entry
-  
+
   // Find the selected model object
   const selectedModel = useMemo(() => {
     console.log("[useForecastAnalysis Hook] Calculating selectedModel");
@@ -74,13 +90,13 @@ export const useForecastAnalysis = (
     if (!selectedModel) return null;
     console.log(`[useForecastAnalysis Hook] Calculating for Model ID: ${selectedModelId}`);
 
-    try { 
+    try {
         // 1. Generate the base forecast using the central function
         const forecastTrendData: ForecastPeriodData[] = generateForecastTimeSeries(selectedModel);
         if (forecastTrendData.length === 0) {
             console.warn("[useForecastAnalysis Hook] generateForecastTimeSeries returned empty data.");
             // Return null or a default state if forecast generation fails?
-             return null; 
+             return null;
         }
 
         const duration = forecastTrendData.length;
@@ -113,13 +129,13 @@ export const useForecastAnalysis = (
                 const recordedRevenue = actualEntry.revenueActuals || {};
                 periodRevenueActual = Object.values(recordedRevenue).reduce((s, v) => s + v, 0);
                 cumulativeRevenueActual += periodRevenueActual;
-                
+
                 // --- Calculate Actual Costs (including COGS derived from actual revenue) ---
                 let calculatedVariableCosts = 0;
                 let calculatedFixedCosts = 0;
                 let calculatedRecurringCosts = 0;
                 let calculatedMarketingCosts = 0;
-                
+
                 // COGS based on Actual Revenue
                 const fbRevenueActual = recordedRevenue["F&B Sales"] ?? 0;
                 const merchRevenueActual = recordedRevenue["Merchandise Sales"] ?? 0;
@@ -127,13 +143,13 @@ export const useForecastAnalysis = (
                 const merchCogsPercent = selectedModel.assumptions?.metadata?.costs?.merchandiseCogsPercent ?? 0;
                 calculatedVariableCosts += (fbRevenueActual * fbCogsPercent) / 100;
                 calculatedVariableCosts += (merchRevenueActual * merchCogsPercent) / 100;
-                
+
                 // Other costs entered by user
                 const recordedCosts = actualEntry.costActuals || {};
                 for (const [costName, costValue] of Object.entries(recordedCosts)) {
                     const value = costValue ?? 0;
                     if (costName === "F&B COGS" || costName === "Merchandise COGS") continue; // Skip COGS
-                    
+
                     const assumption = selectedModel.assumptions?.costs?.find(c => c.name === costName);
                     if (costName === "Marketing Budget") calculatedMarketingCosts += value;
                     else if (assumption?.type === 'fixed' || costName === "Setup Costs") calculatedFixedCosts += value;
@@ -145,13 +161,13 @@ export const useForecastAnalysis = (
                 // --- End Actual Cost Calculation ---
 
                 periodProfitActual = periodRevenueActual - periodCostActual;
-                
+
                 if (isWeekly && actualEntry.attendanceActual !== undefined && actualEntry.attendanceActual !== null) {
                     periodAttendanceActual = actualEntry.attendanceActual;
                     cumulativeAttendanceActual += periodAttendanceActual;
                 }
             }
-            
+
             // Rename forecast fields to match AnalysisPeriodData interface
             const revenueForecast = forecastPeriod.revenue;
             const costForecast = forecastPeriod.cost;
@@ -174,8 +190,8 @@ export const useForecastAnalysis = (
             // Use the CORRECT cumulative actuals calculated earlier
             const currentCumulativeRevenueActual = actualEntry ? cumulativeRevenueActual : undefined;
             const currentCumulativeCostActual = actualEntry ? cumulativeCostActual : undefined;
-            const currentCumulativeProfitActual = (currentCumulativeRevenueActual !== undefined && currentCumulativeCostActual !== undefined) 
-                                                  ? currentCumulativeRevenueActual - currentCumulativeCostActual 
+            const currentCumulativeProfitActual = (currentCumulativeRevenueActual !== undefined && currentCumulativeCostActual !== undefined)
+                                                  ? currentCumulativeRevenueActual - currentCumulativeCostActual
                                                   : undefined;
 
             const periodResult = {
@@ -213,41 +229,74 @@ export const useForecastAnalysis = (
         const totalAttendanceForecast = isWeekly ? forecastTrendData.reduce((sum, p) => sum + (p.attendance ?? 0), 0) : undefined;
         const avgProfitMarginForecast = totalRevenueForecast > 0 ? (totalProfitForecast / totalRevenueForecast) * 100 : 0;
 
-        // Calculate Revised Outlook Totals
+        // Calculate Actuals Totals (only from periods with actual data)
+        let actualTotalRevenue = 0;
+        let actualTotalCost = 0;
+        let actualTotalProfit = 0;
+        let periodsWithActuals = 0;
+
+        // Calculate Revised Outlook Totals (blend of actuals + forecast)
         let revisedTotalRevenue = 0;
         let revisedTotalCost = 0;
+
         for (let period = 1; period <= duration; period++) {
             const p = periodicAnalysisData[period - 1];
+
+            // Add to actuals totals if we have actual data for this period
+            if (p.revenueActual !== undefined && p.costActual !== undefined) {
+                actualTotalRevenue += p.revenueActual;
+                actualTotalCost += p.costActual;
+                actualTotalProfit += p.profitActual ?? (p.revenueActual - p.costActual);
+                periodsWithActuals++;
+            }
+
+            // Add to revised outlook (blend of actuals + forecast)
             revisedTotalRevenue += p.revenueActual ?? p.revenueForecast;
             revisedTotalCost += p.costActual ?? p.costForecast;
         }
+
         const revisedTotalProfit = revisedTotalRevenue - revisedTotalCost;
+        const actualAvgProfitMargin = actualTotalRevenue > 0 ? (actualTotalProfit / actualTotalRevenue) * 100 : 0;
         const revisedAvgProfitMargin = revisedTotalRevenue > 0 ? (revisedTotalProfit / revisedTotalRevenue) * 100 : 0;
-        
+
         // Calculate Variance between Original Forecast and Revised Outlook
         const totalRevenueVariance = revisedTotalRevenue - totalRevenueForecast;
         const totalCostVariance = revisedTotalCost - totalCostForecast;
         const totalProfitVariance = revisedTotalProfit - totalProfitForecast;
         const totalAttendanceVariance = cumulativeAttendanceActual - (totalAttendanceForecast ?? 0);
-        
+
         const summary: AnalysisSummary = {
+           // Forecast totals (original forecast)
            totalRevenueForecast, totalCostForecast, totalProfitForecast,
-           revisedTotalRevenue, revisedTotalCost, revisedTotalProfit, 
+
+           // Actual totals (only from periods with actual data)
+           actualTotalRevenue, actualTotalCost, actualTotalProfit,
+           periodsWithActuals,
+           actualAvgProfitMargin,
+
+           // Revised outlook (blend of actuals + forecast)
+           revisedTotalRevenue, revisedTotalCost, revisedTotalProfit,
+
+           // Variances
            totalRevenueVariance, totalCostVariance, totalProfitVariance,
-           avgProfitMarginForecast, revisedAvgProfitMargin, latestActualPeriod, 
-           timeUnit, 
+
+           // Other metrics
+           avgProfitMarginForecast, revisedAvgProfitMargin, latestActualPeriod,
+           timeUnit,
+
+           // Attendance metrics
            totalAttendanceForecast: totalAttendanceForecast ?? 0, // Ensure number
            totalAttendanceActual: cumulativeAttendanceActual,
            totalAttendanceVariance,
         };
-        
+
         // Log summary before returning
         console.log("[useForecastAnalysis Hook] Calculated Summary:", summary);
-        
+
         console.log("[useForecastAnalysis Hook] Calculation finished successfully.");
         return {
             summary: summary,
-            trendData: periodicAnalysisData 
+            trendData: periodicAnalysisData
         };
     } catch (error) {
         console.error("[useForecastAnalysis Hook] Error during calculation:", error);

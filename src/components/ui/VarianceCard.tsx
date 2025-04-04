@@ -20,6 +20,8 @@ interface VarianceCardProps {
   description?: string;
   className?: string;
   footer?: React.ReactNode;
+  secondaryValue?: number;
+  secondaryLabel?: string;
 }
 
 // Helper to calculate and format variance with color and icon
@@ -136,9 +138,16 @@ export const VarianceCard: React.FC<VarianceCardProps> = ({
 
         <div className="space-y-1">
           <div className="flex justify-between items-center">
-            <p className="text-xs text-muted-foreground">{actualLabel}</p>
+            <p className="text-xs text-muted-foreground">{actualLabel || 'Actual'}</p>
             <p className="text-base font-medium">{formatValue(actual)}</p>
           </div>
+
+          {secondaryValue !== undefined && (
+            <div className="flex justify-between items-center">
+              <p className="text-xs text-muted-foreground">{secondaryLabel || 'Revised'}</p>
+              <p className="text-sm">{formatValue(secondaryValue)}</p>
+            </div>
+          )}
 
           <div className="flex justify-between items-center">
             <p className="text-xs text-muted-foreground">Variance</p>
