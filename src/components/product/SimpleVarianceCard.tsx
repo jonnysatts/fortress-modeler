@@ -40,17 +40,17 @@ export const SimpleVarianceCard: React.FC<SimpleVarianceCardProps> = ({
   if (comparisonMode === 'period') {
     forecast = periodForecast;
     variance = actual - periodForecast;
-    console.log(`[SimpleVarianceCard] ${title} - Using PERIOD mode: forecast=${forecast}, actual=${actual}, variance=${variance}`);
+
   } else if (comparisonMode === 'cumulative') {
     // For cumulative, we compare actual to the cumulative forecast for the periods with actuals
     forecast = periodForecast;
     variance = actual - periodForecast;
-    console.log(`[SimpleVarianceCard] ${title} - Using CUMULATIVE mode: forecast=${forecast}, actual=${actual}, variance=${variance}`);
+
   } else { // projected
     // For projected outcome, we compare actual to the total forecast
     forecast = totalForecast;
     variance = actual - totalForecast;
-    console.log(`[SimpleVarianceCard] ${title} - Using PROJECTED mode: forecast=${forecast}, actual=${actual}, variance=${variance}`);
+
   }
 
   // Determine color and icon
@@ -105,12 +105,9 @@ export const SimpleVarianceCard: React.FC<SimpleVarianceCardProps> = ({
   });
 
   return (
-    <Card className={className} style={{ border: '3px solid red' }}>
-      <CardHeader className="pb-2" style={{ backgroundColor: 'yellow' }}>
-        <CardTitle className="text-sm font-medium">{title} - NEW CARD</CardTitle>
-        <div style={{ backgroundColor: 'black', color: 'white', padding: '5px', marginTop: '5px' }}>
-          Mode: {comparisonMode.toUpperCase()}
-        </div>
+    <Card className={className}>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
         {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
       </CardHeader>
       <CardContent className="space-y-3">

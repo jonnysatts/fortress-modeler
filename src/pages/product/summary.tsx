@@ -199,14 +199,6 @@ const ProductSummary: React.FC = () => {
     const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
     const breakeven = totalProfit >= 0;
 
-    console.log('SUMMARY PAGE METRICS:', {
-      totalRevenue,
-      totalCosts,
-      totalProfit,
-      profitMargin,
-      breakeven,
-      finalPeriod
-    });
 
     return { totalRevenue, totalCosts, totalProfit, profitMargin, breakeven };
   }, [timeSeriesData]);
@@ -323,13 +315,10 @@ const ProductSummary: React.FC = () => {
     <div className="space-y-6">
       {/* Key Metrics Cards (Now 5 cards with Breakeven) */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4"> {/* Adjusted grid for 5 cards */}
-        <ContentCard title="Total Revenue" style={{ border: '3px solid red', backgroundColor: 'lightyellow' }}>
+        <ContentCard title="Total Revenue">
           <div className="flex items-center justify-between">
             <div className="text-3xl font-bold">{formatCurrency(totalRevenue)}</div>
             <TrendingUp className="h-6 w-6 text-fortress-emerald" />
-          </div>
-          <div style={{ backgroundColor: 'black', color: 'white', padding: '5px', marginTop: '5px' }}>
-            Raw Value: {totalRevenue}
           </div>
         </ContentCard>
 
