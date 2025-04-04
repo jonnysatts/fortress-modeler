@@ -173,11 +173,28 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
   // Force a refresh when comparison mode changes
   useEffect(() => {
     if (summary) {
-      // Update the component when comparison mode changes
+      console.log("[PerfAnalysis Component] Comparison mode changed to:", comparisonMode);
+      console.log("[PerfAnalysis Component] Current summary data:", summary);
+      console.log("[PerfAnalysis Component] Period-specific forecasts:", {
+        periodSpecificRevenueForecast,
+        periodSpecificCostForecast,
+        periodSpecificProfitForecast
+      });
+      console.log("[PerfAnalysis Component] Total forecasts:", {
+        totalRevenueForecast,
+        totalCostForecast,
+        totalProfitForecast
+      });
+      console.log("[PerfAnalysis Component] Actual totals:", {
+        actualTotalRevenue,
+        actualTotalCost,
+        actualTotalProfit
+      });
       // Force a refresh of the component
       setRefreshKey(prev => prev + 1);
     }
-  }, [summary, comparisonMode]);
+  }, [summary, comparisonMode, periodSpecificRevenueForecast, periodSpecificCostForecast, periodSpecificProfitForecast,
+      totalRevenueForecast, totalCostForecast, totalProfitForecast, actualTotalRevenue, actualTotalCost, actualTotalProfit]);
 
   return (
     <div className="space-y-6">
