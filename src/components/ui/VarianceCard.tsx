@@ -101,7 +101,7 @@ export const VarianceCard: React.FC<VarianceCardProps> = ({
     variance: providedVariance
 }) => {
 
-  // Use provided variance if available, otherwise calculate it
+  // Always use the provided variance if available
   const variance = providedVariance !== undefined ? providedVariance : actual - forecast;
 
   // Log the values for debugging
@@ -109,7 +109,8 @@ export const VarianceCard: React.FC<VarianceCardProps> = ({
     forecast,
     actual,
     providedVariance,
-    calculatedVariance: variance
+    calculatedVariance: variance,
+    usingProvidedVariance: providedVariance !== undefined
   });
 
   // Calculate previous variance if available

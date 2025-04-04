@@ -166,7 +166,9 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
   console.log("[PerfAnalysis Component] Trend Data for Charts:", trendData);
   console.log("[PerfAnalysis Component] Current Comparison Mode:", comparisonMode);
 
-  // Log variance values for debugging
+  // Log variance values for debugging and force refresh when comparison mode changes
+  const [refreshKey, setRefreshKey] = useState(0);
+
   useEffect(() => {
     if (summary) {
       console.log("[PerfAnalysis Component] Variance Values:", {
@@ -178,6 +180,9 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
         totalProfitVariance,
         comparisonMode
       });
+
+      // Force a refresh when comparison mode changes
+      setRefreshKey(prev => prev + 1);
     }
   }, [summary, comparisonMode]);
 
@@ -259,7 +264,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
             </div>
 
             {/* Enhanced Variance Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6" key={`variance-cards-${refreshKey}`}>
                 <VarianceCard
                     title="Total Revenue"
                     forecast={comparisonMode === 'period' ? periodSpecificRevenueForecast :
