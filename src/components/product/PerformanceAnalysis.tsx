@@ -63,6 +63,26 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
      return <p className="text-muted-foreground">No product forecasts exist for this project to analyze performance against.</p>;
   }
 
+  // Destructure summary safely first to avoid reference errors
+  const {
+    totalRevenueForecast = 0,
+    totalCostForecast = 0,
+    totalProfitForecast = 0,
+    revisedTotalRevenue = 0,
+    revisedTotalCost = 0,
+    revisedTotalProfit = 0,
+    totalRevenueVariance = 0,
+    totalCostVariance = 0,
+    totalProfitVariance = 0,
+    avgProfitMarginForecast = 0,
+    revisedAvgProfitMargin = 0,
+    latestActualPeriod = 0,
+    timeUnit = 'Period', // Default timeUnit
+    totalAttendanceForecast = 0,
+    totalAttendanceActual = 0,
+    totalAttendanceVariance = 0,
+  } = summary || {};
+
   // Create enhanced tooltip for charts
   const renderEnhancedTooltip = ({ active, payload, label }: TooltipProps<ValueType, NameType>) => {
     if (active && payload && payload.length) {
@@ -102,26 +122,6 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
       'Previous': 90, // Example value
     }));
   }, [trendData, timeUnit]);
-
-  // Destructure summary safely
-  const {
-    totalRevenueForecast = 0,
-    totalCostForecast = 0,
-    totalProfitForecast = 0,
-    revisedTotalRevenue = 0,
-    revisedTotalCost = 0,
-    revisedTotalProfit = 0,
-    totalRevenueVariance = 0,
-    totalCostVariance = 0,
-    totalProfitVariance = 0,
-    avgProfitMarginForecast = 0,
-    revisedAvgProfitMargin = 0,
-    latestActualPeriod = 0,
-    timeUnit = 'Period', // Default timeUnit
-    totalAttendanceForecast = 0,
-    totalAttendanceActual = 0,
-    totalAttendanceVariance = 0,
-  } = summary || {};
 
   // Log trendData before rendering charts
   console.log("[PerfAnalysis Component] Trend Data for Charts:", trendData);
