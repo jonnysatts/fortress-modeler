@@ -22,6 +22,8 @@ interface VarianceCardProps {
   footer?: React.ReactNode;
   secondaryValue?: number;
   secondaryLabel?: string;
+  // Optional pre-calculated variance (if not provided, will be calculated as actual - forecast)
+  variance?: number;
 }
 
 // Helper to calculate and format variance with color and icon
@@ -95,10 +97,12 @@ export const VarianceCard: React.FC<VarianceCardProps> = ({
     className,
     footer,
     secondaryValue,
-    secondaryLabel
+    secondaryLabel,
+    variance: providedVariance
 }) => {
 
-  const variance = actual - forecast;
+  // Use provided variance if available, otherwise calculate it
+  const variance = providedVariance !== undefined ? providedVariance : actual - forecast;
 
   // Calculate previous variance if available
   const previousVariance = previousValue !== undefined ? actual - previousValue : undefined;

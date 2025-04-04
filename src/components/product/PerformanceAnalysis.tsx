@@ -250,6 +250,9 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                              comparisonMode === 'cumulative' ? actualTotalRevenue + periodSpecificRevenueForecast :
                              totalRevenueForecast}
                     actual={actualTotalRevenue}
+                    variance={comparisonMode === 'period' ? periodRevenueVariance :
+                             comparisonMode === 'cumulative' ? actualTotalRevenue - periodSpecificRevenueForecast :
+                             actualTotalRevenue - totalRevenueForecast}
                     actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     trend={trendData.slice(-10).map(d => d.revenueActual || 0).filter(Boolean)}
                     description={comparisonMode === 'period' ?
@@ -266,6 +269,9 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                              comparisonMode === 'cumulative' ? actualTotalCost + periodSpecificCostForecast :
                              totalCostForecast}
                     actual={actualTotalCost}
+                    variance={comparisonMode === 'period' ? periodCostVariance :
+                             comparisonMode === 'cumulative' ? actualTotalCost - periodSpecificCostForecast :
+                             actualTotalCost - totalCostForecast}
                     actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     higherIsBad={true}
                     trend={trendData.slice(-10).map(d => d.costActual || 0).filter(Boolean)}
@@ -283,6 +289,9 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                              comparisonMode === 'cumulative' ? actualTotalProfit + periodSpecificProfitForecast :
                              totalProfitForecast}
                     actual={actualTotalProfit}
+                    variance={comparisonMode === 'period' ? periodProfitVariance :
+                             comparisonMode === 'cumulative' ? actualTotalProfit - periodSpecificProfitForecast :
+                             actualTotalProfit - totalProfitForecast}
                     actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     trend={trendData.slice(-10).map(d => d.profitActual || 0).filter(Boolean)}
                     description={comparisonMode === 'period' ?
@@ -299,6 +308,9 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                              comparisonMode === 'cumulative' ? (actualAvgProfitMargin + periodSpecificProfitMargin) / 2 :
                              avgProfitMarginForecast}
                     actual={actualAvgProfitMargin}
+                    variance={comparisonMode === 'period' ? actualAvgProfitMargin - periodSpecificProfitMargin :
+                             comparisonMode === 'cumulative' ? actualAvgProfitMargin - ((actualAvgProfitMargin + periodSpecificProfitMargin) / 2) :
+                             actualAvgProfitMargin - avgProfitMarginForecast}
                     actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     isPercentage={true}
                     description={comparisonMode === 'period' ?
@@ -318,6 +330,11 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                                  (totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * (periodsWithActuals + 1) : 0 :
                                  totalAttendanceForecast}
                         actual={totalAttendanceActual}
+                        variance={comparisonMode === 'period' ?
+                                 totalAttendanceActual - ((totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * periodsWithActuals : 0) :
+                                 comparisonMode === 'cumulative' ?
+                                 totalAttendanceActual - ((totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * (periodsWithActuals + 1) : 0) :
+                                 totalAttendanceActual - totalAttendanceForecast}
                         actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                         isUnits={true}
                         trend={trendData.slice(-10).map(d => d.attendanceActual || 0).filter(Boolean)}
