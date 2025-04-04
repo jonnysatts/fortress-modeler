@@ -4,7 +4,7 @@ import { useForm, useFieldArray, Controller, SubmitHandler } from 'react-hook-fo
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { FinancialModel, db, updateProject } from '@/lib/db'; // Assuming update function exists or similar
-import { ModelAssumptions, RevenueStream, CostCategory } from '@/types/models'; 
+import { ModelAssumptions, RevenueStream, CostCategory } from '@/types/models';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,7 +33,7 @@ const defaultChannelTypes = [
   "Custom",
 ];
 
-// --- Zod Schema for Validation --- 
+// --- Zod Schema for Validation ---
 const revenueStreamSchema = z.object({
   name: z.string().min(1, "Stream name is required"),
   value: z.number().positive("Base value must be positive"),
@@ -65,7 +65,7 @@ const marketingChannelSchema = z.object({
 });
 
 const marketingSetupSchema = z.object({
-  allocationMode: z.enum(['channels', 'highLevel', 'none']), // Added 'none' 
+  allocationMode: z.enum(['channels', 'highLevel', 'none']), // Added 'none'
   channels: z.array(marketingChannelSchema).optional(),
   totalBudget: z.number().nonnegative().optional(),
   budgetApplication: z.enum(['upfront', 'spreadEvenly', 'spreadCustom']).optional(),
@@ -102,7 +102,7 @@ const modelMetadataSchema = z.object({
 });
 
 // Comprehensive schema for the entire assumptions object
-const assumptionsSchema = z.object({ 
+const assumptionsSchema = z.object({
     metadata: modelMetadataSchema.optional().default({ type: 'Monthly', weeks: 12 }),
     revenue: z.array(revenueStreamSchema).default([]),
     costs: z.array(costCategorySchema).default([]),
@@ -117,7 +117,7 @@ const ForecastBuilder: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   // State to store the initial assumptions as a string
-  const [initialAssumptionsString, setInitialAssumptionsString] = useState<string>(""); 
+  const [initialAssumptionsString, setInitialAssumptionsString] = useState<string>("");
   const { currentProject } = useStore();
 
   const projectIdNum = projectId ? parseInt(projectId) : NaN;
@@ -128,34 +128,41 @@ const ForecastBuilder: React.FC = () => {
       costs: [],
       growthModel: { type: 'exponential', rate: 0 },
       // Base default is Monthly
-      metadata: { type: 'Monthly', weeks: 0 }, 
-      marketing: { allocationMode: 'channels', channels: [] }
+      metadata: { type: 'Monthly', weeks: 0 },
+      marketing: {
+          allocationMode: 'none',
+          channels: [],
+          totalBudget: 0,
+          budgetApplication: 'spreadEvenly',
+          spreadDuration: 4
+      }
   };
   // Specific default metadata for Weekly Events
   const defaultWeeklyEventMetadata: ModelAssumptions['metadata'] = {
       type: "WeeklyEvent",
-      weeks: 12, 
-      initialWeeklyAttendance: 100, 
+      weeks: 12,
+      initialWeeklyAttendance: 100,
       perCustomer: { ticketPrice: 0, fbSpend: 0, merchandiseSpend: 0, onlineSpend: 0, miscSpend: 0 },
       costs: { fbCOGSPercent: 30, merchandiseCogsPercent: 40, staffCount: 0, staffCostPerPerson: 0, managementCosts: 0 },
       growth: { attendanceGrowthRate: 0, useCustomerSpendGrowth: false, ticketPriceGrowth: 0, fbSpendGrowth: 0, merchandiseSpendGrowth: 0, onlineSpendGrowth: 0, miscSpendGrowth: 0 }
   };
 
   // --- Form Setup ---
-  const { 
-    control, 
-    handleSubmit, 
-    watch, 
+  const {
+    control,
+    handleSubmit,
+    watch,
     getValues,
+    setValue,
     reset, // Keep reset for initialization sync
     formState: { isSubmitting, errors } // Remove dirtyFields from here
   } = useForm<ModelAssumptions>({
     resolver: zodResolver(assumptionsSchema),
-    // We might not need 'values' prop with this manual dirty check, 
+    // We might not need 'values' prop with this manual dirty check,
     // relying on reset in useEffect might be sufficient now.
     // Let's keep it for now, but can remove if causing issues.
-    values: model?.assumptions || defaultAssumptions, 
-    mode: "onChange", 
+    values: model?.assumptions || defaultAssumptions,
+    mode: "onChange",
   });
 
   // Get ALL current form values
@@ -174,14 +181,14 @@ const ForecastBuilder: React.FC = () => {
       // GUARD CLAUSE: Ensure projectIdNum is valid AND currentProject is loaded and matches
       if (isNaN(projectIdNum) || !currentProject || currentProject.id !== projectIdNum) {
         console.log(`[ForecastBuilder Effect] Waiting: projectIdNum=${projectIdNum}, currentProject loaded=${!!currentProject}, project match=${currentProject?.id === projectIdNum}`);
-        // Set loading true here ONLY if not already loading, 
+        // Set loading true here ONLY if not already loading,
         // or handle potential infinite loops if project never loads.
         // For now, just return and wait for parent layout/store to provide correct project.
         // If this component *should* trigger project loading, add it here.
         // setLoading(true); // Cautious about setting loading here
-        return; 
+        return;
       }
-      
+
       console.log(`[ForecastBuilder Effect] Running fetch for projectId: ${projectIdNum} (Project Type: ${currentProject.productType})`);
       setLoading(true);
       setError(null);
@@ -189,7 +196,7 @@ const ForecastBuilder: React.FC = () => {
         const models = await db.financialModels.where({ projectId: projectIdNum }).toArray();
         let modelToSet: FinancialModel | null = null;
         let assumptionsToSet: ModelAssumptions;
-        
+
         if (models.length > 0) {
           let fetchedModel = models[0];
           // --- DATA SANITIZATION ---
@@ -199,9 +206,9 @@ const ForecastBuilder: React.FC = () => {
                   ...fetchedModel,
                   assumptions: {
                       ...defaultAssumptions,
-                      ...fetchedModel.assumptions, 
-                      metadata: { 
-                          ...defaultWeeklyEventMetadata, 
+                      ...fetchedModel.assumptions,
+                      metadata: {
+                          ...defaultWeeklyEventMetadata,
                           ...(fetchedModel.assumptions.metadata || {}),
                           type: "WeeklyEvent" // Add comma here if needed, ensure this is last or has comma
                       }
@@ -214,10 +221,10 @@ const ForecastBuilder: React.FC = () => {
         } else {
           setError("No financial model found for this project. Creating default.");
           // --- CREATE DEFAULT MODEL ---
-          const newModelAssumptions = currentProject.productType === "WeeklyEvent" 
+          const newModelAssumptions = currentProject.productType === "WeeklyEvent"
               ? { ...defaultAssumptions, metadata: defaultWeeklyEventMetadata }
               : defaultAssumptions;
-          
+
           const newModelData = {
               projectId: projectIdNum,
               name: `Default ${currentProject.productType} Model`, // Use project type in name
@@ -235,19 +242,19 @@ const ForecastBuilder: React.FC = () => {
               throw new Error("Failed to retrieve newly created default model.");
           }
         }
-        
+
         // Set model state (triggers re-render and updates 'values' prop)
         setModel(modelToSet);
         // Reset the form state AND set the initial string for comparison
         if (modelToSet) {
             console.log("Setting initial state and resetting form with:", assumptionsToSet);
-            reset(assumptionsToSet); 
+            reset(assumptionsToSet);
             setInitialAssumptionsString(JSON.stringify(assumptionsToSet));
         } else {
             reset(defaultAssumptions);
             setInitialAssumptionsString(JSON.stringify(defaultAssumptions));
         }
-        
+
       } catch (err) {
         console.error("Error fetching or creating financial model:", err);
         setError("Failed to load or create model data.");
@@ -260,7 +267,7 @@ const ForecastBuilder: React.FC = () => {
         console.log(`[ForecastBuilder Effect] Finished fetch for ${projectIdNum}`);
       }
     };
-    
+
     fetchModel();
   }, [projectIdNum, reset, currentProject]); // Keep currentProject in dependencies
 
@@ -268,7 +275,7 @@ const ForecastBuilder: React.FC = () => {
   const modelType = watch("metadata.type");
   const isWeeklyEventType = modelType === "WeeklyEvent";
   const timeUnit = isWeeklyEventType ? "Week" : "Month";
-  const useSpecificGrowth = watch("metadata.growth.useCustomerSpendGrowth"); 
+  const useSpecificGrowth = watch("metadata.growth.useCustomerSpendGrowth");
   const marketingAllocationMode = watch("marketing.allocationMode");
   const budgetApplication = watch("marketing.budgetApplication");
 
@@ -311,7 +318,7 @@ const ForecastBuilder: React.FC = () => {
       await db.financialModels.update(model.id, { assumptions: data });
       toast({ title: "Success", description: "Forecast assumptions saved." });
       // Update the initial state string to match the saved data
-      setInitialAssumptionsString(JSON.stringify(data)); 
+      setInitialAssumptionsString(JSON.stringify(data));
       setIsDirty(false); // Form is no longer dirty relative to saved state
     } catch (err) {
       console.error("Error saving assumptions:", err);
@@ -359,18 +366,18 @@ const ForecastBuilder: React.FC = () => {
                 <TabsTrigger value="growth">Growth</TabsTrigger>
                 <TabsTrigger value="marketing">Marketing</TabsTrigger>
             </TabsList>
-            
-            {/* --- Revenue Tab --- */} 
+
+            {/* --- Revenue Tab --- */}
             <TabsContent value="revenue">
                 <Card>
                     <CardHeader><CardTitle>Revenue Assumptions</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
-                        
+
                         {/* Conditional Inputs for Weekly Event Drivers */}
                         {isWeeklyEventType && (
                              <div className="space-y-4 border p-4 rounded-md bg-secondary/30">
                                 <h4 className="font-semibold mb-2">Weekly Event Drivers</h4>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4"> {/* Adjust grid */} 
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4"> {/* Adjust grid */}
                                     {/* Number of Weeks */}
                                     <div className="space-y-1">
                                         <Label htmlFor="metadataWeeks">Number of Weeks</Label>
@@ -407,7 +414,7 @@ const ForecastBuilder: React.FC = () => {
                                     </div>
                                 </div>
                                 <h5 className="font-medium pt-4">Spend Per Attendee</h5>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4"> {/* Adjust grid */} 
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4"> {/* Adjust grid */}
                                     {/* F&B Spend */}
                                     <div className="space-y-1">
                                         <Label htmlFor="perCustomerFbSpend">F&B Spend</Label>
@@ -434,7 +441,7 @@ const ForecastBuilder: React.FC = () => {
                                 </div>
                              </div>
                         )}
-                        
+
                         {/* Other/Custom Revenue Streams */}
                         <h4 className="font-semibold pt-4">Other / Custom Revenue Streams</h4>
                         <div className="space-y-2">
@@ -477,19 +484,19 @@ const ForecastBuilder: React.FC = () => {
                                 )
                             ))}
                         </div>
-                        <Button 
-                            type="button" 
-                            variant="outline" 
+                        <Button
+                            type="button"
+                            variant="outline"
                             // Default for custom streams
-                            onClick={() => appendRevenue({ name: '', value: 0, type: 'recurring' })} 
+                            onClick={() => appendRevenue({ name: '', value: 0, type: 'recurring' })}
                         >
                             + Add Custom Revenue Stream
                         </Button>
                     </CardContent>
                 </Card>
             </TabsContent>
-            
-            {/* --- Costs Tab --- */} 
+
+            {/* --- Costs Tab --- */}
             <TabsContent value="costs">
                  <Card>
                     <CardHeader><CardTitle>Cost Assumptions</CardTitle></CardHeader>
@@ -502,7 +509,7 @@ const ForecastBuilder: React.FC = () => {
                                  <div className="space-y-1">
                                      <Label htmlFor="fbCogsPercent">F&B COGS %</Label>
                                      <Controller
-                                         name="metadata.costs.fbCOGSPercent" 
+                                         name="metadata.costs.fbCOGSPercent"
                                          control={control}
                                          render={({ field }) => (
                                              <Input id="fbCogsPercent" type="number" placeholder="e.g., 30" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} />
@@ -512,7 +519,7 @@ const ForecastBuilder: React.FC = () => {
                                  <div className="space-y-1">
                                      <Label htmlFor="merchCogsPercent">Merchandise COGS %</Label>
                                      <Controller
-                                         name="metadata.costs.merchandiseCogsPercent" 
+                                         name="metadata.costs.merchandiseCogsPercent"
                                          control={control}
                                          render={({ field }) => (
                                              <Input id="merchCogsPercent" type="number" placeholder="e.g., 40" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} />
@@ -521,7 +528,7 @@ const ForecastBuilder: React.FC = () => {
                                  </div>
                              </div>
                         </div>
-                        
+
                         {/* Conditional Inputs for Weekly Event Cost Drivers */}
                         {isWeeklyEventType && (
                             <div className="space-y-3 border p-4 rounded-md bg-secondary/30">
@@ -551,7 +558,7 @@ const ForecastBuilder: React.FC = () => {
                                 </div>
                             </div>
                         )}
-                        
+
                         {/* Fixed / Recurring Costs Section */}
                         <h4 className="font-semibold pt-4">Other Costs (Fixed / Recurring)</h4>
                         <div className="space-y-2">
@@ -606,9 +613,9 @@ const ForecastBuilder: React.FC = () => {
                                 </div>
                             ))}
                         </div>
-                        <Button 
-                            type="button" 
-                            variant="outline" 
+                        <Button
+                            type="button"
+                            variant="outline"
                             onClick={() => appendCost({ name: '', value: 0, type: 'recurring', category: 'other' })} // Provide default values
                         >
                             + Add Other Cost Item
@@ -616,8 +623,8 @@ const ForecastBuilder: React.FC = () => {
                     </CardContent>
                 </Card>
             </TabsContent>
-            
-            {/* --- Growth Tab --- */} 
+
+            {/* --- Growth Tab --- */}
             <TabsContent value="growth">
                  <Card>
                     <CardHeader><CardTitle>Growth Assumptions</CardTitle></CardHeader>
@@ -640,7 +647,7 @@ const ForecastBuilder: React.FC = () => {
                                                 <SelectContent>
                                                     <SelectItem value="exponential">Exponential %</SelectItem>
                                                     <SelectItem value="linear">Linear Amount</SelectItem>
-                                                    <SelectItem value="seasonal">Seasonal (Not Implemented)</SelectItem> 
+                                                    <SelectItem value="seasonal">Seasonal (Not Implemented)</SelectItem>
                                                     {/* Add 'none'? */}
                                                 </SelectContent>
                                             </Select>
@@ -659,7 +666,7 @@ const ForecastBuilder: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-                        
+
                         {/* Specific Growth Rates (Conditional - Weekly Event Only?) */}
                         {isWeeklyEventType && (
                             <div className="space-y-3 border p-4 rounded-md bg-secondary/30">
@@ -668,10 +675,10 @@ const ForecastBuilder: React.FC = () => {
                                         name="metadata.growth.useCustomerSpendGrowth"
                                         control={control}
                                         render={({ field }) => (
-                                            <Checkbox 
-                                                id="useSpecificGrowth" 
-                                                checked={field.value} 
-                                                onCheckedChange={field.onChange} 
+                                            <Checkbox
+                                                id="useSpecificGrowth"
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
                                             />
                                         )}
                                     />
@@ -679,7 +686,7 @@ const ForecastBuilder: React.FC = () => {
                                         Use Specific Growth Rates per Period?
                                     </Label>
                                 </div>
-                                
+
                                 {useSpecificGrowth && (
                                     <div className="space-y-3 pl-6 border-l-2 ml-2">
                                         <p className="text-xs text-muted-foreground">Define specific percentage growth rates per week for key drivers.</p>
@@ -724,7 +731,7 @@ const ForecastBuilder: React.FC = () => {
                                                     )}
                                                 />
                                             </div>
-                                            {/* Add Online Spend Growth, Misc Spend Growth etc. if needed */} 
+                                            {/* Add Online Spend Growth, Misc Spend Growth etc. if needed */}
                                         </div>
                                     </div>
                                 )}
@@ -733,8 +740,8 @@ const ForecastBuilder: React.FC = () => {
                     </CardContent>
                 </Card>
             </TabsContent>
-            
-            {/* --- Marketing Tab --- */} 
+
+            {/* --- Marketing Tab --- */}
             <TabsContent value="marketing">
                  <Card>
                     <CardHeader><CardTitle>Marketing Assumptions</CardTitle></CardHeader>
@@ -746,9 +753,19 @@ const ForecastBuilder: React.FC = () => {
                                 name="marketing.allocationMode"
                                 control={control}
                                 render={({ field }) => (
-                                    <RadioGroup 
-                                        onValueChange={field.onChange} 
-                                        defaultValue={field.value} 
+                                    <RadioGroup
+                                        onValueChange={value => {
+                                            field.onChange(value);
+                                            console.log('Marketing allocation mode updated:', value);
+
+                                            // Initialize default values when switching modes
+                                            if (value === 'highLevel' && !getValues('marketing.totalBudget')) {
+                                                // Set default budget and application method
+                                                setValue('marketing.totalBudget', 5000);
+                                                setValue('marketing.budgetApplication', 'spreadEvenly');
+                                            }
+                                        }}
+                                        value={field.value}
                                         className="flex space-x-4"
                                     >
                                         <div className="flex items-center space-x-2">
@@ -780,7 +797,12 @@ const ForecastBuilder: React.FC = () => {
                                                 name={`marketing.channels.${index}.channelType`}
                                                 control={control}
                                                 render={({ field }) => (
-                                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                    <Select
+                                                        onValueChange={value => {
+                                                            field.onChange(value);
+                                                            console.log(`Channel ${index} type updated:`, value);
+                                                        }}
+                                                        value={field.value || defaultChannelTypes[0]}>
                                                         <SelectTrigger className="w-[180px]">
                                                             <SelectValue placeholder="Select Type..." />
                                                         </SelectTrigger>
@@ -796,13 +818,36 @@ const ForecastBuilder: React.FC = () => {
                                             <Controller
                                                 name={`marketing.channels.${index}.name`}
                                                 control={control}
-                                                render={({ field }) => <Input placeholder="Specific Campaign/Name" {...field} className="flex-1" />}
+                                                render={({ field }) => (
+                                                    <Input
+                                                        placeholder="Specific Campaign/Name"
+                                                        value={field.value || ''}
+                                                        onChange={e => {
+                                                            field.onChange(e.target.value);
+                                                            console.log(`Channel ${index} name updated:`, e.target.value);
+                                                        }}
+                                                        className="flex-1"
+                                                    />
+                                                )}
                                             />
                                             {/* Weekly Budget Input */}
                                             <Controller
                                                 name={`marketing.channels.${index}.weeklyBudget`}
                                                 control={control}
-                                                render={({ field }) => <Input type="number" step="0.01" placeholder="Weekly Budget" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} className="w-32" />}
+                                                render={({ field }) => (
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        placeholder="Weekly Budget"
+                                                        value={field.value || ''}
+                                                        onChange={e => {
+                                                            const value = e.target.value === '' ? undefined : parseFloat(e.target.value) || 0;
+                                                            field.onChange(value);
+                                                            console.log(`Channel ${index} budget updated:`, value);
+                                                        }}
+                                                        className="w-32"
+                                                    />
+                                                )}
                                             />
                                             {/* TODO: Add Target Audience/Description inputs if desired */}
                                             <Button type="button" variant="ghost" size="icon" onClick={() => removeChannel(index)} className="text-destructive hover:bg-destructive/10">
@@ -811,17 +856,17 @@ const ForecastBuilder: React.FC = () => {
                                         </div>
                                     ))}
                                 </div>
-                                <Button 
-                                    type="button" 
-                                    variant="outline" 
+                                <Button
+                                    type="button"
+                                    variant="outline"
                                     // Provide default values including a default channelType
-                                    onClick={() => appendChannel({ 
-                                        id: crypto.randomUUID(), 
+                                    onClick={() => appendChannel({
+                                        id: crypto.randomUUID(),
                                         channelType: defaultChannelTypes[0], // Default to first type
-                                        name: '', 
-                                        weeklyBudget: 0, 
-                                        targetAudience: '', 
-                                        description: '' 
+                                        name: '',
+                                        weeklyBudget: 0,
+                                        targetAudience: '',
+                                        description: ''
                                     })}
                                 >
                                     + Add Marketing Channel
@@ -840,7 +885,18 @@ const ForecastBuilder: React.FC = () => {
                                             name="marketing.totalBudget"
                                             control={control}
                                             render={({ field }) => (
-                                                <Input id="totalBudget" type="number" step="0.01" placeholder="e.g., 10000" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                                                <Input
+                                                    id="totalBudget"
+                                                    type="number"
+                                                    step="0.01"
+                                                    placeholder="e.g., 10000"
+                                                    value={field.value || ''}
+                                                    onChange={e => {
+                                                        const value = e.target.value === '' ? undefined : parseFloat(e.target.value) || 0;
+                                                        field.onChange(value);
+                                                        console.log('Marketing budget updated:', value);
+                                                    }}
+                                                />
                                             )}
                                         />
                                     </div>
@@ -850,14 +906,20 @@ const ForecastBuilder: React.FC = () => {
                                             name="marketing.budgetApplication"
                                             control={control}
                                             render={({ field }) => (
-                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <Select
+                                                    onValueChange={value => {
+                                                        field.onChange(value);
+                                                        console.log('Budget application updated:', value);
+                                                    }}
+                                                    value={field.value || 'spreadEvenly'}
+                                                >
                                                     <SelectTrigger id="budgetApplication">
                                                         <SelectValue placeholder="Select Application" />
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         <SelectItem value="spreadEvenly">Spread Evenly</SelectItem>
                                                         <SelectItem value="upfront">Upfront (Period 1)</SelectItem>
-                                                        <SelectItem value="spreadCustom">Spread Over Custom Duration</SelectItem> 
+                                                        <SelectItem value="spreadCustom">Spread Over Custom Duration</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             )}
@@ -871,7 +933,17 @@ const ForecastBuilder: React.FC = () => {
                                             name="marketing.spreadDuration"
                                             control={control}
                                             render={({ field }) => (
-                                                <Input id="spreadDuration" type="number" placeholder={`e.g., 3 for 3 ${timeUnit}s`} {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} />
+                                                <Input
+                                                    id="spreadDuration"
+                                                    type="number"
+                                                    placeholder={`e.g., 3 for 3 ${timeUnit}s`}
+                                                    value={field.value || ''}
+                                                    onChange={e => {
+                                                        const value = e.target.value === '' ? undefined : parseInt(e.target.value) || 0;
+                                                        field.onChange(value);
+                                                        console.log('Spread duration updated:', value);
+                                                    }}
+                                                />
                                             )}
                                         />
                                     </div>
@@ -881,7 +953,7 @@ const ForecastBuilder: React.FC = () => {
                     </CardContent>
                 </Card>
             </TabsContent>
-            
+
            </Tabs>
         </CardContent>
       </Card>
@@ -889,4 +961,4 @@ const ForecastBuilder: React.FC = () => {
   );
 };
 
-export default ForecastBuilder; 
+export default ForecastBuilder;
