@@ -10,6 +10,7 @@ import {
   Tooltip
 } from 'recharts';
 import { useTheme } from 'next-themes';
+import { useState, useEffect } from 'react';
 import { dataColors } from '@/lib/colors';
 
 interface RadarChartProps {
@@ -27,8 +28,12 @@ const RadarChart: React.FC<RadarChartProps> = ({
   isPercentage = false,
   maxValue,
 }) => {
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
+  const { theme, resolvedTheme } = useTheme();
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    setIsDark(resolvedTheme === 'dark' || theme === 'dark');
+  }, [theme, resolvedTheme]);
 
   // Define colors for each data key
   const colors = [

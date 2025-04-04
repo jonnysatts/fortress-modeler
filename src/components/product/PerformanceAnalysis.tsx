@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { FinancialModel } from '@/lib/db';
 import { ActualsPeriodEntry } from '@/types/models';
@@ -48,7 +48,12 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
 
   const [viewMode, setViewMode] = useState<'weekly' | 'cumulative'>('weekly');
   const [comparisonMode, setComparisonMode] = useState<'period' | 'cumulative' | 'projected'>('period');
-  const { theme } = useTheme();
+  const { theme, resolvedTheme } = useTheme();
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    setIsDark(resolvedTheme === 'dark' || theme === 'dark');
+  }, [theme, resolvedTheme]);
 
   // --- Restore the hook call ---
   // console.log("[PerfAnalysis Component] Bypassing useForecastAnalysis hook for testing.");
@@ -633,23 +638,23 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                       <CartesianGrid strokeDasharray="3 3" stroke={dataColors.grid} strokeOpacity={0.5} />
                       <XAxis
                         dataKey="point"
-                        tick={{ fontSize: 11, fill: theme === 'dark' ? '#ccc' : '#333' }}
+                        tick={{ fontSize: 11, fill: isDark ? '#ccc' : '#333' }}
                         axisLine={{ stroke: dataColors.grid, strokeOpacity: 0.8 }}
                         tickLine={{ stroke: dataColors.grid, strokeOpacity: 0.8 }}
                       />
                       <YAxis
                         tickFormatter={val => val.toLocaleString()}
-                        tick={{ fontSize: 11, fill: theme === 'dark' ? '#ccc' : '#333' }}
+                        tick={{ fontSize: 11, fill: isDark ? '#ccc' : '#333' }}
                         axisLine={{ stroke: dataColors.grid, strokeOpacity: 0.8 }}
                         tickLine={{ stroke: dataColors.grid, strokeOpacity: 0.8 }}
                       />
                       <Tooltip
                         content={renderEnhancedTooltip}
-                        cursor={{ fill: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }}
+                        cursor={{ fill: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }}
                       />
                       <Legend
                         wrapperStyle={{ paddingTop: 15 }}
-                        formatter={(value) => <span style={{ color: theme === 'dark' ? '#fff' : '#333', fontSize: 12 }}>{value}</span>}
+                        formatter={(value) => <span style={{ color: isDark ? '#fff' : '#333', fontSize: 12 }}>{value}</span>}
                       />
                       <Bar
                         dataKey="attendanceForecast"
