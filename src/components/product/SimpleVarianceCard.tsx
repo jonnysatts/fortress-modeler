@@ -33,22 +33,9 @@ export const SimpleVarianceCard: React.FC<SimpleVarianceCardProps> = ({
   secondaryValue,
   secondaryLabel
 }) => {
-  // Determine which forecast to use based on comparison mode
-  let forecast = 0;
-  let variance = 0;
-
-  console.log(`[SimpleVarianceCard] ${title} - Inputs:`, {
-    comparisonMode,
-    periodForecast,
-    totalForecast,
-    actual
-  });
-
   // Use the periodForecast value directly (which is already adjusted in the parent component)
-  forecast = periodForecast;
-  variance = actual - periodForecast;
-
-  console.log(`[SimpleVarianceCard] ${title} - Using ${comparisonMode.toUpperCase()} mode: forecast=${forecast}, actual=${actual}, variance=${variance}`);
+  const forecast = periodForecast;
+  const variance = actual - periodForecast;
 
   // Determine color and icon
   const isPositive = variance > 0;
@@ -102,12 +89,9 @@ export const SimpleVarianceCard: React.FC<SimpleVarianceCardProps> = ({
   });
 
   return (
-    <Card className={className} style={{ border: comparisonMode === 'period' ? '3px solid blue' : comparisonMode === 'cumulative' ? '3px solid green' : '3px solid purple' }}>
+    <Card className={className}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <div style={{ backgroundColor: 'black', color: 'white', padding: '5px', marginTop: '5px', fontSize: '12px' }}>
-          Mode: {comparisonMode.toUpperCase()}
-        </div>
         {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
       </CardHeader>
       <CardContent className="space-y-3">

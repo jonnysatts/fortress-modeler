@@ -181,8 +181,6 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
   // Force a refresh when comparison mode changes
   useEffect(() => {
     if (summary) {
-      console.log("[PerfAnalysis Component] Comparison mode changed to:", comparisonMode);
-
       // Calculate different forecast values based on comparison mode
       let revenueForecast = 0;
       let costForecast = 0;
@@ -208,13 +206,6 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
       }
 
       setAdjustedForecasts({
-        revenueForecast,
-        costForecast,
-        profitForecast,
-        profitMargin
-      });
-
-      console.log("[PerfAnalysis Component] Adjusted forecasts:", {
         revenueForecast,
         costForecast,
         profitForecast,
