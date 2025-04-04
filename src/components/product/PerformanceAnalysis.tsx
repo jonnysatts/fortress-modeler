@@ -20,6 +20,7 @@ import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipCont
 import type { AnalysisPeriodData } from '@/hooks/useForecastAnalysis';
 import { useForecastAnalysis } from '@/hooks/useForecastAnalysis';
 import { ComparisonVarianceCard } from '@/components/ui/ComparisonVarianceCard';
+import { VarianceDisplay } from './VarianceDisplay';
 
 // Import enhanced UI components
 import {
@@ -265,97 +266,50 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
             </div>
 
             {/* Enhanced Variance Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6" key={`variance-cards-${refreshKey}`}>
-                <ComparisonVarianceCard
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6" key={`variance-cards-${refreshKey}-${comparisonMode}`}>
+                <VarianceDisplay
                     key={`revenue-${comparisonMode}-${refreshKey}`}
                     title="Total Revenue"
                     periodForecast={periodSpecificRevenueForecast}
-                    cumulativeForecast={periodSpecificRevenueForecast}
                     totalForecast={totalRevenueForecast}
                     actual={actualTotalRevenue}
                     comparisonMode={comparisonMode}
-                    actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
-                    trend={trendData.slice(-10).map(d => d.revenueActual || 0).filter(Boolean)}
-                    description={comparisonMode === 'period' ?
-                      `Comparing actual revenue to forecast for ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}` :
-                      comparisonMode === 'cumulative' ?
-                      `Comparing actual revenue to cumulative forecast` :
-                      `Comparing actual revenue to total forecast`}
-                    secondaryValue={revisedTotalRevenue}
-                    secondaryLabel="Revised Outlook"
                 />
-                 <ComparisonVarianceCard
+                <VarianceDisplay
                     key={`costs-${comparisonMode}-${refreshKey}`}
                     title="Total Costs"
                     periodForecast={periodSpecificCostForecast}
-                    cumulativeForecast={periodSpecificCostForecast}
                     totalForecast={totalCostForecast}
                     actual={actualTotalCost}
                     comparisonMode={comparisonMode}
-                    actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     higherIsBad={true}
-                    trend={trendData.slice(-10).map(d => d.costActual || 0).filter(Boolean)}
-                    description={comparisonMode === 'period' ?
-                      `Comparing actual costs to forecast for ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}` :
-                      comparisonMode === 'cumulative' ?
-                      `Comparing actual costs to cumulative forecast` :
-                      `Comparing actual costs to total forecast`}
-                    secondaryValue={revisedTotalCost}
-                    secondaryLabel="Revised Outlook"
                 />
-                 <ComparisonVarianceCard
+                <VarianceDisplay
                     key={`profit-${comparisonMode}-${refreshKey}`}
                     title="Total Profit"
                     periodForecast={periodSpecificProfitForecast}
-                    cumulativeForecast={periodSpecificProfitForecast}
                     totalForecast={totalProfitForecast}
                     actual={actualTotalProfit}
                     comparisonMode={comparisonMode}
-                    actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
-                    trend={trendData.slice(-10).map(d => d.profitActual || 0).filter(Boolean)}
-                    description={comparisonMode === 'period' ?
-                      `Comparing actual profit to forecast for ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}` :
-                      comparisonMode === 'cumulative' ?
-                      `Comparing actual profit to cumulative forecast` :
-                      `Comparing actual profit to total forecast`}
-                    secondaryValue={revisedTotalProfit}
-                    secondaryLabel="Revised Outlook"
                 />
-                 <ComparisonVarianceCard
+                <VarianceDisplay
                     key={`margin-${comparisonMode}-${refreshKey}`}
                     title="Avg. Profit Margin"
                     periodForecast={periodSpecificProfitMargin}
-                    cumulativeForecast={periodSpecificProfitMargin}
                     totalForecast={avgProfitMarginForecast}
                     actual={actualAvgProfitMargin}
                     comparisonMode={comparisonMode}
-                    actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     isPercentage={true}
-                    description={comparisonMode === 'period' ?
-                      `Comparing actual margin to forecast for ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}` :
-                      comparisonMode === 'cumulative' ?
-                      `Comparing actual margin to cumulative forecast` :
-                      `Comparing actual margin to total forecast`}
-                    secondaryValue={revisedAvgProfitMargin}
-                    secondaryLabel="Revised Outlook"
                 />
                 {isWeeklyEvent && (
-                    <ComparisonVarianceCard
+                    <VarianceDisplay
                         key={`attendance-${comparisonMode}-${refreshKey}`}
                         title="Total Attendance"
                         periodForecast={(totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * periodsWithActuals : 0}
-                        cumulativeForecast={(totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * periodsWithActuals : 0}
                         totalForecast={totalAttendanceForecast}
                         actual={totalAttendanceActual}
                         comparisonMode={comparisonMode}
-                        actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                         isUnits={true}
-                        trend={trendData.slice(-10).map(d => d.attendanceActual || 0).filter(Boolean)}
-                        description={comparisonMode === 'period' ?
-                          `Comparing actual attendance to forecast for ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}` :
-                          comparisonMode === 'cumulative' ?
-                          `Comparing actual attendance to cumulative forecast` :
-                          `Comparing actual attendance to total forecast`}
                     />
                 )}
             </div>
