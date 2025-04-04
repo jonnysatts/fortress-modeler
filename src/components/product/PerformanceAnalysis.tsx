@@ -174,6 +174,8 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
   useEffect(() => {
     if (summary) {
       console.log("[PerfAnalysis Component] Comparison mode changed to:", comparisonMode);
+      console.log("[PerfAnalysis Component] Current summary data:", summary);
+      // Force a refresh of the component
       setRefreshKey(prev => prev + 1);
     }
   }, [summary, comparisonMode]);

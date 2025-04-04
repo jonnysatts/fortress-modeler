@@ -33,19 +33,24 @@ export const SimpleVarianceCard: React.FC<SimpleVarianceCardProps> = ({
   secondaryValue,
   secondaryLabel
 }) => {
-  // FORCE DIFFERENT VALUES FOR DIFFERENT MODES
+  // Determine which forecast to use based on comparison mode
   let forecast = 0;
   let variance = 0;
 
   if (comparisonMode === 'period') {
     forecast = periodForecast;
     variance = actual - periodForecast;
+    console.log(`[SimpleVarianceCard] ${title} - Using PERIOD mode: forecast=${forecast}, actual=${actual}, variance=${variance}`);
   } else if (comparisonMode === 'cumulative') {
-    forecast = periodForecast * 0.8; // Force a different value for cumulative
-    variance = actual - (periodForecast * 0.8);
+    // For cumulative, we compare actual to the cumulative forecast for the periods with actuals
+    forecast = periodForecast;
+    variance = actual - periodForecast;
+    console.log(`[SimpleVarianceCard] ${title} - Using CUMULATIVE mode: forecast=${forecast}, actual=${actual}, variance=${variance}`);
   } else { // projected
+    // For projected outcome, we compare actual to the total forecast
     forecast = totalForecast;
     variance = actual - totalForecast;
+    console.log(`[SimpleVarianceCard] ${title} - Using PROJECTED mode: forecast=${forecast}, actual=${actual}, variance=${variance}`);
   }
 
   // Determine color and icon
