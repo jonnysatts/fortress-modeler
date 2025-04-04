@@ -101,15 +101,16 @@ export const VarianceCard: React.FC<VarianceCardProps> = ({
     variance: providedVariance
 }) => {
 
-  // Always use the provided variance if available
-  const variance = providedVariance !== undefined ? providedVariance : actual - forecast;
+  // ALWAYS use the provided variance and NEVER calculate it internally
+  // This ensures that the parent component has full control over the variance calculation
+  const variance = providedVariance !== undefined ? providedVariance : 0;
 
   // Log the values for debugging
   console.log(`[VarianceCard] ${title}:`, {
     forecast,
     actual,
     providedVariance,
-    calculatedVariance: variance,
+    finalVariance: variance,
     usingProvidedVariance: providedVariance !== undefined
   });
 
