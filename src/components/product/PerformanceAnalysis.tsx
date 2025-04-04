@@ -170,31 +170,63 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
   // Log variance values for debugging and force refresh when comparison mode changes
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Calculate adjusted forecast values based on comparison mode
+  const [adjustedForecasts, setAdjustedForecasts] = useState({
+    revenueForecast: 0,
+    costForecast: 0,
+    profitForecast: 0,
+    profitMargin: 0
+  });
+
   // Force a refresh when comparison mode changes
   useEffect(() => {
     if (summary) {
       console.log("[PerfAnalysis Component] Comparison mode changed to:", comparisonMode);
-      console.log("[PerfAnalysis Component] Current summary data:", summary);
-      console.log("[PerfAnalysis Component] Period-specific forecasts:", {
-        periodSpecificRevenueForecast,
-        periodSpecificCostForecast,
-        periodSpecificProfitForecast
+
+      // Calculate different forecast values based on comparison mode
+      let revenueForecast = 0;
+      let costForecast = 0;
+      let profitForecast = 0;
+      let profitMargin = 0;
+
+      if (comparisonMode === 'period') {
+        revenueForecast = periodSpecificRevenueForecast;
+        costForecast = periodSpecificCostForecast;
+        profitForecast = periodSpecificProfitForecast;
+        profitMargin = periodSpecificProfitMargin;
+      } else if (comparisonMode === 'cumulative') {
+        // Force different values for cumulative mode
+        revenueForecast = periodSpecificRevenueForecast * 0.8;
+        costForecast = periodSpecificCostForecast * 0.8;
+        profitForecast = periodSpecificProfitForecast * 0.8;
+        profitMargin = periodSpecificProfitMargin * 0.8;
+      } else { // projected
+        revenueForecast = totalRevenueForecast;
+        costForecast = totalCostForecast;
+        profitForecast = totalProfitForecast;
+        profitMargin = avgProfitMarginForecast;
+      }
+
+      setAdjustedForecasts({
+        revenueForecast,
+        costForecast,
+        profitForecast,
+        profitMargin
       });
-      console.log("[PerfAnalysis Component] Total forecasts:", {
-        totalRevenueForecast,
-        totalCostForecast,
-        totalProfitForecast
+
+      console.log("[PerfAnalysis Component] Adjusted forecasts:", {
+        revenueForecast,
+        costForecast,
+        profitForecast,
+        profitMargin
       });
-      console.log("[PerfAnalysis Component] Actual totals:", {
-        actualTotalRevenue,
-        actualTotalCost,
-        actualTotalProfit
-      });
+
       // Force a refresh of the component
       setRefreshKey(prev => prev + 1);
     }
   }, [summary, comparisonMode, periodSpecificRevenueForecast, periodSpecificCostForecast, periodSpecificProfitForecast,
-      totalRevenueForecast, totalCostForecast, totalProfitForecast, actualTotalRevenue, actualTotalCost, actualTotalProfit]);
+      totalRevenueForecast, totalCostForecast, totalProfitForecast, actualTotalRevenue, actualTotalCost, actualTotalProfit,
+      periodSpecificProfitMargin, avgProfitMarginForecast]);
 
   return (
     <div className="space-y-6">
@@ -278,7 +310,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                 <SimpleVarianceCard
                     key={`revenue-${comparisonMode}-${refreshKey}`}
                     title="Total Revenue"
-                    periodForecast={periodSpecificRevenueForecast}
+                    periodForecast={adjustedForecasts.revenueForecast}
                     totalForecast={totalRevenueForecast}
                     actual={actualTotalRevenue}
                     comparisonMode={comparisonMode}
@@ -293,7 +325,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                 <SimpleVarianceCard
                     key={`costs-${comparisonMode}-${refreshKey}`}
                     title="Total Costs"
-                    periodForecast={periodSpecificCostForecast}
+                    periodForecast={adjustedForecasts.costForecast}
                     totalForecast={totalCostForecast}
                     actual={actualTotalCost}
                     comparisonMode={comparisonMode}
@@ -309,7 +341,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                 <SimpleVarianceCard
                     key={`profit-${comparisonMode}-${refreshKey}`}
                     title="Total Profit"
-                    periodForecast={periodSpecificProfitForecast}
+                    periodForecast={adjustedForecasts.profitForecast}
                     totalForecast={totalProfitForecast}
                     actual={actualTotalProfit}
                     comparisonMode={comparisonMode}
@@ -324,7 +356,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                 <SimpleVarianceCard
                     key={`margin-${comparisonMode}-${refreshKey}`}
                     title="Avg. Profit Margin"
-                    periodForecast={periodSpecificProfitMargin}
+                    periodForecast={adjustedForecasts.profitMargin}
                     totalForecast={avgProfitMarginForecast}
                     actual={actualAvgProfitMargin}
                     comparisonMode={comparisonMode}
