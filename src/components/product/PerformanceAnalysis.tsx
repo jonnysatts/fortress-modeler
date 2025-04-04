@@ -266,6 +266,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
             {/* Enhanced Variance Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6" key={`variance-cards-${refreshKey}`}>
                 <VarianceCard
+                    key={`revenue-${comparisonMode}-${refreshKey}`}
                     title="Total Revenue"
                     forecast={comparisonMode === 'period' ? periodSpecificRevenueForecast :
                              comparisonMode === 'cumulative' ? periodSpecificRevenueForecast :
@@ -285,6 +286,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                     secondaryLabel="Revised Outlook"
                 />
                  <VarianceCard
+                    key={`costs-${comparisonMode}-${refreshKey}`}
                     title="Total Costs"
                     forecast={comparisonMode === 'period' ? periodSpecificCostForecast :
                              comparisonMode === 'cumulative' ? periodSpecificCostForecast :
@@ -305,6 +307,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                     secondaryLabel="Revised Outlook"
                 />
                  <VarianceCard
+                    key={`profit-${comparisonMode}-${refreshKey}`}
                     title="Total Profit"
                     forecast={comparisonMode === 'period' ? periodSpecificProfitForecast :
                              comparisonMode === 'cumulative' ? periodSpecificProfitForecast :
@@ -324,6 +327,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                     secondaryLabel="Revised Outlook"
                 />
                  <VarianceCard
+                    key={`margin-${comparisonMode}-${refreshKey}`}
                     title="Avg. Profit Margin"
                     forecast={comparisonMode === 'period' ? periodSpecificProfitMargin :
                              comparisonMode === 'cumulative' ? periodSpecificProfitMargin :
@@ -344,6 +348,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                 />
                 {isWeeklyEvent && (
                     <VarianceCard
+                        key={`attendance-${comparisonMode}-${refreshKey}`}
                         title="Total Attendance"
                         forecast={comparisonMode === 'period' ?
                                  (totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * periodsWithActuals : 0 :
