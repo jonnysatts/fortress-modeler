@@ -188,7 +188,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                 <PerformanceScorecard
                     title="Revenue Performance"
                     metric="revenue"
-                    actual={revisedTotalRevenue}
+                    actual={actualTotalRevenue}
                     forecast={totalRevenueForecast}
                     previousPeriod={totalRevenueForecast * 0.9} // Example previous period
                     target={totalRevenueForecast * 1.1} // Example target
@@ -199,7 +199,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                 <PerformanceScorecard
                     title="Cost Management"
                     metric="cost"
-                    actual={revisedTotalCost}
+                    actual={actualTotalCost}
                     forecast={totalCostForecast}
                     previousPeriod={totalCostForecast * 1.1} // Example previous period
                     target={totalCostForecast * 0.9} // Example target
@@ -210,7 +210,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                 <PerformanceScorecard
                     title="Profit Achievement"
                     metric="profit"
-                    actual={revisedTotalProfit}
+                    actual={actualTotalProfit}
                     forecast={totalProfitForecast}
                     previousPeriod={totalProfitForecast * 0.8} // Example previous period
                     target={totalProfitForecast * 1.2} // Example target
@@ -224,45 +224,53 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                 <VarianceCard
                     title="Total Revenue"
                     forecast={totalRevenueForecast}
-                    actual={revisedTotalRevenue}
-                    actualLabel="Revised Outlook"
+                    actual={actualTotalRevenue}
+                    actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     trend={trendData.slice(-10).map(d => d.revenueActual || 0).filter(Boolean)}
-                    description="Projected total revenue based on actuals"
+                    description={`Actual revenue from ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}`}
+                    secondaryValue={revisedTotalRevenue}
+                    secondaryLabel="Revised Outlook"
                 />
                  <VarianceCard
                     title="Total Costs"
                     forecast={totalCostForecast}
-                    actual={revisedTotalCost}
-                    actualLabel="Revised Outlook"
+                    actual={actualTotalCost}
+                    actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     higherIsBad={true}
                     trend={trendData.slice(-10).map(d => d.costActual || 0).filter(Boolean)}
-                    description="Projected total costs based on actuals"
+                    description={`Actual costs from ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}`}
+                    secondaryValue={revisedTotalCost}
+                    secondaryLabel="Revised Outlook"
                 />
                  <VarianceCard
                     title="Total Profit"
                     forecast={totalProfitForecast}
-                    actual={revisedTotalProfit}
-                    actualLabel="Revised Outlook"
+                    actual={actualTotalProfit}
+                    actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     trend={trendData.slice(-10).map(d => d.profitActual || 0).filter(Boolean)}
-                    description="Projected total profit based on actuals"
+                    description={`Actual profit from ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}`}
+                    secondaryValue={revisedTotalProfit}
+                    secondaryLabel="Revised Outlook"
                 />
                  <VarianceCard
                     title="Avg. Profit Margin"
                     forecast={avgProfitMarginForecast}
-                    actual={revisedAvgProfitMargin}
-                    actualLabel="Revised Outlook %"
+                    actual={actualAvgProfitMargin}
+                    actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     isPercentage={true}
-                    description="Average profit margin across all periods"
+                    description={`Actual profit margin from ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}`}
+                    secondaryValue={revisedAvgProfitMargin}
+                    secondaryLabel="Revised Outlook"
                 />
                 {isWeeklyEvent && (
                     <VarianceCard
                         title="Total Attendance"
                         forecast={totalAttendanceForecast}
                         actual={totalAttendanceActual}
-                        actualLabel="Actual"
+                        actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                         isUnits={true}
                         trend={trendData.slice(-10).map(d => d.attendanceActual || 0).filter(Boolean)}
-                        description="Total attendance across all events"
+                        description={`Actual attendance from ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}`}
                     />
                 )}
             </div>
