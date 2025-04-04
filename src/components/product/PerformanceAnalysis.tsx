@@ -65,19 +65,35 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
 
   // Destructure summary safely first to avoid reference errors
   const {
+    // Forecast totals
     totalRevenueForecast = 0,
     totalCostForecast = 0,
     totalProfitForecast = 0,
+    avgProfitMarginForecast = 0,
+
+    // Actual totals (with fallbacks to use revised values if not available)
+    actualTotalRevenue = 0,
+    actualTotalCost = 0,
+    actualTotalProfit = 0,
+    periodsWithActuals = 0,
+    actualAvgProfitMargin = 0,
+
+    // Revised outlook
     revisedTotalRevenue = 0,
     revisedTotalCost = 0,
     revisedTotalProfit = 0,
+    revisedAvgProfitMargin = 0,
+
+    // Variances
     totalRevenueVariance = 0,
     totalCostVariance = 0,
     totalProfitVariance = 0,
-    avgProfitMarginForecast = 0,
-    revisedAvgProfitMargin = 0,
+
+    // Other metrics
     latestActualPeriod = 0,
     timeUnit = 'Period', // Default timeUnit
+
+    // Attendance metrics
     totalAttendanceForecast = 0,
     totalAttendanceActual = 0,
     totalAttendanceVariance = 0,
@@ -172,7 +188,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                 <PerformanceScorecard
                     title="Revenue Performance"
                     metric="revenue"
-                    actual={actualTotalRevenue}
+                    actual={revisedTotalRevenue}
                     forecast={totalRevenueForecast}
                     previousPeriod={totalRevenueForecast * 0.9} // Example previous period
                     target={totalRevenueForecast * 1.1} // Example target
@@ -183,7 +199,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                 <PerformanceScorecard
                     title="Cost Management"
                     metric="cost"
-                    actual={actualTotalCost}
+                    actual={revisedTotalCost}
                     forecast={totalCostForecast}
                     previousPeriod={totalCostForecast * 1.1} // Example previous period
                     target={totalCostForecast * 0.9} // Example target
@@ -194,7 +210,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                 <PerformanceScorecard
                     title="Profit Achievement"
                     metric="profit"
-                    actual={actualTotalProfit}
+                    actual={revisedTotalProfit}
                     forecast={totalProfitForecast}
                     previousPeriod={totalProfitForecast * 0.8} // Example previous period
                     target={totalProfitForecast * 1.2} // Example target
@@ -208,53 +224,45 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                 <VarianceCard
                     title="Total Revenue"
                     forecast={totalRevenueForecast}
-                    actual={actualTotalRevenue}
-                    actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit : timeUnit + 's'})`}
+                    actual={revisedTotalRevenue}
+                    actualLabel="Revised Outlook"
                     trend={trendData.slice(-10).map(d => d.revenueActual || 0).filter(Boolean)}
-                    description={`Actual revenue from ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}`}
-                    secondaryValue={revisedTotalRevenue}
-                    secondaryLabel="Revised Outlook"
+                    description="Projected total revenue based on actuals"
                 />
                  <VarianceCard
                     title="Total Costs"
                     forecast={totalCostForecast}
-                    actual={actualTotalCost}
-                    actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit : timeUnit + 's'})`}
+                    actual={revisedTotalCost}
+                    actualLabel="Revised Outlook"
                     higherIsBad={true}
                     trend={trendData.slice(-10).map(d => d.costActual || 0).filter(Boolean)}
-                    description={`Actual costs from ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}`}
-                    secondaryValue={revisedTotalCost}
-                    secondaryLabel="Revised Outlook"
+                    description="Projected total costs based on actuals"
                 />
                  <VarianceCard
                     title="Total Profit"
                     forecast={totalProfitForecast}
-                    actual={actualTotalProfit}
-                    actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit : timeUnit + 's'})`}
+                    actual={revisedTotalProfit}
+                    actualLabel="Revised Outlook"
                     trend={trendData.slice(-10).map(d => d.profitActual || 0).filter(Boolean)}
-                    description={`Actual profit from ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}`}
-                    secondaryValue={revisedTotalProfit}
-                    secondaryLabel="Revised Outlook"
+                    description="Projected total profit based on actuals"
                 />
                  <VarianceCard
                     title="Avg. Profit Margin"
                     forecast={avgProfitMarginForecast}
-                    actual={actualAvgProfitMargin}
-                    actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit : timeUnit + 's'})`}
+                    actual={revisedAvgProfitMargin}
+                    actualLabel="Revised Outlook %"
                     isPercentage={true}
-                    description={`Actual profit margin from ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}`}
-                    secondaryValue={revisedAvgProfitMargin}
-                    secondaryLabel="Revised Outlook"
+                    description="Average profit margin across all periods"
                 />
                 {isWeeklyEvent && (
                     <VarianceCard
                         title="Total Attendance"
                         forecast={totalAttendanceForecast}
                         actual={totalAttendanceActual}
-                        actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit : timeUnit + 's'})`}
+                        actualLabel="Actual"
                         isUnits={true}
                         trend={trendData.slice(-10).map(d => d.attendanceActual || 0).filter(Boolean)}
-                        description={`Actual attendance from ${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'}`}
+                        description="Total attendance across all events"
                     />
                 )}
             </div>

@@ -239,8 +239,16 @@ export const useForecastAnalysis = (
         let revisedTotalRevenue = 0;
         let revisedTotalCost = 0;
 
+        console.log("[useForecastAnalysis Hook] Calculating actuals from periodicAnalysisData:", periodicAnalysisData);
+
         for (let period = 1; period <= duration; period++) {
             const p = periodicAnalysisData[period - 1];
+
+            console.log(`[useForecastAnalysis Hook] Period ${period} data:`, {
+                revenueActual: p.revenueActual,
+                costActual: p.costActual,
+                profitActual: p.profitActual
+            });
 
             // Add to actuals totals if we have actual data for this period
             if (p.revenueActual !== undefined && p.costActual !== undefined) {
@@ -248,6 +256,13 @@ export const useForecastAnalysis = (
                 actualTotalCost += p.costActual;
                 actualTotalProfit += p.profitActual ?? (p.revenueActual - p.costActual);
                 periodsWithActuals++;
+
+                console.log(`[useForecastAnalysis Hook] Added period ${period} to actuals. Running totals:`, {
+                    actualTotalRevenue,
+                    actualTotalCost,
+                    actualTotalProfit,
+                    periodsWithActuals
+                });
             }
 
             // Add to revised outlook (blend of actuals + forecast)
@@ -265,23 +280,34 @@ export const useForecastAnalysis = (
         const totalProfitVariance = revisedTotalProfit - totalProfitForecast;
         const totalAttendanceVariance = cumulativeAttendanceActual - (totalAttendanceForecast ?? 0);
 
+        // Ensure all values are properly defined
         const summary: AnalysisSummary = {
            // Forecast totals (original forecast)
-           totalRevenueForecast, totalCostForecast, totalProfitForecast,
+           totalRevenueForecast,
+           totalCostForecast,
+           totalProfitForecast,
+           avgProfitMarginForecast,
 
            // Actual totals (only from periods with actual data)
-           actualTotalRevenue, actualTotalCost, actualTotalProfit,
+           actualTotalRevenue,
+           actualTotalCost,
+           actualTotalProfit,
            periodsWithActuals,
            actualAvgProfitMargin,
 
            // Revised outlook (blend of actuals + forecast)
-           revisedTotalRevenue, revisedTotalCost, revisedTotalProfit,
+           revisedTotalRevenue,
+           revisedTotalCost,
+           revisedTotalProfit,
+           revisedAvgProfitMargin,
 
            // Variances
-           totalRevenueVariance, totalCostVariance, totalProfitVariance,
+           totalRevenueVariance,
+           totalCostVariance,
+           totalProfitVariance,
 
            // Other metrics
-           avgProfitMarginForecast, revisedAvgProfitMargin, latestActualPeriod,
+           latestActualPeriod,
            timeUnit,
 
            // Attendance metrics
@@ -289,6 +315,14 @@ export const useForecastAnalysis = (
            totalAttendanceActual: cumulativeAttendanceActual,
            totalAttendanceVariance,
         };
+
+        // Log the actual values to verify they're being calculated
+        console.log("[useForecastAnalysis Hook] Actual values:", {
+          actualTotalRevenue,
+          actualTotalCost,
+          actualTotalProfit,
+          periodsWithActuals
+        });
 
         // Log summary before returning
         console.log("[useForecastAnalysis Hook] Calculated Summary:", summary);
