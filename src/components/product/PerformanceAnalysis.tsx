@@ -179,7 +179,8 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
   }, [summary, comparisonMode]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" style={{ border: '5px solid blue', padding: '20px', backgroundColor: 'lightblue' }}>
+      <h1 style={{ color: 'red', fontSize: '24px', fontWeight: 'bold' }}>THIS IS THE UPDATED COMPONENT</h1>
       {/* Model Selector and View Mode */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center space-x-2 max-w-sm">

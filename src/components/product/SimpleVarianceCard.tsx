@@ -34,18 +34,18 @@ export const SimpleVarianceCard: React.FC<SimpleVarianceCardProps> = ({
   secondaryLabel
 }) => {
   // Determine which forecast to use based on comparison mode
-  const forecast = comparisonMode === 'period' || comparisonMode === 'cumulative' 
-    ? periodForecast 
+  const forecast = comparisonMode === 'period' || comparisonMode === 'cumulative'
+    ? periodForecast
     : totalForecast;
-  
+
   // Calculate variance
   const variance = actual - forecast;
-  
+
   // Determine color and icon
   const isPositive = variance > 0;
   const isNegative = variance < 0;
   const isZero = variance === 0;
-  
+
   let textColor;
   if (isZero) {
     textColor = dataColors.neutral;
@@ -54,23 +54,23 @@ export const SimpleVarianceCard: React.FC<SimpleVarianceCardProps> = ({
   } else {
     textColor = higherIsBad ? dataColors.positive : dataColors.negative;
   }
-  
+
   const Icon = isZero ? Minus : (isPositive ? ArrowUp : ArrowDown);
-  
+
   // Format values
-  const formatValue = isPercentage 
-    ? (val: number) => `${val.toFixed(1)}%` 
-    : isUnits 
-      ? (val: number) => val.toLocaleString() 
+  const formatValue = isPercentage
+    ? (val: number) => `${val.toFixed(1)}%`
+    : isUnits
+      ? (val: number) => val.toLocaleString()
       : formatCurrency;
-  
+
   // Format variance
-  const formattedVariance = isPercentage 
-    ? `${variance.toFixed(1)} pts` 
-    : isUnits 
-      ? variance.toLocaleString() 
+  const formattedVariance = isPercentage
+    ? `${variance.toFixed(1)} pts`
+    : isUnits
+      ? variance.toLocaleString()
       : formatCurrency(variance);
-  
+
   // Calculate percentage variance
   let percentageString = "";
   if (!isPercentage && !isUnits && forecast !== 0) {
@@ -79,9 +79,9 @@ export const SimpleVarianceCard: React.FC<SimpleVarianceCardProps> = ({
       percentageString = ` (${percentage.toFixed(1)}%)`;
     }
   }
-  
+
   const sign = isPositive && !isUnits ? '+' : '';
-  
+
   console.log(`[SimpleVarianceCard] ${title}:`, {
     comparisonMode,
     periodForecast,
@@ -91,35 +91,35 @@ export const SimpleVarianceCard: React.FC<SimpleVarianceCardProps> = ({
     variance,
     formattedVariance: `${sign}${formattedVariance}${percentageString}`
   });
-  
+
   return (
-    <Card className={className}>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+    <Card className={className} style={{ border: '3px solid red' }}>
+      <CardHeader className="pb-2" style={{ backgroundColor: 'yellow' }}>
+        <CardTitle className="text-sm font-medium">{title} - NEW CARD</CardTitle>
         {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
       </CardHeader>
       <CardContent className="space-y-3">
         <div>
           <p className="text-xs text-muted-foreground">
-            {comparisonMode === 'period' ? 'Period Forecast' : 
-             comparisonMode === 'cumulative' ? 'Cumulative Forecast' : 
+            {comparisonMode === 'period' ? 'Period Forecast' :
+             comparisonMode === 'cumulative' ? 'Cumulative Forecast' :
              'Total Forecast'}
           </p>
           <p className="text-lg font-semibold">{formatValue(forecast)}</p>
         </div>
-        
+
         <div>
           <p className="text-xs text-muted-foreground">Actual</p>
           <p className="text-base font-medium">{formatValue(actual)}</p>
         </div>
-        
+
         {secondaryValue !== undefined && (
           <div>
             <p className="text-xs text-muted-foreground">{secondaryLabel || 'Revised'}</p>
             <p className="text-sm">{formatValue(secondaryValue)}</p>
           </div>
         )}
-        
+
         <div>
           <p className="text-xs text-muted-foreground">Variance</p>
           <p className="text-sm font-medium flex items-center" style={{ color: textColor }}>
