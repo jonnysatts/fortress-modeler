@@ -148,20 +148,48 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
 
   // Create data for radar chart
   const radarData = useMemo(() => {
-    if (!trendData || trendData.length === 0) return [];
+    if (!summary || !trendData || trendData.length === 0) return [];
 
-    // Get the last 5 periods with actual data
-    const periodsWithActuals = trendData
-      .filter(period => period.revenueActual !== undefined)
-      .slice(-5);
-
-    return periodsWithActuals.map(period => ({
-      subject: `${timeUnit} ${period.period}`,
-      'Actual': (period.revenueActual || 0) / (period.revenueForecast || 1) * 100,
-      'Target': 100,
-      'Previous': 90, // Example value
-    }));
-  }, [trendData, timeUnit]);
+    // Create performance metrics for radar chart
+    // Instead of showing periods, show different performance dimensions
+    return [
+      {
+        subject: 'Revenue',
+        'Actual': (actualTotalRevenue / totalRevenueForecast) * 100,
+        'Target': 100,
+        'Previous': 90
+      },
+      {
+        subject: 'Cost Efficiency',
+        // For costs, lower is better, so invert the percentage
+        'Actual': totalCostForecast > 0 ? (2 - (actualTotalCost / totalCostForecast)) * 100 : 0,
+        'Target': 100,
+        'Previous': 95
+      },
+      {
+        subject: 'Profit',
+        'Actual': (actualTotalProfit / totalProfitForecast) * 100,
+        'Target': 100,
+        'Previous': 85
+      },
+      {
+        subject: 'Profit Margin',
+        'Actual': (actualAvgProfitMargin / avgProfitMarginForecast) * 100,
+        'Target': 100,
+        'Previous': 90
+      },
+      {
+        subject: 'Attendance',
+        'Actual': isWeeklyEvent && totalAttendanceForecast > 0 ?
+          (totalAttendanceActual / totalAttendanceForecast) * 100 : 0,
+        'Target': 100,
+        'Previous': 95
+      }
+    ];
+  }, [trendData, timeUnit, summary, actualTotalRevenue, totalRevenueForecast,
+      actualTotalCost, totalCostForecast, actualTotalProfit, totalProfitForecast,
+      actualAvgProfitMargin, avgProfitMarginForecast, isWeeklyEvent,
+      totalAttendanceActual, totalAttendanceForecast]);
 
   // Log trendData and comparison mode before rendering charts
   console.log("[PerfAnalysis Component] Trend Data for Charts:", trendData);
@@ -267,9 +295,12 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                     metric="revenue"
                     actual={actualTotalRevenue}
                     forecast={totalRevenueForecast}
-                    previousPeriod={totalRevenueForecast * 0.9} // Example previous period
-                    target={totalRevenueForecast * 1.1} // Example target
-                    trend={trendData.map(d => d.revenueActual || 0).filter(Boolean)}
+                    previousPeriod={periodSpecificRevenueForecast} // Use actual period-specific forecast
+                    target={totalRevenueForecast * 1.05} // 5% above forecast as target
+                    trend={trendData
+                      .filter(d => d.revenueActual !== undefined && d.revenueActual !== null)
+                      .map(d => d.revenueActual || 0)
+                      .slice(-6)} // Only use last 6 periods for trend
                     isCurrency={true}
                 />
 
@@ -278,9 +309,12 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                     metric="cost"
                     actual={actualTotalCost}
                     forecast={totalCostForecast}
-                    previousPeriod={totalCostForecast * 1.1} // Example previous period
-                    target={totalCostForecast * 0.9} // Example target
-                    trend={trendData.map(d => d.costActual || 0).filter(Boolean)}
+                    previousPeriod={periodSpecificCostForecast} // Use actual period-specific forecast
+                    target={totalCostForecast * 0.95} // 5% below forecast as target (lower costs are better)
+                    trend={trendData
+                      .filter(d => d.costActual !== undefined && d.costActual !== null)
+                      .map(d => d.costActual || 0)
+                      .slice(-6)} // Only use last 6 periods for trend
                     isCurrency={true}
                 />
 
@@ -289,9 +323,12 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                     metric="profit"
                     actual={actualTotalProfit}
                     forecast={totalProfitForecast}
-                    previousPeriod={totalProfitForecast * 0.8} // Example previous period
-                    target={totalProfitForecast * 1.2} // Example target
-                    trend={trendData.map(d => d.profitActual || 0).filter(Boolean)}
+                    previousPeriod={periodSpecificProfitForecast} // Use actual period-specific forecast
+                    target={totalProfitForecast * 1.1} // 10% above forecast as target
+                    trend={trendData
+                      .filter(d => d.profitActual !== undefined && d.profitActual !== null)
+                      .map(d => d.profitActual || 0)
+                      .slice(-6)} // Only use last 6 periods for trend
                     isCurrency={true}
                 />
             </div>
@@ -708,49 +745,78 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                   downloadData={trendData}
                   downloadFilename="attendance-data.csv"
                 >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={trendData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={dataColors.grid} strokeOpacity={0.5} />
-                      <XAxis
-                        dataKey="point"
-                        tick={{ fontSize: 11, fill: isDark ? '#ccc' : '#333' }}
-                        axisLine={{ stroke: dataColors.grid, strokeOpacity: 0.8 }}
-                        tickLine={{ stroke: dataColors.grid, strokeOpacity: 0.8 }}
-                      />
-                      <YAxis
-                        tickFormatter={val => val.toLocaleString()}
-                        tick={{ fontSize: 11, fill: isDark ? '#ccc' : '#333' }}
-                        axisLine={{ stroke: dataColors.grid, strokeOpacity: 0.8 }}
-                        tickLine={{ stroke: dataColors.grid, strokeOpacity: 0.8 }}
-                      />
-                      <Tooltip
-                        content={renderEnhancedTooltip}
-                        cursor={{ fill: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }}
-                      />
-                      <Legend
-                        wrapperStyle={{ paddingTop: 15 }}
-                        formatter={(value) => <span style={{ color: isDark ? '#fff' : '#333', fontSize: 12 }}>{value}</span>}
-                      />
-                      <Bar
-                        dataKey="attendanceForecast"
-                        name="Forecast"
-                        fill={dataColors.forecast}
-                        fillOpacity={0.8}
-                        radius={[4, 4, 0, 0]}
-                        barSize={24}
-                        animationDuration={1000}
-                      />
-                      <Bar
-                        dataKey="attendanceActual"
-                        name="Actual"
-                        fill={dataColors.attendance}
-                        fillOpacity={1}
-                        radius={[4, 4, 0, 0]}
-                        barSize={24}
-                        animationDuration={1000}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {trendData && trendData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={trendData.map(period => ({
+                          ...period,
+                          // Ensure we have valid numbers for the chart
+                          attendanceForecast: period.attendanceForecast || 0,
+                          attendanceActual: period.attendanceActual !== undefined ? period.attendanceActual : null
+                        }))}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke={dataColors.grid} strokeOpacity={0.5} />
+                        <XAxis
+                          dataKey="point"
+                          tick={{ fontSize: 11, fill: isDark ? '#ccc' : '#333' }}
+                          axisLine={{ stroke: dataColors.grid, strokeOpacity: 0.8 }}
+                          tickLine={{ stroke: dataColors.grid, strokeOpacity: 0.8 }}
+                        />
+                        <YAxis
+                          tickFormatter={val => val.toLocaleString()}
+                          tick={{ fontSize: 11, fill: isDark ? '#ccc' : '#333' }}
+                          axisLine={{ stroke: dataColors.grid, strokeOpacity: 0.8 }}
+                          tickLine={{ stroke: dataColors.grid, strokeOpacity: 0.8 }}
+                        />
+                        <Tooltip
+                          content={({ active, payload, label }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-white dark:bg-gray-800 p-3 border rounded-md shadow-lg">
+                                  <p className="font-medium text-sm mb-2">{label}</p>
+                                  {payload.map((entry, index) => (
+                                    <div key={index} className="flex justify-between items-center text-sm">
+                                      <span style={{ color: entry.color }}>{entry.name}:</span>
+                                      <span className="font-medium ml-4">{entry.value?.toLocaleString() || 'N/A'}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                          cursor={{ fill: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }}
+                        />
+                        <Legend
+                          wrapperStyle={{ paddingTop: 15 }}
+                          formatter={(value) => <span style={{ color: isDark ? '#fff' : '#333', fontSize: 12 }}>{value}</span>}
+                        />
+                        <Bar
+                          dataKey="attendanceForecast"
+                          name="Forecast"
+                          fill={dataColors.forecast}
+                          fillOpacity={0.8}
+                          radius={[4, 4, 0, 0]}
+                          barSize={24}
+                          animationDuration={1000}
+                        />
+                        <Bar
+                          dataKey="attendanceActual"
+                          name="Actual"
+                          fill={dataColors.attendance}
+                          fillOpacity={0.9}
+                          radius={[4, 4, 0, 0]}
+                          barSize={24}
+                          animationDuration={1000}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex justify-center items-center h-full">
+                      <p className="text-muted-foreground">No attendance data available</p>
+                    </div>
+                  )}
                 </ChartContainer>
               ) : (
                 <ChartContainer
