@@ -58,10 +58,10 @@ const calculateRevenueBreakdown = (timeSeries: ForecastPeriodData[], model: Fina
             breakdown["F&B Sales"] += currentAttendance * currentFbSpend;
             breakdown["Merchandise Sales"] += currentAttendance * currentMerchSpend;
          }
-         
+
          revenueStreams.forEach(stream => {
             if (isWeekly && ["Ticket Sales", "F&B Sales", "Merchandise Sales"].includes(stream.name)) return; // Skip already calculated
-            
+
             let streamRevenue = stream.value ?? 0;
             if (period > 1 && growthModel) { // Apply general growth to others
                 if (growthModel.type === "linear") streamRevenue = (stream.value??0) * (1 + growthModel.rate * (period - 1));
@@ -91,13 +91,13 @@ interface CostBreakdownItem {
 }
 const calculateCostBreakdown = (timeSeries: ForecastPeriodData[], model: FinancialModel | null): CostBreakdownItem[] => {
      if (!model?.assumptions || timeSeries.length === 0) return [];
-     
-     const breakdown: Record<string, number> = { 
-         "COGS": 0, 
-         "Marketing": 0, 
-         "Fixed/Setup": 0, 
-         "Other Recurring": 0 
-     }; 
+
+     const breakdown: Record<string, number> = {
+         "COGS": 0,
+         "Marketing": 0,
+         "Fixed/Setup": 0,
+         "Other Recurring": 0
+     };
      const { assumptions } = model;
      const metadata = assumptions.metadata;
      const costs = assumptions.costs || [];
@@ -110,7 +110,7 @@ const calculateCostBreakdown = (timeSeries: ForecastPeriodData[], model: Financi
         let periodFBCRevenue = 0; // Need to recalculate revenue for COGS base
         let periodMerchRevenue = 0;
         let currentAttendance = periodData.attendance ?? 0;
-        
+
         // Simplified revenue recalc for COGS (assumes relevant data is available)
         if (isWeekly && metadata?.perCustomer) {
              let currentFbSpend = metadata.perCustomer.fbSpend ?? 0;
@@ -122,13 +122,13 @@ const calculateCostBreakdown = (timeSeries: ForecastPeriodData[], model: Financi
              periodFBCRevenue = currentAttendance * currentFbSpend;
              periodMerchRevenue = currentAttendance * currentMerchSpend;
         }
-        
+
         // 1. COGS
         const fbCogsPercent = metadata?.costs?.fbCOGSPercent ?? 0;
         const merchCogsPercent = metadata?.costs?.merchandiseCogsPercent ?? 0;
         breakdown["COGS"] += (periodFBCRevenue * fbCogsPercent) / 100;
         breakdown["COGS"] += (periodMerchRevenue * merchCogsPercent) / 100;
-        
+
         // 2. Fixed/Recurring
         costs.forEach(cost => {
             const costType = cost.type?.toLowerCase();
@@ -139,11 +139,11 @@ const calculateCostBreakdown = (timeSeries: ForecastPeriodData[], model: Financi
                  if (cost.name === "Setup Costs" && isWeekly && duration > 0) {
                     breakdown["Fixed/Setup"] += baseValue / duration; // Spread setup if recurring
                  } else {
-                    breakdown["Other Recurring"] += baseValue; 
+                    breakdown["Other Recurring"] += baseValue;
                  }
             }
         });
-        
+
         // 3. Marketing
         let periodMarketingCost = 0;
         if (marketingSetup.allocationMode === 'channels') {
@@ -159,9 +159,9 @@ const calculateCostBreakdown = (timeSeries: ForecastPeriodData[], model: Financi
         }
         breakdown["Marketing"] += periodMarketingCost;
      });
-     
+
      const totalCosts = Object.values(breakdown).reduce((sum, val) => sum + val, 0);
-     
+
      return Object.entries(breakdown)
         .map(([category, totalValue]) => ({
             category,
@@ -174,17 +174,17 @@ const calculateCostBreakdown = (timeSeries: ForecastPeriodData[], model: Financi
 
 const ProductSummary: React.FC = () => {
   // Correctly extract projectId from URL parameters
-  const { projectId } = useParams<{ projectId: string }>(); 
+  const { projectId } = useParams<{ projectId: string }>();
   const { currentProject, loadModelsForProject, loadActualsForProject } = useStore();
   const [models, setModels] = useState<FinancialModel[]>([]);
   const [actuals, setActuals] = useState<ActualsPeriodEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Memoized calculations depend on state, but called unconditionally
   const latestModel = useMemo(() => (models.length > 0 ? models[0] : null), [models]);
-  
+
   const timeSeriesData: ForecastPeriodData[] = useMemo(() => {
-    if (!latestModel) return []; 
+    if (!latestModel) return [];
     return generateForecastTimeSeries(latestModel);
   }, [latestModel]);
 
@@ -198,17 +198,27 @@ const ProductSummary: React.FC = () => {
     const totalProfit = finalPeriod.cumulativeProfit;
     const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
     const breakeven = totalProfit >= 0;
+
+    console.log('SUMMARY PAGE METRICS:', {
+      totalRevenue,
+      totalCosts,
+      totalProfit,
+      profitMargin,
+      breakeven,
+      finalPeriod
+    });
+
     return { totalRevenue, totalCosts, totalProfit, profitMargin, breakeven };
   }, [timeSeriesData]);
 
   const revenueBreakdownData = useMemo(() => calculateRevenueBreakdown(timeSeriesData, latestModel), [timeSeriesData, latestModel]);
   const costBreakdownData = useMemo(() => calculateCostBreakdown(timeSeriesData, latestModel), [timeSeriesData, latestModel]);
-  
+
   const breakEvenPeriod = useMemo(() => {
       const breakEvenIndex = timeSeriesData.findIndex(p => p.cumulativeProfit >= 0);
       if (breakEvenIndex === -1) return { label: "Not Reached", index: null };
       const periodData = timeSeriesData[breakEvenIndex];
-      return { 
+      return {
           label: periodData.point, // e.g., "Week 7"
           index: breakEvenIndex // Numeric index (0-based) for ReferenceLine
       };
@@ -229,13 +239,13 @@ const ProductSummary: React.FC = () => {
 
   const { revenueConcentration, warnings } = useMemo(() => {
     const { totalRevenue, profitMargin, breakeven } = summaryMetrics;
-    const revenueStreams = latestModel?.assumptions.revenue || []; 
+    const revenueStreams = latestModel?.assumptions.revenue || [];
     let revenueConcentration = 0;
     if (totalRevenue > 0 && revenueStreams.length > 0) {
         const highestInitialRevenue = Math.max(0, ...revenueStreams.map(stream => stream.value ?? 0));
-        revenueConcentration = (highestInitialRevenue / totalRevenue) * 100; 
+        revenueConcentration = (highestInitialRevenue / totalRevenue) * 100;
     }
-    
+
     const warnings = [];
     if (revenueConcentration > 80) warnings.push({ type: 'Revenue Concentration', message: 'Over 80% of revenue comes from a single source', severity: 'warning' });
     if (profitMargin < 20) warnings.push({ type: 'Low Profit Margin', message: 'Profit margin is below 20%', severity: 'warning' });
@@ -249,7 +259,7 @@ const ProductSummary: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       // Use projectId in the log and logic
-      console.log(`[ProductSummary Effect] Running for projectId: ${projectId}`); 
+      console.log(`[ProductSummary Effect] Running for projectId: ${projectId}`);
       if (projectId) { // Check projectId instead of id
         setIsLoading(true);
         try {
@@ -260,7 +270,7 @@ const ProductSummary: React.FC = () => {
           console.log(`[ProductSummary Effect] Fetching actuals for projectId: ${projectIdNum}`);
           const loadedActuals = await loadActualsForProject(projectIdNum);
           console.log(`[ProductSummary Effect] Fetched ${loadedActuals.length} actuals.`);
-          
+
           setModels(loadedModels);
           setActuals(loadedActuals);
           console.log(`[ProductSummary Effect] State updated.`);
@@ -268,27 +278,27 @@ const ProductSummary: React.FC = () => {
           console.error('[ProductSummary Effect] Error loading data:', error);
         } finally {
           setIsLoading(false);
-          console.log(`[ProductSummary Effect] Finished, isLoading set to false.`); 
+          console.log(`[ProductSummary Effect] Finished, isLoading set to false.`);
         }
       } else {
           console.log(`[ProductSummary Effect] No projectId provided.`); // Update log message
-          setIsLoading(false); 
+          setIsLoading(false);
       }
     };
-    
+
     loadData();
     // Update dependency array to use projectId
-  }, [projectId]); 
-  
+  }, [projectId]);
+
   // --- Conditional Returns AFTER all hooks ---
   if (isLoading) {
     return <div className="py-8 text-center">Loading product data...</div>;
   }
-  
+
   if (!currentProject) {
     return <div className="py-8 text-center">Product not found</div>;
   }
-  
+
   if (!latestModel) {
     return (
       <div className="py-8 text-center">
@@ -300,7 +310,7 @@ const ProductSummary: React.FC = () => {
       </div>
     );
   }
-  
+
   // --- Prepare data for rendering (now safe to access latestModel) ---
   const { totalRevenue, totalCosts, totalProfit, profitMargin } = summaryMetrics;
   const revenueChartData = (latestModel.assumptions.revenue || []).map(stream => ({ name: stream.name, value: stream.value }));
@@ -312,21 +322,24 @@ const ProductSummary: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Key Metrics Cards (Now 5 cards with Breakeven) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4"> {/* Adjusted grid for 5 cards */} 
-        <ContentCard title="Total Revenue">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4"> {/* Adjusted grid for 5 cards */}
+        <ContentCard title="Total Revenue" style={{ border: '3px solid red', backgroundColor: 'lightyellow' }}>
           <div className="flex items-center justify-between">
             <div className="text-3xl font-bold">{formatCurrency(totalRevenue)}</div>
             <TrendingUp className="h-6 w-6 text-fortress-emerald" />
           </div>
+          <div style={{ backgroundColor: 'black', color: 'white', padding: '5px', marginTop: '5px' }}>
+            Raw Value: {totalRevenue}
+          </div>
         </ContentCard>
-        
+
         <ContentCard title="Total Costs">
           <div className="flex items-center justify-between">
             <div className="text-3xl font-bold">{formatCurrency(totalCosts)}</div>
             <TrendingDown className="h-6 w-6 text-red-500" />
           </div>
         </ContentCard>
-        
+
         <ContentCard title="Total Profit">
           <div className="flex items-center justify-between">
             <div className="text-3xl font-bold">{formatCurrency(totalProfit)}</div>
@@ -337,7 +350,7 @@ const ProductSummary: React.FC = () => {
             )}
           </div>
         </ContentCard>
-        
+
         <ContentCard title="Profit Margin">
           <div className="flex items-center justify-between">
             <div className="text-3xl font-bold">{formatPercent(profitMargin)}</div>
@@ -355,7 +368,7 @@ const ProductSummary: React.FC = () => {
           </div>
         </ContentCard>
       </div>
-      
+
       {/* Warnings & Alerts - Render as individual cards in a grid */}
       {warnings.length > 0 && (
         <div> {/* Optional: Add a title here if needed: <TypographyH4 className="mb-2">Warnings & Alerts</TypographyH4> */}
@@ -396,11 +409,11 @@ const ProductSummary: React.FC = () => {
             </div>
         </div>
       )}
-      
+
       {/* Revenue & Cost Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Revenue Breakdown Pie */}
-        <ChartContainer 
+        <ChartContainer
           title="Total Revenue Distribution"
           description="% contribution per stream"
           height={300} // Adjust height as needed
@@ -429,7 +442,7 @@ const ProductSummary: React.FC = () => {
         </ChartContainer>
 
         {/* Revenue Breakdown Bar */}
-        <ChartContainer 
+        <ChartContainer
           title="Total Revenue Value"
           description="Absolute value per stream"
           height={300} // Adjust height as needed
@@ -448,9 +461,9 @@ const ProductSummary: React.FC = () => {
                 </BarChart>
             </ResponsiveContainer>
         </ChartContainer>
-        
+
         {/* Cost Breakdown Pie */}
-        <ChartContainer 
+        <ChartContainer
             title="Total Cost Distribution"
             description="% contribution per category"
             height={300} // Adjust height as needed
@@ -469,7 +482,7 @@ const ProductSummary: React.FC = () => {
                         label={({ percent }) => `${formatPercent(percent * 100)}`}
                     >
                     {costBreakdownData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COST_COLORS[index % COST_COLORS.length]} /> 
+                        <Cell key={`cell-${index}`} fill={COST_COLORS[index % COST_COLORS.length]} />
                     ))}
                     </Pie>
                     <Tooltip formatter={(value) => [formatCurrency(value as number), "Total Cost"]} />
@@ -479,7 +492,7 @@ const ProductSummary: React.FC = () => {
         </ChartContainer>
 
         {/* Cost Breakdown Bar */}
-        <ChartContainer 
+        <ChartContainer
             title="Total Cost Value"
             description="Absolute value per category"
             height={300} // Adjust height as needed
@@ -499,7 +512,7 @@ const ProductSummary: React.FC = () => {
             </ResponsiveContainer>
         </ChartContainer>
       </div>
-      
+
       {/* Forecast Chart */}
       <ChartContainer
         title="Financial Forecast"
@@ -514,10 +527,10 @@ const ProductSummary: React.FC = () => {
             <Tooltip formatter={(value) => [formatCurrency(value as number), '']} />
             <Legend />
             {breakEvenPeriod.index !== null && (
-                <ReferenceLine 
+                <ReferenceLine
                     x={timeSeriesData[breakEvenPeriod.index]?.point}
                     stroke="#F59E0B"
-                    strokeDasharray="3 3" 
+                    strokeDasharray="3 3"
                 >
                     <Label value="Breakeven" position="insideTopLeft" fill="#F59E0B" fontSize={10}/>
                 </ReferenceLine>
@@ -528,7 +541,7 @@ const ProductSummary: React.FC = () => {
           </LineChart>
         </ResponsiveContainer>
       </ChartContainer>
-      
+
       {/* Average Metrics Section */}
       <ContentCard title="Forecast Averages (Per Period)">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -546,7 +559,7 @@ const ProductSummary: React.FC = () => {
             </div>
         </div>
       </ContentCard>
-      
+
       {/* Product Details */}
       <ContentCard title="Product Details">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -571,7 +584,7 @@ const ProductSummary: React.FC = () => {
               </div>
             </dl>
           </div>
-          
+
           <div>
             <h4 className="font-medium mb-2">Forecast Information</h4>
             <dl className="space-y-2">
