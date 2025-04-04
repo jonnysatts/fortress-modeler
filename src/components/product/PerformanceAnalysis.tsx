@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useTheme } from '@/components/theme-provider';
+import { useTheme } from 'next-themes';
 import { FinancialModel } from '@/lib/db';
 import { ActualsPeriodEntry } from '@/types/models';
 import {

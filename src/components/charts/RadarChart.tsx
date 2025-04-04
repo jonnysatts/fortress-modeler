@@ -1,15 +1,15 @@
 import React from 'react';
-import { 
-  Radar, 
-  RadarChart as RechartsRadarChart, 
-  PolarGrid, 
-  PolarAngleAxis, 
-  PolarRadiusAxis, 
-  ResponsiveContainer, 
+import {
+  Radar,
+  RadarChart as RechartsRadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  ResponsiveContainer,
   Legend,
   Tooltip
 } from 'recharts';
-import { useTheme } from '@/components/theme-provider';
+import { useTheme } from 'next-themes';
 import { dataColors } from '@/lib/colors';
 
 interface RadarChartProps {
@@ -49,22 +49,22 @@ const RadarChart: React.FC<RadarChartProps> = ({
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <RechartsRadarChart 
-        data={data} 
+      <RechartsRadarChart
+        data={data}
         margin={{ top: 20, right: 30, bottom: 20, left: 30 }}
       >
         <PolarGrid stroke={isDark ? '#444' : '#ddd'} />
-        <PolarAngleAxis 
-          dataKey="name" 
+        <PolarAngleAxis
+          dataKey="name"
           tick={{ fill: isDark ? '#ccc' : '#333', fontSize: 12 }}
         />
-        <PolarRadiusAxis 
-          angle={90} 
+        <PolarRadiusAxis
+          angle={90}
           domain={[0, maxValue || 'auto']}
           tick={{ fill: isDark ? '#ccc' : '#333', fontSize: 10 }}
           tickFormatter={(value) => isPercentage ? `${value}%` : value}
         />
-        
+
         {dataKeys.map((key, index) => (
           <Radar
             key={key}
@@ -77,18 +77,18 @@ const RadarChart: React.FC<RadarChartProps> = ({
             isAnimationActive={true}
           />
         ))}
-        
-        <Tooltip 
+
+        <Tooltip
           formatter={(value: number) => [formatTooltipValue(value)]}
-          contentStyle={{ 
+          contentStyle={{
             backgroundColor: isDark ? '#333' : '#fff',
             border: `1px solid ${isDark ? '#555' : '#ddd'}`,
             borderRadius: '4px',
             color: isDark ? '#fff' : '#333'
           }}
         />
-        
-        <Legend 
+
+        <Legend
           wrapperStyle={{ paddingTop: 10 }}
           formatter={(value) => <span style={{ color: isDark ? '#fff' : '#333' }}>{value}</span>}
         />
