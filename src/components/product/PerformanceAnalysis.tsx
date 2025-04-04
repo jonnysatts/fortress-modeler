@@ -162,8 +162,24 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
     }));
   }, [trendData, timeUnit]);
 
-  // Log trendData before rendering charts
+  // Log trendData and comparison mode before rendering charts
   console.log("[PerfAnalysis Component] Trend Data for Charts:", trendData);
+  console.log("[PerfAnalysis Component] Current Comparison Mode:", comparisonMode);
+
+  // Log variance values for debugging
+  useEffect(() => {
+    if (summary) {
+      console.log("[PerfAnalysis Component] Variance Values:", {
+        periodRevenueVariance,
+        periodCostVariance,
+        periodProfitVariance,
+        totalRevenueVariance,
+        totalCostVariance,
+        totalProfitVariance,
+        comparisonMode
+      });
+    }
+  }, [summary, comparisonMode]);
 
   return (
     <div className="space-y-6">
