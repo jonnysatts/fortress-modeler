@@ -76,7 +76,9 @@ const VarianceDisplay: React.FC<{
   return (
     <p className="text-sm font-medium flex items-center" style={{ color: textColor }}>
       {showIcon && <Icon className="h-4 w-4 mr-1" />}
-      {sign}{formattedVariance}{percentageString}
+      <span data-variance={variance > 0 ? 'positive' : variance < 0 ? 'negative' : 'neutral'}>
+        {sign}{formattedVariance}{percentageString}
+      </span>
     </p>
   );
 };
@@ -167,13 +169,19 @@ export const VarianceCard: React.FC<VarianceCardProps> = ({
 
           <div className="flex justify-between items-center">
             <p className="text-xs text-muted-foreground">Variance</p>
-            <VarianceDisplay
-              variance={variance}
-              forecast={forecast}
-              higherIsBad={higherIsBad}
-              isPercentage={isPercentage}
-              isUnits={isUnits}
-            />
+            <div data-variance={title.toLowerCase().includes('revenue') ? 'revenue' :
+                               title.toLowerCase().includes('cost') ? 'cost' :
+                               title.toLowerCase().includes('profit') && !title.toLowerCase().includes('margin') ? 'profit' :
+                               title.toLowerCase().includes('margin') ? 'margin' :
+                               title.toLowerCase().includes('attendance') ? 'attendance' : ''}>
+              <VarianceDisplay
+                variance={variance}
+                forecast={forecast}
+                higherIsBad={higherIsBad}
+                isPercentage={isPercentage}
+                isUnits={isUnits}
+              />
+            </div>
           </div>
         </div>
 

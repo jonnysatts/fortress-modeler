@@ -207,6 +207,51 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
 
       // Force a refresh when comparison mode changes
       setRefreshKey(prev => prev + 1);
+
+      // Direct DOM manipulation to update variance values
+      // This is a last resort approach
+      setTimeout(() => {
+        try {
+          // Update the variance values directly in the DOM
+          const revenueVarianceElement = document.querySelector('[data-variance="revenue"]');
+          const costVarianceElement = document.querySelector('[data-variance="cost"]');
+          const profitVarianceElement = document.querySelector('[data-variance="profit"]');
+          const marginVarianceElement = document.querySelector('[data-variance="margin"]');
+          const attendanceVarianceElement = document.querySelector('[data-variance="attendance"]');
+
+          if (revenueVarianceElement) {
+            console.log('Updating revenue variance element');
+            const sign = revenueVariance > 0 ? '+' : '';
+            revenueVarianceElement.textContent = `${sign}${formatCurrency(revenueVariance)}`;
+          }
+
+          if (costVarianceElement) {
+            console.log('Updating cost variance element');
+            const sign = costVariance > 0 ? '+' : '';
+            costVarianceElement.textContent = `${sign}${formatCurrency(costVariance)}`;
+          }
+
+          if (profitVarianceElement) {
+            console.log('Updating profit variance element');
+            const sign = profitVariance > 0 ? '+' : '';
+            profitVarianceElement.textContent = `${sign}${formatCurrency(profitVariance)}`;
+          }
+
+          if (marginVarianceElement) {
+            console.log('Updating margin variance element');
+            const sign = marginVariance > 0 ? '+' : '';
+            marginVarianceElement.textContent = `${sign}${marginVariance.toFixed(1)} pts`;
+          }
+
+          if (attendanceVarianceElement) {
+            console.log('Updating attendance variance element');
+            const sign = attendanceVariance > 0 ? '+' : '';
+            attendanceVarianceElement.textContent = `${sign}${attendanceVariance.toLocaleString()}`;
+          }
+        } catch (error) {
+          console.error('Error updating variance elements:', error);
+        }
+      }, 100);
     }
   }, [summary, comparisonMode, revenueVariance, costVariance, profitVariance, marginVariance, attendanceVariance]);
 
