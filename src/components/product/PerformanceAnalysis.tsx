@@ -19,6 +19,7 @@ import { TooltipProps } from 'recharts';
 import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import type { AnalysisPeriodData } from '@/hooks/useForecastAnalysis';
 import { useForecastAnalysis } from '@/hooks/useForecastAnalysis';
+import { ComparisonVarianceCard } from '@/components/ui/ComparisonVarianceCard';
 
 // Import enhanced UI components
 import {
@@ -265,16 +266,14 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
 
             {/* Enhanced Variance Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6" key={`variance-cards-${refreshKey}`}>
-                <VarianceCard
+                <ComparisonVarianceCard
                     key={`revenue-${comparisonMode}-${refreshKey}`}
                     title="Total Revenue"
-                    forecast={comparisonMode === 'period' ? periodSpecificRevenueForecast :
-                             comparisonMode === 'cumulative' ? periodSpecificRevenueForecast :
-                             totalRevenueForecast}
+                    periodForecast={periodSpecificRevenueForecast}
+                    cumulativeForecast={periodSpecificRevenueForecast}
+                    totalForecast={totalRevenueForecast}
                     actual={actualTotalRevenue}
-                    variance={comparisonMode === 'period' ? periodRevenueVariance :
-                             comparisonMode === 'cumulative' ? actualTotalRevenue - periodSpecificRevenueForecast :
-                             actualTotalRevenue - totalRevenueForecast}
+                    comparisonMode={comparisonMode}
                     actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     trend={trendData.slice(-10).map(d => d.revenueActual || 0).filter(Boolean)}
                     description={comparisonMode === 'period' ?
@@ -285,16 +284,14 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                     secondaryValue={revisedTotalRevenue}
                     secondaryLabel="Revised Outlook"
                 />
-                 <VarianceCard
+                 <ComparisonVarianceCard
                     key={`costs-${comparisonMode}-${refreshKey}`}
                     title="Total Costs"
-                    forecast={comparisonMode === 'period' ? periodSpecificCostForecast :
-                             comparisonMode === 'cumulative' ? periodSpecificCostForecast :
-                             totalCostForecast}
+                    periodForecast={periodSpecificCostForecast}
+                    cumulativeForecast={periodSpecificCostForecast}
+                    totalForecast={totalCostForecast}
                     actual={actualTotalCost}
-                    variance={comparisonMode === 'period' ? periodCostVariance :
-                             comparisonMode === 'cumulative' ? actualTotalCost - periodSpecificCostForecast :
-                             actualTotalCost - totalCostForecast}
+                    comparisonMode={comparisonMode}
                     actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     higherIsBad={true}
                     trend={trendData.slice(-10).map(d => d.costActual || 0).filter(Boolean)}
@@ -306,16 +303,14 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                     secondaryValue={revisedTotalCost}
                     secondaryLabel="Revised Outlook"
                 />
-                 <VarianceCard
+                 <ComparisonVarianceCard
                     key={`profit-${comparisonMode}-${refreshKey}`}
                     title="Total Profit"
-                    forecast={comparisonMode === 'period' ? periodSpecificProfitForecast :
-                             comparisonMode === 'cumulative' ? periodSpecificProfitForecast :
-                             totalProfitForecast}
+                    periodForecast={periodSpecificProfitForecast}
+                    cumulativeForecast={periodSpecificProfitForecast}
+                    totalForecast={totalProfitForecast}
                     actual={actualTotalProfit}
-                    variance={comparisonMode === 'period' ? periodProfitVariance :
-                             comparisonMode === 'cumulative' ? actualTotalProfit - periodSpecificProfitForecast :
-                             actualTotalProfit - totalProfitForecast}
+                    comparisonMode={comparisonMode}
                     actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     trend={trendData.slice(-10).map(d => d.profitActual || 0).filter(Boolean)}
                     description={comparisonMode === 'period' ?
@@ -326,16 +321,14 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                     secondaryValue={revisedTotalProfit}
                     secondaryLabel="Revised Outlook"
                 />
-                 <VarianceCard
+                 <ComparisonVarianceCard
                     key={`margin-${comparisonMode}-${refreshKey}`}
                     title="Avg. Profit Margin"
-                    forecast={comparisonMode === 'period' ? periodSpecificProfitMargin :
-                             comparisonMode === 'cumulative' ? periodSpecificProfitMargin :
-                             avgProfitMarginForecast}
+                    periodForecast={periodSpecificProfitMargin}
+                    cumulativeForecast={periodSpecificProfitMargin}
+                    totalForecast={avgProfitMarginForecast}
                     actual={actualAvgProfitMargin}
-                    variance={comparisonMode === 'period' ? actualAvgProfitMargin - periodSpecificProfitMargin :
-                             comparisonMode === 'cumulative' ? actualAvgProfitMargin - periodSpecificProfitMargin :
-                             actualAvgProfitMargin - avgProfitMarginForecast}
+                    comparisonMode={comparisonMode}
                     actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                     isPercentage={true}
                     description={comparisonMode === 'period' ?
@@ -347,20 +340,14 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                     secondaryLabel="Revised Outlook"
                 />
                 {isWeeklyEvent && (
-                    <VarianceCard
+                    <ComparisonVarianceCard
                         key={`attendance-${comparisonMode}-${refreshKey}`}
                         title="Total Attendance"
-                        forecast={comparisonMode === 'period' ?
-                                 (totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * periodsWithActuals : 0 :
-                                 comparisonMode === 'cumulative' ?
-                                 (totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * periodsWithActuals : 0 :
-                                 totalAttendanceForecast}
+                        periodForecast={(totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * periodsWithActuals : 0}
+                        cumulativeForecast={(totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * periodsWithActuals : 0}
+                        totalForecast={totalAttendanceForecast}
                         actual={totalAttendanceActual}
-                        variance={comparisonMode === 'period' ?
-                                 totalAttendanceActual - ((totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * periodsWithActuals : 0) :
-                                 comparisonMode === 'cumulative' ?
-                                 totalAttendanceActual - ((totalAttendanceForecast && periodsWithActuals) ? totalAttendanceForecast / duration * periodsWithActuals : 0) :
-                                 totalAttendanceActual - totalAttendanceForecast}
+                        comparisonMode={comparisonMode}
                         actualLabel={`Actual (${periodsWithActuals} ${periodsWithActuals === 1 ? timeUnit.toLowerCase() : timeUnit.toLowerCase() + 's'})`}
                         isUnits={true}
                         trend={trendData.slice(-10).map(d => d.attendanceActual || 0).filter(Boolean)}
@@ -599,19 +586,28 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                 <Label htmlFor="comparison-mode" className="mr-2">Compare:</Label>
                 <div className="flex space-x-2">
                   <button
-                    onClick={() => setComparisonMode('period')}
+                    onClick={() => {
+                      console.log('Setting comparison mode to period');
+                      setComparisonMode('period');
+                    }}
                     className={`px-3 py-1 text-sm rounded ${comparisonMode === 'period' ? 'bg-primary text-white' : 'bg-muted'}`}
                   >
                     Period to Period
                   </button>
                   <button
-                    onClick={() => setComparisonMode('cumulative')}
+                    onClick={() => {
+                      console.log('Setting comparison mode to cumulative');
+                      setComparisonMode('cumulative');
+                    }}
                     className={`px-3 py-1 text-sm rounded ${comparisonMode === 'cumulative' ? 'bg-primary text-white' : 'bg-muted'}`}
                   >
                     Cumulative
                   </button>
                   <button
-                    onClick={() => setComparisonMode('projected')}
+                    onClick={() => {
+                      console.log('Setting comparison mode to projected');
+                      setComparisonMode('projected');
+                    }}
                     className={`px-3 py-1 text-sm rounded ${comparisonMode === 'projected' ? 'bg-primary text-white' : 'bg-muted'}`}
                   >
                     Projected Outcome
