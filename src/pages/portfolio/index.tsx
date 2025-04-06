@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   BarChart3, PlusCircle, TrendingUp, AlertTriangle, FolderIcon, ArrowUpRight,
   DollarSign, TrendingDown, BarChart2, PieChart as PieChartIcon, Activity, Target,
-  Building
+  Building, MoreVertical, Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import useStore from '@/store/useStore';
@@ -24,6 +24,23 @@ import { generateForecastTimeSeries, ForecastPeriodData } from '@/lib/financialC
 import { dataColors } from '@/lib/colors';
 import MetricCard from '@/components/ui/metric-card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { toast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 
 // Define type for projects with calculated metrics
@@ -286,6 +303,29 @@ const PortfolioDashboard: React.FC = () => {
 
   // Define chart colors
   const COLORS = dataColors.series;
+
+  // Handle product deletion
+  const [projectToDelete, setProjectToDelete] = useState<number | null>(null);
+
+  const handleDeleteProject = async () => {
+    if (projectToDelete === null) return;
+
+    try {
+      await deleteProject(projectToDelete);
+      toast({
+        title: "Product deleted",
+        description: "The product has been successfully deleted.",
+      });
+      setProjectToDelete(null);
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to delete product",
+        description: "There was an error deleting the product. Please try again.",
+      });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -725,14 +765,34 @@ const PortfolioDashboard: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/projects/${project.id}/summary`)}
-                        className="hover:bg-muted/50"
-                      >
-                        View Details
-                      </Button>
+                      <div className="flex items-center justify-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/projects/${project.id}/summary`)}
+                          className="hover:bg-muted/50"
+                        >
+                          View Details
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => navigate(`/projects/${project.id}/edit`)}>
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-red-600"
+                              onClick={() => setProjectToDelete(project.id!)}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -749,6 +809,24 @@ const PortfolioDashboard: React.FC = () => {
 
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={projectToDelete !== null} onOpenChange={(open) => !open && setProjectToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the product and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setProjectToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteProject} className="bg-red-500 hover:bg-red-600">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
