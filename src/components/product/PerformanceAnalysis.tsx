@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { FinancialModel } from '@/lib/db';
 import { ActualsPeriodEntry } from '@/types/models';
@@ -14,6 +14,9 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { formatCurrency, formatPercent, cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ChartContainer from '@/components/common/ChartContainer';
+import { dataColors } from '@/lib/colors';
+// Import enhanced chart components
+import { RevenuePerformanceChart, ProfitPerformanceChart, EnhancedRadarChart, AttendanceTrackingChart } from '@/components/charts';
 import { TypographyH4, TypographyMuted } from '@/components/ui/typography';
 import { TooltipProps } from 'recharts';
 import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
@@ -41,7 +44,6 @@ import {
   WaterfallChart,
   BulletChart,
   RadarChart,
-  dataColors
 } from '@/components/ui/enhanced-charts';
 
 import useStore from '@/store/useStore'; // Import useStore
@@ -114,9 +116,9 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
 
   // Get store actions
   const { registerExportFunction, unregisterExportFunction } = useStore(
-    (state) => ({ 
-      registerExportFunction: state.registerExportFunction, 
-      unregisterExportFunction: state.unregisterExportFunction 
+    (state) => ({
+      registerExportFunction: state.registerExportFunction,
+      unregisterExportFunction: state.unregisterExportFunction
     })
   );
 
@@ -130,20 +132,26 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
     selectedModelId
   );
 
+  // No chart generation for PDF
+
   // Function to gather data for export
-  const getDataForExport = (): ExportDataType => {
+  const getDataForExport = async (): Promise<ExportDataType> => {
       if (!summary || !selectedModel) {
           console.error("Cannot export, data not ready.");
           return { error: "Data not available" };
       }
+
+      console.log('Preparing data for PDF export');
+
       return {
           reportType: 'Performance Analysis',
           generatedAt: new Date().toISOString(),
-          projectName: selectedModel.name, 
+          projectName: selectedModel.name,
           modelName: selectedModel.name,
           summaryMetrics: summary,
           trendData: trendData,
-          assumptions: selectedModel.assumptions,
+          assumptions: selectedModel.assumptions
+          // No charts included in PDF export
       };
   };
 
@@ -151,20 +159,20 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
   useEffect(() => {
     // Only register if data is available
     if (summary && selectedModel) {
-      const key = 'Performance Analysis'; 
+      const key = 'Performance Analysis';
       registerExportFunction(key, getDataForExport);
-      
+
       // Cleanup function to unregister
       return () => {
         unregisterExportFunction(key);
       };
     }
     // No cleanup needed if never registered
-    return undefined; 
+    return undefined;
   // Depend on summary and selectedModel availability
-  }, [summary, selectedModel, registerExportFunction, unregisterExportFunction]); 
+  }, [summary, selectedModel, registerExportFunction, unregisterExportFunction]);
 
-  // --- Add explicit check for summary before proceeding --- 
+  // --- Add explicit check for summary before proceeding ---
   useEffect(() => {
     if(summary) {
       console.log('[PerformanceAnalysis] Received summary. Actual Total Attendance:', summary.actualTotalAttendance);
@@ -180,7 +188,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
         </div>
      );
   }
-  // --- If summary exists, proceed with destructuring --- 
+  // --- If summary exists, proceed with destructuring ---
   const {
     periodSpecificRevenueForecast = 0,
     periodSpecificCostForecast = 0,
@@ -194,14 +202,14 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
     actualTotalAttendance = 0, // Default re-added
     latestActualPeriod = 0,
     timeUnit = 'Period',
-    totalRevenueForecast = 0, 
-    totalCostForecast = 0,    
-    totalProfitForecast = 0,   
-    avgProfitMarginForecast = 0, 
-    totalAttendanceForecast = 0, 
+    totalRevenueForecast = 0,
+    totalCostForecast = 0,
+    totalProfitForecast = 0,
+    avgProfitMarginForecast = 0,
+    totalAttendanceForecast = 0,
   } = summary; // Destructure from validated summary
 
-  // --- Calculations (can now safely use destructured values) --- 
+  // --- Calculations (can now safely use destructured values) ---
   const revenueVarianceSummary = actualTotalRevenue - periodSpecificRevenueForecast;
   const profitMarginActualPercent = actualTotalRevenue > 0 ? (actualTotalProfit / actualTotalRevenue) * 100 : 0;
   const attendanceVarianceSummary = actualTotalAttendance - (periodSpecificAttendanceForecast ?? 0);
@@ -222,7 +230,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
       gray: 'bg-gray-100 text-gray-800 border-gray-300',
   };
 
-  const renderEnhancedTooltip = CustomTooltip; 
+  const renderEnhancedTooltip = CustomTooltip;
 
   const radarData = useMemo(() => {
     const targetValue = 100;
@@ -233,8 +241,8 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
         'Target': targetValue,
       },
       {
-        subject: 'Cost Eff.', 
-        'Actual': periodSpecificCostForecast > 0 ? (2 - (actualTotalCost / periodSpecificCostForecast)) * 100 : 0, 
+        subject: 'Cost Eff.',
+        'Actual': periodSpecificCostForecast > 0 ? (2 - (actualTotalCost / periodSpecificCostForecast)) * 100 : 0,
         'Target': targetValue,
       },
       {
@@ -243,19 +251,19 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
         'Target': targetValue,
       },
        {
-        subject: 'Margin', 
+        subject: 'Margin',
         'Actual': periodSpecificProfitMargin > 0 ? (actualAvgProfitMargin / periodSpecificProfitMargin) * 100 : 0,
         'Target': targetValue,
       },
       {
-        subject: 'Attend.', 
-        'Actual': isWeeklyEvent && (periodSpecificAttendanceForecast ?? 0) > 0 ? 
+        subject: 'Attend.',
+        'Actual': isWeeklyEvent && (periodSpecificAttendanceForecast ?? 0) > 0 ?
           (actualTotalAttendance / (periodSpecificAttendanceForecast ?? 1)) * 100 : 0,
         'Target': targetValue,
       }
     ].filter(item => !isNaN(item.Actual) && item.Actual !== 0);
-  }, [summary, isWeeklyEvent, 
-      actualTotalRevenue, periodSpecificRevenueForecast, 
+  }, [summary, isWeeklyEvent,
+      actualTotalRevenue, periodSpecificRevenueForecast,
       actualTotalCost, periodSpecificCostForecast,
       actualTotalProfit, periodSpecificProfitForecast,
       actualAvgProfitMargin, periodSpecificProfitMargin,
@@ -332,7 +340,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                  {`, profit margin is `}
                  <span className="font-semibold">{`${formatPercent(profitMarginActualPercent)}`}</span>
                  {isWeeklyEvent && `, and attendance is `}
-                 {isWeeklyEvent && 
+                 {isWeeklyEvent &&
                     <span className={cn(attendanceVariancePercent >= 0 ? "text-green-600 font-semibold" : "text-red-600 font-semibold")}>
                         {`${attendanceVariancePercent >= 0 ? 'above' : 'below'} target by ${formatPercent(Math.abs(attendanceVariancePercent))}`}
                    </span>
@@ -359,7 +367,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
              <div className="flex-grow flex items-center space-x-2">
                <Label className="text-sm font-medium text-muted-foreground">Overall Target Progress:</Label>
                {/* TODO: Calculate actual progress based on a primary goal (e.g., profit) */}
-               <Progress value={13.6} className="w-[200px] h-2.5" /> 
+               <Progress value={13.6} className="w-[200px] h-2.5" />
                <span className="text-sm font-semibold">13.6%</span>{/* Placeholder */}
              </div>
            </div>
@@ -369,37 +377,37 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
              <div>
                <TypographyH4 className="mb-3 text-base font-semibold">Revenue & Profit</TypographyH4>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <PerformanceScorecard 
-                     title="Revenue Performance (vs Forecast-to-Date)" 
-                     metric="revenue" 
-                     actual={actualTotalRevenue} 
+                 <PerformanceScorecard
+                     title="Revenue Performance (vs Forecast-to-Date)"
+                     metric="revenue"
+                     actual={actualTotalRevenue}
                      forecast={periodSpecificRevenueForecast}
                      target={periodSpecificRevenueForecast * 1.05}
                      trend={trendData.filter(d => d.revenueActual !== undefined).map(d => d.revenueActual! || 0).slice(-6)}
-                     isCurrency={true} 
+                     isCurrency={true}
                  />
-                 <PerformanceScorecard 
-                     title="Profit Achievement (vs Forecast-to-Date)" 
-                     metric="profit" 
-                     actual={actualTotalProfit} 
+                 <PerformanceScorecard
+                     title="Profit Achievement (vs Forecast-to-Date)"
+                     metric="profit"
+                     actual={actualTotalProfit}
                      forecast={periodSpecificProfitForecast}
                      target={periodSpecificProfitForecast * 1.1}
                      trend={trendData.filter(d => d.profitActual !== undefined).map(d => d.profitActual! || 0).slice(-6)}
-                     isCurrency={true} 
+                     isCurrency={true}
                  />
                </div>
              </div>
              <div>
                <TypographyH4 className="mb-3 text-base font-semibold">Costs & Attendance</TypographyH4>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <PerformanceScorecard 
-                    title="Cost Management (vs Forecast-to-Date)" 
-                    metric="cost" 
-                    actual={actualTotalCost} 
+                 <PerformanceScorecard
+                    title="Cost Management (vs Forecast-to-Date)"
+                    metric="cost"
+                    actual={actualTotalCost}
                     forecast={periodSpecificCostForecast}
                     target={periodSpecificCostForecast * 0.95}
-                    trend={trendData.filter(d => d.costActual !== undefined).map(d => d.costActual! || 0).slice(-6)} 
-                    isCurrency={true} 
+                    trend={trendData.filter(d => d.costActual !== undefined).map(d => d.costActual! || 0).slice(-6)}
+                    isCurrency={true}
                     higherIsBad={true}
                  />
                  {isWeeklyEvent && (
@@ -416,9 +424,9 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                </div>
              </div>
            </div>
-           
+
            {/* === Graph Section === */}
-           <div> 
+           <div>
               {/* Tabs: Period/Cumulative/Projected */}
               <div className="mb-4 flex justify-center">
                   {/* Re-style these buttons later */}
@@ -433,204 +441,32 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
               {/* Charts */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                  {/* Revenue Performance Chart (With view toggle) */}
-                 <ChartContainer title="Revenue Performance" description="Forecast vs. Actual Revenue" height={350} allowDownload={true} allowExpand={true} downloadData={trendData} downloadFilename="revenue-performance.csv">
-                     <Tabs defaultValue="line" className="w-full">
-                        <TabsList className="mb-4">
-                           <TabsTrigger value="line">Line</TabsTrigger>
-                           <TabsTrigger value="area">Area</TabsTrigger>
-                           <TabsTrigger value="bar">Bar</TabsTrigger>
-                        </TabsList>
-                        {/* Line Chart View */}
-                        <div className="h-[300px] w-full" data-state={"line"}>
-                           <ResponsiveContainer width="100%" height="100%">
-                              <LineChart data={trendData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                                 <CartesianGrid strokeDasharray="3 3" stroke={dataColors.grid} />
-                                 <XAxis dataKey="point" tick={{ fontSize: 10 }} />
-                                 <YAxis tickFormatter={val => formatCurrency(val)} tick={{ fontSize: 10 }} />
-                                 <Tooltip content={renderEnhancedTooltip} />
-                                 <Legend />
-                                 <Line
-                                    type="monotone"
-                                    dataKey={viewMode === 'cumulative' ? "cumulativeRevenueForecast" : "revenueForecast"}
-                                    name="Forecast"
-                                    stroke={dataColors.forecast}
-                                    strokeWidth={2}
-                                    dot={false}
-                                    strokeDasharray="5 5"
-                                 />
-                                 <Line
-                                    type="monotone"
-                                    dataKey={viewMode === 'cumulative' ? "cumulativeRevenueActual" : "revenueActual"}
-                                    name="Actual"
-                                    stroke={dataColors.revenue}
-                                    strokeWidth={2}
-                                    dot={{ r: 3 }}
-                                    connectNulls
-                                 />
-                              </LineChart>
-                           </ResponsiveContainer>
-                        </div>
-                        {/* Area Chart View */}
-                        <div className="h-[300px] w-full" data-state={"area"}>
-                           <ResponsiveContainer width="100%" height="100%">
-                              <AreaChart data={trendData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                                 <CartesianGrid strokeDasharray="3 3" stroke={dataColors.grid} />
-                                 <XAxis dataKey="point" tick={{ fontSize: 10 }} />
-                                 <YAxis tickFormatter={val => formatCurrency(val)} tick={{ fontSize: 10 }} />
-                                 <Tooltip content={renderEnhancedTooltip} />
-                                 <Legend />
-                                 <Area
-                                    type="monotone"
-                                    dataKey={viewMode === 'cumulative' ? "cumulativeRevenueForecast" : "revenueForecast"}
-                                    name="Forecast"
-                                    stroke={dataColors.forecast}
-                                    fill={dataColors.forecast}
-                                    fillOpacity={0.1}
-                                    strokeDasharray="5 5"
-                                 />
-                                 <Area
-                                    type="monotone"
-                                    dataKey={viewMode === 'cumulative' ? "cumulativeRevenueActual" : "revenueActual"}
-                                    name="Actual"
-                                    stroke={dataColors.revenue}
-                                    fill={dataColors.revenue}
-                                    fillOpacity={0.2}
-                                 />
-                              </AreaChart>
-                           </ResponsiveContainer>
-                        </div>
-                        {/* Bar Chart View */}
-                        <div className="h-[300px] w-full" data-state={"bar"}>
-                           <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={trendData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                                 <CartesianGrid strokeDasharray="3 3" stroke={dataColors.grid} />
-                                 <XAxis dataKey="point" tick={{ fontSize: 10 }} />
-                                 <YAxis tickFormatter={val => formatCurrency(val)} tick={{ fontSize: 10 }} />
-                                 <Tooltip content={renderEnhancedTooltip} />
-                                 <Legend />
-                                 <Bar
-                                    dataKey={viewMode === 'cumulative' ? "cumulativeRevenueForecast" : "revenueForecast"}
-                                    name="Forecast"
-                                    fill={dataColors.forecast}
-                                    fillOpacity={0.7}
-                                    radius={[4, 4, 0, 0]}
-                                 />
-                                 <Bar
-                                    dataKey={viewMode === 'cumulative' ? "cumulativeRevenueActual" : "revenueActual"}
-                                    name="Actual"
-                                    fill={dataColors.revenue}
-                                    radius={[4, 4, 0, 0]}
-                                 />
-                              </BarChart>
-                           </ResponsiveContainer>
-                        </div>
-                     </Tabs>
+                 <ChartContainer id="revenue-chart" title="Revenue Performance" description="Forecast vs. Actual Revenue" height={350} allowDownload={true} allowExpand={true} downloadData={trendData} downloadFilename="revenue-performance.csv">
+                     {/* Enhanced Revenue Performance Chart */}
+                     <RevenuePerformanceChart
+                        data={trendData}
+                        viewMode={comparisonMode}
+                        animate={true}
+                     />
                   </ChartContainer>
                   {/* Profit Performance Chart (With view toggle) */}
-                  <ChartContainer title="Profit Performance" description="Forecast vs. Actual Profit" height={350} allowDownload={true} allowExpand={true} downloadData={trendData} downloadFilename="profit-performance.csv">
-                      <Tabs defaultValue="line" className="w-full">
-                         <TabsList className="mb-4">
-                           <TabsTrigger value="line">Line</TabsTrigger>
-                           <TabsTrigger value="area">Area</TabsTrigger>
-                           <TabsTrigger value="bar">Bar</TabsTrigger>
-                         </TabsList>
-                           {/* Line Chart View */}
-                           <div className="h-[300px] w-full" data-state={"line"}>
-                              <ResponsiveContainer width="100%" height="100%">
-                                 <LineChart data={trendData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke={dataColors.grid} />
-                                    <XAxis dataKey="point" tick={{ fontSize: 10 }} />
-                                    <YAxis tickFormatter={val => formatCurrency(val)} tick={{ fontSize: 10 }} />
-                                    <Tooltip content={renderEnhancedTooltip} />
-                                    <Legend />
-                                    <ReferenceLine y={0} stroke="#b0b0b0" strokeDasharray="2 2"/>
-                                    <Line
-                                       type="monotone"
-                                       dataKey={viewMode === 'cumulative' ? "cumulativeProfitForecast" : "profitForecast"}
-                                       name="Forecast"
-                                       stroke={dataColors.forecast}
-                                       strokeWidth={2}
-                                       dot={false}
-                                       strokeDasharray="5 5"
-                                    />
-                                    <Line
-                                       type="monotone"
-                                       dataKey={viewMode === 'cumulative' ? "cumulativeProfitActual" : "profitActual"}
-                                       name="Actual"
-                                       stroke={dataColors.profit}
-                                       strokeWidth={2}
-                                       dot={{ r: 3 }}
-                                       connectNulls
-                                    />
-                                 </LineChart>
-                              </ResponsiveContainer>
-                           </div>
-                           {/* Area Chart View */}
-                           <div className="h-[300px] w-full" data-state={"area"}>
-                              <ResponsiveContainer width="100%" height="100%">
-                                 <AreaChart data={trendData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke={dataColors.grid} />
-                                    <XAxis dataKey="point" tick={{ fontSize: 10 }} />
-                                    <YAxis tickFormatter={val => formatCurrency(val)} tick={{ fontSize: 10 }} />
-                                    <Tooltip content={renderEnhancedTooltip} />
-                                    <Legend />
-                                    <ReferenceLine y={0} stroke="#b0b0b0" strokeDasharray="2 2"/>
-                                    <Area
-                                       type="monotone"
-                                       dataKey={viewMode === 'cumulative' ? "cumulativeProfitForecast" : "profitForecast"}
-                                       name="Forecast"
-                                       stroke={dataColors.forecast}
-                                       fill={dataColors.forecast}
-                                       fillOpacity={0.1}
-                                       strokeDasharray="5 5"
-                                    />
-                                    <Area
-                                       type="monotone"
-                                       dataKey={viewMode === 'cumulative' ? "cumulativeProfitActual" : "profitActual"}
-                                       name="Actual"
-                                       stroke={dataColors.profit}
-                                       fill={dataColors.profit}
-                                       fillOpacity={0.2}
-                                    />
-                                 </AreaChart>
-                              </ResponsiveContainer>
-                           </div>
-                           {/* Bar Chart View */}
-                           <div className="h-[300px] w-full" data-state={"bar"}>
-                              <ResponsiveContainer width="100%" height="100%">
-                                 <BarChart data={trendData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke={dataColors.grid} />
-                                    <XAxis dataKey="point" tick={{ fontSize: 10 }} />
-                                    <YAxis tickFormatter={val => formatCurrency(val)} tick={{ fontSize: 10 }} />
-                                    <Tooltip content={renderEnhancedTooltip} />
-                                    <Legend />
-                                    <ReferenceLine y={0} stroke="#b0b0b0" strokeDasharray="2 2"/>
-                                    <Bar
-                                       dataKey={viewMode === 'cumulative' ? "cumulativeProfitForecast" : "profitForecast"}
-                                       name="Forecast"
-                                       fill={dataColors.forecast}
-                                       fillOpacity={0.7}
-                                       radius={[4, 4, 0, 0]}
-                                    />
-                                    <Bar
-                                       dataKey={viewMode === 'cumulative' ? "cumulativeProfitActual" : "profitActual"}
-                                       name="Actual"
-                                       fill={dataColors.profit}
-                                       radius={[4, 4, 0, 0]}
-                                    />
-                                 </BarChart>
-                              </ResponsiveContainer>
-                           </div>
-                      </Tabs>
+                  <ChartContainer id="profit-chart" title="Profit Performance" description="Forecast vs. Actual Profit" height={350} allowDownload={true} allowExpand={true} downloadData={trendData} downloadFilename="profit-performance.csv">
+                     {/* Enhanced Profit Performance Chart */}
+                     <ProfitPerformanceChart
+                        data={trendData}
+                        viewMode={comparisonMode}
+                        animate={true}
+                     />
+
                   </ChartContainer>
               </div>
                {/* Advanced Visualizations */}
                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                     {/* Radar Chart (Removed 'Previous' key) */}
-                   <ChartContainer title="Performance Radar" description="Multi-dimensional performance view" height={350} allowDownload={true} downloadData={radarData} downloadFilename="performance-radar.csv">
+                   <ChartContainer id="radar-chart" title="Performance Radar" description="Multi-dimensional performance view" height={350} allowDownload={true} downloadData={radarData} downloadFilename="performance-radar.csv">
                       {radarData && radarData.length > 0 ? (
                          <div className="flex flex-col justify-center items-center h-full">
-                            <RadarChart data={radarData} dataKeys={['Actual', 'Target']} height={300} isPercentage={true} maxValue={120} />
+                            <EnhancedRadarChart data={radarData} height={300} />
                             <p className="text-xs text-muted-foreground mt-2 text-center px-4">Visualises multi-dimensional performance across revenue, cost efficiency, profit, margin, and attendance. Actual vs Target.</p>
                          </div>
                        ) : ( <div className="flex justify-center items-center h-full"><p className="text-muted-foreground">No data available for radar</p></div> )}
@@ -639,17 +475,11 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                    {isWeeklyEvent ? (
                        <ChartContainer title="Attendance Tracking" description="Forecast vs. Actual Attendance" height={350} allowDownload={true} downloadData={trendData} downloadFilename="attendance-data.csv">
                            {trendData && trendData.length > 0 ? (
-                               <ResponsiveContainer width="100%" height="100%">
-                                  <BarChart data={trendData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                                     <CartesianGrid strokeDasharray="3 3" vertical={false}/>
-                                     <XAxis dataKey="point" tick={{ fontSize: 10 }} />
-                                     <YAxis tickFormatter={val => val.toLocaleString()} tick={{ fontSize: 10 }}/>
-                                     <Tooltip content={renderEnhancedTooltip} />
-                                     <Legend />
-                                     <Bar dataKey="attendanceForecast" name="Forecast" fill={dataColors.neutral[300]} radius={[4, 4, 0, 0]} barSize={20} />
-                                     <Bar dataKey="attendanceActual" name="Actual" fill={dataColors.attendance} radius={[4, 4, 0, 0]} barSize={20} />
-                                  </BarChart>
-                               </ResponsiveContainer>
+                               <AttendanceTrackingChart
+                                  data={trendData}
+                                  viewMode={comparisonMode}
+                                  animate={true}
+                               />
                            ) : (
                                <div className="flex justify-center items-center h-full">
                                    <p className="text-muted-foreground">No attendance data available</p>
@@ -686,9 +516,9 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
            </div>
 
            {/* Placeholder for original SimpleVarianceCards if needed later */}
-           {/* 
+           {/*
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6" key={`variance-cards-${refreshKey}-${comparisonMode}`}>
-             <SimpleVarianceCard ... /> 
+             <SimpleVarianceCard ... />
              </div>
            */}
 

@@ -15,13 +15,17 @@ export const formatCurrency = (amount: number): string => {
 };
 
 export const formatPercent = (value: number): string => {
-  return `${value.toFixed(1)}%`;
+  return new Intl.NumberFormat('en-US', {
+    style: 'percent',
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  }).format(value / 100);
 };
 
 // Formats variance, showing $ amount and (percentage %)
 export const formatVariance = (variance: number | undefined, forecast: number | undefined): string => {
   if (variance === undefined || variance === null) return "N/A";
-  
+
   const formattedAmount = formatCurrency(variance);
   let percentageString = "";
 
@@ -29,9 +33,9 @@ export const formatVariance = (variance: number | undefined, forecast: number | 
     const percentage = (variance / forecast) * 100;
     percentageString = ` (${percentage.toFixed(1)}%)`;
   }
-  
+
   // Add a plus sign for positive variance
   const sign = variance > 0 ? '+' : '';
-  
+
   return `${sign}${formattedAmount}${percentageString}`;
 };

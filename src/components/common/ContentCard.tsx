@@ -11,6 +11,7 @@ interface ContentCardProps {
   headerClassName?: string;
   contentClassName?: string;
   footerClassName?: string;
+  allowOverflow?: boolean;
 }
 
 const ContentCard: React.FC<ContentCardProps> = ({
@@ -22,16 +23,17 @@ const ContentCard: React.FC<ContentCardProps> = ({
   headerClassName,
   contentClassName,
   footerClassName,
+  allowOverflow = false,
 }) => {
   return (
-    <Card className={cn("overflow-hidden", className)}>
+    <Card className={cn(allowOverflow ? "overflow-visible" : "overflow-hidden", className)}>
       {(title || description) && (
         <CardHeader className={headerClassName}>
           {title && <CardTitle>{title}</CardTitle>}
           {description && <CardDescription>{description}</CardDescription>}
         </CardHeader>
       )}
-      <CardContent className={cn("p-6", contentClassName)}>
+      <CardContent className={cn("p-6", allowOverflow ? "overflow-visible" : "", contentClassName)} style={allowOverflow ? { overflow: 'visible' } : {}}>
         {children}
       </CardContent>
       {footer && (
