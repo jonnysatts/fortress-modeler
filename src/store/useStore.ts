@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Project, FinancialModel, db } from '@/lib/db';
+import { Project, FinancialModel, db, deleteProject as dbDeleteProject } from '@/lib/db';
 
 interface AppState {
   projects: Project[];
@@ -110,8 +110,9 @@ const useStore = create<AppState>((set, get) => ({
   deleteProject: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      // Use the db.deleteProject function which handles all related data
-      await db.deleteProject(id);
+      console.log(`Store: Deleting project ${id} using dbDeleteProject function`);
+      // Use the imported dbDeleteProject function instead of trying to call it as a method on db
+      await dbDeleteProject(id);
 
       // Reset current project if it's the one being deleted
       const currentProject = get().currentProject;
@@ -121,6 +122,7 @@ const useStore = create<AppState>((set, get) => ({
 
       await get().loadProjects();
       set({ isLoading: false });
+      console.log(`Store: Successfully deleted project ${id}`);
     } catch (error) {
       console.error('Error deleting project:', error);
       set({ error: 'Failed to delete project', isLoading: false });
