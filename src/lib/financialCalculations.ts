@@ -279,12 +279,28 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
       if (marketingMode === 'channels') {
         // Sum up all channel weekly budgets
         const channels = Array.isArray(marketingSetup.channels) ? marketingSetup.channels : [];
-        const budget = channels.reduce((s, ch) => s + (typeof ch.weeklyBudget === 'number' ? ch.weeklyBudget : 0), 0);
+
+        // Log each channel for debugging
+        if (channels.length > 0) {
+          console.log(`[ForecastCalc Period ${period}] Marketing Channels (${channels.length}):`);
+          channels.forEach((ch, idx) => {
+            console.log(`  Channel ${idx+1}: ${ch.name || 'Unnamed'} (${ch.channelType || 'Unknown'}) - Budget: ${ch.weeklyBudget || 0}`);
+          });
+        } else {
+          console.log(`[ForecastCalc Period ${period}] No marketing channels defined.`);
+        }
+
+        // Calculate total budget from all channels
+        const budget = channels.reduce((s, ch) => {
+          const weeklyBudget = typeof ch.weeklyBudget === 'number' ? ch.weeklyBudget : 0;
+          return s + weeklyBudget;
+        }, 0);
+
         periodMarketingCost = isWeekly ? budget : budget * (365.25 / 7 / 12); // Approx monthly
 
         // Log channel budgets for debugging
-        console.log(`[ForecastCalc Period ${period}] Marketing Channels:`, channels);
         console.log(`[ForecastCalc Period ${period}] Total Channel Budget: ${budget} per ${isWeekly ? 'week' : 'month'}`);
+        console.log(`[ForecastCalc Period ${period}] Calculated Marketing Cost: ${periodMarketingCost}`);
       } else if (marketingMode === 'highLevel') {
         // Ensure we have valid values for all required fields
         const totalBudget = typeof marketingSetup.totalBudget === 'number' ? marketingSetup.totalBudget : 0;

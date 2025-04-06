@@ -346,9 +346,23 @@ const ForecastBuilder: React.FC = () => {
         }
       }
 
-      // For channels mode, ensure channels array exists
-      if (dataToSave.marketing.allocationMode === 'channels' && !Array.isArray(dataToSave.marketing.channels)) {
-        dataToSave.marketing.channels = [];
+      // For channels mode, ensure channels array exists and is properly formatted
+      if (dataToSave.marketing.allocationMode === 'channels') {
+        if (!Array.isArray(dataToSave.marketing.channels)) {
+          dataToSave.marketing.channels = [];
+        } else {
+          // Ensure each channel has the required properties
+          dataToSave.marketing.channels = dataToSave.marketing.channels.map(channel => ({
+            id: channel.id || crypto.randomUUID(),
+            channelType: channel.channelType || defaultChannelTypes[0],
+            name: channel.name || '',
+            weeklyBudget: typeof channel.weeklyBudget === 'number' ? channel.weeklyBudget : 0,
+            targetAudience: channel.targetAudience || '',
+            description: channel.description || ''
+          }));
+        }
+
+        console.log('Processed marketing channels for saving:', dataToSave.marketing.channels);
       }
     }
 
@@ -872,6 +886,7 @@ const ForecastBuilder: React.FC = () => {
                                                         onValueChange={value => {
                                                             field.onChange(value);
                                                             console.log(`Channel ${index} type updated:`, value);
+                                                            setIsDirty(true); // Force dirty state
                                                         }}
                                                         value={field.value || defaultChannelTypes[0]}>
                                                         <SelectTrigger className="w-[180px]">
@@ -896,6 +911,7 @@ const ForecastBuilder: React.FC = () => {
                                                         onChange={e => {
                                                             field.onChange(e.target.value);
                                                             console.log(`Channel ${index} name updated:`, e.target.value);
+                                                            setIsDirty(true); // Force dirty state
                                                         }}
                                                         className="flex-1"
                                                     />
@@ -912,16 +928,38 @@ const ForecastBuilder: React.FC = () => {
                                                         placeholder="Weekly Budget"
                                                         value={field.value || ''}
                                                         onChange={e => {
-                                                            const value = e.target.value === '' ? undefined : parseFloat(e.target.value) || 0;
+                                                            const value = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0;
                                                             field.onChange(value);
                                                             console.log(`Channel ${index} budget updated:`, value);
+                                                            setIsDirty(true); // Force dirty state
+                                                        }}
+                                                        onBlur={() => {
+                                                            // Ensure we have a number on blur
+                                                            if (field.value === undefined || field.value === null) {
+                                                                field.onChange(0);
+                                                            }
                                                         }}
                                                         className="w-32"
                                                     />
                                                 )}
                                             />
                                             {/* TODO: Add Target Audience/Description inputs if desired */}
-                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeChannel(index)} className="text-destructive hover:bg-destructive/10">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => {
+                                                    // Remove the channel
+                                                    removeChannel(index);
+
+                                                    // Force the form to be dirty
+                                                    setIsDirty(true);
+
+                                                    console.log(`Removed marketing channel at index ${index}`);
+                                                    console.log('Remaining channels:', getValues('marketing.channels'));
+                                                }}
+                                                className="text-destructive hover:bg-destructive/10"
+                                            >
                                                 <TrashIcon className="h-4 w-4" />
                                             </Button>
                                         </div>
@@ -931,14 +969,23 @@ const ForecastBuilder: React.FC = () => {
                                     type="button"
                                     variant="outline"
                                     // Provide default values including a default channelType
-                                    onClick={() => appendChannel({
-                                        id: crypto.randomUUID(),
-                                        channelType: defaultChannelTypes[0], // Default to first type
-                                        name: '',
-                                        weeklyBudget: 0,
-                                        targetAudience: '',
-                                        description: ''
-                                    })}
+                                    onClick={() => {
+                                        // Add a new channel with default values
+                                        appendChannel({
+                                            id: crypto.randomUUID(),
+                                            channelType: defaultChannelTypes[0], // Default to first type
+                                            name: '',
+                                            weeklyBudget: 0,
+                                            targetAudience: '',
+                                            description: ''
+                                        });
+
+                                        // Force the form to be dirty
+                                        setIsDirty(true);
+
+                                        console.log('Added new marketing channel');
+                                        console.log('Current channels:', getValues('marketing.channels'));
+                                    }}
                                 >
                                     + Add Marketing Channel
                                 </Button>
