@@ -63,7 +63,7 @@ interface ProjectWithMetrics extends Project {
 
 const PortfolioDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { projects, loadProjects } = useStore();
+  const { projects, loadProjects, deleteProject } = useStore();
   const [projectsWithMetrics, setProjectsWithMetrics] = useState<ProjectWithMetrics[]>([]);
 
   useEffect(() => {

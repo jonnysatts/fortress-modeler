@@ -110,7 +110,8 @@ const useStore = create<AppState>((set, get) => ({
   deleteProject: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      await db.projects.delete(id);
+      // Use the db.deleteProject function which handles all related data
+      await db.deleteProject(id);
 
       // Reset current project if it's the one being deleted
       const currentProject = get().currentProject;
@@ -123,6 +124,8 @@ const useStore = create<AppState>((set, get) => ({
     } catch (error) {
       console.error('Error deleting project:', error);
       set({ error: 'Failed to delete project', isLoading: false });
+      // Re-throw the error so the UI can handle it
+      throw new Error('Failed to delete project');
     }
   },
 

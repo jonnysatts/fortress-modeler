@@ -119,7 +119,7 @@ export class FortressDB extends Dexie {
     }).upgrade(tx => {
       console.log("Upgrading DB schema to version 3, changing index for 'actuals' table.");
     });
-    
+
     this.version(2).stores({
       projects: '++id, name, productType, createdAt, updatedAt',
       financialModels: '++id, projectId, name, createdAt, updatedAt',
@@ -164,11 +164,22 @@ export const updateProject = async (id: number, project: Partial<Omit<Project, '
 };
 
 export const deleteProject = async (id: number): Promise<void> => {
-  await db.projects.delete(id);
-  await db.financialModels.where('projectId').equals(id).delete();
-  await db.actualPerformance.where('projectId').equals(id).delete();
-  await db.risks.where('projectId').equals(id).delete();
-  await db.scenarios.where('projectId').equals(id).delete();
+  // Use a transaction to ensure all related data is deleted
+  await db.transaction('rw',
+    [db.projects, db.financialModels, db.actualPerformance, db.risks, db.scenarios, db.actuals],
+    async () => {
+      // Delete all related data first
+      await db.financialModels.where('projectId').equals(id).delete();
+      await db.actualPerformance.where('projectId').equals(id).delete();
+      await db.risks.where('projectId').equals(id).delete();
+      await db.scenarios.where('projectId').equals(id).delete();
+      await db.actuals.where('projectId').equals(id).delete(); // Add this line to delete actuals
+
+      // Delete the project last
+      await db.projects.delete(id);
+
+      console.log(`Project ${id} and all related data successfully deleted`);
+  });
 };
 
 export const getModelsForProject = async (projectId: number): Promise<FinancialModel[]> => {
@@ -181,11 +192,11 @@ export const getActualsForProject = async (projectId: number): Promise<ActualsPe
 
 export const upsertActualsPeriod = async (actualEntry: Omit<ActualsPeriodEntry, 'id'>): Promise<ActualsPeriodEntry | null> => {
   try {
-      const existing = await db.actuals.get({ 
-        projectId: actualEntry.projectId, 
-        period: actualEntry.period 
+      const existing = await db.actuals.get({
+        projectId: actualEntry.projectId,
+        period: actualEntry.period
       });
-      
+
       let savedId: number;
       if (existing?.id) {
         await db.actuals.update(existing.id, actualEntry);
@@ -198,7 +209,7 @@ export const upsertActualsPeriod = async (actualEntry: Omit<ActualsPeriodEntry, 
   } catch (error) {
       console.error("Error in upsertActualsPeriod:", error);
       // Optionally re-throw or handle differently
-      return null; 
+      return null;
   }
 };
 
