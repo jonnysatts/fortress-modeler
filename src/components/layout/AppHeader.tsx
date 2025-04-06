@@ -21,28 +21,28 @@ const AppHeader: React.FC = () => {
 
   // Generate breadcrumb items based on current route (using /projects)
   const getBreadcrumbItems = (): BreadcrumbItem[] => { // Use the explicit type
-    const items: BreadcrumbItem[] = [{ label: 'Portfolio Overview', href: '/' }];
+    const items: BreadcrumbItem[] = [{ label: 'Portfolio Dashboard', href: '/' }];
 
     if (location.pathname.startsWith('/projects')) {
-      items.push({ label: 'Projects', href: '/projects' }); 
+      items.push({ label: 'Products', href: '/projects' });
 
       if (projectId) {
         items.push({
-          label: currentProject?.name || `Project ${projectId}`,
-          href: `/projects/${projectId}/summary` 
+          label: currentProject?.name || `Product ${projectId}`,
+          href: `/projects/${projectId}/summary`
         });
 
         if (location.pathname.includes('/models/new')) {
           items.push({ label: 'New Forecast' }); // No href needed
         } else if (modelId) {
           items.push({
-            label: currentModel?.name || 'Forecast Detail', 
-            href: `/projects/${projectId}/models/${modelId}` 
+            label: currentModel?.name || 'Forecast Detail',
+            href: `/projects/${projectId}/models/${modelId}`
           });
           if (location.pathname.includes('/edit')) {
             items.push({ label: 'Edit Forecast' }); // No href needed
           }
-        } else if (location.pathname.includes('/edit-project')) { 
+        } else if (location.pathname.includes('/edit-project')) {
           items.push({ label: 'Edit Project' }); // No href needed
         } else {
             const pathSegments = location.pathname.split('/');
@@ -69,7 +69,7 @@ const AppHeader: React.FC = () => {
     if (location.pathname === '/') return 'Portfolio Overview';
     if (location.pathname === '/projects') return 'Projects'; // Standardized
     if (location.pathname === '/projects/new') return 'New Project';
-    
+
     // Extract the last part of the path for specific views
     const pathSegments = location.pathname.split('/');
     const view = pathSegments[pathSegments.length - (location.pathname.endsWith('/edit') ? 2 : 1)];
@@ -108,7 +108,7 @@ const AppHeader: React.FC = () => {
         </Button>
       );
     }
-    // Show "New Forecast" on project-level pages (summary, builder, etc.) 
+    // Show "New Forecast" on project-level pages (summary, builder, etc.)
     // but not on model-specific pages or edit pages.
     if (projectId && !modelId && !location.pathname.includes('/edit') && !location.pathname.includes('models/new')) {
       return (

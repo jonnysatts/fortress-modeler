@@ -30,11 +30,9 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 const productTypes = [
-  { value: "SaaS", label: "SaaS Product" },
   { value: "WeeklyEvent", label: "Weekly Event" },
-  { value: "DigitalProduct", label: "Digital Product" },
-  { value: "PhysicalGood", label: "Physical Good" },
-  { value: "ConsultingProject", label: "Consulting Project" },
+  { value: "Merchandise", label: "Merchandise" },
+  { value: "CalendarEvent", label: "Calendar Event" },
 ];
 
 const NewProject = () => {
@@ -96,19 +94,19 @@ const NewProject = () => {
         },
         avatarImage: avatarDataUrl,
       });
-      
+
       toast({
-        title: "Project created!",
+        title: "Product created!",
         description: `${data.name} has been created successfully.`,
       });
-      
+
       navigate(`/projects/${projectId}`);
     } catch (error) {
-      console.error("Error creating project:", error);
+      console.error("Error creating product:", error);
       toast({
         variant: "destructive",
-        title: "Failed to create project",
-        description: "There was an error creating your project. Please try again.",
+        title: "Failed to create product",
+        description: "There was an error creating your product. Please try again.",
       });
     } finally {
       setIsSubmitting(false);
@@ -121,14 +119,14 @@ const NewProject = () => {
         <Button variant="ghost" size="icon" onClick={() => navigate("/projects")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-3xl font-bold text-fortress-blue">New Project</h1>
+        <h1 className="text-3xl font-bold text-fortress-blue">New Product</h1>
       </div>
 
       <Card className="max-w-3xl mx-auto">
         <CardHeader>
-          <CardTitle>Create a New Project</CardTitle>
+          <CardTitle>Create a New Product</CardTitle>
           <CardDescription>
-            Enter the details for your new financial modeling project.
+            Enter the details for your new financial modeling product.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -139,12 +137,12 @@ const NewProject = () => {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Project Name</FormLabel>
+                    <FormLabel>Product Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter project name..." {...field} />
+                      <Input placeholder="Enter product name..." {...field} />
                     </FormControl>
                     <FormDescription>
-                      This is how your project will be identified in the dashboard.
+                      This is how your product will be identified in the dashboard.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -158,10 +156,10 @@ const NewProject = () => {
                   <FormItem>
                     <FormLabel>Description (Optional)</FormLabel>
                     <FormControl>
-                      <Textarea 
-                        placeholder="Enter a brief description of your project..." 
+                      <Textarea
+                        placeholder="Enter a brief description of your project..."
                         className="resize-none h-20"
-                        {...field} 
+                        {...field}
                       />
                     </FormControl>
                     <FormDescription>
@@ -308,10 +306,10 @@ const NewProject = () => {
 
               <div>
                 <Label htmlFor="avatar-upload">Project Avatar (Optional)</Label>
-                <Input 
+                <Input
                   id="avatar-upload"
-                  type="file" 
-                  accept="image/*" 
+                  type="file"
+                  accept="image/*"
                   onChange={handleImageChange}
                   className="mt-1"
                 />
@@ -319,13 +317,13 @@ const NewProject = () => {
                   <div className="mt-4">
                     <Label>Preview:</Label>
                     <img src={avatarPreview} alt="Avatar Preview" className="mt-2 w-24 h-24 object-cover rounded-md border" />
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="mt-2 text-xs" 
-                      onClick={() => { 
-                        setAvatarPreview(null); 
-                        setAvatarDataUrl(undefined); 
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2 text-xs"
+                      onClick={() => {
+                        setAvatarPreview(null);
+                        setAvatarDataUrl(undefined);
                         const fileInput = document.getElementById('avatar-upload') as HTMLInputElement;
                         if (fileInput) fileInput.value = "";
                       }}
@@ -338,15 +336,15 @@ const NewProject = () => {
               </div>
 
               <CardFooter className="flex justify-between px-0 pb-0">
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => navigate("/projects")}
                 >
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   disabled={isSubmitting}
                   className="bg-fortress-emerald hover:bg-fortress-emerald/90"
                 >
@@ -358,7 +356,7 @@ const NewProject = () => {
                   ) : (
                     <span className="flex items-center gap-1">
                       <Check className="h-4 w-4" />
-                      Create Project
+                      Create Product
                     </span>
                   )}
                 </Button>

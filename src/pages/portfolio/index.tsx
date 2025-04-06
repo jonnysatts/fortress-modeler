@@ -28,30 +28,30 @@ const PortfolioDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { projects, loadProjects } = useStore();
   const [projectsWithMetrics, setProjectsWithMetrics] = useState<ProjectWithMetrics[]>([]);
-  
+
   useEffect(() => {
     loadProjects();
   }, [loadProjects]);
-  
+
   useEffect(() => {
     const getProjectMetrics = async () => {
       const projectMetricsPromises = projects.map(async (project) => {
         const models = await useStore.getState().loadModelsForProject(project.id!);
         const actuals = await useStore.getState().loadActualsForProject(project.id!);
-        
+
         const latestModel = models.length > 0 ? models[0] : null;
-        
+
         let totalRevenue = 0;
         let totalProfit = 0;
         let profitMargin = 0;
         let revenueConcentration = 0;
         let breakeven = false;
         let sparklineData: number[] = [];
-        
+
         if (latestModel) {
           // Generate forecast using the new function
           const timeSeriesData = generateForecastTimeSeries(latestModel);
-          
+
           if (timeSeriesData.length > 0) {
             const finalPeriod = timeSeriesData[timeSeriesData.length - 1];
             totalRevenue = finalPeriod.cumulativeRevenue;
@@ -60,18 +60,18 @@ const PortfolioDashboard: React.FC = () => {
           breakeven = totalProfit >= 0;
             // Use cumulative profit for sparkline
             sparklineData = timeSeriesData.map(p => p.cumulativeProfit);
-            
+
             // Keep revenue concentration calculation for now, though its basis might need review
             const { revenue = [] } = latestModel.assumptions;
             if (totalRevenue > 0 && revenue.length > 0) {
                const highestInitialRevenue = Math.max(...revenue.map(stream => stream.value));
                // This concentration is based on initial values, not forecast totals - might need revision
-               revenueConcentration = (highestInitialRevenue / totalRevenue) * 100; 
+               revenueConcentration = (highestInitialRevenue / totalRevenue) * 100;
             }
-          } 
+          }
           // else: handle case where forecast generation returns empty (e.g., due to error or no duration)
         }
-        
+
         return {
           ...project,
           totalRevenue,
@@ -83,17 +83,17 @@ const PortfolioDashboard: React.FC = () => {
           sparklineData
         };
       });
-      
+
       const calculatedMetrics = await Promise.all(projectMetricsPromises);
       calculatedMetrics.sort((a, b) => b.totalProfit - a.totalProfit);
       setProjectsWithMetrics(calculatedMetrics);
     };
-    
+
     if (projects.length > 0) {
       getProjectMetrics();
     }
   }, [projects]);
-  
+
   // Calculate portfolio totals
   const portfolioTotals = projectsWithMetrics.reduce((totals, project) => {
     return {
@@ -101,29 +101,40 @@ const PortfolioDashboard: React.FC = () => {
       profit: totals.profit + project.totalProfit,
       projectsWithActuals: totals.projectsWithActuals + (project.hasActuals ? 1 : 0),
       projectsWithWarnings: totals.projectsWithWarnings + (
-        project.revenueConcentration > 80 || 
-        project.profitMargin < 20 || 
+        project.revenueConcentration > 80 ||
+        project.profitMargin < 20 ||
         !project.breakeven ? 1 : 0
       )
     };
   }, { revenue: 0, profit: 0, projectsWithActuals: 0, projectsWithWarnings: 0 });
-  
+
   // Prepare data for charts
   const topProjects = projectsWithMetrics.slice(0, 5);
   const projectRevenueData = topProjects.map(project => ({
     name: project.name,
     revenue: project.totalRevenue
   }));
-  
+
   const projectProfitData = topProjects.map(project => ({
     name: project.name,
     profit: project.totalProfit
   }));
-  
+
   const COLORS = ['#1A2942', '#3E5C89', '#10B981', '#334155'];
-  
+
   return (
     <div className="space-y-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-fortress-blue">Portfolio Dashboard</h1>
+        <Button
+          onClick={() => navigate("/projects/new")}
+          className="bg-fortress-emerald hover:bg-fortress-emerald/90"
+        >
+          <PlusCircle className="mr-2 h-4 w-4" />
+          New Product
+        </Button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <ContentCard
           title="Total Products"
@@ -166,10 +177,10 @@ const PortfolioDashboard: React.FC = () => {
             <BarChart data={projectRevenueData}>
               <XAxis dataKey="name" tick={{ fontSize: 10 }} />
               <YAxis tickFormatter={val => formatCurrency(val)} />
-              <Tooltip 
-                formatter={(value) => [formatCurrency(value as number), 'Revenue']} 
-                contentStyle={{ 
-                  backgroundColor: '#f8fafc', 
+              <Tooltip
+                formatter={(value) => [formatCurrency(value as number), 'Revenue']}
+                contentStyle={{
+                  backgroundColor: '#f8fafc',
                   border: '1px solid #e2e8f0',
                   borderRadius: '6px'
                 }}
@@ -188,10 +199,10 @@ const PortfolioDashboard: React.FC = () => {
             <BarChart data={projectProfitData}>
               <XAxis dataKey="name" tick={{ fontSize: 10 }} />
               <YAxis tickFormatter={val => formatCurrency(val)} />
-              <Tooltip 
-                formatter={(value) => [formatCurrency(value as number), 'Profit']} 
-                contentStyle={{ 
-                  backgroundColor: '#f8fafc', 
+              <Tooltip
+                formatter={(value) => [formatCurrency(value as number), 'Profit']}
+                contentStyle={{
+                  backgroundColor: '#f8fafc',
                   border: '1px solid #e2e8f0',
                   borderRadius: '6px'
                 }}
@@ -231,11 +242,11 @@ const PortfolioDashboard: React.FC = () => {
                   <td className="py-3 px-4 text-right">{formatPercent(project.profitMargin)}</td>
                   <td className="py-3 px-4">
                     <div className="flex justify-center">
-                      <Sparkline 
-                        data={project.sparklineData} 
-                        width={100} 
-                        height={30} 
-                        color={project.totalProfit >= 0 ? "#10B981" : "#EF4444"} 
+                      <Sparkline
+                        data={project.sparklineData}
+                        width={100}
+                        height={30}
+                        color={project.totalProfit >= 0 ? "#10B981" : "#EF4444"}
                       />
                     </div>
                   </td>
@@ -253,19 +264,19 @@ const PortfolioDashboard: React.FC = () => {
                       {!project.hasActuals && (
                         <Badge variant="outline" className="text-xs">No Actuals</Badge>
                       )}
-                      {project.hasActuals && 
-                       project.revenueConcentration <= 80 && 
-                       project.profitMargin >= 20 && 
+                      {project.hasActuals &&
+                       project.revenueConcentration <= 80 &&
+                       project.profitMargin >= 20 &&
                        project.breakeven && (
                         <Badge variant="success" className="text-xs">Healthy</Badge>
                       )}
                     </div>
                   </td>
                   <td className="py-3 px-4 text-center">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => navigate(`/products/${project.id}/summary`)}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => navigate(`/projects/${project.id}/summary`)}
                     >
                       <ArrowUpRight className="h-4 w-4" />
                       <span className="sr-only">View</span>
@@ -283,10 +294,10 @@ const PortfolioDashboard: React.FC = () => {
             </tbody>
           </table>
         </div>
-        
+
         <div className="mt-4 flex justify-end">
-          <Button 
-            onClick={() => navigate("/projects/new")} 
+          <Button
+            onClick={() => navigate("/projects/new")}
             className="bg-fortress-emerald hover:bg-fortress-emerald/90"
           >
             <PlusCircle className="mr-2 h-4 w-4" />

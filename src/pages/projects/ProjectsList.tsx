@@ -27,46 +27,46 @@ const ProjectsList = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-fortress-blue">Projects</h1>
-        <Button 
-          onClick={() => navigate("/projects/new")} 
+        <h1 className="text-3xl font-bold text-fortress-blue">Products</h1>
+        <Button
+          onClick={() => navigate("/projects/new")}
           className="bg-fortress-emerald hover:bg-fortress-emerald/90"
         >
           <PlusCircle className="mr-2 h-4 w-4" />
-          New Project
+          New Product
         </Button>
       </div>
-      
+
       <div className="w-full max-w-md relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input 
-          placeholder="Search projects..." 
+        <Input
+          placeholder="Search products..."
           className="pl-10"
         />
       </div>
-      
+
       {projects.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 space-y-4">
           <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
             <FolderIcon className="h-8 w-8 text-muted-foreground" />
           </div>
-          <h2 className="text-xl font-semibold">No projects found</h2>
+          <h2 className="text-xl font-semibold">No products found</h2>
           <p className="text-muted-foreground text-center max-w-md">
-            Get started by creating your first project. You'll be able to define product details,
+            Get started by creating your first product. You'll be able to define product details,
             create financial models, and track performance.
           </p>
-          <Button 
-            onClick={() => navigate("/projects/new")} 
+          <Button
+            onClick={() => navigate("/projects/new")}
             className="bg-fortress-emerald hover:bg-fortress-emerald/90"
           >
-            Create Your First Project
+            Create Your First Product
           </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {projects.map((project) => (
-            <Card 
-              key={project.id} 
+            <Card
+              key={project.id}
               className="hover:shadow-md transition-shadow cursor-pointer"
               onClick={() => handleProjectClick(project.id!)}
             >

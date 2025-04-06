@@ -31,11 +31,9 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 const productTypes = [
-  { value: "SaaS", label: "SaaS Product" },
   { value: "WeeklyEvent", label: "Weekly Event" },
-  { value: "DigitalProduct", label: "Digital Product" },
-  { value: "PhysicalGood", label: "Physical Good" },
-  { value: "ConsultingProject", label: "Consulting Project" },
+  { value: "Merchandise", label: "Merchandise" },
+  { value: "CalendarEvent", label: "Calendar Event" },
 ];
 
 const EditProject = () => {
@@ -299,4 +297,4 @@ const EditProject = () => {
   );
 };
 
-export default EditProject; 
+export default EditProject;
