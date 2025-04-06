@@ -167,45 +167,54 @@ export const deleteProject = async (id: number): Promise<void> => {
   console.log(`Starting deletion of project ${id} and all related data...`);
 
   try {
-    // Use a transaction to ensure all related data is deleted
-    await db.transaction('rw',
-      [db.projects, db.financialModels, db.actualPerformance, db.risks, db.scenarios, db.actuals],
-      async () => {
-        // Log counts before deletion for debugging
-        const financialModelsCount = await db.financialModels.where('projectId').equals(id).count();
-        const actualsCount = await db.actuals.where('projectId').equals(id).count();
-        const risksCount = await db.risks.where('projectId').equals(id).count();
-        const scenariosCount = await db.scenarios.where('projectId').equals(id).count();
-        const actualPerformanceCount = await db.actualPerformance.where('projectId').equals(id).count();
+    // Delete all related data first without using a transaction
+    // This approach is more direct and will help us identify exactly where the issue is
 
-        console.log(`Found related data: ${financialModelsCount} models, ${actualsCount} actuals, ${risksCount} risks, ${scenariosCount} scenarios, ${actualPerformanceCount} performance records`);
+    // Log counts before deletion for debugging
+    const financialModelsCount = await db.financialModels.where('projectId').equals(id).count();
+    const actualsCount = await db.actuals.where('projectId').equals(id).count();
+    const risksCount = await db.risks.where('projectId').equals(id).count();
+    const scenariosCount = await db.scenarios.where('projectId').equals(id).count();
+    const actualPerformanceCount = await db.actualPerformance.where('projectId').equals(id).count();
 
-        // Delete all related data first
-        await db.financialModels.where('projectId').equals(id).delete();
-        console.log(`Deleted financial models for project ${id}`);
+    console.log(`Found related data: ${financialModelsCount} models, ${actualsCount} actuals, ${risksCount} risks, ${scenariosCount} scenarios, ${actualPerformanceCount} performance records`);
 
-        await db.actualPerformance.where('projectId').equals(id).delete();
-        console.log(`Deleted actual performance records for project ${id}`);
+    // Check if the project exists before attempting to delete
+    const project = await db.projects.get(id);
+    if (!project) {
+      throw new Error(`Project with ID ${id} not found`);
+    }
 
-        await db.risks.where('projectId').equals(id).delete();
-        console.log(`Deleted risks for project ${id}`);
+    console.log(`Project found: ${project.name}`);
 
-        await db.scenarios.where('projectId').equals(id).delete();
-        console.log(`Deleted scenarios for project ${id}`);
+    // Delete all related data first
+    await db.financialModels.where('projectId').equals(id).delete();
+    console.log(`Deleted financial models for project ${id}`);
 
-        // Make sure to delete actuals data
-        const actualsDeleted = await db.actuals.where('projectId').equals(id).delete();
-        console.log(`Deleted ${actualsDeleted} actuals records for project ${id}`);
+    await db.actualPerformance.where('projectId').equals(id).delete();
+    console.log(`Deleted actual performance records for project ${id}`);
 
-        // Delete the project last
-        const projectDeleted = await db.projects.delete(id);
+    await db.risks.where('projectId').equals(id).delete();
+    console.log(`Deleted risks for project ${id}`);
 
-        if (projectDeleted !== 1) {
-          throw new Error(`Failed to delete project ${id}. Expected to delete 1 record but deleted ${projectDeleted}.`);
-        }
+    await db.scenarios.where('projectId').equals(id).delete();
+    console.log(`Deleted scenarios for project ${id}`);
 
-        console.log(`Project ${id} and all related data successfully deleted`);
-    });
+    // Make sure to delete actuals data
+    await db.actuals.where('projectId').equals(id).delete();
+    console.log(`Deleted actuals records for project ${id}`);
+
+    // Delete the project directly
+    await db.table('projects').delete(id);
+    console.log(`Project ${id} deleted successfully`);
+
+    // Verify the project was deleted
+    const projectAfterDelete = await db.projects.get(id);
+    if (projectAfterDelete) {
+      throw new Error(`Failed to delete project ${id}. Project still exists after deletion.`);
+    }
+
+    console.log(`Project ${id} and all related data successfully deleted`);
   } catch (error) {
     console.error(`Error deleting project ${id}:`, error);
     throw error; // Re-throw to allow proper error handling
