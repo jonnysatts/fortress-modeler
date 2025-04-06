@@ -123,18 +123,19 @@ const PortfolioDashboard: React.FC = () => {
             }));
 
             // Calculate cost efficiency (profit per dollar spent)
-            const totalCosts = finalPeriod.cumulativeCosts;
+            const totalCosts = finalPeriod.cumulativeCost;
             costEfficiency = totalCosts > 0 ? (totalProfit / totalCosts) * 100 : 0;
 
             // Keep revenue concentration calculation
             const { revenue = [], marketing } = latestModel.assumptions;
             if (totalRevenue > 0 && revenue.length > 0) {
-               const highestInitialRevenue = Math.max(...revenue.map(stream => stream.value));
+               const highestInitialRevenueStream = revenue.reduce((prev, current) => (prev.value > current.value) ? prev : current);
+               const highestInitialRevenue = highestInitialRevenueStream.value;
                revenueConcentration = (highestInitialRevenue / totalRevenue) * 100;
             }
 
             // Calculate marketing ROI if marketing data exists
-            if (marketing && marketing.allocationMode !== 'none') {
+            if (marketing) {
               let marketingCost = 0;
               if (marketing.allocationMode === 'highLevel' && marketing.totalBudget) {
                 marketingCost = marketing.totalBudget;
@@ -273,40 +274,40 @@ const PortfolioDashboard: React.FC = () => {
       ...topProjects.reduce((acc, project, index) => {
         acc[project.name] = Math.max(0, project.profitMargin);
         return acc;
-      }, {})
+      }, {} as { [key: string]: number })
     },
     {
       subject: 'Growth Rate',
       ...topProjects.reduce((acc, project, index) => {
         acc[project.name] = Math.max(0, (project.growthRate || 0) + 50); // Normalize: -50% to +50% → 0 to 100
         return acc;
-      }, {})
+      }, {} as { [key: string]: number })
     },
     {
       subject: 'Cost Efficiency',
       ...topProjects.reduce((acc, project, index) => {
         acc[project.name] = Math.max(0, project.costEfficiency || 60 + Math.random() * 20);
         return acc;
-      }, {})
+      }, {} as { [key: string]: number })
     },
     {
       subject: 'Marketing ROI',
       ...topProjects.reduce((acc, project, index) => {
         acc[project.name] = Math.max(0, project.marketingROI || 50 + Math.random() * 30);
         return acc;
-      }, {})
+      }, {} as { [key: string]: number })
     },
     {
       subject: 'Health Score',
       ...topProjects.reduce((acc, project, index) => {
         acc[project.name] = project.healthScore || 40 + Math.random() * 40;
         return acc;
-      }, {})
+      }, {} as { [key: string]: number })
     }
   ];
 
   // Monthly trend data for portfolio
-  const portfolioTrendData = [];
+  const portfolioTrendData: { month: string; revenue: number; profit: number }[] = [];
   if (topProjects.length > 0 && topProjects[0].monthlyTrend) {
     // Initialize with months
     topProjects[0].monthlyTrend.forEach(item => {
@@ -489,6 +490,140 @@ const PortfolioDashboard: React.FC = () => {
                 ></div>
               </div>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Product Performance Table - Moved Up */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div>
+            <CardTitle className="text-xl font-bold">Product Performance</CardTitle>
+            <CardDescription>All products sorted by profit</CardDescription>
+          </div>
+          <Button
+            onClick={() => navigate("/projects/new")}
+            className="bg-fortress-emerald hover:bg-fortress-emerald/90"
+            size="sm"
+          >
+            <PlusCircle className="mr-2 h-4 w-4" />
+            New Product
+          </Button>
+        </CardHeader>
+        <CardContent className="px-0">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b bg-muted/40">
+                  <th className="py-3 px-4 text-left font-medium">Product</th>
+                  <th className="py-3 px-4 text-right font-medium">Revenue</th>
+                  <th className="py-3 px-4 text-right font-medium">Profit</th>
+                  <th className="py-3 px-4 text-right font-medium">Margin</th>
+                  <th className="py-3 px-4 text-center font-medium">Health</th>
+                  <th className="py-3 px-4 text-center font-medium">Trend</th>
+                  <th className="py-3 px-4 text-center font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {projectsWithMetrics.map(project => (
+                  <tr key={project.id} className="border-b hover:bg-muted/20 transition-colors">
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10 border">
+                          <AvatarImage src={project.avatarImage} alt={`${project.name} avatar`} />
+                          <AvatarFallback>
+                            {project.name.substring(0, 2).toUpperCase() || <Building size={16}/>}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium">{project.name}</div>
+                          <div className="text-xs text-muted-foreground">{project.productType}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono">{formatCurrency(project.totalRevenue)}</td>
+                    <td className="py-3 px-4 text-right font-mono">{formatCurrency(project.totalProfit)}</td>
+                    <td className="py-3 px-4 text-right font-mono">{formatPercent(project.profitMargin)}</td>
+                    <td className="py-3 px-4 text-center">
+                      {project.healthScore !== undefined && (
+                        <div className="flex items-center justify-center">
+                          {/* Simplified health bar */}
+                          <div className="flex items-center space-x-1">
+                             <div className={`h-2 w-2 rounded-full ${
+                                project.riskLevel === 'high' ? 'bg-red-500' :
+                                project.riskLevel === 'medium' ? 'bg-amber-500' : 'bg-green-500'
+                              }`}></div>
+                              <span className="text-xs font-medium">{project.healthScore}</span>
+                          </div>
+                          {/* <div
+                            className={cn(
+                              "h-2.5 w-16 rounded-full",
+                              project.healthScore >= 70 ? "bg-green-500" :
+                              project.healthScore >= 40 ? "bg-amber-500" : "bg-red-500"
+                            )}
+                            style={{ width: `${Math.min(64, Math.max(16, project.healthScore / 100 * 64))}px` }}
+                          ></div>
+                          <span className="ml-2 text-xs font-medium">{project.healthScore}</span> */}
+                        </div>
+                      )}
+                      <div className="flex flex-wrap gap-1 justify-center mt-1">
+                        {project.riskLevel === 'high' && (
+                          <Badge variant="destructive" className="text-xs px-1.5 py-0.5">High Risk</Badge>
+                        )}
+                        {project.riskLevel === 'medium' && (
+                          <Badge variant="warning" className="text-xs px-1.5 py-0.5">Medium Risk</Badge>
+                        )}
+                        {project.riskLevel === 'low' && (
+                          <Badge variant="success" className="text-xs px-1.5 py-0.5">Low Risk</Badge>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex justify-center">
+                        <Sparkline
+                          data={project.sparklineData}
+                          width={100}
+                          height={30}
+                          color={project.totalProfit >= 0 ? dataColors.positive : dataColors.negative}
+                          strokeWidth={1.5}
+                          fillOpacity={0.2}
+                        />
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/projects/${project.id}/summary`)}
+                          className="hover:bg-muted/50"
+                        >
+                          View Details
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => navigate(`/projects/${project.id}/edit`)}>
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-red-600"
+                              onClick={() => setProjectToDelete(project.id!)}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>
@@ -717,139 +852,6 @@ const PortfolioDashboard: React.FC = () => {
           </ChartContainer>
         </TabsContent>
       </Tabs>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <div>
-            <CardTitle className="text-xl font-bold">Product Performance</CardTitle>
-            <CardDescription>All products sorted by profit</CardDescription>
-          </div>
-          <Button
-            onClick={() => navigate("/projects/new")}
-            className="bg-fortress-emerald hover:bg-fortress-emerald/90"
-            size="sm"
-          >
-            <PlusCircle className="mr-2 h-4 w-4" />
-            New Product
-          </Button>
-        </CardHeader>
-        <CardContent className="px-0">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b bg-muted/40">
-                  <th className="py-3 px-4 text-left font-medium">Product</th>
-                  <th className="py-3 px-4 text-right font-medium">Revenue</th>
-                  <th className="py-3 px-4 text-right font-medium">Profit</th>
-                  <th className="py-3 px-4 text-right font-medium">Margin</th>
-                  <th className="py-3 px-4 text-center font-medium">Health</th>
-                  <th className="py-3 px-4 text-center font-medium">Trend</th>
-                  <th className="py-3 px-4 text-center font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {projectsWithMetrics.map(project => (
-                  <tr key={project.id} className="border-b hover:bg-muted/20 transition-colors">
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10 border">
-                          <AvatarImage src={project.avatarImage} alt={`${project.name} avatar`} />
-                          <AvatarFallback>
-                            {project.name.substring(0, 2).toUpperCase() || <Building size={16}/>}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="font-medium">{project.name}</div>
-                          <div className="text-xs text-muted-foreground">{project.productType}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono">{formatCurrency(project.totalRevenue)}</td>
-                    <td className="py-3 px-4 text-right font-mono">{formatCurrency(project.totalProfit)}</td>
-                    <td className="py-3 px-4 text-right font-mono">{formatPercent(project.profitMargin)}</td>
-                    <td className="py-3 px-4 text-center">
-                      {project.healthScore !== undefined && (
-                        <div className="flex items-center justify-center">
-                          <div
-                            className={cn(
-                              "h-2.5 w-16 rounded-full",
-                              project.healthScore >= 70 ? "bg-green-500" :
-                              project.healthScore >= 40 ? "bg-amber-500" : "bg-red-500"
-                            )}
-                            style={{ width: `${Math.min(64, Math.max(16, project.healthScore / 100 * 64))}px` }}
-                          ></div>
-                          <span className="ml-2 text-xs font-medium">{project.healthScore}</span>
-                        </div>
-                      )}
-                      <div className="flex flex-wrap gap-1 justify-center mt-1">
-                        {project.riskLevel === 'high' && (
-                          <Badge variant="destructive" className="text-xs">High Risk</Badge>
-                        )}
-                        {project.riskLevel === 'medium' && (
-                          <Badge variant="warning" className="text-xs">Medium Risk</Badge>
-                        )}
-                        {project.riskLevel === 'low' && (
-                          <Badge variant="success" className="text-xs">Low Risk</Badge>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex justify-center">
-                        <Sparkline
-                          data={project.sparklineData}
-                          width={100}
-                          height={30}
-                          color={project.totalProfit >= 0 ? dataColors.positive : dataColors.negative}
-                          strokeWidth={1.5}
-                          fillOpacity={0.2}
-                        />
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/projects/${project.id}/summary`)}
-                          className="hover:bg-muted/50"
-                        >
-                          View Details
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => navigate(`/projects/${project.id}/edit`)}>
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-red-600"
-                              onClick={() => setProjectToDelete(project.id!)}
-                            >
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              {projectsWithMetrics.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="py-8 text-center text-muted-foreground">
-                    No products found. Create your first product to get started.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        </CardContent>
-      </Card>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={projectToDelete !== null} onOpenChange={(open) => !open && setProjectToDelete(null)}>

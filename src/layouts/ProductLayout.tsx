@@ -10,6 +10,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import AppHeader from "@/components/layout/AppHeader";
 import ResponsiveContainer from "@/components/layout/ResponsiveContainer";
 import { Toaster } from "@/components/ui/toaster";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const ProductLayout: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -77,9 +78,19 @@ const ProductLayout: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <Breadcrumbs items={breadcrumbItems} className="mb-2" />
-                      <TypographyH3 className="text-fortress-blue">
-                        {currentProject?.name || "Product Details"}
-                      </TypographyH3>
+                      <div className="flex items-center gap-3">
+                        {currentProject && (
+                          <Avatar className="h-10 w-10 border">
+                             <AvatarImage src={currentProject.avatarImage} alt={`${currentProject.name} avatar`} />
+                             <AvatarFallback>
+                               {currentProject.name.substring(0, 2).toUpperCase()}
+                             </AvatarFallback>
+                           </Avatar>
+                        )}
+                        <TypographyH3 className="text-fortress-blue">
+                          {currentProject?.name || "Product Details"}
+                        </TypographyH3>
+                      </div>
                     </div>
                     <Button
                       variant="outline"
