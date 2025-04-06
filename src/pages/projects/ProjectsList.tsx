@@ -48,7 +48,12 @@ const ProjectsList = () => {
     if (projectToDelete === null) return;
 
     try {
+      console.log(`ProjectsList: Attempting to delete project ${projectToDelete}`);
       await deleteProject(projectToDelete);
+
+      // Reload projects to update the UI
+      await loadProjects();
+
       toast({
         title: "Product deleted",
         description: "The product has been successfully deleted.",

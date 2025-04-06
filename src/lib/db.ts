@@ -164,22 +164,52 @@ export const updateProject = async (id: number, project: Partial<Omit<Project, '
 };
 
 export const deleteProject = async (id: number): Promise<void> => {
-  // Use a transaction to ensure all related data is deleted
-  await db.transaction('rw',
-    [db.projects, db.financialModels, db.actualPerformance, db.risks, db.scenarios, db.actuals],
-    async () => {
-      // Delete all related data first
-      await db.financialModels.where('projectId').equals(id).delete();
-      await db.actualPerformance.where('projectId').equals(id).delete();
-      await db.risks.where('projectId').equals(id).delete();
-      await db.scenarios.where('projectId').equals(id).delete();
-      await db.actuals.where('projectId').equals(id).delete(); // Add this line to delete actuals
+  console.log(`Starting deletion of project ${id} and all related data...`);
 
-      // Delete the project last
-      await db.projects.delete(id);
+  try {
+    // Use a transaction to ensure all related data is deleted
+    await db.transaction('rw',
+      [db.projects, db.financialModels, db.actualPerformance, db.risks, db.scenarios, db.actuals],
+      async () => {
+        // Log counts before deletion for debugging
+        const financialModelsCount = await db.financialModels.where('projectId').equals(id).count();
+        const actualsCount = await db.actuals.where('projectId').equals(id).count();
+        const risksCount = await db.risks.where('projectId').equals(id).count();
+        const scenariosCount = await db.scenarios.where('projectId').equals(id).count();
+        const actualPerformanceCount = await db.actualPerformance.where('projectId').equals(id).count();
 
-      console.log(`Project ${id} and all related data successfully deleted`);
-  });
+        console.log(`Found related data: ${financialModelsCount} models, ${actualsCount} actuals, ${risksCount} risks, ${scenariosCount} scenarios, ${actualPerformanceCount} performance records`);
+
+        // Delete all related data first
+        await db.financialModels.where('projectId').equals(id).delete();
+        console.log(`Deleted financial models for project ${id}`);
+
+        await db.actualPerformance.where('projectId').equals(id).delete();
+        console.log(`Deleted actual performance records for project ${id}`);
+
+        await db.risks.where('projectId').equals(id).delete();
+        console.log(`Deleted risks for project ${id}`);
+
+        await db.scenarios.where('projectId').equals(id).delete();
+        console.log(`Deleted scenarios for project ${id}`);
+
+        // Make sure to delete actuals data
+        const actualsDeleted = await db.actuals.where('projectId').equals(id).delete();
+        console.log(`Deleted ${actualsDeleted} actuals records for project ${id}`);
+
+        // Delete the project last
+        const projectDeleted = await db.projects.delete(id);
+
+        if (projectDeleted !== 1) {
+          throw new Error(`Failed to delete project ${id}. Expected to delete 1 record but deleted ${projectDeleted}.`);
+        }
+
+        console.log(`Project ${id} and all related data successfully deleted`);
+    });
+  } catch (error) {
+    console.error(`Error deleting project ${id}:`, error);
+    throw error; // Re-throw to allow proper error handling
+  }
 };
 
 export const getModelsForProject = async (projectId: number): Promise<FinancialModel[]> => {
