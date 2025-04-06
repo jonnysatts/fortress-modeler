@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart3, PlusCircle, TrendingUp, AlertTriangle, FolderIcon, ArrowUpRight,
-  DollarSign, TrendingDown, BarChart2, PieChart as PieChartIcon, Activity, Target
+  DollarSign, TrendingDown, BarChart2, PieChart as PieChartIcon, Activity, Target,
+  Building
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import useStore from '@/store/useStore';
@@ -17,6 +18,7 @@ import { formatCurrency, formatPercent, cn } from '@/lib/utils';
 import { TypographyH4, TypographyMuted } from '@/components/ui/typography';
 import { Project, FinancialModel } from '@/lib/db';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Sparkline, SparklinePoint } from '@/components/ui/sparkline';
 import { generateForecastTimeSeries, ForecastPeriodData } from '@/lib/financialCalculations';
 import { dataColors } from '@/lib/colors';
@@ -668,8 +670,18 @@ const PortfolioDashboard: React.FC = () => {
                 {projectsWithMetrics.map(project => (
                   <tr key={project.id} className="border-b hover:bg-muted/20 transition-colors">
                     <td className="py-3 px-4">
-                      <div className="font-medium">{project.name}</div>
-                      <div className="text-xs text-muted-foreground">{project.productType}</div>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10 border">
+                          <AvatarImage src={project.avatarImage} alt={`${project.name} avatar`} />
+                          <AvatarFallback>
+                            {project.name.substring(0, 2).toUpperCase() || <Building size={16}/>}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium">{project.name}</div>
+                          <div className="text-xs text-muted-foreground">{project.productType}</div>
+                        </div>
+                      </div>
                     </td>
                     <td className="py-3 px-4 text-right font-mono">{formatCurrency(project.totalRevenue)}</td>
                     <td className="py-3 px-4 text-right font-mono">{formatCurrency(project.totalProfit)}</td>

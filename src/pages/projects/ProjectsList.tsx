@@ -1,16 +1,36 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PlusCircle, Search } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { PlusCircle, Search, Trash2, Building, MoreVertical } from "lucide-react";
 import useStore from "@/store/useStore";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "@/hooks/use-toast";
 
 const ProjectsList = () => {
   const navigate = useNavigate();
-  const { projects, loadProjects, setCurrentProject } = useStore();
+  const { projects, loadProjects, setCurrentProject, deleteProject } = useStore();
+  const [projectToDelete, setProjectToDelete] = useState<number | null>(null);
 
   useEffect(() => {
     loadProjects();
@@ -22,6 +42,30 @@ const ProjectsList = () => {
       setCurrentProject(project);
       navigate(`/projects/${projectId}`);
     }
+  };
+
+  const handleDeleteProject = async () => {
+    if (projectToDelete === null) return;
+
+    try {
+      await deleteProject(projectToDelete);
+      toast({
+        title: "Product deleted",
+        description: "The product has been successfully deleted.",
+      });
+      setProjectToDelete(null);
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to delete product",
+        description: "There was an error deleting the product. Please try again.",
+      });
+    }
+  };
+
+  const stopPropagation = (e: React.MouseEvent) => {
+    e.stopPropagation();
   };
 
   return (
@@ -67,12 +111,46 @@ const ProjectsList = () => {
           {projects.map((project) => (
             <Card
               key={project.id}
-              className="hover:shadow-md transition-shadow cursor-pointer"
+              className="hover:shadow-md transition-shadow cursor-pointer overflow-hidden"
               onClick={() => handleProjectClick(project.id!)}
             >
-              <CardHeader>
-                <CardTitle className="text-lg">{project.name}</CardTitle>
-                <CardDescription>{project.productType}</CardDescription>
+              <CardHeader className="flex flex-row items-start gap-4 space-y-0 pb-2">
+                <Avatar className="h-12 w-12 border">
+                  <AvatarImage src={project.avatarImage} alt={`${project.name} avatar`} />
+                  <AvatarFallback>
+                    {project.name.substring(0, 2).toUpperCase() || <Building size={20}/>}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <div className="flex justify-between items-start">
+                    <CardTitle className="text-lg">{project.name}</CardTitle>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={stopPropagation}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => {
+                          stopPropagation(e);
+                          navigate(`/projects/${project.id}/edit`);
+                        }}>
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-red-600"
+                          onClick={(e) => {
+                            stopPropagation(e);
+                            setProjectToDelete(project.id!);
+                          }}
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <CardDescription>{project.productType}</CardDescription>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -91,6 +169,24 @@ const ProjectsList = () => {
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={projectToDelete !== null} onOpenChange={(open) => !open && setProjectToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the product and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setProjectToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteProject} className="bg-red-500 hover:bg-red-600">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

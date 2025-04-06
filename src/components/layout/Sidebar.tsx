@@ -94,19 +94,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
 
                 {!isCollapsed && expandedSections.projects && (
                   <div className="mt-1 ml-6 space-y-1">
-                    <NavLink
-                      to="/projects"
-                      className={({ isActive }) =>
-                        cn(
-                          "flex items-center px-4 py-2 rounded-md text-sm transition-colors",
-                          isActive && location.pathname === "/projects"
-                            ? "bg-gray-700 text-white"
-                            : "text-gray-300 hover:bg-gray-700 hover:text-white"
-                        )
-                      }
-                    >
-                      All Projects
-                    </NavLink>
 
                     {projects.slice(0, 5).map(project => (
                       <NavLink
