@@ -17,6 +17,7 @@ interface PerformanceScorecardProps {
   className?: string;
   isCurrency?: boolean;
   isPercentage?: boolean;
+  higherIsBad?: boolean;
 }
 
 const PerformanceScorecard: React.FC<PerformanceScorecardProps> = ({
@@ -30,6 +31,7 @@ const PerformanceScorecard: React.FC<PerformanceScorecardProps> = ({
   className,
   isCurrency = true,
   isPercentage = false,
+  higherIsBad = false,
 }) => {
   // Format value based on type
   const formatValue = (value: number): string => {
@@ -61,15 +63,17 @@ const PerformanceScorecard: React.FC<PerformanceScorecardProps> = ({
     ? (actual / target) * 100
     : undefined;
   
-  // Determine status colors
+  // Determine status colors (inverted if higherIsBad)
   const getForecastStatusColor = () => {
     if (forecastVariance === undefined) return dataColors.neutral;
-    return forecastVariance >= 0 ? dataColors.positive : dataColors.negative;
+    const isGood = higherIsBad ? forecastVariance <= 0 : forecastVariance >= 0;
+    return isGood ? dataColors.positive : dataColors.negative;
   };
   
   const getPreviousStatusColor = () => {
     if (previousVariance === undefined) return dataColors.neutral;
-    return previousVariance >= 0 ? dataColors.positive : dataColors.negative;
+     const isGood = higherIsBad ? previousVariance <= 0 : previousVariance >= 0;
+    return isGood ? dataColors.positive : dataColors.negative;
   };
   
   // Get metric color
@@ -88,19 +92,21 @@ const PerformanceScorecard: React.FC<PerformanceScorecardProps> = ({
     }
   };
   
-  // Get appropriate icon based on status
+  // Get appropriate icon based on status (inverted if higherIsBad)
   const getForecastStatusIcon = () => {
     if (forecastVariance === undefined) return <Minus className="w-4 h-4" style={{ color: dataColors.neutral }} />;
-    return forecastVariance >= 0 
-      ? <ArrowUpRight className="w-4 h-4" style={{ color: dataColors.positive }} />
-      : <ArrowDownRight className="w-4 h-4" style={{ color: dataColors.negative }} />;
+    const isGood = higherIsBad ? forecastVariance <= 0 : forecastVariance >= 0;
+    return isGood 
+      ? <ArrowUpRight className="w-4 h-4" style={{ color: dataColors.positive }} /> // Up/Good
+      : <ArrowDownRight className="w-4 h-4" style={{ color: dataColors.negative }} />; // Down/Bad
   };
   
   const getPreviousStatusIcon = () => {
     if (previousVariance === undefined) return <Minus className="w-4 h-4" style={{ color: dataColors.neutral }} />;
-    return previousVariance >= 0 
-      ? <TrendingUp className="w-4 h-4" style={{ color: dataColors.positive }} />
-      : <TrendingDown className="w-4 h-4" style={{ color: dataColors.negative }} />;
+    const isGood = higherIsBad ? previousVariance <= 0 : previousVariance >= 0;
+    return isGood 
+      ? <TrendingUp className="w-4 h-4" style={{ color: dataColors.positive }} /> // Up/Good
+      : <TrendingDown className="w-4 h-4" style={{ color: dataColors.negative }} />; // Down/Bad
   };
 
   return (
@@ -144,7 +150,7 @@ const PerformanceScorecard: React.FC<PerformanceScorecardProps> = ({
                 >
                   {forecastVariance !== undefined && (forecastVariance > 0 ? '+' : '')}
                   {forecastVariance !== undefined ? formatValue(forecastVariance) : 'N/A'}
-                  {forecastVariancePercent !== undefined && ` (${formatPercent(forecastVariancePercent)})`}
+                  {forecastVariancePercent !== undefined && ` (${forecastVariancePercent.toFixed(1)}%)`}
                 </span>
               </div>
             </div>
@@ -166,7 +172,7 @@ const PerformanceScorecard: React.FC<PerformanceScorecardProps> = ({
                 >
                   {previousVariance !== undefined && (previousVariance > 0 ? '+' : '')}
                   {previousVariance !== undefined ? formatValue(previousVariance) : 'N/A'}
-                  {previousVariancePercent !== undefined && ` (${formatPercent(previousVariancePercent)})`}
+                  {previousVariancePercent !== undefined && ` (${previousVariancePercent.toFixed(1)}%)`}
                 </span>
               </div>
             </div>

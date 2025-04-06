@@ -1,17 +1,22 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { FinancialModel, ActualsPeriodEntry } from '@/lib/db';
 import useStore from '@/store/useStore';
-import { formatCurrency, formatPercent } from '@/lib/utils';
+import { formatCurrency, formatPercent, cn } from '@/lib/utils';
 import { generateForecastTimeSeries, ForecastPeriodData } from '@/lib/financialCalculations';
-import { TypographyH4, TypographyMuted } from '@/components/ui/typography';
+import { TypographyH4, TypographyMuted, TypographyH2, TypographyP } from '@/components/ui/typography';
 import ContentCard from '@/components/common/ContentCard';
 import ChartContainer from '@/components/common/ChartContainer';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, ReferenceLine, Label } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, ReferenceLine, Label as RechartsLabel, AreaChart, Area } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, CheckCircle, TrendingUp, TrendingDown } from 'lucide-react';
 import { Sparkline } from '@/components/ui/sparkline';
-import { Card } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { dataColors } from '@/lib/colors';
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 // --- Helper: Calculate Revenue Breakdown from Time Series ---
 interface RevenueBreakdownItem {
@@ -172,21 +177,50 @@ const calculateCostBreakdown = (timeSeries: ForecastPeriodData[], model: Financi
         .sort((a, b) => b.totalValue - a.totalValue);
 };
 
+// --- Custom Tooltip for Charts ---
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload; // Access the data point for the hovered item
+    return (
+      <div className="bg-white dark:bg-gray-800 p-3 border rounded shadow-lg text-xs">
+        <p className="font-semibold mb-1">{label}</p>
+        {payload.map((entry: any, index: number) => (
+          <p key={`item-${index}`} style={{ color: entry.color }}>
+            {`${entry.name}: ${formatCurrency(entry.value)}`}
+          </p>
+        ))}
+        {/* Add profit if available in the data point */}
+        {data.profit !== undefined && (
+             <p style={{ color: dataColors.forecast }}>{`Profit: ${formatCurrency(data.profit)}`}</p>
+        )}
+      </div>
+    );
+  }
+  return null;
+};
+
 const ProductSummary: React.FC = () => {
-  // Correctly extract projectId from URL parameters
   const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
   const { currentProject, loadModelsForProject, loadActualsForProject } = useStore();
   const [models, setModels] = useState<FinancialModel[]>([]);
   const [actuals, setActuals] = useState<ActualsPeriodEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [annotation, setAnnotation] = useState<string>("");
 
-  // Memoized calculations depend on state, but called unconditionally
   const latestModel = useMemo(() => (models.length > 0 ? models[0] : null), [models]);
 
   const timeSeriesData: ForecastPeriodData[] = useMemo(() => {
     if (!latestModel) return [];
     return generateForecastTimeSeries(latestModel);
   }, [latestModel]);
+
+  // Prepare sparkline data (last 8 periods or all if fewer)
+  const sparklineLength = 8;
+  const revenueSparkline = useMemo(() => timeSeriesData.map(d => d.revenue).slice(-sparklineLength), [timeSeriesData]);
+  const costSparkline = useMemo(() => timeSeriesData.map(d => d.cost).slice(-sparklineLength), [timeSeriesData]);
+  const profitSparkline = useMemo(() => timeSeriesData.map(d => d.profit).slice(-sparklineLength), [timeSeriesData]);
+  const marginSparkline = useMemo(() => timeSeriesData.map(d => d.revenue > 0 ? (d.profit / d.revenue) * 100 : 0).slice(-sparklineLength), [timeSeriesData]);
 
   const summaryMetrics = useMemo(() => {
     if (timeSeriesData.length === 0) {
@@ -208,11 +242,12 @@ const ProductSummary: React.FC = () => {
 
   const breakEvenPeriod = useMemo(() => {
       const breakEvenIndex = timeSeriesData.findIndex(p => p.cumulativeProfit >= 0);
-      if (breakEvenIndex === -1) return { label: "Not Reached", index: null };
+      if (breakEvenIndex === -1) return { label: "Not Reached", index: null, achieved: false };
       const periodData = timeSeriesData[breakEvenIndex];
       return {
-          label: periodData.point, // e.g., "Week 7"
-          index: breakEvenIndex // Numeric index (0-based) for ReferenceLine
+          label: periodData.point,
+          index: breakEvenIndex,
+          achieved: true
       };
   }, [timeSeriesData]);
 
@@ -229,23 +264,83 @@ const ProductSummary: React.FC = () => {
     };
   }, [timeSeriesData, summaryMetrics]);
 
-  const { revenueConcentration, warnings } = useMemo(() => {
+  const { warnings } = useMemo(() => {
     const { totalRevenue, profitMargin, breakeven } = summaryMetrics;
     const revenueStreams = latestModel?.assumptions.revenue || [];
-    let revenueConcentration = 0;
-    if (totalRevenue > 0 && revenueStreams.length > 0) {
+    let revenueConcentrationCalc = 0;
+    if (latestModel && totalRevenue > 0 && revenueStreams.length > 0) {
         const highestInitialRevenue = Math.max(0, ...revenueStreams.map(stream => stream.value ?? 0));
-        revenueConcentration = (highestInitialRevenue / totalRevenue) * 100;
+        revenueConcentrationCalc = (highestInitialRevenue / totalRevenue) * 100;
     }
 
-    const warnings = [];
-    if (revenueConcentration > 80) warnings.push({ type: 'Revenue Concentration', message: 'Over 80% of revenue comes from a single source', severity: 'warning' });
-    if (profitMargin < 20) warnings.push({ type: 'Low Profit Margin', message: 'Profit margin is below 20%', severity: 'warning' });
-    if (!breakeven) warnings.push({ type: 'No Breakeven', message: 'Product does not reach breakeven point', severity: 'error' });
-    if (actuals.length === 0) warnings.push({ type: 'No Actuals', message: 'No actual performance data has been recorded', severity: 'info' });
+    const warningsList = [];
+    if (revenueConcentrationCalc > 80) warningsList.push({ type: 'Revenue Concentration', message: 'Over 80% of revenue comes from a single source', severity: 'warning' });
+    if (profitMargin < 20) warningsList.push({ type: 'Low Profit Margin', message: 'Profit margin is below 20%', severity: 'warning' });
+    if (!breakeven) warningsList.push({ type: 'No Breakeven', message: 'Product does not reach breakeven point', severity: 'error' });
+    if (actuals.length === 0) warningsList.push({ type: 'No Actuals', message: 'No actual performance data has been recorded', severity: 'info' });
 
-    return { revenueConcentration, warnings };
+    return { warnings: warningsList };
   }, [summaryMetrics, actuals, latestModel]);
+
+  // --- Calculate Deltas --- 
+  const { revenueDelta, costDelta, profitDelta, marginDelta } = useMemo(() => {
+    if (timeSeriesData.length < 2) {
+      return { revenueDelta: undefined, costDelta: undefined, profitDelta: undefined, marginDelta: undefined };
+    }
+    const last = timeSeriesData[timeSeriesData.length - 1];
+    const prev = timeSeriesData[timeSeriesData.length - 2];
+
+    const calcDelta = (current: number, previous: number): number | undefined => {
+        if (previous === 0) return undefined; // Avoid division by zero
+        return ((current - previous) / previous) * 100;
+    };
+    
+    const lastMargin = last.revenue > 0 ? (last.profit / last.revenue) * 100 : 0;
+    const prevMargin = prev.revenue > 0 ? (prev.profit / prev.revenue) * 100 : 0;
+
+    return {
+        revenueDelta: calcDelta(last.revenue, prev.revenue),
+        costDelta: calcDelta(last.cost, prev.cost),
+        profitDelta: calcDelta(last.profit, prev.profit),
+        marginDelta: prevMargin === 0 ? undefined : lastMargin - prevMargin // Margin delta is absolute change
+    };
+  }, [timeSeriesData]);
+
+  // --- Calculate Core Assumption Summaries --- 
+  const { marketingSpendSummary, fixedCostSummary, variableCostSummary } = useMemo(() => {
+    if (!latestModel) return { marketingSpendSummary: 'N/A', fixedCostSummary: 'N/A', variableCostSummary: 'N/A' };
+
+    const { marketing, costs, metadata } = latestModel.assumptions;
+    let marketingSpend = 'N/A';
+    if (marketing?.allocationMode === 'channels') {
+        const weeklyBudget = marketing.channels.reduce((sum, ch) => sum + (ch.weeklyBudget ?? 0), 0);
+        marketingSpend = `${formatCurrency(weeklyBudget)} / week`;
+    } else if (marketing?.allocationMode === 'highLevel' && marketing.totalBudget) {
+        marketingSpend = `${formatCurrency(marketing.totalBudget)} total (${marketing.budgetApplication || 'spread'})`;
+    }
+
+    const fixedCosts = (costs || [])
+        .filter(c => c.type === 'fixed')
+        .reduce((sum, c) => sum + (c.value ?? 0), 0);
+    
+    const fbCogs = metadata?.costs?.fbCOGSPercent;
+    const merchCogs = metadata?.costs?.merchandiseCogsPercent;
+    let cogs = 'N/A';
+    if (fbCogs !== undefined && merchCogs !== undefined) {
+        cogs = `F&B: ${fbCogs}%, Merch: ${merchCogs}%`;
+    } else if (fbCogs !== undefined) {
+        cogs = `F&B: ${fbCogs}%`;
+    } else if (merchCogs !== undefined) {
+        cogs = `Merch: ${merchCogs}%`;
+    }
+
+    return {
+      marketingSpendSummary: marketingSpend,
+      fixedCostSummary: formatCurrency(fixedCosts),
+      variableCostSummary: cogs
+    };
+
+  }, [latestModel]);
 
   // Data loading effect
   useEffect(() => {
@@ -282,7 +377,14 @@ const ProductSummary: React.FC = () => {
     // Update dependency array to use projectId
   }, [projectId]);
 
-  // --- Conditional Returns AFTER all hooks ---
+  // Initialize annotation from model when loaded
+  useEffect(() => {
+    if (latestModel && latestModel.assumptions.metadata && latestModel.assumptions.metadata.annotation) {
+      setAnnotation(latestModel.assumptions.metadata.annotation);
+    }
+  }, [latestModel]);
+
+  // --- Conditional Returns BEFORE main render ---
   if (isLoading) {
     return <div className="py-8 text-center">Loading product data...</div>;
   }
@@ -303,304 +405,416 @@ const ProductSummary: React.FC = () => {
     );
   }
 
-  // --- Prepare data for rendering (now safe to access latestModel) ---
+  // --- Prepare data for rendering ---
   const { totalRevenue, totalCosts, totalProfit, profitMargin } = summaryMetrics;
-  const revenueChartData = (latestModel.assumptions.revenue || []).map(stream => ({ name: stream.name, value: stream.value }));
-  const costChartData = (latestModel.assumptions.costs || []).map(cost => ({ name: cost.name, value: cost.value }));
+  const finalPeriodLabel = timeSeriesData.length > 0 ? timeSeriesData[timeSeriesData.length - 1].point : 'end';
+  const forecastHeadline = `Forecasting ${formatCurrency(totalProfit)} total profit by ${finalPeriodLabel}, with breakeven ${breakEvenPeriod.index !== null ? `expected in ${breakEvenPeriod.label}` : "not reached"}.`;
+  const forecastConfidence: 'High' | 'Medium' | 'Low' = 'Medium';
+  const confidenceVariant = (forecastConfidence as string) === 'High' ? 'success'
+                          : (forecastConfidence as string) === 'Medium' ? 'warning'
+                          : 'destructive';
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
-  const COST_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+  // --- Helper Function to Format Date/Time ---
+  const formatDateTime = (date: Date | string | undefined): string => {
+    if (!date) return 'N/A';
+    try {
+      return new Date(date).toLocaleString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+      });
+    } catch { return 'Invalid Date'; }
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Key Metrics Cards (Now 5 cards with Breakeven) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4"> {/* Adjusted grid for 5 cards */}
-        <ContentCard title="Total Revenue">
-          <div className="flex items-center justify-between">
-            <div className="text-3xl font-bold">{formatCurrency(totalRevenue)}</div>
-            <TrendingUp className="h-6 w-6 text-fortress-emerald" />
-          </div>
-        </ContentCard>
-
-        <ContentCard title="Total Costs">
-          <div className="flex items-center justify-between">
-            <div className="text-3xl font-bold">{formatCurrency(totalCosts)}</div>
-            <TrendingDown className="h-6 w-6 text-red-500" />
-          </div>
-        </ContentCard>
-
-        <ContentCard title="Total Profit">
-          <div className="flex items-center justify-between">
-            <div className="text-3xl font-bold">{formatCurrency(totalProfit)}</div>
-            {totalProfit >= 0 ? (
-              <CheckCircle className="h-6 w-6 text-fortress-emerald" />
-            ) : (
-              <AlertTriangle className="h-6 w-6 text-red-500" />
-            )}
-          </div>
-        </ContentCard>
-
-        <ContentCard title="Profit Margin">
-          <div className="flex items-center justify-between">
-            <div className="text-3xl font-bold">{formatPercent(profitMargin)}</div>
-            {profitMargin >= 20 ? (
-              <CheckCircle className="h-6 w-6 text-fortress-emerald" />
-            ) : (
-              <AlertTriangle className="h-6 w-6 text-amber-500" />
-            )}
-          </div>
-        </ContentCard>
-
-        <ContentCard title="Breakeven Point">
-          <div className="flex items-center justify-between">
-            <div className="text-3xl font-bold">{breakEvenPeriod.label}</div>
-          </div>
-        </ContentCard>
+    <div className="space-y-8">
+      {/* === Header Section === */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <TypographyH2 className="text-lg font-semibold tracking-tight flex-grow">{forecastHeadline}</TypographyH2>
+        <Badge variant={confidenceVariant} className="flex-shrink-0"> 
+            {forecastConfidence} Confidence
+        </Badge>
       </div>
 
-      {/* Warnings & Alerts - Render as individual cards in a grid */}
-      {warnings.length > 0 && (
-        <div> {/* Optional: Add a title here if needed: <TypographyH4 className="mb-2">Warnings & Alerts</TypographyH4> */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {warnings.map((warning, index) => {
-                    // Determine card styling based on severity
-                    let cardClasses = "p-4 border rounded-lg flex items-start gap-3 "; // Base classes
-                    let iconColor = "text-blue-500"; // Default (info)
-                    let titleColor = "text-blue-800 dark:text-blue-200";
-                    let textColor = "text-blue-700 dark:text-blue-300";
-
-                    if (warning.severity === 'error') {
-                        cardClasses += "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700/50";
-                        iconColor = "text-red-500";
-                        titleColor = "text-red-800 dark:text-red-200";
-                        textColor = "text-red-700 dark:text-red-300";
-                    } else if (warning.severity === 'warning') {
-                        cardClasses += "bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700/50";
-                        iconColor = "text-amber-500";
-                        titleColor = "text-amber-800 dark:text-amber-200";
-                        textColor = "text-amber-700 dark:text-amber-300";
-                    } else { // Info
-                        cardClasses += "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700/50";
-                    }
-
-                    return (
-                        <Card key={index} className={cardClasses}>
-                            <AlertTriangle className={`h-5 w-5 ${iconColor} flex-shrink-0 mt-0.5`} />
-                            <div>
-                                <h4 className={`font-medium ${titleColor}`}>{warning.type}</h4>
-                                <p className={`text-sm ${textColor}`}>
-                                    {warning.message}
-                                </p>
-                            </div>
-                        </Card>
-                    );
-                })}
+      {/* === Section 1: Summary Cards Row === */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Card 1: Revenue */}
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            {/* Optional: Add hover tooltip icon here */}
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
+            {revenueDelta !== undefined && (
+              <p className={cn("text-xs", revenueDelta >= 0 ? "text-green-600" : "text-red-600")}>
+                  {revenueDelta >= 0 ? '+' : ''}{revenueDelta.toFixed(1)}% vs last period
+              </p>
+            )}
+            <div className="h-[40px] mt-2">
+              <Sparkline data={revenueSparkline} width={100} height={30} color={dataColors.revenue} />
             </div>
-        </div>
-      )}
+          </CardContent>
+        </Card>
 
-      {/* Revenue & Cost Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Revenue Breakdown Pie */}
-        <ChartContainer
-          title="Total Revenue Distribution"
-          description="% contribution per stream"
-          height={300} // Adjust height as needed
-        >
-            <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                    <Pie
-                        data={revenueBreakdownData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="totalValue"
-                        nameKey="name"
-                        label={({ percent }) => `${formatPercent(percent * 100)}`}
-                    >
-                    {revenueBreakdownData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => [formatCurrency(value as number), "Total Revenue"]} />
-                    <Legend />
-                </PieChart>
-            </ResponsiveContainer>
-        </ChartContainer>
+        {/* Card 2: Costs */}
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium">Total Costs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(totalCosts)}</div>
+            {costDelta !== undefined && (
+              <p className={cn("text-xs", costDelta <= 0 ? "text-green-600" : "text-red-600")}>
+                  {costDelta >= 0 ? '+' : ''}{costDelta.toFixed(1)}% vs last period
+              </p>
+            )}
+            <div className="h-[40px] mt-2">
+              <Sparkline data={costSparkline} width={100} height={30} color={dataColors.cost} />
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Revenue Breakdown Bar */}
-        <ChartContainer
-          title="Total Revenue Value"
-          description="Absolute value per stream"
-          height={300} // Adjust height as needed
-        >
-            <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={revenueBreakdownData} layout="vertical" margin={{ left: 100 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" tickFormatter={formatCurrency} />
-                    <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 10 }}/>
-                    <Tooltip formatter={(value) => [formatCurrency(value as number), "Total Revenue"]} />
-                    <Bar dataKey="totalValue" name="Total Revenue" radius={[0, 4, 4, 0]}>
-                        {revenueBreakdownData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                    </Bar>
-                </BarChart>
-            </ResponsiveContainer>
-        </ChartContainer>
+        {/* Card 3: Profit */}
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(totalProfit)}</div>
+            {profitDelta !== undefined && (
+              <p className={cn("text-xs", profitDelta >= 0 ? "text-green-600" : "text-red-600")}>
+                  {profitDelta >= 0 ? '+' : ''}{profitDelta.toFixed(1)}% vs last period
+              </p>
+            )}
+            <div className="h-[40px] mt-2">
+              <Sparkline data={profitSparkline} width={100} height={30} color={dataColors.profit} />
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Cost Breakdown Pie */}
-        <ChartContainer
-            title="Total Cost Distribution"
-            description="% contribution per category"
-            height={300} // Adjust height as needed
-        >
-            <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                    <Pie
-                        data={costBreakdownData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="totalValue"
-                        nameKey="category"
-                        label={({ percent }) => `${formatPercent(percent * 100)}`}
-                    >
-                    {costBreakdownData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COST_COLORS[index % COST_COLORS.length]} />
-                    ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => [formatCurrency(value as number), "Total Cost"]} />
-                    <Legend />
-                </PieChart>
-            </ResponsiveContainer>
-        </ChartContainer>
+        {/* Card 4: Profit Margin */}
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium">Profit Margin</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatPercent(profitMargin)}</div>
+            {marginDelta !== undefined && (
+              <p className={cn("text-xs", marginDelta >= 0 ? "text-green-600" : "text-red-600")}>
+                  {marginDelta >= 0 ? '+' : ''}{marginDelta.toFixed(1)}% vs last period
+              </p>
+            )}
+            <div className="h-[40px] mt-2">
+              <Sparkline data={marginSparkline} width={100} height={30} color={dataColors.profit} />
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Cost Breakdown Bar */}
-        <ChartContainer
-            title="Total Cost Value"
-            description="Absolute value per category"
-            height={300} // Adjust height as needed
-        >
-            <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={costBreakdownData} layout="vertical" margin={{ left: 100 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" tickFormatter={formatCurrency} />
-                    <YAxis dataKey="category" type="category" width={100} tick={{ fontSize: 10 }} />
-                    <Tooltip formatter={(value) => [formatCurrency(value as number), "Total Cost"]} />
-                    <Bar dataKey="totalValue" name="Total Cost" radius={[0, 4, 4, 0]}>
-                        {costBreakdownData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COST_COLORS[index % COST_COLORS.length]} />
-                        ))}
-                    </Bar>
-                </BarChart>
-            </ResponsiveContainer>
-        </ChartContainer>
+        {/* Card 5: Breakeven Point (Consider making larger via grid spans if needed) */}
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium">Breakeven Point</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold mb-2">{breakEvenPeriod.label}</div>
+            {breakEvenPeriod.achieved ? (
+                <span className="text-sm text-green-600 font-medium flex items-center">
+                    <CheckCircle className="h-4 w-4 mr-1" /> Achieved
+                </span>
+            ) : (
+                <span className="text-sm text-amber-600 font-medium flex items-center">
+                    <AlertTriangle className="h-4 w-4 mr-1" /> Projected
+                </span>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Forecast Chart */}
-      <ChartContainer
-        title="Financial Forecast"
-        description="Revenue, costs, and profit over time"
-        height={400}
-      >
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={timeSeriesData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="point" />
-            <YAxis tickFormatter={val => formatCurrency(val)} />
-            <Tooltip formatter={(value) => [formatCurrency(value as number), '']} />
-            <Legend />
-            {breakEvenPeriod.index !== null && (
-                <ReferenceLine
-                    x={timeSeriesData[breakEvenPeriod.index]?.point}
-                    stroke="#F59E0B"
-                    strokeDasharray="3 3"
-                >
-                    <Label value="Breakeven" position="insideTopLeft" fill="#F59E0B" fontSize={10}/>
-                </ReferenceLine>
-            )}
-            <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#10B981" strokeWidth={2} />
-            <Line type="monotone" dataKey="cost" name="Costs" stroke="#EF4444" strokeWidth={2} />
-            <Line type="monotone" dataKey="profit" name="Profit" stroke="#1A2942" strokeWidth={2} />
-          </LineChart>
-        </ResponsiveContainer>
-      </ChartContainer>
-
-      {/* Average Metrics Section */}
-      <ContentCard title="Forecast Averages (Per Period)">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-                <TypographyMuted className="text-sm">Avg. Revenue</TypographyMuted>
-                <div className="text-2xl font-semibold">{formatCurrency(averageMetrics.avgRevenue)}</div>
-            </div>
-             <div>
-                <TypographyMuted className="text-sm">Avg. Costs</TypographyMuted>
-                <div className="text-2xl font-semibold">{formatCurrency(averageMetrics.avgCost)}</div>
-            </div>
-             <div>
-                <TypographyMuted className="text-sm">Avg. Profit</TypographyMuted>
-                <div className="text-2xl font-semibold">{formatCurrency(averageMetrics.avgProfit)}</div>
-            </div>
-        </div>
-      </ContentCard>
-
-      {/* Product Details */}
-      <ContentCard title="Product Details">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h4 className="font-medium mb-2">Basic Information</h4>
-            <dl className="space-y-2">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Product Type</dt>
-                <dd className="font-medium">{currentProject.productType}</dd>
+      {/* === Section 2: Forecast Averages Panel === */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Forecast Averages (Per Week)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                  <TypographyMuted className="text-sm">Avg. Revenue</TypographyMuted>
+                  <div className="text-2xl font-semibold">{formatCurrency(averageMetrics.avgRevenue)}</div>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Target Audience</dt>
-                <dd className="font-medium">{currentProject.targetAudience || 'Not specified'}</dd>
+               <div>
+                  <TypographyMuted className="text-sm">Avg. Costs</TypographyMuted>
+                  <div className="text-2xl font-semibold">{formatCurrency(averageMetrics.avgCost)}</div>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Created</dt>
-                <dd className="font-medium">{new Date(currentProject.createdAt).toLocaleDateString()}</dd>
+               <div>
+                  <TypographyMuted className="text-sm">Avg. Profit</TypographyMuted>
+                  <div className="text-2xl font-semibold">{formatCurrency(averageMetrics.avgProfit)}</div>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Last Updated</dt>
-                <dd className="font-medium">{new Date(currentProject.updatedAt).toLocaleDateString()}</dd>
-              </div>
-            </dl>
           </div>
+        </CardContent>
+      </Card>
 
-          <div>
-            <h4 className="font-medium mb-2">Forecast Information</h4>
-            <dl className="space-y-2">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Forecast Name</dt>
-                <dd className="font-medium">{latestModel.name}</dd>
-              </div>
+      {/* === Section 3: Assumptions & Model Settings (Side-by-Side) === */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Card 1: Model Settings */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg">Forecast Model Settings</CardTitle>
+            {/* Removed Edit button from here, maybe add to overall section? */}
+          </CardHeader>
+          <CardContent>
+            <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Growth Model</dt>
-                <dd className="font-medium">{latestModel.assumptions.growthModel?.type || 'Not specified'}</dd>
+                <dd className="font-medium capitalize">{latestModel.assumptions.growthModel?.type || 'N/A'}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Growth Rate</dt>
                 <dd className="font-medium">{formatPercent(latestModel.assumptions.growthModel?.rate || 0)}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Revenue Streams</dt>
-                <dd className="font-medium">{latestModel.assumptions.revenue?.length || 0}</dd>
+                <dt className="text-muted-foreground">Model Created</dt>
+                <dd className="font-medium">{formatDateTime(latestModel.createdAt)}</dd>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Cost Categories</dt>
-                <dd className="font-medium">{latestModel.assumptions.costs?.length || 0}</dd>
+               <div className="flex justify-between">
+                <dt className="text-muted-foreground">Last Updated</dt>
+                <dd className="font-medium">{formatDateTime(latestModel.updatedAt)}</dd>
               </div>
             </dl>
-          </div>
-        </div>
-      </ContentCard>
+          </CardContent>
+        </Card>
+
+        {/* Card 2: Core Assumptions */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg">Core Assumptions</CardTitle>
+             <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => navigate(`/projects/${projectId}/forecast-builder`)}
+             >
+               Edit Assumptions
+            </Button>
+          </CardHeader>
+          <CardContent>
+             <dl className="space-y-2 text-sm">
+               <div className="flex justify-between">
+                 <dt className="text-muted-foreground">Avg Attendance (Initial)</dt>
+                 <dd className="font-medium">{latestModel.assumptions.metadata?.initialWeeklyAttendance?.toLocaleString() ?? 'N/A'}</dd>
+               </div>
+               <div className="flex justify-between">
+                 <dt className="text-muted-foreground">Avg Spend / Attendee</dt>
+                 <dd className="font-medium">{
+                   latestModel.assumptions.metadata?.perCustomer ? 
+                   formatCurrency(
+                     (latestModel.assumptions.metadata.perCustomer.ticketPrice ?? 0) +
+                     (latestModel.assumptions.metadata.perCustomer.fbSpend ?? 0) +
+                     (latestModel.assumptions.metadata.perCustomer.merchandiseSpend ?? 0)
+                   ) : 'N/A'
+                 }</dd>
+               </div>
+                <div className="flex justify-between">
+                 <dt className="text-muted-foreground">Marketing Spend</dt>
+                 <dd className="font-medium">{marketingSpendSummary}</dd>
+               </div>
+               <div className="flex justify-between">
+                 <dt className="text-muted-foreground">Fixed Costs</dt>
+                 <dd className="font-medium">{fixedCostSummary}</dd>
+               </div>
+               <div className="flex justify-between">
+                 <dt className="text-muted-foreground">Variable Costs (COGS)</dt>
+                 <dd className="font-medium">{variableCostSummary}</dd>
+               </div>
+             </dl>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* === Section 4: Forecast Visualisation Charts === */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Chart 1: Weekly Revenue vs. Costs */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Weekly Revenue vs. Costs</CardTitle>
+          </CardHeader>
+          <CardContent>
+             <ResponsiveContainer width="100%" height={300}>
+                <BarChart 
+                  data={timeSeriesData} 
+                  margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                  barCategoryGap="25%" 
+                  barGap={2} 
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                  <XAxis 
+                    dataKey="point" 
+                    tick={{ fontSize: 11 }} 
+                    axisLine={false} 
+                    tickLine={false} 
+                  />
+                  <YAxis 
+                    tickFormatter={formatCurrency} 
+                    tick={{ fontSize: 11 }} 
+                    axisLine={false} 
+                    tickLine={false} 
+                    width={60}
+                  />
+                  <Tooltip 
+                    content={<CustomTooltip />} 
+                    cursor={{ fill: 'transparent' }} 
+                  />
+                  <Legend 
+                    wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} 
+                    verticalAlign="bottom" 
+                    iconSize={10}
+                  />
+                  <Bar name="Weekly Revenue" dataKey="revenue" fill={dataColors.revenue} radius={[3, 3, 0, 0]} barSize={15} />
+                  <Bar name="Weekly Costs" dataKey="cost" fill={dataColors.cost} radius={[3, 3, 0, 0]} barSize={15} /> 
+                </BarChart>
+             </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Chart 2: Financial Forecast */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Financial Forecast</CardTitle>
+          </CardHeader>
+          <CardContent>
+             <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={timeSeriesData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                <defs>
+                    {/* Adjusted gradient opacity */}
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={dataColors.revenue} stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor={dataColors.revenue} stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={dataColors.cost} stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor={dataColors.cost} stopOpacity={0}/>
+                    </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="point" 
+                  tick={{ fontSize: 11 }} 
+                  axisLine={false} 
+                  tickLine={false} 
+                />
+                <YAxis 
+                  tickFormatter={formatCurrency} 
+                  tick={{ fontSize: 11 }} 
+                  axisLine={false} 
+                  tickLine={false} 
+                  width={60}
+                />
+                <Tooltip 
+                  content={<CustomTooltip />} 
+                  cursor={{ stroke: dataColors.neutral[400], strokeWidth: 1, strokeDasharray: "3 3" }} 
+                />
+                <Legend 
+                  wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} 
+                  verticalAlign="bottom" 
+                  payload={[
+                    { value: 'Revenue', type: 'square', id: 'revenue', color: dataColors.revenue },
+                    { value: 'Costs', type: 'square', id: 'cost', color: dataColors.cost },
+                    { value: 'Profit', type: 'line', id: 'profit', color: dataColors.forecast }
+                  ]}
+                />
+                {breakEvenPeriod.index !== null && (
+                    <ReferenceLine 
+                      x={timeSeriesData[breakEvenPeriod.index]?.point} 
+                      stroke={dataColors.status.warning} 
+                      strokeDasharray="4 4" 
+                      strokeWidth={1.5}
+                    >
+                        <RechartsLabel 
+                          value="Breakeven" 
+                          position="insideTopLeft" 
+                          fill={dataColors.status.warning} 
+                          fontSize={10} 
+                          offset={8} 
+                          className="font-semibold"
+                        />
+                    </ReferenceLine>
+                 )}
+                <Area type="monotone" dataKey="revenue" name="Revenue" stroke={dataColors.revenue} strokeWidth={1.5} fillOpacity={1} fill="url(#colorRevenue)" dot={false} />
+                <Area type="monotone" dataKey="cost" name="Costs" stroke={dataColors.cost} strokeWidth={1.5} fillOpacity={1} fill="url(#colorCost)" dot={false}/>
+                 <Line type="monotone" dataKey="profit" name="Profit" stroke={dataColors.forecast} strokeWidth={2} dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* === Section 5: Scenario Analysis Panel === */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Scenario Analysis ("What If")</CardTitle>
+        </CardHeader>
+        <CardContent>
+           <TypographyP className="text-muted-foreground">[Scenario adjustment controls placeholder]</TypographyP>
+          {/* TODO: Implement scenario dropdowns/buttons */}
+        </CardContent>
+      </Card>
+
+      {/* === Section 6: Risk Flags / Alerts === */}
+      <Card>
+        <CardHeader>
+           <CardTitle className="text-lg">Risk Flags & Alerts</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {warnings.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {warnings.map((warning, index) => {
+                    // Using smaller cards/badges for alerts might be better here
+                    let alertClasses = "p-3 border rounded-lg flex items-start gap-3 text-xs ";
+                    let iconColor = "text-blue-500";
+                    let titleColor = "font-semibold";
+                    if (warning.severity === 'error') {
+                        alertClasses += "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700/50";
+                        iconColor = "text-red-500";
+                    } else if (warning.severity === 'warning') {
+                        alertClasses += "bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700/50";
+                        iconColor = "text-amber-500";
+                    } else { // Info
+                        alertClasses += "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700/50";
+                    }
+                    return (
+                        <div key={index} className={alertClasses}>
+                            <AlertTriangle className={`h-4 w-4 ${iconColor} flex-shrink-0 mt-0.5`} />
+                            <div>
+                                <h4 className={titleColor}>{warning.type}</h4>
+                                <p>{warning.message}</p>
+                                {/* TODO: Link to relevant assumption/input */}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+          ) : (
+             <TypographyP className="text-muted-foreground">No specific risks flagged based on current forecast.</TypographyP>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* === Section 7: Notes & Commentary === */}
+      <Card>
+        <CardHeader>
+           <CardTitle className="text-lg">Notes & Commentary</CardTitle>
+        </CardHeader>
+        <CardContent>
+           <Label htmlFor="pm-notes" className="sr-only">PM Commentary</Label> {/* Screen reader label */}
+           <Textarea
+             id="pm-notes"
+             placeholder="Add notes or observations about this forecast..."
+             value={annotation}
+             onChange={(e) => setAnnotation(e.target.value)}
+             className="mt-1"
+             rows={4}
+           />
+           {/* TODO: Add save button, timestamp, author */}
+        </CardContent>
+      </Card>
+
     </div>
   );
 };

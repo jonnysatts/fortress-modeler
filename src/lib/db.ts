@@ -29,7 +29,15 @@ export interface FinancialModel {
     costs: CostAssumption[];
     growthModel: GrowthModel;
     marketing?: MarketingSetup;
-    metadata?: any; // For product-specific data
+    metadata?: {
+      type?: string;
+      weeks?: number;
+      initialWeeklyAttendance?: number;
+      annotation?: string;
+      perCustomer?: any;
+      growth?: any;
+      costs?: any;
+    };
     cogsPercentages?: {
       fbCogsPercent?: number;
       merchandiseCogsPercent?: number;

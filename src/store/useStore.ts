@@ -1,5 +1,18 @@
 import { create } from 'zustand';
 import { Project, FinancialModel, db, deleteProject as dbDeleteProject } from '@/lib/db';
+import * as pdfMakeLib from 'pdfmake/build/pdfmake';
+import * as pdfFonts from 'pdfmake/build/vfs_fonts';
+// Import type directly from pdfmake library path
+import type { TDocumentDefinitions } from 'pdfmake/interfaces';
+// No static import for pdfmake needed due to dynamic import
+
+// EXPORT the generic type
+export type ExportDataType = Record<string, any>; 
+
+// EXPORT the type for the export function map
+export type ExportFunctionMap = {
+    [key: string]: () => ExportDataType | Promise<ExportDataType>;
+};
 
 interface AppState {
   projects: Project[];
@@ -7,6 +20,13 @@ interface AppState {
   currentModel: FinancialModel | null;
   isLoading: boolean;
   error: string | null;
+
+  // Export state and actions
+  exportFunctions: ExportFunctionMap;
+  registerExportFunction: (key: string, func: () => ExportDataType | Promise<ExportDataType>) => void;
+  unregisterExportFunction: (key: string) => void;
+  triggerExport: (reportKey: string, format: 'json' | 'pdf' | 'xlsx') => Promise<void>;
+  triggerFullExport: (format: 'json' | 'pdf' | 'xlsx') => Promise<void>;
 
   loadProjects: () => Promise<void>;
   loadProjectById: (id: number) => Promise<Project | null>;
@@ -27,6 +47,53 @@ interface AppState {
   loadActualsForProject: (projectId: number) => Promise<any[]>;
 }
 
+// --- Helper function to create basic pdfmake doc definition ---
+// This needs significant expansion for proper styling, tables, charts etc.
+const createDocDefinition = (data: ExportDataType, reportKey: string): TDocumentDefinitions => {
+  console.log("Creating pdfmake doc definition for:", reportKey, data);
+  const content: any[] = [];
+
+  // Basic Title
+  content.push({ text: `${reportKey} Report`, style: 'header' });
+  content.push({ text: `Project: ${data.projectName || 'N/A'}`, style: 'subheader' });
+  content.push({ text: `Generated: ${new Date(data.exportDate).toLocaleString()}`, style: 'subheader' });
+  content.push({ text: ' ', margin: [0, 10] }); // Spacer
+
+  // Basic Summary Metrics (Example)
+  if (data.summaryMetrics) {
+    content.push({ text: 'Summary', style: 'subheader' });
+    const summaryTableBody = Object.entries(data.summaryMetrics)
+        // Filter or format specific metrics as needed
+        .map(([key, value]) => [key, typeof value === 'number' ? value.toFixed(2) : String(value)]);
+    
+    content.push({
+        layout: 'lightHorizontalLines', // optional
+        table: {
+            headerRows: 1,
+            widths: ['*', 'auto'],
+            body: [
+                [{ text: 'Metric', style: 'tableHeader' }, { text: 'Value', style: 'tableHeader' }],
+                ...summaryTableBody
+            ]
+        }
+    });
+    content.push({ text: ' ', margin: [0, 10] }); // Spacer
+  }
+
+  // TODO: Add Trend Data Table (using data.trendData)
+  // TODO: Add Assumptions (using data.assumptions)
+  // TODO: Add logic to render charts (likely needs converting charts to images first)
+
+  return {
+    content: content,
+    styles: {
+      header: { fontSize: 18, bold: true, margin: [0, 0, 0, 10] },
+      subheader: { fontSize: 12, margin: [0, 0, 0, 5] },
+      tableHeader: { bold: true, fontSize: 11, color: 'black' }
+    }
+  };
+};
+
 const useStore = create<AppState>((set, get) => ({
   projects: [],
   currentProject: null,
@@ -34,6 +101,169 @@ const useStore = create<AppState>((set, get) => ({
   isLoading: false,
   error: null,
 
+  // --- Export State & Actions ---
+  exportFunctions: {},
+
+  registerExportFunction: (key, func) => {
+    console.log(`[Store] Registering export function: ${key}`);
+    set((state) => ({
+      exportFunctions: { ...state.exportFunctions, [key]: func },
+    }));
+  },
+
+  unregisterExportFunction: (key) => {
+    console.log(`[Store] Unregistering export function: ${key}`);
+    set((state) => {
+      const { [key]: _, ...rest } = state.exportFunctions;
+      return { exportFunctions: rest };
+    });
+  },
+
+  triggerExport: async (reportKey, format) => {
+    console.log(`[Store] Triggering export for: ${reportKey} as ${format}`);
+    const func = get().exportFunctions[reportKey];
+    if (!func) {
+      console.error(`Export function for key "${reportKey}" not found.`);
+      alert(`Could not export ${reportKey}: Data function not available.`);
+      return;
+    }
+    try {
+      const data = await func();
+      console.log(`[Store] Data fetched for ${reportKey}:`, data);
+      
+      const projectName = get().currentProject?.name || 'export';
+      const filenameBase = `${reportKey.replace(/\s+/g, '_')}-${projectName.replace(/\s+/g, '_')}`;
+
+      if (format === 'json') {
+          const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+              JSON.stringify(data, null, 2)
+          )}`;
+          const link = document.createElement("a");
+          link.href = jsonString;
+          link.download = `${filenameBase}.json`;
+          link.click();
+          console.log(`[Store] JSON export triggered for ${reportKey}`);
+      } else if (format === 'pdf') {
+          alert(`PDF export for '${reportKey}' starting. Generation may take a moment...`);
+          console.log('PDF Export Data:', data);
+          try {
+              // Font assignment removed earlier
+              
+              const docDefinition: TDocumentDefinitions = createDocDefinition(data, reportKey);
+              pdfMakeLib.createPdf(docDefinition).download(`${filenameBase}.pdf`);
+              console.log("[Store] pdfmake PDF download triggered.");
+
+          } catch (pdfError) {
+              console.error("Error during PDF generation:", pdfError);
+              alert("Failed to generate PDF. Check console and ensure library is installed correctly.");
+          }
+      } else if (format === 'xlsx') {
+          alert(`Excel export for '${reportKey}' requires implementation.\n\nInstall xlsx (SheetJS) or exceljs and add generation logic here using the fetched data object.`);
+          console.log('Excel Export Data:', data);
+      }
+    } catch (error) {
+        console.error(`Error during export for ${reportKey}:`, error);
+        alert(`Failed to export ${reportKey}.`);
+    }
+  },
+
+  triggerFullExport: async (format) => {
+      console.log(`[Store] Triggering FULL export as ${format}`);
+      const state = get();
+      const allExportData: Record<string, ExportDataType> = {};
+      let errorOccurred = false;
+
+      for (const key in state.exportFunctions) {
+          try {
+              const func = state.exportFunctions[key];
+              allExportData[key] = await func();
+              console.log(`[Store] Fetched data for ${key} (Full Report)`);
+          } catch (error) {
+              console.error(`Error fetching data for ${key} during full export:`, error);
+              errorOccurred = true;
+              // Optionally skip failed parts or add error info to export
+              allExportData[key] = { error: `Failed to fetch data for ${key}` };
+          }
+      }
+
+      if (errorOccurred) {
+          alert("Warning: Some parts of the full report failed to generate. Check console.");
+      }
+      
+      const projectName = state.currentProject?.name || 'full_report';
+      const filenameBase = `full_product_report-${projectName.replace(/\s+/g, '_')}`;
+
+       if (format === 'json') {
+          const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+              JSON.stringify(allExportData, null, 2)
+          )}`;
+          const link = document.createElement("a");
+          link.href = jsonString;
+          link.download = `${filenameBase}.json`;
+          link.click();
+          console.log(`[Store] FULL JSON export triggered`);
+      } else if (format === 'pdf') {
+          alert("Full Report PDF export starting. Generation may take a moment...");
+          console.log('Full PDF Export Data:', allExportData);
+          try {
+              // Font assignment removed earlier
+
+              let fullDocDefinitionContent: any[] = [];
+              // Add overall title
+              fullDocDefinitionContent.push({ text: `Full Product Report - ${projectName}`, style: 'header' });
+              fullDocDefinitionContent.push({ text: `Generated: ${new Date().toLocaleString()}`, style: 'subheader', margin: [0, 0, 0, 15] });
+
+              for (const key in allExportData) {
+                  const reportData = allExportData[key];
+                  if (reportData.error) { // Handle potential errors during data fetching
+                       fullDocDefinitionContent.push({ text: `Section: ${key}`, style: 'sectionHeader' });
+                       fullDocDefinitionContent.push({ text: `Error: ${reportData.error}`, color: 'red', margin: [0, 5, 0, 15] });
+                      continue;
+                  }
+                  // Generate content for each section using a similar structure
+                  fullDocDefinitionContent.push({ text: `Section: ${key}`, style: 'sectionHeader' });
+                  // Use parts of createDocDefinition or a similar helper
+                  if (reportData.summaryMetrics) {
+                      const summaryTableBody = Object.entries(reportData.summaryMetrics)
+                          .map(([k, v]) => [k, typeof v === 'number' ? v.toFixed(2) : String(v)]);
+                      fullDocDefinitionContent.push({ text: 'Summary', style: 'subheader' });
+                      fullDocDefinitionContent.push({
+                          layout: 'lightHorizontalLines',
+                          table: {
+                              headerRows: 1, widths: ['*', 'auto'],
+                              body: [[{ text: 'Metric', style: 'tableHeader' }, { text: 'Value', style: 'tableHeader' }], ...summaryTableBody]
+                          }
+                      });
+                  }
+                   // TODO: Add Trend Data Table, Assumptions etc. for each section
+                   fullDocDefinitionContent.push({ text: ' ', margin: [0, 15] }); // Spacer between sections
+              }
+
+              // Use the imported type for the definition
+              const fullDocDefinition: TDocumentDefinitions = {
+                  content: fullDocDefinitionContent,
+                  styles: {
+                      header: { fontSize: 18, bold: true, margin: [0, 0, 0, 10] },
+                      sectionHeader: { fontSize: 14, bold: true, margin: [0, 10, 0, 5] },
+                      subheader: { fontSize: 12, margin: [0, 0, 0, 5] },
+                      tableHeader: { bold: true, fontSize: 11, color: 'black' }
+                  }
+              };
+
+              pdfMakeLib.createPdf(fullDocDefinition).download(`${filenameBase}.pdf`);
+              console.log("[Store] pdfmake Full PDF download triggered.");
+
+           } catch (pdfError) {
+                console.error("Error during Full PDF generation:", pdfError);
+                alert("Failed to generate Full PDF. Check console and ensure library is installed correctly.");
+           }
+      } else if (format === 'xlsx') {
+          alert("Full Report Excel export requires implementation.\n\nInstall xlsx/exceljs and add generation logic to create multiple sheets.");
+          console.log('Full Excel Export Data:', allExportData);
+      }
+  },
+
+  // --- Existing State & Actions ---
   loadProjects: async () => {
     set({ isLoading: true, error: null });
     try {

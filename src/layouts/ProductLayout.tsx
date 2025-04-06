@@ -1,16 +1,27 @@
 import React, { useState, useEffect } from "react";
 import { Outlet, NavLink, useParams, useNavigate, useLocation } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Pencil, Download, FileJson, FileSpreadsheet, FileText, MenuSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal,
+  DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu";
 import useStore from "@/store/useStore";
 import ErrorBoundary from "@/components/common/ErrorBoundary";
 import { TypographyH3 } from "@/components/ui/typography";
 import Breadcrumbs from "@/components/common/Breadcrumbs";
 import Sidebar from "@/components/layout/Sidebar";
-import AppHeader from "@/components/layout/AppHeader";
 import ResponsiveContainer from "@/components/layout/ResponsiveContainer";
 import { Toaster } from "@/components/ui/toaster";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
 
 const ProductLayout: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -18,6 +29,22 @@ const ProductLayout: React.FC = () => {
   const location = useLocation();
   const { currentProject, loadProjectById, setCurrentProject, loadProjects } = useStore();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // Get export actions and state from store
+  const { 
+      triggerExport, 
+      triggerFullExport, 
+      exportFunctions 
+  } = useStore(
+    (state) => ({ 
+      triggerExport: state.triggerExport, 
+      triggerFullExport: state.triggerFullExport, 
+      exportFunctions: state.exportFunctions 
+    })
+  );
+
+  // Get available report keys from the store state
+  const availableReportKeys = Object.keys(exportFunctions);
 
   // Load projects and current project
   useEffect(() => {
@@ -42,7 +69,7 @@ const ProductLayout: React.FC = () => {
   };
 
   const steps = [
-    { path: "summary", label: "Product Summary" },
+    { path: "summary", label: "Forecast Summary" },
     { path: "forecast-builder", label: "Forecast Builder" },
     { path: "actuals-tracker", label: "Actuals Tracker" },
     { path: "performance-analysis", label: "Performance Analysis" },
@@ -73,65 +100,105 @@ const ProductLayout: React.FC = () => {
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 transition-all duration-300 ease-in-out">
           <ResponsiveContainer className="py-6">
             <ErrorBoundary>
-              <header className="bg-white dark:bg-gray-800 border-b mb-6 rounded-lg shadow-sm">
+              <header className="bg-white dark:bg-gray-800 border-b mb-4 rounded-lg shadow-sm">
                 <div className="px-4 py-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <Breadcrumbs items={breadcrumbItems} className="mb-2" />
-                      <div className="flex items-center gap-3">
-                        {currentProject && (
-                          <Avatar className="h-10 w-10 border">
-                             <AvatarImage src={currentProject.avatarImage} alt={`${currentProject.name} avatar`} />
-                             <AvatarFallback>
-                               {currentProject.name.substring(0, 2).toUpperCase()}
-                             </AvatarFallback>
-                           </Avatar>
-                        )}
+                    <div className="flex items-center gap-4">
+                      {currentProject && (
+                        <Avatar className="h-10 w-10 border">
+                           <AvatarImage src={currentProject.avatarImage} alt={`${currentProject.name} avatar`} />
+                           <AvatarFallback>
+                             {currentProject.name.substring(0, 2).toUpperCase()}
+                           </AvatarFallback>
+                         </Avatar>
+                      )}
+                      <div>
+                        <Breadcrumbs items={breadcrumbItems} className="mb-1 text-xs" />
                         <TypographyH3 className="text-fortress-blue">
                           {currentProject?.name || "Product Details"}
                         </TypographyH3>
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate("/")}
-                    >
-                      <ChevronLeft className="mr-2 h-4 w-4" />
-                      Back to Portfolio
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/forecast-builder`)}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit Inputs
+                      </Button>
+                      
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                             <Download className="mr-2 h-4 w-4" />
+                             Export Report
+                           </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56"> 
+                           <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>
+                                <MenuSquare className="mr-2 h-4 w-4" />
+                                <span>Full Product Report</span>
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuPortal>
+                                <DropdownMenuSubContent>
+                                   {/* Call triggerFullExport from store */}
+                                  <DropdownMenuItem onClick={() => triggerFullExport('pdf')}>PDF</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => triggerFullExport('xlsx')}>Excel (XLSX)</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => triggerFullExport('json')}>JSON</DropdownMenuItem>
+                                </DropdownMenuSubContent>
+                              </DropdownMenuPortal>
+                           </DropdownMenuSub>
+
+                           {availableReportKeys.length > 0 && <DropdownMenuSeparator />} 
+
+                           {/* Dynamically add sections based on registered functions */}
+                           {availableReportKeys.map(reportKey => (
+                              <DropdownMenuSub key={reportKey}>
+                                <DropdownMenuSubTrigger>
+                                  <MenuSquare className="mr-2 h-4 w-4" />
+                                  {/* Improve naming if needed, e.g., format key */}
+                                  <span>Export {reportKey}</span> 
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuPortal>
+                                  <DropdownMenuSubContent>
+                                     {/* Call triggerExport from store with key */}
+                                    <DropdownMenuItem onClick={() => triggerExport(reportKey, 'pdf')}>PDF</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => triggerExport(reportKey, 'xlsx')}>Excel (XLSX)</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => triggerExport(reportKey, 'json')}>JSON</DropdownMenuItem>
+                                  </DropdownMenuSubContent>
+                                </DropdownMenuPortal>
+                            </DropdownMenuSub>
+                           ))}
+                         </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                 </div>
               </header>
 
-              <div className="flex flex-col md:flex-row gap-6">
-                <aside className="w-full md:w-60 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
-                  <nav>
-                    <ul className="space-y-2">
-                      {steps.map(step => (
-                        <li key={step.path}>
-                          <NavLink
-                            to={`/projects/${projectId}/${step.path}`}
-                            className={({ isActive }) =>
-                              `block px-4 py-2 rounded-md transition-colors ${
-                                isActive
-                                  ? "bg-fortress-blue text-white font-medium"
-                                  : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                              }`
-                            }
-                          >
-                            {step.label}
-                          </NavLink>
-                        </li>
-                      ))}
-                    </ul>
-                  </nav>
-                </aside>
+              <nav className="mb-6">
+                <div className="flex space-x-1 border-b">
+                    {steps.map(step => (
+                       <NavLink
+                         key={step.path}
+                         to={`/projects/${projectId}/${step.path}`}
+                         className={({ isActive }) =>
+                           cn(
+                             "px-4 py-2 text-sm font-medium transition-colors border-b-2",
+                             isActive
+                               ? "border-fortress-blue text-fortress-blue"
+                               : "border-transparent text-muted-foreground hover:text-gray-700 hover:border-gray-300 dark:hover:text-gray-200 dark:hover:border-gray-600"
+                           )
+                         }
+                       >
+                         {step.label}
+                       </NavLink>
+                     ))}
+                </div>
+              </nav>
 
-                <main className="flex-1 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm min-w-0">
-                  <Outlet />
-                </main>
-              </div>
+              <main className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm min-w-0">
+                 <Outlet />
+              </main>
             </ErrorBoundary>
           </ResponsiveContainer>
         </main>

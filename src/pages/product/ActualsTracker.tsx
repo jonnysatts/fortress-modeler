@@ -343,91 +343,89 @@ const ActualsTracker: React.FC = () => {
           </ChartContainer>
           
           <ContentCard title="Actuals Summary" className="w-full">
-            <div className="space-y-4">
-              <div className="flex items-center p-4 bg-blue-50 border border-blue-200 rounded-md">
-                <Info className="h-5 w-5 text-blue-500 mr-3 flex-shrink-0" />
-                <p className="text-blue-700 text-sm">
-                  {sortedActuals.length > 0 
-                    ? `You have recorded actuals for ${sortedActuals.length} ${sortedActuals.length === 1 ? 'period' : 'periods'}.`
-                    : 'You have not recorded any actuals yet. Use the "Record New Actuals" button to get started.'}
-                </p>
-              </div>
-              
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse min-w-[800px]">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="py-2 px-4 text-left">Period</th>
-                      {isWeeklyEvent && <th className="py-2 px-4 text-right">Attendance</th>}
-                      <th className="py-2 px-4 text-right">Revenue</th>
-                      <th className="py-2 px-4 text-right">Variable Costs</th>
-                      <th className="py-2 px-4 text-right">Fixed/Setup</th>
-                      <th className="py-2 px-4 text-right">Recurring</th>
-                      <th className="py-2 px-4 text-right">Marketing</th>
-                      <th className="py-2 px-4 text-right font-semibold border-l">Total Costs</th>
-                      <th className="py-2 px-4 text-right">Profit</th>
-                      <th className="py-2 px-4 text-right">Margin</th>
-                      <th className="py-2 px-4 text-center">Status</th>
-                      <th className="py-2 px-4 text-center">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {chartData.map((period, index) => (
-                      <tr key={index} className="border-b hover:bg-gray-50">
-                        <td className="py-2 px-4">{period.name}</td>
-                        {isWeeklyEvent && (
-                          <td className="py-2 px-4 text-right">
-                            {period.hasActuals && period.attendanceActual !== undefined 
-                              ? period.attendanceActual.toLocaleString() 
-                              : '-'}
-                          </td>
-                        )}
+            <div className="flex items-center p-4 bg-blue-50 border border-blue-200 rounded-md mb-4">
+              <Info className="h-5 w-5 text-blue-500 mr-3 flex-shrink-0" />
+              <p className="text-blue-700 text-sm">
+                {sortedActuals.length > 0 
+                  ? `You have recorded actuals for ${sortedActuals.length} ${sortedActuals.length === 1 ? 'period' : 'periods'}.`
+                  : 'You have not recorded any actuals yet. Use the "Record New Actuals" button to get started.'}
+              </p>
+            </div>
+            
+            <div className="w-full overflow-x-auto">
+              <table className="w-full border-collapse min-w-[800px]">
+                <thead>
+                  <tr className="border-b bg-muted/40 sticky top-0 z-10">
+                    <th className="py-2 px-4 text-left">Period</th>
+                    {isWeeklyEvent && <th className="py-2 px-4 text-right">Attendance</th>}
+                    <th className="py-2 px-4 text-right">Revenue</th>
+                    <th className="py-2 px-4 text-right">Variable Costs</th>
+                    <th className="py-2 px-4 text-right">Fixed/Setup</th>
+                    <th className="py-2 px-4 text-right">Recurring</th>
+                    <th className="py-2 px-4 text-right">Marketing</th>
+                    <th className="py-2 px-4 text-right font-semibold border-l">Total Costs</th>
+                    <th className="py-2 px-4 text-right">Profit</th>
+                    <th className="py-2 px-4 text-right">Margin</th>
+                    <th className="py-2 px-4 text-center">Status</th>
+                    <th className="py-2 px-4 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {chartData.map((period, index) => (
+                    <tr key={index} className="border-b hover:bg-gray-50">
+                      <td className="py-2 px-4">{period.name}</td>
+                      {isWeeklyEvent && (
                         <td className="py-2 px-4 text-right">
-                          {period.hasActuals ? formatCurrency(period.revenueActual ?? 0) : '-'}
-                        </td>
-                        <td className="py-2 px-4 text-right text-muted-foreground">
-                          {period.hasActuals ? formatCurrency(period.variableCostsActual ?? 0) : '-'}
-                        </td>
-                        <td className="py-2 px-4 text-right text-muted-foreground">
-                          {period.hasActuals ? formatCurrency(period.fixedCostsActual ?? 0) : '-'}
-                        </td>
-                        <td className="py-2 px-4 text-right text-muted-foreground">
-                          {period.hasActuals ? formatCurrency(period.recurringCostsActual ?? 0) : '-'}
-                        </td>
-                        <td className="py-2 px-4 text-right text-muted-foreground">
-                          {period.hasActuals ? formatCurrency(period.marketingCostsActual ?? 0) : '-'}
-                        </td>
-                        <td className="py-2 px-4 text-right font-semibold border-l">
-                          {period.hasActuals ? formatCurrency(period.totalCostActual ?? 0) : '-'}
-                        </td>
-                        <td className="py-2 px-4 text-right">
-                          {period.hasActuals ? formatCurrency(period.profitActual ?? 0) : '-'}
-                        </td>
-                        <td className="py-2 px-4 text-right">
-                          {period.hasActuals && (period.revenueActual ?? 0) > 0 
-                            ? formatPercent(((period.profitActual ?? 0) / (period.revenueActual ?? 1)) * 100)
+                          {period.hasActuals && period.attendanceActual !== undefined 
+                            ? period.attendanceActual.toLocaleString() 
                             : '-'}
                         </td>
-                        <td className="py-2 px-4 text-center">
-                          {period.hasActuals 
-                            ? <Badge variant="success">Recorded</Badge>
-                            : <Badge variant="outline">Missing</Badge>}
-                        </td>
-                        <td className="py-2 px-4 text-center">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => handleOpenRecordDialog(period.period)}
-                            className="h-7 px-2 text-xs"
-                          >
-                             {period.hasActuals ? "Edit" : "Add"} 
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                      )}
+                      <td className="py-2 px-4 text-right">
+                        {period.hasActuals ? formatCurrency(period.revenueActual ?? 0) : '-'}
+                      </td>
+                      <td className="py-2 px-4 text-right text-muted-foreground">
+                        {period.hasActuals ? formatCurrency(period.variableCostsActual ?? 0) : '-'}
+                      </td>
+                      <td className="py-2 px-4 text-right text-muted-foreground">
+                        {period.hasActuals ? formatCurrency(period.fixedCostsActual ?? 0) : '-'}
+                      </td>
+                      <td className="py-2 px-4 text-right text-muted-foreground">
+                        {period.hasActuals ? formatCurrency(period.recurringCostsActual ?? 0) : '-'}
+                      </td>
+                      <td className="py-2 px-4 text-right text-muted-foreground">
+                        {period.hasActuals ? formatCurrency(period.marketingCostsActual ?? 0) : '-'}
+                      </td>
+                      <td className="py-2 px-4 text-right font-semibold border-l">
+                        {period.hasActuals ? formatCurrency(period.totalCostActual ?? 0) : '-'}
+                      </td>
+                      <td className="py-2 px-4 text-right">
+                        {period.hasActuals ? formatCurrency(period.profitActual ?? 0) : '-'}
+                      </td>
+                      <td className="py-2 px-4 text-right">
+                        {period.hasActuals && (period.revenueActual ?? 0) > 0 
+                          ? formatPercent(((period.profitActual ?? 0) / (period.revenueActual ?? 1)) * 100)
+                          : '-'}
+                      </td>
+                      <td className="py-2 px-4 text-center">
+                        {period.hasActuals 
+                          ? <Badge variant="success">Recorded</Badge>
+                          : <Badge variant="outline">Missing</Badge>}
+                      </td>
+                      <td className="py-2 px-4 text-center">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleOpenRecordDialog(period.period)}
+                          className="h-7 px-2 text-xs"
+                        >
+                           {period.hasActuals ? "Edit" : "Add"} 
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </ContentCard>
         </TabsContent>
