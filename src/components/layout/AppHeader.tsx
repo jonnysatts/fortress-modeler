@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import Breadcrumbs from '@/components/common/Breadcrumbs';
 import useStore from '@/store/useStore';
-import GlobalSearch from '@/components/common/GlobalSearch';
+
 import { TypographyH3 } from '@/components/ui/typography';
 
 // Define the type for breadcrumb items explicitly
@@ -21,7 +21,12 @@ const AppHeader: React.FC = () => {
 
   // Generate breadcrumb items based on current route (using /projects)
   const getBreadcrumbItems = (): BreadcrumbItem[] => { // Use the explicit type
-    const items: BreadcrumbItem[] = [{ label: 'Portfolio Dashboard', href: '/' }];
+    const items: BreadcrumbItem[] = [];
+
+    // Only add Portfolio Dashboard to breadcrumbs when not on the dashboard itself
+    if (location.pathname !== '/') {
+      items.push({ label: 'Portfolio Dashboard', href: '/' });
+    }
 
     if (location.pathname.startsWith('/projects')) {
       items.push({ label: 'Products', href: '/projects' });
@@ -129,7 +134,6 @@ const AppHeader: React.FC = () => {
     <div className="flex flex-col space-y-4 mb-6">
       <div className="flex justify-between items-center">
         <Breadcrumbs items={getBreadcrumbItems()} className="mb-2" />
-        <GlobalSearch />
       </div>
 
       <div className="flex justify-between items-center">

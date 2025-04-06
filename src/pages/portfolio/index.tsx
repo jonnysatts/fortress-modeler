@@ -363,8 +363,7 @@ const PortfolioDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-fortress-blue">Portfolio Dashboard</h1>
+      <div className="flex justify-end mb-6">
         <Button
           onClick={() => navigate("/projects/new")}
           className="bg-fortress-emerald hover:bg-fortress-emerald/90"
@@ -414,8 +413,8 @@ const PortfolioDashboard: React.FC = () => {
       {/* Portfolio Health Overview */}
       <Card>
         <CardHeader>
-          <CardTitle>Portfolio Health Overview</CardTitle>
-          <CardDescription>Key performance indicators across all products</CardDescription>
+          <CardTitle>Performance Metrics</CardTitle>
+          <CardDescription>Key indicators across all products</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
