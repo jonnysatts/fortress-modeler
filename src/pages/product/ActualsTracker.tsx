@@ -171,6 +171,20 @@ const ActualsTracker: React.FC = () => {
             else if (category === 'Marketing') periodData.marketingCostsActual = (periodData.marketingCostsActual ?? 0) + value;
         }
 
+        // Process marketing channel actuals if they exist
+        if (actual.marketingActuals) {
+            let channelMarketingTotal = 0;
+            Object.values(actual.marketingActuals).forEach(channelActual => {
+                channelMarketingTotal += channelActual.actualSpend;
+            });
+
+            // If we have both marketing budget and channel actuals, use the channel actuals
+            // as they are more detailed
+            if (channelMarketingTotal > 0) {
+                periodData.marketingCostsActual = channelMarketingTotal;
+            }
+        }
+
         // 4. Calculate total cost and profit for the period
         periodData.totalCostActual =
             (periodData.variableCostsActual ?? 0) + // Now includes calculated COGS
@@ -536,17 +550,43 @@ const ActualsTracker: React.FC = () => {
                     <div key={index} className="border rounded-md p-4">
                       <h3 className="font-medium text-lg mb-3">{timeUnit} {actual.period}</h3>
 
-                      {Object.entries(actual.costActuals || {}).length > 0 ? (
+                      {(Object.entries(actual.costActuals || {}).length > 0 || Object.entries(actual.marketingActuals || {}).length > 0) ? (
                         <div className="space-y-2">
+                          {/* Regular cost actuals */}
                           {Object.entries(actual.costActuals || {}).map(([key, value], idx) => (
                             <div key={idx} className="flex justify-between py-1 border-b">
                               <span>{key}</span>
                               <span className="font-medium">{formatCurrency(value)}</span>
                             </div>
                           ))}
+
+                          {/* Marketing channel actuals */}
+                          {Object.entries(actual.marketingActuals || {}).length > 0 && (
+                            <>
+                              <div className="py-1 border-b font-medium text-sm text-blue-600">
+                                Marketing Channel Actuals
+                              </div>
+                              {Object.entries(actual.marketingActuals || {}).map(([channelId, channelActual], idx) => {
+                                // Find the channel name from the model
+                                const channel = latestModel?.assumptions?.marketing?.channels?.find(c => c.id === channelId);
+                                return (
+                                  <div key={`channel-${idx}`} className="flex justify-between py-1 border-b">
+                                    <span>{channel?.name || 'Unknown Channel'}</span>
+                                    <span className="font-medium">{formatCurrency(channelActual.actualSpend)}</span>
+                                  </div>
+                                );
+                              })}
+                            </>
+                          )}
+
                           <div className="flex justify-between py-1 font-medium">
                             <span>Total</span>
-                            <span>{formatCurrency(Object.values(actual.costActuals || {}).reduce((sum, val) => sum + val, 0))}</span>
+                            <span>
+                              {formatCurrency(
+                                Object.values(actual.costActuals || {}).reduce((sum, val) => sum + val, 0) +
+                                Object.values(actual.marketingActuals || {}).reduce((sum, val) => sum + val.actualSpend, 0)
+                              )}
+                            </span>
                           </div>
                         </div>
                       ) : (

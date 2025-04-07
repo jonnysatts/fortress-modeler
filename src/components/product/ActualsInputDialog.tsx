@@ -4,27 +4,31 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-    Dialog, 
-    DialogContent, 
-    DialogHeader, 
-    DialogTitle, 
-    DialogDescription, 
-    DialogFooter, 
+import { Badge } from "@/components/ui/badge";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
     DialogClose
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
+
+import { MarketingChannelActual } from '@/types/models';
 
 // Type for the form state within the dialog
 type PeriodActualsFormData = {
     revenueActuals: Record<string, number>;
     costActuals: Record<string, number>;
     attendanceActual?: number;
+    marketingActuals?: Record<string, MarketingChannelActual>;
     notes?: string;
 };
 
 interface ActualsInputDialogProps {
-  model: FinancialModel; 
+  model: FinancialModel;
   period: number; // The specific period (week/month number) to add/edit
   existingEntry: ActualsPeriodEntry | null; // Pass existing data if editing
   open: boolean;
@@ -32,8 +36,8 @@ interface ActualsInputDialogProps {
   onSave: (savedEntry: ActualsPeriodEntry) => void; // Callback after saving to trigger refetch
 }
 
-export const ActualsInputDialog: React.FC<ActualsInputDialogProps> = ({ 
-    model, 
+export const ActualsInputDialog: React.FC<ActualsInputDialogProps> = ({
+    model,
     period,
     existingEntry,
     open,
@@ -42,14 +46,14 @@ export const ActualsInputDialog: React.FC<ActualsInputDialogProps> = ({
 }) => {
   const isWeekly = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeekly ? "Week" : "Month";
-  
-  const [formData, setFormData] = useState<PeriodActualsFormData>({ revenueActuals: {}, costActuals: {} });
+
+  const [formData, setFormData] = useState<PeriodActualsFormData>({ revenueActuals: {}, costActuals: {}, marketingActuals: {} });
   const [isDirty, setIsDirty] = useState(false);
   const [initialDataString, setInitialDataString] = useState<string>("");
 
   const revenueItems = model.assumptions.revenue || [];
   const costItems = model.assumptions.costs || [];
-  
+
   // Log the items to be rendered
   console.log("Actuals Dialog - Revenue Items:", revenueItems);
   console.log("Actuals Dialog - Cost Items:", costItems);
@@ -72,6 +76,7 @@ export const ActualsInputDialog: React.FC<ActualsInputDialogProps> = ({
             revenueActuals: existingEntry?.revenueActuals || {},
             costActuals: existingEntry?.costActuals || {},
             attendanceActual: existingEntry?.attendanceActual,
+            marketingActuals: existingEntry?.marketingActuals || {},
             notes: existingEntry?.notes || ''
         };
         setFormData(initialValues);
@@ -88,9 +93,9 @@ export const ActualsInputDialog: React.FC<ActualsInputDialogProps> = ({
 
   // Define known revenue streams for WeeklyEvent
   const weeklyEventRevenueStreams = [
-      "Ticket Sales", 
-      "F&B Sales", 
-      "Merchandise Sales", 
+      "Ticket Sales",
+      "F&B Sales",
+      "Merchandise Sales",
       "Online Sales", // Assuming these exist based on metadata structure
       "Miscellaneous Revenue"
   ];
@@ -99,9 +104,10 @@ export const ActualsInputDialog: React.FC<ActualsInputDialogProps> = ({
 
   // --- Input Handlers ---
   const handleInputChange = (
-      type: 'revenue' | 'cost' | 'attendance',
+      type: 'revenue' | 'cost' | 'attendance' | 'marketing',
       key: string,
-      value: string
+      value: string,
+      subField?: string
   ) => {
     // Allow empty input visually, but treat as 0 for state if needed
     const numValue = value === '' ? undefined : parseFloat(value);
@@ -114,11 +120,50 @@ export const ActualsInputDialog: React.FC<ActualsInputDialogProps> = ({
 
         if (type === 'attendance') {
             return { ...prev, attendanceActual: updatedValue };
+        } else if (type === 'marketing') {
+            // Handle marketing actuals
+            const marketingActuals = { ...(prev.marketingActuals || {}) };
+
+            // If this channel doesn't exist yet, create it
+            if (!marketingActuals[key]) {
+                marketingActuals[key] = {
+                    channelId: key,
+                    actualSpend: 0,
+                };
+            }
+
+            // Update the specific field
+            if (subField === 'actualSpend') {
+                marketingActuals[key] = {
+                    ...marketingActuals[key],
+                    actualSpend: updatedValue ?? 0
+                };
+            } else if (subField === 'conversions') {
+                marketingActuals[key] = {
+                    ...marketingActuals[key],
+                    conversions: updatedValue ?? 0
+                };
+            } else if (subField === 'clicks') {
+                marketingActuals[key] = {
+                    ...marketingActuals[key],
+                    clicks: updatedValue ?? 0
+                };
+            } else if (subField === 'impressions') {
+                marketingActuals[key] = {
+                    ...marketingActuals[key],
+                    impressions: updatedValue ?? 0
+                };
+            }
+
+            return {
+                ...prev,
+                marketingActuals
+            };
         } else {
             const fieldKey = type === 'revenue' ? 'revenueActuals' : 'costActuals';
             const updatedRecord = { ...(prev[fieldKey] || {}), [key]: updatedValue ?? 0 }; // Store 0 if undefined
             // Optional: Clean up keys if value becomes undefined again
-            // if (updatedValue === undefined) delete updatedRecord[key]; 
+            // if (updatedValue === undefined) delete updatedRecord[key];
             return {
                 ...prev,
                 [fieldKey]: updatedRecord
@@ -134,11 +179,11 @@ export const ActualsInputDialog: React.FC<ActualsInputDialogProps> = ({
   // --- Save Handler ---
   const handleSave = async () => {
     const projectIdNum = model?.projectId;
-    if (!model?.id || typeof projectIdNum !== 'number') { 
+    if (!model?.id || typeof projectIdNum !== 'number') {
         toast({ variant: "destructive", title: "Error", description: "Model or Project ID is invalid." });
         return;
     }
-    
+
     const actualEntry: Omit<ActualsPeriodEntry, 'id'> = {
         projectId: projectIdNum,
         period: period,
@@ -146,6 +191,7 @@ export const ActualsInputDialog: React.FC<ActualsInputDialogProps> = ({
         revenueActuals: formData.revenueActuals,
         costActuals: formData.costActuals,
         attendanceActual: formData.attendanceActual,
+        marketingActuals: formData.marketingActuals,
         notes: formData.notes
     };
 
@@ -154,7 +200,7 @@ export const ActualsInputDialog: React.FC<ActualsInputDialogProps> = ({
         if (savedEntry) {
             toast({ title: "Success", description: `Actuals for ${timeUnit} ${period} saved.` });
             onSave(savedEntry); // Pass the returned entry back
-            onOpenChange(false); 
+            onOpenChange(false);
         } else {
              toast({ variant: "destructive", title: "Save Error", description: "Could not save actuals data (failed to retrieve after save)." });
         }
@@ -183,13 +229,13 @@ export const ActualsInputDialog: React.FC<ActualsInputDialogProps> = ({
                 {revenueItemsToDisplay.map(streamName => (
                     <div key={`rev-${streamName}`} className="flex items-center justify-between gap-4">
                         <Label htmlFor={`rev-${streamName}`} className="text-sm whitespace-normal">
-                            {streamName} 
+                            {streamName}
                         </Label>
-                        <Input 
+                        <Input
                             id={`rev-${streamName}`}
                             type="number"
-                            className="h-8 w-32" 
-                            value={formData.revenueActuals[streamName] ?? ''} 
+                            className="h-8 w-32"
+                            value={formData.revenueActuals[streamName] ?? ''}
                             onChange={(e) => handleInputChange('revenue', streamName, e.target.value)}
                             placeholder="0"
                             step="0.01"
@@ -210,7 +256,7 @@ export const ActualsInputDialog: React.FC<ActualsInputDialogProps> = ({
                         <Label htmlFor={`cost-${item.name}`} className="text-sm whitespace-normal">
                             {item.name}
                         </Label>
-                        <Input 
+                        <Input
                             id={`cost-${item.name}`}
                             type="number"
                             className="h-8 w-32"
@@ -227,7 +273,7 @@ export const ActualsInputDialog: React.FC<ActualsInputDialogProps> = ({
                         <Label htmlFor="cost-MarketingBudget" className="text-sm whitespace-normal">
                             Marketing Budget
                         </Label>
-                        <Input 
+                        <Input
                             id="cost-MarketingBudget"
                             type="number"
                             className="h-8 w-32"
@@ -241,7 +287,58 @@ export const ActualsInputDialog: React.FC<ActualsInputDialogProps> = ({
                  )}
             </div>
 
-                       {/* Attendance Input (conditional) */}
+            {/* Marketing Channels Section (conditional) */}
+            {model.assumptions.marketing?.allocationMode === 'channels' && (
+                <div className="space-y-3">
+                    <h4 className="font-semibold border-b pb-1">Marketing Channel Actuals</h4>
+                    {model.assumptions.marketing.channels.length === 0 ? (
+                        <p className="text-sm text-muted-foreground italic">No marketing channels defined in the forecast model.</p>
+                    ) : (
+                        model.assumptions.marketing.channels.map(channel => (
+                            <div key={`marketing-${channel.id}`} className="border p-3 rounded-md space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <h5 className="font-medium">{channel.name}</h5>
+                                    <Badge variant="outline">{channel.channelType}</Badge>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <Label htmlFor={`marketing-${channel.id}-spend`} className="text-xs">
+                                            Actual Spend
+                                        </Label>
+                                        <Input
+                                            id={`marketing-${channel.id}-spend`}
+                                            type="number"
+                                            className="h-8"
+                                            value={formData.marketingActuals?.[channel.id]?.actualSpend ?? ''}
+                                            onChange={(e) => handleInputChange('marketing', channel.id, e.target.value, 'actualSpend')}
+                                            placeholder="0"
+                                            step="0.01"
+                                            min="0"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor={`marketing-${channel.id}-conversions`} className="text-xs">
+                                            Conversions
+                                        </Label>
+                                        <Input
+                                            id={`marketing-${channel.id}-conversions`}
+                                            type="number"
+                                            className="h-8"
+                                            value={formData.marketingActuals?.[channel.id]?.conversions ?? ''}
+                                            onChange={(e) => handleInputChange('marketing', channel.id, e.target.value, 'conversions')}
+                                            placeholder="0"
+                                            step="1"
+                                            min="0"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            )}
+
+            {/* Attendance Input (conditional) */}
                        {isWeekly && (
               <div className="space-y-2 pt-4 border-t">
                  <Label htmlFor="attendanceActual">Actual Attendance for {timeUnit} {period}</Label>
@@ -261,7 +358,7 @@ export const ActualsInputDialog: React.FC<ActualsInputDialogProps> = ({
             {/* Notes Section */}
             <div className="space-y-2 pt-4 border-t">
                  <Label htmlFor="notes">Notes for {timeUnit} {period}</Label>
-                 <Textarea 
+                 <Textarea
                     id="notes"
                     value={formData.notes ?? ''}
                     onChange={(e) => handleNotesChange(e.target.value)}
@@ -281,4 +378,4 @@ export const ActualsInputDialog: React.FC<ActualsInputDialogProps> = ({
       </DialogContent>
     </Dialog>
   );
-}; 
+};

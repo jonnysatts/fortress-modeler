@@ -31,15 +31,15 @@ const ProductLayout: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Get export actions and state from store
-  const { 
-      triggerExport, 
-      triggerFullExport, 
-      exportFunctions 
+  const {
+      triggerExport,
+      triggerFullExport,
+      exportFunctions
   } = useStore(
-    (state) => ({ 
-      triggerExport: state.triggerExport, 
-      triggerFullExport: state.triggerFullExport, 
-      exportFunctions: state.exportFunctions 
+    (state) => ({
+      triggerExport: state.triggerExport,
+      triggerFullExport: state.triggerFullExport,
+      exportFunctions: state.exportFunctions
     })
   );
 
@@ -73,6 +73,7 @@ const ProductLayout: React.FC = () => {
     { path: "forecast-builder", label: "Forecast Builder" },
     { path: "actuals-tracker", label: "Actuals Tracker" },
     { path: "performance-analysis", label: "Performance Analysis" },
+    { path: "marketing-analysis", label: "Marketing Analysis" },
     { path: "risks-scenarios", label: "Risks & Scenarios" }
   ];
 
@@ -124,7 +125,7 @@ const ProductLayout: React.FC = () => {
                         <Pencil className="mr-2 h-4 w-4" />
                         Edit Inputs
                       </Button>
-                      
+
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" size="sm">
@@ -132,7 +133,7 @@ const ProductLayout: React.FC = () => {
                              Export Report
                            </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56"> 
+                        <DropdownMenuContent align="end" className="w-56">
                            <DropdownMenuSub>
                               <DropdownMenuSubTrigger>
                                 <MenuSquare className="mr-2 h-4 w-4" />
@@ -148,7 +149,7 @@ const ProductLayout: React.FC = () => {
                               </DropdownMenuPortal>
                            </DropdownMenuSub>
 
-                           {availableReportKeys.length > 0 && <DropdownMenuSeparator />} 
+                           {availableReportKeys.length > 0 && <DropdownMenuSeparator />}
 
                            {/* Dynamically add sections based on registered functions */}
                            {availableReportKeys.map(reportKey => (
@@ -156,7 +157,7 @@ const ProductLayout: React.FC = () => {
                                 <DropdownMenuSubTrigger>
                                   <MenuSquare className="mr-2 h-4 w-4" />
                                   {/* Improve naming if needed, e.g., format key */}
-                                  <span>Export {reportKey}</span> 
+                                  <span>Export {reportKey}</span>
                                 </DropdownMenuSubTrigger>
                                 <DropdownMenuPortal>
                                   <DropdownMenuSubContent>

@@ -217,11 +217,44 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
   const attendanceVariancePercent = (periodSpecificAttendanceForecast ?? 0) !== 0 ? (attendanceVarianceSummary / (periodSpecificAttendanceForecast ?? 1)) * 100 : 0;
 
   const overallStatus = useMemo(() => {
-      const profitVariancePercent = periodSpecificProfitForecast !== 0 ? (actualTotalProfit - periodSpecificProfitForecast) / periodSpecificProfitForecast * 100 : 0;
-      if (Math.abs(profitVariancePercent) <= 15) return { text: 'On Track', color: 'blue' };
-      if (profitVariancePercent > 15) return { text: 'Exceeding', color: 'green' };
-      return { text: 'At Risk', color: 'red' };
-  }, [summary, actualTotalProfit, periodSpecificProfitForecast]);
+      // Calculate variance percentages for key metrics
+      const revenueVariancePercent = periodSpecificRevenueForecast !== 0 ?
+          (actualTotalRevenue - periodSpecificRevenueForecast) / periodSpecificRevenueForecast * 100 : 0;
+
+      const profitVariancePercent = periodSpecificProfitForecast !== 0 ?
+          (actualTotalProfit - periodSpecificProfitForecast) / periodSpecificProfitForecast * 100 : 0;
+
+      const attendanceVariancePercent = (periodSpecificAttendanceForecast ?? 0) !== 0 ?
+          (actualTotalAttendance - (periodSpecificAttendanceForecast ?? 0)) / (periodSpecificAttendanceForecast ?? 1) * 100 : 0;
+
+      // Count how many metrics are performing well
+      let positiveMetrics = 0;
+      let negativeMetrics = 0;
+
+      // Revenue: Consider negative variance as bad
+      if (revenueVariancePercent < -10) negativeMetrics++;
+      else if (revenueVariancePercent >= 0) positiveMetrics++;
+
+      // Profit: Consider negative variance as bad
+      if (profitVariancePercent < -15) negativeMetrics++;
+      else if (profitVariancePercent >= 5) positiveMetrics++;
+
+      // Attendance: Consider if we're tracking attendance
+      if (isWeeklyEvent) {
+          if (attendanceVariancePercent < -10) negativeMetrics++;
+          else if (attendanceVariancePercent >= 5) positiveMetrics++;
+      }
+
+      // Determine overall status based on positive and negative metrics
+      if (negativeMetrics >= 2 || (revenueVariancePercent < -15 && profitVariancePercent < -15)) {
+          return { text: 'At Risk', color: 'red' };
+      } else if (positiveMetrics >= 2 && negativeMetrics === 0) {
+          return { text: 'Exceeding', color: 'green' };
+      } else {
+          return { text: 'On Track', color: 'blue' };
+      }
+  }, [summary, actualTotalRevenue, periodSpecificRevenueForecast, actualTotalProfit, periodSpecificProfitForecast,
+      actualTotalAttendance, periodSpecificAttendanceForecast, isWeeklyEvent]);
 
   const overallStatusColorMap: { [key: string]: string } = {
       green: 'bg-green-100 text-green-800 border-green-300',
@@ -366,9 +399,43 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
              {/* Explicit Progress Bar Label */}
              <div className="flex-grow flex items-center space-x-2">
                <Label className="text-sm font-medium text-muted-foreground">Overall Target Progress:</Label>
-               {/* TODO: Calculate actual progress based on a primary goal (e.g., profit) */}
-               <Progress value={13.6} className="w-[200px] h-2.5" />
-               <span className="text-sm font-semibold">13.6%</span>{/* Placeholder */}
+               {/* Calculate weighted progress based on revenue, profit, and attendance */}
+               {(() => {
+                 // Calculate progress percentages for each metric
+                 const revenueProgress = periodSpecificRevenueForecast > 0 ?
+                   Math.min(100, Math.max(0, (actualTotalRevenue / periodSpecificRevenueForecast) * 100)) : 0;
+
+                 const profitProgress = periodSpecificProfitForecast > 0 ?
+                   Math.min(100, Math.max(0, (actualTotalProfit / periodSpecificProfitForecast) * 100)) : 0;
+
+                 const attendanceProgress = (periodSpecificAttendanceForecast ?? 0) > 0 ?
+                   Math.min(100, Math.max(0, (actualTotalAttendance / (periodSpecificAttendanceForecast ?? 1)) * 100)) : 0;
+
+                 // Calculate weighted average (revenue 40%, profit 40%, attendance 20% if applicable)
+                 let overallProgress = 0;
+                 let divisor = 0;
+
+                 overallProgress += revenueProgress * 0.4;
+                 divisor += 0.4;
+
+                 overallProgress += profitProgress * 0.4;
+                 divisor += 0.4;
+
+                 if (isWeeklyEvent) {
+                   overallProgress += attendanceProgress * 0.2;
+                   divisor += 0.2;
+                 }
+
+                 // Normalize to account for missing metrics
+                 const normalizedProgress = divisor > 0 ? overallProgress / divisor : 0;
+
+                 return (
+                   <>
+                     <Progress value={normalizedProgress} className="w-[200px] h-2.5" />
+                     <span className="text-sm font-semibold">{normalizedProgress.toFixed(1)}%</span>
+                   </>
+                 );
+               })()}
              </div>
            </div>
 

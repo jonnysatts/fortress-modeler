@@ -844,7 +844,9 @@ const ForecastBuilder: React.FC = () => {
                                                         name: 'Default Channel',
                                                         weeklyBudget: 500,
                                                         targetAudience: '',
-                                                        description: ''
+                                                        description: '',
+                                                        distribution: 'spreadEvenly',
+                                                        spreadDuration: 12
                                                     });
                                                     console.log('Added default marketing channel');
                                                 }
@@ -943,7 +945,66 @@ const ForecastBuilder: React.FC = () => {
                                                     />
                                                 )}
                                             />
-                                            {/* TODO: Add Target Audience/Description inputs if desired */}
+                                            {/* Distribution Type */}
+                                            <Controller
+                                                name={`marketing.channels.${index}.distribution`}
+                                                control={control}
+                                                render={({ field }) => {
+                                                    // Ensure we have a valid value
+                                                    const validValue = ['spreadEvenly', 'upfront', 'spreadCustom'].includes(field.value)
+                                                        ? field.value
+                                                        : 'spreadEvenly';
+
+                                                    return (
+                                                        <Select
+                                                            onValueChange={value => {
+                                                                field.onChange(value);
+                                                                console.log(`Channel ${index} distribution updated:`, value);
+                                                                setIsDirty(true); // Force dirty state
+                                                            }}
+                                                            value={validValue}
+                                                        >
+                                                            <SelectTrigger className="w-40">
+                                                                <SelectValue placeholder="Distribution" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="spreadEvenly">Spread Evenly</SelectItem>
+                                                                <SelectItem value="upfront">Upfront</SelectItem>
+                                                                <SelectItem value="spreadCustom">Custom Duration</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    );
+                                                }}
+                                            />
+
+                                            {/* Spread Duration (only shown for spreadCustom) */}
+                                            {watch(`marketing.channels.${index}.distribution`) === 'spreadCustom' && (
+                                                <Controller
+                                                    name={`marketing.channels.${index}.spreadDuration`}
+                                                    control={control}
+                                                    render={({ field }) => {
+                                                        // Ensure we have a valid value
+                                                        const displayValue = field.value !== undefined && field.value !== null ? field.value : '';
+
+                                                        return (
+                                                            <Input
+                                                                type="number"
+                                                                placeholder="Duration"
+                                                                value={displayValue}
+                                                                onChange={e => {
+                                                                    const value = e.target.value === '' ? 1 : Math.max(1, parseInt(e.target.value) || 1);
+                                                                    field.onChange(value);
+                                                                    console.log(`Channel ${index} spread duration updated:`, value);
+                                                                    setIsDirty(true); // Force dirty state
+                                                                }}
+                                                                className="w-24"
+                                                                min="1"
+                                                            />
+                                                        );
+                                                    }}
+                                                />
+                                            )}
+
                                             <Button
                                                 type="button"
                                                 variant="ghost"
@@ -977,7 +1038,9 @@ const ForecastBuilder: React.FC = () => {
                                             name: '',
                                             weeklyBudget: 0,
                                             targetAudience: '',
-                                            description: ''
+                                            description: '',
+                                            distribution: 'spreadEvenly',
+                                            spreadDuration: 12
                                         });
 
                                         // Force the form to be dirty

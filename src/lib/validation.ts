@@ -63,6 +63,10 @@ export const marketingChannelItemSchema = z.object({
   weeklyBudget: z.number().nonnegative("Budget must be non-negative"),
   targetAudience: z.string().min(1, "Target audience is required"),
   description: z.string().optional(),
+  distribution: z.enum(["upfront", "spreadEvenly", "spreadCustom"]).optional(),
+  spreadDuration: z.number().positive("Spread duration must be positive").optional(),
+  conversionTarget: z.number().nonnegative().optional(),
+  costPerConversion: z.number().nonnegative().optional(),
 });
 
 /**
@@ -128,6 +132,18 @@ export const financialModelSchema = z.object({
 });
 
 /**
+ * Validation schema for marketing channel actuals
+ */
+export const marketingChannelActualSchema = z.object({
+  channelId: z.string().min(1, "Channel ID is required"),
+  actualSpend: z.number().nonnegative("Actual spend must be non-negative"),
+  conversions: z.number().nonnegative().optional(),
+  clicks: z.number().nonnegative().optional(),
+  impressions: z.number().nonnegative().optional(),
+  notes: z.string().optional(),
+});
+
+/**
  * Validation schema for actuals period entries
  */
 export const actualsPeriodEntrySchema = z.object({
@@ -137,5 +153,6 @@ export const actualsPeriodEntrySchema = z.object({
   revenueActuals: z.record(z.string(), z.number()),
   costActuals: z.record(z.string(), z.number()),
   attendanceActual: z.number().nonnegative("Attendance must be non-negative").optional(),
+  marketingActuals: z.record(z.string(), marketingChannelActualSchema).optional(),
   notes: z.string().optional(),
 });
