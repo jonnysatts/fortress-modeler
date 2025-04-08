@@ -202,10 +202,23 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 const ProductSummary: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { currentProject, loadModelsForProject, loadActualsForProject } = useStore();
+  // Use the modular store with specific selectors
+  const {
+    currentProject,
+    loadModels,
+    loadActuals,
+    error,
+    loading
+  } = useStore(state => ({
+    currentProject: state.currentProject,
+    loadModels: state.loadModels,
+    loadActuals: state.loadActualsForProject,
+    error: state.error,
+    loading: state.loading
+  }));
+
   const [models, setModels] = useState<FinancialModel[]>([]);
   const [actuals, setActuals] = useState<ActualsPeriodEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [annotation, setAnnotation] = useState<string>("");
 
   const latestModel = useMemo(() => (models.length > 0 ? models[0] : null), [models]);
@@ -282,7 +295,7 @@ const ProductSummary: React.FC = () => {
     return { warnings: warningsList };
   }, [summaryMetrics, actuals, latestModel]);
 
-  // --- Calculate Deltas --- 
+  // --- Calculate Deltas ---
   const { revenueDelta, costDelta, profitDelta, marginDelta } = useMemo(() => {
     if (timeSeriesData.length < 2) {
       return { revenueDelta: undefined, costDelta: undefined, profitDelta: undefined, marginDelta: undefined };
@@ -294,7 +307,7 @@ const ProductSummary: React.FC = () => {
         if (previous === 0) return undefined; // Avoid division by zero
         return ((current - previous) / previous) * 100;
     };
-    
+
     const lastMargin = last.revenue > 0 ? (last.profit / last.revenue) * 100 : 0;
     const prevMargin = prev.revenue > 0 ? (prev.profit / prev.revenue) * 100 : 0;
 
@@ -306,7 +319,7 @@ const ProductSummary: React.FC = () => {
     };
   }, [timeSeriesData]);
 
-  // --- Calculate Core Assumption Summaries --- 
+  // --- Calculate Core Assumption Summaries ---
   const { marketingSpendSummary, fixedCostSummary, variableCostSummary } = useMemo(() => {
     if (!latestModel) return { marketingSpendSummary: 'N/A', fixedCostSummary: 'N/A', variableCostSummary: 'N/A' };
 
@@ -322,7 +335,7 @@ const ProductSummary: React.FC = () => {
     const fixedCosts = (costs || [])
         .filter(c => c.type === 'fixed')
         .reduce((sum, c) => sum + (c.value ?? 0), 0);
-    
+
     const fbCogs = metadata?.costs?.fbCOGSPercent;
     const merchCogs = metadata?.costs?.merchandiseCogsPercent;
     let cogs = 'N/A';
@@ -345,17 +358,16 @@ const ProductSummary: React.FC = () => {
   // Data loading effect
   useEffect(() => {
     const loadData = async () => {
-      // Use projectId in the log and logic
       console.log(`[ProductSummary Effect] Running for projectId: ${projectId}`);
-      if (projectId) { // Check projectId instead of id
-        setIsLoading(true);
+      if (projectId) {
         try {
-          const projectIdNum = parseInt(projectId); // Parse projectId
+          const projectIdNum = parseInt(projectId);
           console.log(`[ProductSummary Effect] Fetching models for projectId: ${projectIdNum}`);
-          const loadedModels = await loadModelsForProject(projectIdNum);
+          const loadedModels = await loadModels(projectIdNum);
           console.log(`[ProductSummary Effect] Fetched ${loadedModels.length} models.`);
+
           console.log(`[ProductSummary Effect] Fetching actuals for projectId: ${projectIdNum}`);
-          const loadedActuals = await loadActualsForProject(projectIdNum);
+          const loadedActuals = await loadActuals(projectIdNum);
           console.log(`[ProductSummary Effect] Fetched ${loadedActuals.length} actuals.`);
 
           setModels(loadedModels);
@@ -363,19 +375,14 @@ const ProductSummary: React.FC = () => {
           console.log(`[ProductSummary Effect] State updated.`);
         } catch (error) {
           console.error('[ProductSummary Effect] Error loading data:', error);
-        } finally {
-          setIsLoading(false);
-          console.log(`[ProductSummary Effect] Finished, isLoading set to false.`);
         }
       } else {
-          console.log(`[ProductSummary Effect] No projectId provided.`); // Update log message
-          setIsLoading(false);
+        console.log(`[ProductSummary Effect] No projectId provided.`);
       }
     };
 
     loadData();
-    // Update dependency array to use projectId
-  }, [projectId]);
+  }, [projectId, loadModels, loadActuals]);
 
   // Initialize annotation from model when loaded
   useEffect(() => {
@@ -385,8 +392,21 @@ const ProductSummary: React.FC = () => {
   }, [latestModel]);
 
   // --- Conditional Returns BEFORE main render ---
-  if (isLoading) {
+  if (loading.isLoading) {
     return <div className="py-8 text-center">Loading product data...</div>;
+  }
+
+  // Show error state if there's an error
+  if (error.isError) {
+    return (
+      <div className="py-8 text-center">
+        <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+        <TypographyH4>Error Loading Data</TypographyH4>
+        <TypographyMuted className="mt-2">
+          {error.message || 'An error occurred while loading the product data.'}
+        </TypographyMuted>
+      </div>
+    );
   }
 
   if (!currentProject) {
@@ -429,7 +449,7 @@ const ProductSummary: React.FC = () => {
       {/* === Header Section === */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <TypographyH2 className="text-lg font-semibold tracking-tight flex-grow">{forecastHeadline}</TypographyH2>
-        <Badge variant={confidenceVariant} className="flex-shrink-0"> 
+        <Badge variant={confidenceVariant} className="flex-shrink-0">
             {forecastConfidence} Confidence
         </Badge>
       </div>
@@ -586,9 +606,9 @@ const ProductSummary: React.FC = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Core Assumptions</CardTitle>
-             <Button 
-              variant="outline" 
-              size="sm" 
+             <Button
+              variant="outline"
+              size="sm"
               onClick={() => navigate(`/projects/${projectId}/forecast-builder`)}
              >
                Edit Assumptions
@@ -603,7 +623,7 @@ const ProductSummary: React.FC = () => {
                <div className="flex justify-between">
                  <dt className="text-muted-foreground">Avg Spend / Attendee</dt>
                  <dd className="font-medium">{
-                   latestModel.assumptions.metadata?.perCustomer ? 
+                   latestModel.assumptions.metadata?.perCustomer ?
                    formatCurrency(
                      (latestModel.assumptions.metadata.perCustomer.ticketPrice ?? 0) +
                      (latestModel.assumptions.metadata.perCustomer.fbSpend ?? 0) +
@@ -637,37 +657,37 @@ const ProductSummary: React.FC = () => {
           </CardHeader>
           <CardContent>
              <ResponsiveContainer width="100%" height={300}>
-                <BarChart 
-                  data={timeSeriesData} 
+                <BarChart
+                  data={timeSeriesData}
                   margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
-                  barCategoryGap="25%" 
-                  barGap={2} 
+                  barCategoryGap="25%"
+                  barGap={2}
                 >
                   <CartesianGrid strokeDasharray="3 3" vertical={false}/>
-                  <XAxis 
-                    dataKey="point" 
-                    tick={{ fontSize: 11 }} 
-                    axisLine={false} 
-                    tickLine={false} 
+                  <XAxis
+                    dataKey="point"
+                    tick={{ fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
                   />
-                  <YAxis 
-                    tickFormatter={formatCurrency} 
-                    tick={{ fontSize: 11 }} 
-                    axisLine={false} 
-                    tickLine={false} 
+                  <YAxis
+                    tickFormatter={formatCurrency}
+                    tick={{ fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
                     width={60}
                   />
-                  <Tooltip 
-                    content={<CustomTooltip />} 
-                    cursor={{ fill: 'transparent' }} 
+                  <Tooltip
+                    content={<CustomTooltip />}
+                    cursor={{ fill: 'transparent' }}
                   />
-                  <Legend 
-                    wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} 
-                    verticalAlign="bottom" 
+                  <Legend
+                    wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
+                    verticalAlign="bottom"
                     iconSize={10}
                   />
                   <Bar name="Weekly Revenue" dataKey="revenue" fill={dataColors.revenue} radius={[3, 3, 0, 0]} barSize={15} />
-                  <Bar name="Weekly Costs" dataKey="cost" fill={dataColors.cost} radius={[3, 3, 0, 0]} barSize={15} /> 
+                  <Bar name="Weekly Costs" dataKey="cost" fill={dataColors.cost} radius={[3, 3, 0, 0]} barSize={15} />
                 </BarChart>
              </ResponsiveContainer>
           </CardContent>
@@ -693,26 +713,26 @@ const ProductSummary: React.FC = () => {
                     </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="point" 
-                  tick={{ fontSize: 11 }} 
-                  axisLine={false} 
-                  tickLine={false} 
+                <XAxis
+                  dataKey="point"
+                  tick={{ fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
                 />
-                <YAxis 
-                  tickFormatter={formatCurrency} 
-                  tick={{ fontSize: 11 }} 
-                  axisLine={false} 
-                  tickLine={false} 
+                <YAxis
+                  tickFormatter={formatCurrency}
+                  tick={{ fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
                   width={60}
                 />
-                <Tooltip 
-                  content={<CustomTooltip />} 
-                  cursor={{ stroke: dataColors.neutral[400], strokeWidth: 1, strokeDasharray: "3 3" }} 
+                <Tooltip
+                  content={<CustomTooltip />}
+                  cursor={{ stroke: dataColors.neutral[400], strokeWidth: 1, strokeDasharray: "3 3" }}
                 />
-                <Legend 
-                  wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} 
-                  verticalAlign="bottom" 
+                <Legend
+                  wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
+                  verticalAlign="bottom"
                   payload={[
                     { value: 'Revenue', type: 'square', id: 'revenue', color: dataColors.revenue },
                     { value: 'Costs', type: 'square', id: 'cost', color: dataColors.cost },
@@ -720,18 +740,18 @@ const ProductSummary: React.FC = () => {
                   ]}
                 />
                 {breakEvenPeriod.index !== null && (
-                    <ReferenceLine 
-                      x={timeSeriesData[breakEvenPeriod.index]?.point} 
-                      stroke={dataColors.status.warning} 
-                      strokeDasharray="4 4" 
+                    <ReferenceLine
+                      x={timeSeriesData[breakEvenPeriod.index]?.point}
+                      stroke={dataColors.status.warning}
+                      strokeDasharray="4 4"
                       strokeWidth={1.5}
                     >
-                        <RechartsLabel 
-                          value="Breakeven" 
-                          position="insideTopLeft" 
-                          fill={dataColors.status.warning} 
-                          fontSize={10} 
-                          offset={8} 
+                        <RechartsLabel
+                          value="Breakeven"
+                          position="insideTopLeft"
+                          fill={dataColors.status.warning}
+                          fontSize={10}
+                          offset={8}
                           className="font-semibold"
                         />
                     </ReferenceLine>

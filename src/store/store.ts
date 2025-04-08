@@ -24,10 +24,13 @@ export const useStore = create<StoreState>()(
       }),
       {
         name: 'fortress-store',
-        // Only persist UI state to avoid issues with large data
+        // Persist UI state and project references
         partialize: (state) => ({
           isSidebarCollapsed: state.isSidebarCollapsed,
           activeTab: state.activeTab,
+          // Store project IDs to reload them on initialization
+          projectIds: state.projects?.map(p => p.id) || [],
+          currentProjectId: state.currentProject?.id || null
         }),
       }
     ),

@@ -46,10 +46,28 @@ interface ChartPeriodData {
 
 const ActualsTracker: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
-  const { currentProject, loadModelsForProject, loadActualsForProject } = useStore();
+
+  // Use the modular store with specific selectors
+  const {
+    currentProject,
+    loadModels,
+    loadActuals,
+    addActual,
+    updateActual,
+    error,
+    loading
+  } = useStore(state => ({
+    currentProject: state.currentProject,
+    loadModels: state.loadModels,
+    loadActuals: state.loadActualsForProject,
+    addActual: state.addActual,
+    updateActual: state.updateActual,
+    error: state.error,
+    loading: state.loading
+  }));
+
   const [models, setModels] = useState<FinancialModel[]>([]);
   const [actuals, setActuals] = useState<ActualsPeriodEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPeriod, setEditingPeriod] = useState<number | null>(null);
@@ -57,21 +75,18 @@ const ActualsTracker: React.FC = () => {
 
   const loadData = useCallback(async () => {
     if (projectId) {
-      setIsLoading(true);
       try {
         const projectIdNum = parseInt(projectId);
-        const loadedModels = await loadModelsForProject(projectIdNum);
-        const loadedActuals = await loadActualsForProject(projectIdNum);
+        const loadedModels = await loadModels(projectIdNum);
+        const loadedActuals = await loadActuals(projectIdNum);
 
         setModels(loadedModels);
         setActuals(loadedActuals);
       } catch (error) {
         console.error('Error loading data:', error);
-      } finally {
-        setIsLoading(false);
       }
     }
-  }, [projectId, loadModelsForProject, loadActualsForProject]);
+  }, [projectId, loadModels, loadActuals]);
 
   useEffect(() => {
     loadData();
@@ -80,8 +95,21 @@ const ActualsTracker: React.FC = () => {
   // Get the latest model
   const latestModel = models.length > 0 ? models[0] : null;
 
-  if (isLoading) {
+  if (loading.isLoading) {
     return <div className="py-8 text-center">Loading actuals data...</div>;
+  }
+
+  // Show error state if there's an error
+  if (error.isError) {
+    return (
+      <div className="py-8 text-center">
+        <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+        <TypographyH4>Error Loading Data</TypographyH4>
+        <TypographyMuted className="mt-2">
+          {error.message || 'An error occurred while loading the actuals data.'}
+        </TypographyMuted>
+      </div>
+    );
   }
 
   if (!currentProject) {

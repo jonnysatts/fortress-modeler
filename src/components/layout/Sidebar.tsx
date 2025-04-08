@@ -23,7 +23,11 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
   const location = useLocation();
-  const { projects } = useStore();
+  // Use the modular store with specific selectors
+  const { projects, loading } = useStore(state => ({
+    projects: state.projects,
+    loading: state.loading
+  }));
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     projects: true
   });
@@ -94,33 +98,47 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
 
                 {!isCollapsed && expandedSections.projects && (
                   <div className="mt-1 ml-6 space-y-1 border-l border-gray-200 pl-3 bg-gray-50 rounded-r-md">
+                    {loading.isLoading ? (
+                      // Loading state
+                      <div className="flex items-center px-4 py-2 text-sm text-gray-500">
+                        <div className="animate-pulse h-4 w-24 bg-gray-200 rounded"></div>
+                      </div>
+                    ) : projects.length === 0 ? (
+                      // Empty state
+                      <div className="flex items-center px-4 py-2 text-sm text-gray-500">
+                        No products yet
+                      </div>
+                    ) : (
+                      // Projects list
+                      <>
+                        {projects.slice(0, 5).map(project => (
+                          <NavLink
+                            key={project.id}
+                            to={`/projects/${project.id}/summary`}
+                            className={({ isActive }) =>
+                              cn(
+                                "flex items-center px-4 py-2 rounded-md text-sm transition-colors",
+                                isActive
+                                  ? "bg-fortress-blue/5 text-fortress-blue font-medium"
+                                  : "text-gray-700 hover:bg-gray-50 hover:text-fortress-blue font-medium"
+                              )
+                            }
+                          >
+                            {project.name.length > 20
+                              ? `${project.name.substring(0, 20)}...`
+                              : project.name}
+                          </NavLink>
+                        ))}
 
-                    {projects.slice(0, 5).map(project => (
-                      <NavLink
-                        key={project.id}
-                        to={`/projects/${project.id}/summary`}
-                        className={({ isActive }) =>
-                          cn(
-                            "flex items-center px-4 py-2 rounded-md text-sm transition-colors",
-                            isActive
-                              ? "bg-fortress-blue/5 text-fortress-blue font-medium"
-                              : "text-gray-700 hover:bg-gray-50 hover:text-fortress-blue font-medium"
-                          )
-                        }
-                      >
-                        {project.name.length > 20
-                          ? `${project.name.substring(0, 20)}...`
-                          : project.name}
-                      </NavLink>
-                    ))}
-
-                    {projects.length > 5 && (
-                      <NavLink
-                        to="/projects"
-                        className="flex items-center px-4 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
-                      >
-                        View all ({projects.length})
-                      </NavLink>
+                        {projects.length > 5 && (
+                          <NavLink
+                            to="/projects"
+                            className="flex items-center px-4 py-2 rounded-md text-sm text-gray-500 hover:bg-gray-100 hover:text-fortress-blue"
+                          >
+                            View all ({projects.length})
+                          </NavLink>
+                        )}
+                      </>
                     )}
                   </div>
                 )}

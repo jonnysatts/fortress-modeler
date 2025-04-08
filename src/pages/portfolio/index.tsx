@@ -607,7 +607,7 @@ const PortfolioDashboard: React.FC = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => navigate(`/projects/${project.id}/edit`)}>
+                            <DropdownMenuItem onClick={() => navigate(`/projects/${project.id}/edit-project`)}>
                               Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem

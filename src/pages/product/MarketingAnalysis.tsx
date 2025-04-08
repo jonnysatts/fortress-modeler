@@ -53,10 +53,26 @@ interface MarketingPeriodData {
 
 const MarketingAnalysis: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
-  const { currentProject, loadModelsForProject, loadActualsForProject } = useStore();
+
+  // Use the modular store with specific selectors
+  const {
+    currentProject,
+    loadModels,
+    loadActuals,
+    error,
+    loading,
+    registerExportFunction
+  } = useStore(state => ({
+    currentProject: state.currentProject,
+    loadModels: state.loadModels,
+    loadActuals: state.loadActualsForProject,
+    error: state.error,
+    loading: state.loading,
+    registerExportFunction: state.registerExportFunction
+  }));
+
   const [models, setModels] = useState<FinancialModel[]>([]);
   const [actuals, setActuals] = useState<ActualsPeriodEntry[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [channelData, setChannelData] = useState<MarketingChannelData[]>([]);
   const [periodData, setPeriodData] = useState<MarketingPeriodData[]>([]);
@@ -71,21 +87,18 @@ const MarketingAnalysis: React.FC = () => {
   // Load data
   const loadData = useCallback(async () => {
     if (projectId) {
-      setIsLoading(true);
       try {
         const projectIdNum = parseInt(projectId);
-        const loadedModels = await loadModelsForProject(projectIdNum);
-        const loadedActuals = await loadActualsForProject(projectIdNum);
+        const loadedModels = await loadModels(projectIdNum);
+        const loadedActuals = await loadActuals(projectIdNum);
 
         setModels(loadedModels);
         setActuals(loadedActuals);
       } catch (error) {
         console.error('Error loading data:', error);
-      } finally {
-        setIsLoading(false);
       }
     }
-  }, [projectId, loadModelsForProject, loadActualsForProject]);
+  }, [projectId, loadModels, loadActuals]);
 
   useEffect(() => {
     loadData();
@@ -243,16 +256,58 @@ const MarketingAnalysis: React.FC = () => {
     color: COLORS[index % COLORS.length]
   }));
 
+  // Register export function
+  useEffect(() => {
+    // Create export data function
+    const exportMarketingAnalysis = () => {
+      return {
+        projectName: currentProject?.name,
+        projectId: projectId,
+        summary: summaryData,
+        formattedChannels: channelData.map(channel => ({
+          name: channel.name,
+          forecast: formatCurrency(channel.totalForecast || 0),
+          actual: formatCurrency(channel.actualSpend || 0),
+          variance: formatCurrency(channel.variance || 0),
+          variancePercent: formatPercent(channel.variancePercent || 0)
+        })),
+        periodData: periodData
+      };
+    };
+
+    // Register the export function
+    registerExportFunction('Marketing Analysis', exportMarketingAnalysis);
+
+    // Clean up when component unmounts
+    return () => {
+      useStore.getState().unregisterExportFunction('Marketing Analysis');
+    };
+  }, [currentProject, projectId, summaryData, channelData, periodData, registerExportFunction]);
+
   // Handle export
   const handleExport = (format: 'csv' | 'pdf') => {
     if (projectId) {
-      const projectIdNum = parseInt(projectId);
       useStore.getState().triggerExport('Marketing Analysis', format === 'pdf' ? 'pdf' : 'json');
     }
   };
 
-  if (isLoading) {
+  if (loading.isLoading) {
     return <div className="py-8 text-center">Loading marketing data...</div>;
+  }
+
+  // Show error state if there's an error
+  if (error.isError) {
+    return (
+      <div className="py-8 text-center">
+        <div className="flex items-center justify-center">
+          <Info className="h-12 w-12 text-red-500 mx-auto mb-4" />
+        </div>
+        <TypographyH4>Error Loading Data</TypographyH4>
+        <TypographyMuted className="mt-2">
+          {error.message || 'An error occurred while loading the marketing data.'}
+        </TypographyMuted>
+      </div>
+    );
   }
 
   if (!isDetailedChannelsMode) {

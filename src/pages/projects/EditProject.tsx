@@ -139,7 +139,7 @@ const EditProject = () => {
         title: "Project updated!",
         description: `${data.name} has been updated successfully.`,
       });
-      navigate(`/projects/${projectId}`); // Navigate back to project detail
+      navigate(`/projects/${projectId}/summary`); // Navigate back to project summary
     } catch (error) {
       console.error("Error updating project:", error);
       toast({

@@ -121,7 +121,7 @@ const ProductLayout: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/forecast-builder`)}>
+                      <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/edit-project`)}>
                         <Pencil className="mr-2 h-4 w-4" />
                         Edit Inputs
                       </Button>
