@@ -27,7 +27,7 @@ const ForecastBuilder = lazy(() => import("@/pages/product/ForecastBuilder.tsx")
 const ActualsTracker = lazy(() => import("@/pages/product/ActualsTracker.tsx"));
 // Comment out lazy import
 // const PerformanceAnalysisPage = lazy(() => import("@/pages/product/PerformanceAnalysis.tsx"));
-const RisksScenarios = lazy(() => import("@/pages/models/FinancialModelDetail.tsx"));
+const RisksAndScenariosView = lazy(() => import("@/pages/product/RisksAndScenariosView.tsx"));
 const MarketingAnalysis = lazy(() => import("@/pages/product/MarketingAnalysis.tsx"));
 
 // Removed imports for ProductAssumptions, ProductInputs, ProductForecast
@@ -153,7 +153,7 @@ const App = () => (
                 <Route path="actuals-tracker" element={<ActualsTracker />} />
                 <Route path="performance-analysis" element={<PerfAnalysisView />} />
                 <Route path="marketing-analysis" element={<MarketingAnalysis />} />
-                <Route path="risks-scenarios" element={<RisksScenarios />} />
+                <Route path="risks-scenarios" element={<RisksAndScenariosView />} />
                 <Route path="edit-project" element={<EditProject />} />
                 <Route path="models/new" element={<NewFinancialModel />} />
                 <Route path="models/:modelId" element={<FinancialModelDetail />} />

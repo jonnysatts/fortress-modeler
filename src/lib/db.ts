@@ -96,15 +96,18 @@ export interface Risk {
 export interface Scenario {
   id?: number;
   projectId: number;
-  modelId: number;
+  baseModelId: number;
   name: string;
   description?: string;
-  assumptions: {
-    revenue: RevenueAssumption[];
-    costs: CostAssumption[];
-    growthModel: GrowthModel;
+  parameterDeltas: {
+    marketingSpendPercent: number;
+    marketingSpendByChannel: Record<string, number>;
+    pricingPercent: number;
+    attendanceGrowthPercent: number;
+    cogsMultiplier: number;
   };
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export class FortressDB extends Dexie {
@@ -117,6 +120,17 @@ export class FortressDB extends Dexie {
 
   constructor() {
     super('FortressDB');
+    this.version(4).stores({
+      projects: '++id, name, productType, createdAt, updatedAt',
+      financialModels: '++id, projectId, name, createdAt, updatedAt',
+      actualPerformance: '++id, projectId, date',
+      risks: '++id, projectId, type, likelihood, impact, status',
+      scenarios: '++id, projectId, baseModelId, name, createdAt, updatedAt',
+      actuals: '++id, &[projectId+period], projectId, period'
+    }).upgrade(tx => {
+      console.log("Upgrading DB schema to version 4, updating scenarios table structure.");
+    });
+
     this.version(3).stores({
       projects: '++id, name, productType, createdAt, updatedAt',
       financialModels: '++id, projectId, name, createdAt, updatedAt',
@@ -351,49 +365,17 @@ export const addDemoData = async (): Promise<void> => {
 
   await db.scenarios.add({
     projectId,
-    modelId,
+    baseModelId: modelId,
     name: "Aggressive Growth Scenario",
     description: "Assuming higher marketing spend and faster customer acquisition",
-    assumptions: {
-      revenue: [
-        {
-          name: "Monthly Subscription",
-          value: 59.99,
-          type: "recurring",
-          frequency: "monthly"
-        },
-        {
-          name: "Implementation Fee",
-          value: 500,
-          type: "fixed",
-          frequency: "one-time"
-        }
-      ],
-      costs: [
-        {
-          name: "Cloud Infrastructure",
-          value: 3000,
-          type: "fixed",
-          category: "operations"
-        },
-        {
-          name: "Customer Success Team",
-          value: 8000,
-          type: "fixed",
-          category: "staffing"
-        },
-        {
-          name: "Marketing Spend",
-          value: 10000,
-          type: "variable",
-          category: "marketing"
-        }
-      ],
-      growthModel: {
-        type: "exponential",
-        rate: 0.2
-      }
+    parameterDeltas: {
+      marketingSpendPercent: 20,
+      marketingSpendByChannel: {},
+      pricingPercent: 0,
+      attendanceGrowthPercent: 5,
+      cogsMultiplier: 0
     },
-    createdAt: new Date()
+    createdAt: new Date(),
+    updatedAt: new Date()
   });
 };

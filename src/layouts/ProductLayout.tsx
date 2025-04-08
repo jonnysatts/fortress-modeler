@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Outlet, NavLink, useParams, useNavigate, useLocation } from "react-router-dom";
 import { ChevronLeft, Pencil, Download, FileJson, FileSpreadsheet, FileText, MenuSquare } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -30,21 +31,7 @@ const ProductLayout: React.FC = () => {
   const { currentProject, loadProjectById, setCurrentProject, loadProjects } = useStore();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
-  // Get export actions and state from store
-  const {
-      triggerExport,
-      triggerFullExport,
-      exportFunctions
-  } = useStore(
-    (state) => ({
-      triggerExport: state.triggerExport,
-      triggerFullExport: state.triggerFullExport,
-      exportFunctions: state.exportFunctions
-    })
-  );
-
-  // Get available report keys from the store state
-  const availableReportKeys = Object.keys(exportFunctions);
+  // Export functionality temporarily disabled
 
   // Load projects and current project
   useEffect(() => {
@@ -95,6 +82,7 @@ const ProductLayout: React.FC = () => {
 
   return (
     <div className="flex h-screen overflow-hidden">
+      {/* Export functionality temporarily disabled */}
       <Toaster />
       <Sidebar isCollapsed={isSidebarCollapsed} toggleSidebar={toggleSidebar} />
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -126,50 +114,45 @@ const ProductLayout: React.FC = () => {
                         Edit Inputs
                       </Button>
 
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => toast({
+                          title: "PDF Export",
+                          description: "PDF export functionality is currently under development and will be available in a future update.",
+                          variant: "default"
+                        })}
+                        className="flex items-center gap-1"
+                      >
+                        <FileText className="mr-2 h-4 w-4" />
+                        Export PDF
+                      </Button>
+
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" size="sm">
                              <Download className="mr-2 h-4 w-4" />
-                             Export Report
+                             Export Data
                            </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
-                           <DropdownMenuSub>
-                              <DropdownMenuSubTrigger>
-                                <MenuSquare className="mr-2 h-4 w-4" />
-                                <span>Full Product Report</span>
-                              </DropdownMenuSubTrigger>
-                              <DropdownMenuPortal>
-                                <DropdownMenuSubContent>
-                                   {/* Call triggerFullExport from store */}
-                                  <DropdownMenuItem onClick={() => triggerFullExport('pdf')}>PDF</DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => triggerFullExport('xlsx')}>Excel (XLSX)</DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => triggerFullExport('json')}>JSON</DropdownMenuItem>
-                                </DropdownMenuSubContent>
-                              </DropdownMenuPortal>
-                           </DropdownMenuSub>
-
-                           {availableReportKeys.length > 0 && <DropdownMenuSeparator />}
-
-                           {/* Dynamically add sections based on registered functions */}
-                           {availableReportKeys.map(reportKey => (
-                              <DropdownMenuSub key={reportKey}>
-                                <DropdownMenuSubTrigger>
-                                  <MenuSquare className="mr-2 h-4 w-4" />
-                                  {/* Improve naming if needed, e.g., format key */}
-                                  <span>Export {reportKey}</span>
-                                </DropdownMenuSubTrigger>
-                                <DropdownMenuPortal>
-                                  <DropdownMenuSubContent>
-                                     {/* Call triggerExport from store with key */}
-                                    <DropdownMenuItem onClick={() => triggerExport(reportKey, 'pdf')}>PDF</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => triggerExport(reportKey, 'xlsx')}>Excel (XLSX)</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => triggerExport(reportKey, 'json')}>JSON</DropdownMenuItem>
-                                  </DropdownMenuSubContent>
-                                </DropdownMenuPortal>
-                            </DropdownMenuSub>
-                           ))}
-                         </DropdownMenuContent>
+                          <DropdownMenuItem onClick={() => toast({
+                            title: "Data Export",
+                            description: "Data export functionality is currently under development and will be available in a future update.",
+                            variant: "default"
+                          })}>
+                            <FileJson className="mr-2 h-4 w-4" />
+                            <span>Export as JSON</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => toast({
+                            title: "Data Export",
+                            description: "Data export functionality is currently under development and will be available in a future update.",
+                            variant: "default"
+                          })}>
+                            <FileSpreadsheet className="mr-2 h-4 w-4" />
+                            <span>Export as Excel</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
                   </div>

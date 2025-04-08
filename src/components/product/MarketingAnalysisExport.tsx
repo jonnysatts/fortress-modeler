@@ -167,8 +167,22 @@ const MarketingAnalysisExport: React.FC<MarketingAnalysisExportProps> = ({ proje
           forecastToDate,
           actualToDate: totalActual
         },
-        channels: channelData,
+        marketingChannels: channelData,
         periods: periodData,
+        performanceData: {
+          // Add performance metrics for charts
+          channelPerformance: channelData.map(channel => ({
+            name: channel.name,
+            forecast: channel.forecast,
+            actual: channel.actual,
+            variance: channel.variance
+          })),
+          periodPerformance: periodData.map(period => ({
+            name: period.name,
+            forecast: period.totalForecast,
+            actual: period.totalActual || 0
+          }))
+        },
         // Format the data for display
         formattedSummary: {
           totalForecast: formatCurrency(totalForecast),

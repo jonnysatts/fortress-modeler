@@ -7,9 +7,10 @@ import { ModelState, createModelSlice } from './modules/modelStore';
 import { ActualsState, createActualsSlice } from './modules/actualsStore';
 import { ExportState, createExportSlice } from './modules/exportStore';
 import { UIState, createUISlice } from './modules/uiStore';
+import { ScenarioState, createScenarioSlice } from './modules/scenarioStore';
 
 // Define the combined store type
-export type StoreState = ProjectState & ModelState & ActualsState & ExportState & UIState;
+export type StoreState = ProjectState & ModelState & ActualsState & ExportState & UIState & ScenarioState;
 
 // Create the combined store
 export const useStore = create<StoreState>()(
@@ -21,6 +22,7 @@ export const useStore = create<StoreState>()(
         ...createActualsSlice(...a),
         ...createExportSlice(...a),
         ...createUISlice(...a),
+        ...createScenarioSlice(...a),
       }),
       {
         name: 'fortress-store',
