@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Trivia Export</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <h1>Test Trivia Export</h1>
+    <button id="exportButton">Generate Trivia Excel Report</button>
+
+    <script type="module">
+        import { generateTriviaExcelReport } from './src/lib/triviaExport.js';
+        
+        document.getElementById('exportButton').addEventListener('click', async () => {
+            try {
+                console.log('Starting export...');
+                await generateTriviaExcelReport();
+                console.log('Export completed successfully!');
+                alert('Export completed successfully!');
+            } catch (error) {
+                console.error('Export failed:', error);
+                alert('Export failed: ' + error.message);
+            }
+        });
+    </script>
+</body>
+</html>

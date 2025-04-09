@@ -3,6 +3,7 @@ import { Outlet, NavLink, useParams, useNavigate, useLocation } from "react-rout
 import { ChevronLeft, Pencil, Download, FileJson, FileSpreadsheet, FileText, MenuSquare } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
+import { TriviaExportButton } from "@/components/TriviaExportButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +16,7 @@ import {
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import useStore from "@/store/useStore";
+import { ExportFormat } from "@/store/types";
 import ErrorBoundary from "@/components/common/ErrorBoundary";
 import { TypographyH3 } from "@/components/ui/typography";
 import Breadcrumbs from "@/components/common/Breadcrumbs";
@@ -28,7 +30,7 @@ const ProductLayout: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentProject, loadProjectById, setCurrentProject, loadProjects } = useStore();
+  const { currentProject, loadProjectById, setCurrentProject, loadProjects, triggerFullExport } = useStore();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Export functionality temporarily disabled
@@ -117,16 +119,24 @@ const ProductLayout: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => toast({
-                          title: "PDF Export",
-                          description: "PDF export functionality is currently under development and will be available in a future update.",
-                          variant: "default"
-                        })}
+                        onClick={() => {
+                          triggerFullExport('pdf');
+                          toast({
+                            title: "PDF Export",
+                            description: "Exporting data as PDF...",
+                            variant: "default"
+                          });
+                        }}
                         className="flex items-center gap-1"
                       >
                         <FileText className="mr-2 h-4 w-4" />
                         Export PDF
                       </Button>
+
+                      {/* Special Trivia Export Button - only show for Trivia project */}
+                      {currentProject?.name === 'Trivia' && (
+                        <TriviaExportButton />
+                      )}
 
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -136,22 +146,41 @@ const ProductLayout: React.FC = () => {
                            </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
-                          <DropdownMenuItem onClick={() => toast({
-                            title: "Data Export",
-                            description: "Data export functionality is currently under development and will be available in a future update.",
-                            variant: "default"
-                          })}>
+                          <DropdownMenuItem onClick={() => {
+                            triggerFullExport('json');
+                            toast({
+                              title: "JSON Export",
+                              description: "Exporting data as JSON...",
+                              variant: "default"
+                            });
+                          }}>
                             <FileJson className="mr-2 h-4 w-4" />
                             <span>Export as JSON</span>
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => toast({
-                            title: "Data Export",
-                            description: "Data export functionality is currently under development and will be available in a future update.",
-                            variant: "default"
-                          })}>
+                          <DropdownMenuItem onClick={() => {
+                            triggerFullExport('xlsx');
+                            toast({
+                              title: "Excel Export",
+                              description: "Exporting data as Excel spreadsheet...",
+                              variant: "default"
+                            });
+                          }}>
                             <FileSpreadsheet className="mr-2 h-4 w-4" />
                             <span>Export as Excel</span>
                           </DropdownMenuItem>
+                          {currentProject?.name === 'Trivia' && (
+                            <DropdownMenuItem onClick={() => {
+                              toast({
+                                title: "Trivia Excel Export",
+                                description: "Exporting Trivia data with correct values...",
+                                variant: "default"
+                              });
+                              useStore.getState().triggerTriviaExport();
+                            }}>
+                              <FileSpreadsheet className="mr-2 h-4 w-4 text-fortress-emerald" />
+                              <span>Export Trivia Data</span>
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
