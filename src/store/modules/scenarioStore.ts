@@ -371,6 +371,12 @@ export const createScenarioSlice: StateCreator<ScenarioState> = (set, get) => ({
     }
 
     try {
+      // First, update the lastUpdated timestamp to trigger a re-render
+      // This helps components know that a recalculation is in progress
+      set({ lastUpdated: new Date().getTime() });
+      
+      console.log('Starting forecast recalculation...');
+      
       // Create a modified model by applying deltas
       const modifiedModel = applyScenarioDeltas(baselineModel, currentScenario.parameterDeltas);
       console.log('Modified model created');
@@ -386,23 +392,23 @@ export const createScenarioSlice: StateCreator<ScenarioState> = (set, get) => ({
         baselineForecastData = generateForecastTimeSeries(baselineModel);
       }
 
-      // Update state with both datasets to ensure UI updates
-      console.log('Updating state with new forecast data');
-      set({
-        scenarioForecastData,
-        baselineForecastData
-      });
+      // Set the baseline data first to ensure components update
+      set({ baselineForecastData });
+      
+      // Immediately set the scenario data in a separate update
+      // This helps React detect that changes have occurred
+      set({ scenarioForecastData });
 
       console.log('Forecast recalculated:', {
         scenarioForecastData: scenarioForecastData.length,
         baselineForecastData: baselineForecastData.length
       });
 
-      // Force a re-render by updating a timestamp
-      set(state => ({
-        ...state,
-        lastUpdated: new Date().getTime()
-      }));
+      // Force another re-render by updating the timestamp again
+      // This ensures components know the calculation is complete
+      set({ lastUpdated: new Date().getTime() });
+      
+      console.log('Forecast calculation complete, state updated with timestamp:', new Date().getTime());
     } catch (error) {
       console.error('Error calculating scenario forecast:', error);
       toast({
@@ -507,6 +513,9 @@ function applyScenarioDeltas(
       console.log('Adjusting marketing channels budgets');
 
       modifiedModel.assumptions.marketing.channels = modifiedModel.assumptions.marketing.channels.map(channel => {
+        // Store original value for logging
+        const originalBudget = channel.weeklyBudget;
+        
         // Apply the overall marketing spend adjustment
         const adjustedBudget = channel.weeklyBudget * (1 + deltas.marketingSpendPercent / 100);
 
@@ -514,13 +523,24 @@ function applyScenarioDeltas(
         const channelSpecificDelta = deltas.marketingSpendByChannel[channel.id] || 0;
         const finalBudget = adjustedBudget * (1 + channelSpecificDelta / 100);
 
-        console.log(`Channel ${channel.id}: ${channel.weeklyBudget} -> ${Math.round(finalBudget)}`);
+        console.log(`Channel ${channel.name || channel.id}: Original budget: $${originalBudget.toFixed(2)} -> After global ${deltas.marketingSpendPercent}% change: $${adjustedBudget.toFixed(2)} -> After channel-specific ${channelSpecificDelta}% change: $${finalBudget.toFixed(2)}`);
 
         return {
           ...channel,
           weeklyBudget: Math.round(finalBudget)
         };
       });
+      
+      // Calculate and log total marketing spend before and after
+      const originalTotalSpend = baselineModel.assumptions.marketing?.channels?.reduce(
+        (total, channel) => total + channel.weeklyBudget, 0
+      ) || 0;
+      
+      const modifiedTotalSpend = modifiedModel.assumptions.marketing?.channels?.reduce(
+        (total, channel) => total + channel.weeklyBudget, 0
+      ) || 0;
+      
+      console.log(`Total weekly marketing spend: Original: $${originalTotalSpend.toFixed(2)} -> Modified: $${modifiedTotalSpend.toFixed(2)}, Change: ${((modifiedTotalSpend/originalTotalSpend - 1) * 100).toFixed(2)}%`);
     }
 
     // If we have a high-level marketing budget, adjust it
@@ -528,7 +548,7 @@ function applyScenarioDeltas(
       const oldBudget = modifiedModel.assumptions.marketing.totalBudget;
       const newBudget = oldBudget * (1 + deltas.marketingSpendPercent / 100);
 
-      console.log(`Total marketing budget: ${oldBudget} -> ${newBudget}`);
+      console.log(`Total marketing budget: $${oldBudget.toFixed(2)} -> $${newBudget.toFixed(2)}, Change: ${deltas.marketingSpendPercent}%`);
 
       modifiedModel.assumptions.marketing.totalBudget = newBudget;
     }
@@ -541,9 +561,36 @@ function applyScenarioDeltas(
   }
 
   // Apply attendance growth rate delta
-  if (deltas.attendanceGrowthPercent !== 0 && modifiedModel.assumptions.metadata?.growth?.attendanceGrowthRate) {
+  if (deltas.attendanceGrowthPercent !== 0 && modifiedModel.assumptions.metadata?.growth?.attendanceGrowthRate !== undefined) {
     // Add the delta to the existing growth rate (not multiply)
+    const originalRate = modifiedModel.assumptions.metadata.growth.attendanceGrowthRate;
     modifiedModel.assumptions.metadata.growth.attendanceGrowthRate += deltas.attendanceGrowthPercent;
+    
+    console.log(`Attendance growth rate: Original: ${originalRate}% -> Modified: ${modifiedModel.assumptions.metadata.growth.attendanceGrowthRate}%, Change: ${deltas.attendanceGrowthPercent}%`);
+    
+    // CRITICAL: Ensure that growth-related settings are ALWAYS enabled
+    if (modifiedModel.assumptions.metadata.growth) {
+      // Force enable customer spend growth to ensure growth calculations are used
+      modifiedModel.assumptions.metadata.growth.useCustomerSpendGrowth = true;
+      console.log(`Enabled useCustomerSpendGrowth: ${modifiedModel.assumptions.metadata.growth.useCustomerSpendGrowth}`);
+      
+      // If this is a weekly event model, ensure the attendance growth is properly configured
+      if (modifiedModel.assumptions.metadata.type === "WeeklyEvent") {
+        console.log('Configuring weekly event model for attendance growth');
+        
+        // Ensure the growth model is properly set to use exponential growth
+        if (modifiedModel.assumptions.growthModel) {
+          // FORCE Set growth model to use exponential growth with a matching rate
+          modifiedModel.assumptions.growthModel.type = 'exponential';
+          
+          // Update the growth model rate to match or complement the attendance growth rate
+          // Ensure it's active by setting a positive rate
+          modifiedModel.assumptions.growthModel.rate = Math.max(0.1, modifiedModel.assumptions.metadata.growth.attendanceGrowthRate);
+          
+          console.log('Growth model FORCED to type: exponential, rate:', modifiedModel.assumptions.growthModel.rate);
+        }
+      }
+    }
   }
 
   // Apply COGS multiplier delta
@@ -559,6 +606,36 @@ function applyScenarioDeltas(
       modifiedModel.assumptions.metadata.costs.merchandiseCogsPercent =
         modifiedModel.assumptions.metadata.costs.merchandiseCogsPercent * (1 + deltas.cogsMultiplier / 100);
     }
+  }
+
+  // CRITICAL: Fix marketing setup if there's marketing spend
+  if (deltas.marketingSpendPercent !== 0) {
+    // Ensure marketing mode is properly set
+    if (!modifiedModel.assumptions.marketing) {
+      console.log('Creating marketing setup because marketing spend changed');
+      modifiedModel.assumptions.marketing = {
+        allocationMode: 'highLevel',
+        channels: [],
+        totalBudget: 1000, // Default budget
+        budgetApplication: 'spreadEvenly',
+        spreadDuration: modifiedModel.assumptions.metadata?.weeks || 12
+      };
+    }
+    
+    // Ensure allocation mode is set
+    const validModes = ['channels', 'highLevel'];
+    const currentMode = modifiedModel.assumptions.marketing.allocationMode as string;
+    if (currentMode === 'none' || !validModes.includes(currentMode)) {
+      console.log('Fixing marketing allocation mode from', currentMode, 'to highLevel');
+      modifiedModel.assumptions.marketing.allocationMode = 'highLevel';
+      if (!modifiedModel.assumptions.marketing.totalBudget) {
+        modifiedModel.assumptions.marketing.totalBudget = 1000; // Default budget
+      }
+      modifiedModel.assumptions.marketing.budgetApplication = 'spreadEvenly';
+      modifiedModel.assumptions.marketing.spreadDuration = modifiedModel.assumptions.metadata?.weeks || 12;
+    }
+    
+    console.log('Marketing setup configured:', modifiedModel.assumptions.marketing);
   }
 
   return modifiedModel;

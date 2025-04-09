@@ -78,8 +78,12 @@ export function calculateRelatedChanges(
   sourceValue: number,
   currentDeltas: ScenarioParameterDeltas
 ): Partial<ScenarioParameterDeltas> {
+  console.log(`Calculating related changes for ${sourceParam} = ${sourceValue}`);
+  
   // Get relationships for the source parameter
   const relationships = parameterRelationships[sourceParam] || [];
+  
+  console.log(`Found ${relationships.length} relationships for ${sourceParam}`);
   
   if (relationships.length === 0) {
     return {}; // No relationships defined
@@ -89,18 +93,33 @@ export function calculateRelatedChanges(
   const suggestedChanges: Partial<ScenarioParameterDeltas> = {};
   
   relationships.forEach(relationship => {
-    const currentTargetValue = currentDeltas[relationship.targetParam] as number;
+    const targetParam = relationship.targetParam;
+    const currentTargetValue = currentDeltas[targetParam];
+    
+    // Handle special case for marketingSpendByChannel which is an object
+    if (targetParam === 'marketingSpendByChannel') {
+      // Skip for now as this is a complex object
+      return;
+    }
+    
     const suggestedValue = relationship.calculateSuggestion(
       sourceValue, 
-      currentTargetValue,
+      currentTargetValue as number,
       currentDeltas
     );
     
-    // Only suggest if the change is significant
-    if (Math.abs(suggestedValue - currentTargetValue) > 0.1) {
-      suggestedChanges[relationship.targetParam] = suggestedValue;
+    console.log(`Suggested value for ${targetParam}: ${suggestedValue} (current: ${currentTargetValue})`);
+    
+    // Always suggest if there's any change at all
+    if (Math.abs(suggestedValue - (currentTargetValue as number)) > 0.01) {
+      // Ensure we're setting the right type based on parameter
+      if (typeof suggestedValue === 'number') {
+        (suggestedChanges as any)[targetParam] = suggestedValue;
+      }
     }
   });
+  
+  console.log('Final suggested changes:', suggestedChanges);
   
   return suggestedChanges;
 }

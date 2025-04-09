@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { ScenarioParameterDeltas } from '@/types/scenarios';
+import useStore from '@/store/useStore';
 import { toast } from '@/components/ui/use-toast';
 
 interface DirectIgnoreButtonProps {
@@ -12,28 +13,47 @@ interface DirectIgnoreButtonProps {
 
 /**
  * DirectIgnoreButton Component
- * A specialized button that ensures parameter changes are applied when ignoring suggestions
+ * A simplified button that ensures parameter changes are preserved when ignoring suggestions
  */
 const DirectIgnoreButton: React.FC<DirectIgnoreButtonProps> = ({
   sourceParam,
   sourceValue,
   onDismiss
 }) => {
+  const { updateScenarioDeltas, calculateScenarioForecast } = useStore(state => ({
+    updateScenarioDeltas: state.updateScenarioDeltas,
+    calculateScenarioForecast: state.calculateScenarioForecast
+  }));
+
   const handleIgnore = () => {
     try {
-      console.log(`Ignoring suggestions for ${sourceParam}=${sourceValue}`);
+      // Log for debugging
+      console.log(`DirectIgnoreButton: Keeping parameter ${sourceParam} value ${sourceValue}`);
       
       // First dismiss the suggestions UI
       onDismiss();
       
-      // Force a page reload to ensure everything is fresh
-      setTimeout(() => {
-        window.location.reload();
-      }, 100);
-    } catch (error) {
-      console.error('Error ignoring suggestions:', error);
+      // Then explicitly ensure the parameter value is set in store
+      const update = { [sourceParam]: sourceValue };
+      updateScenarioDeltas(update);
       
-      // Show error toast
+      // Dispatch a custom event for parameter ignored
+      console.log('Dispatching parameter:ignored event');
+      const event = new CustomEvent('scenario:parameter:ignored', {
+        detail: { param: sourceParam, value: sourceValue }
+      });
+      document.dispatchEvent(event);
+      
+      // Recalculate to ensure UI updates
+      calculateScenarioForecast();
+      
+      // Notify user
+      toast({
+        title: 'Parameter Applied',
+        description: `Keeping only the ${sourceParam} change of ${sourceValue > 0 ? '+' : ''}${sourceValue}%`,
+      });
+    } catch (error) {
+      console.error('Error applying parameter change:', error);
       toast({
         title: 'Error',
         description: 'Failed to apply parameter change',

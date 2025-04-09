@@ -155,12 +155,16 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
 
       // --- Calculate Attendance (if applicable) ---
       if (isWeekly && metadata?.initialWeeklyAttendance !== undefined) {
-        const initialAttendance = metadata.initialWeeklyAttendance ?? 0;
+        const initialAttendance = metadata.initialWeeklyAttendance;
         if (period === 1) {
           currentAttendance = initialAttendance;
+          console.log(`[FinancialCalc Period ${period}] Initial attendance: ${currentAttendance}`);
         } else {
           // Use the overall growth model rate if attendance growth rate is not set
           let rate = (metadata.growth?.attendanceGrowthRate ?? 0) / 100;
+
+          // Log what growth settings we're using
+          console.log(`[FinancialCalc Period ${period}] Growth settings: attendanceGrowthRate=${metadata.growth?.attendanceGrowthRate ?? 0}%, useCustomerSpendGrowth=${metadata.growth?.useCustomerSpendGrowth}, growthModel.type=${growthModel?.type}, growthModel.rate=${growthModel?.rate ?? 0}`);
 
           // If attendance growth rate is 0 but we have an overall growth model with exponential type,
           // use that rate instead
@@ -170,10 +174,11 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
           }
 
           currentAttendance = initialAttendance * Math.pow(1 + rate, period - 1);
+          console.log(`[FinancialCalc Period ${period}] Attendance calculation: ${initialAttendance} * (1 + ${rate})^(${period - 1}) = ${currentAttendance}`);
 
           // Add debug logging
-          if (period === 2) { // Only log for the second period to avoid console spam
-            console.log(`[FinancialCalc] Attendance Growth: Initial=${initialAttendance}, Rate=${rate * 100}%, Period ${period}=${currentAttendance}`);
+          if (period <= 3) { // Log for first few periods to see progression
+            console.log(`[FinancialCalc] Attendance Growth: Initial=${initialAttendance}, Rate=${rate * 100}%, Period ${period}=${Math.round(currentAttendance)}`);
           }
         }
         currentAttendance = Math.round(currentAttendance);
@@ -203,7 +208,15 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
           periodFBCRevenue = currentAttendance * currentFbSpend; // Assign to specific var for COGS
           periodMerchRevenue = currentAttendance * currentMerchSpend; // Assign to specific var for COGS
 
-          periodRevenue += ticketRevenue + periodFBCRevenue + periodMerchRevenue;
+          // Add all per-attendee revenues together
+          const totalPerAttendeeRevenue = ticketRevenue + periodFBCRevenue + periodMerchRevenue;
+          periodRevenue += totalPerAttendeeRevenue;
+          
+          // Log attendance-based revenue calculation for first few periods
+          if (period <= 3) {
+            console.log(`[FinancialCalc Period ${period}] Attendance-based revenue: ${currentAttendance} attendees x (${currentTicketPrice} ticket + ${currentFbSpend} F&B + ${currentMerchSpend} merch) = $${totalPerAttendeeRevenue.toFixed(2)}`);
+          }
+          
           // Add other per-attendee based streams (e.g., online, misc if calculated similarly)
       }
 

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { ScenarioParameterDeltas } from '@/types/scenarios';
 import useStore from '@/store/useStore';
+import { toast } from '@/components/ui/use-toast';
 
 interface IgnoreButtonProps {
   sourceParam: keyof ScenarioParameterDeltas;
@@ -12,7 +13,7 @@ interface IgnoreButtonProps {
 
 /**
  * IgnoreButton Component
- * A specialized button that ensures parameter changes are applied when ignoring suggestions
+ * A simplified button that ensures parameter changes are preserved when ignoring suggestions
  */
 const IgnoreButton: React.FC<IgnoreButtonProps> = ({
   sourceParam,
@@ -25,29 +26,34 @@ const IgnoreButton: React.FC<IgnoreButtonProps> = ({
   }));
 
   const handleIgnore = () => {
-    // First dismiss the suggestions UI
-    onDismiss();
-    
-    // Then explicitly re-apply the original parameter change
-    console.log('IgnoreButton: Re-applying original change:', { param: sourceParam, value: sourceValue });
-    
-    // Create a proper partial object with the correct structure
-    const deltaUpdate: Partial<ScenarioParameterDeltas> = { 
-      [sourceParam]: sourceValue 
-    };
-    
-    // Update the store with the original parameter change
-    updateScenarioDeltas(deltaUpdate);
-    
-    // Force immediate recalculation
-    setTimeout(() => {
+    try {
+      // Log for debugging
+      console.log(`IgnoreButton: Keeping parameter ${sourceParam} value ${sourceValue}`);
+      
+      // First dismiss the suggestions UI
+      onDismiss();
+      
+      // Then explicitly ensure the parameter value is set in store
+      // This is the simplest approach - just make sure the parameter value is what we expect
+      const update = { [sourceParam]: sourceValue };
+      updateScenarioDeltas(update);
+      
+      // Recalculate once to ensure UI updates
       calculateScenarioForecast();
       
-      // Force another recalculation after a short delay to ensure UI updates
-      setTimeout(() => {
-        calculateScenarioForecast();
-      }, 100);
-    }, 10);
+      // Notify user
+      toast({
+        title: 'Parameter Applied',
+        description: `Applied ${sourceParam} change of ${sourceValue > 0 ? '+' : ''}${sourceValue}%`,
+      });
+    } catch (error) {
+      console.error('Error applying parameter change:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to apply parameter change',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
