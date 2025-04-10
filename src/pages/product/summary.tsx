@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FinancialModel, ActualsPeriodEntry } from '@/lib/db';
+import { FinancialModel, ActualsPeriodEntry, Scenario } from '@/lib/db';
 import useStore from '@/store/useStore';
 import { formatCurrency, formatPercent, cn } from '@/lib/utils';
 import { generateForecastTimeSeries, ForecastPeriodData } from '@/lib/financialCalculations';
@@ -17,6 +17,14 @@ import { Label } from "@/components/ui/label";
 import { dataColors } from '@/lib/colors';
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { db } from '@/lib/db';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+// Placeholder types - Define these properly in @/types/models or similar
+// REMOVE Placeholder types
+// type ScenarioParameterAdjustment = { parameter: string; adjustment: number; /* originalValue?: any; scenarioValue?: any */ };
+// type Scenario = { id?: number; projectId: number; name: string; description?: string; parameters: ScenarioParameterAdjustment[]; createdAt?: Date; updatedAt?: Date; };
 
 // --- Helper: Calculate Revenue Breakdown from Time Series ---
 interface RevenueBreakdownItem {
@@ -214,14 +222,30 @@ const ProductSummary: React.FC = () => {
     currentProject,
     loadModels,
     loadActuals,
+    scenarios,
+    currentScenario,
+    setCurrentScenario,
+    baselineForecastData,
+    scenarioForecastData,
+    loadScenarios,
     error,
-    loading
+    loading,
+    scenariosLoading,
+    setBaselineModel
   } = useStore(state => ({
     currentProject: state.currentProject,
     loadModels: state.loadModels,
     loadActuals: state.loadActualsForProject,
+    scenarios: state.scenarios || [],
+    currentScenario: state.currentScenario,
+    setCurrentScenario: state.setCurrentScenario,
+    baselineForecastData: state.baselineForecastData || [],
+    scenarioForecastData: state.scenarioForecastData || [],
+    loadScenarios: state.loadScenarios,
     error: state.error,
-    loading: state.loading
+    loading: state.loading,
+    scenariosLoading: state.scenariosLoading || false,
+    setBaselineModel: state.setBaselineModel
   }));
 
   const [models, setModels] = useState<FinancialModel[]>([]);
@@ -230,12 +254,9 @@ const ProductSummary: React.FC = () => {
 
   const latestModel = useMemo(() => (models.length > 0 ? models[0] : null), [models]);
 
-  const timeSeriesData: ForecastPeriodData[] = useMemo(() => {
-    if (!latestModel) return [];
-    return generateForecastTimeSeries(latestModel);
-  }, [latestModel]);
+  const timeSeriesData = baselineForecastData;
 
-  // Prepare sparkline data (last 8 periods or all if fewer)
+  // Restore Sparkline calculations (using baselineForecastData)
   const sparklineLength = 8;
   const revenueSparkline = useMemo(() => timeSeriesData.map(d => d.revenue).slice(-sparklineLength), [timeSeriesData]);
   const costSparkline = useMemo(() => timeSeriesData.map(d => d.cost).slice(-sparklineLength), [timeSeriesData]);
@@ -362,7 +383,7 @@ const ProductSummary: React.FC = () => {
 
   }, [latestModel]);
 
-  // Data loading effect
+  // Data loading effect - Restore scenario loading via store action
   useEffect(() => {
     const loadData = async () => {
       console.log(`[ProductSummary Effect] Running for projectId: ${projectId}`);
@@ -373,12 +394,31 @@ const ProductSummary: React.FC = () => {
           const loadedModels = await loadModels(projectIdNum);
           console.log(`[ProductSummary Effect] Fetched ${loadedModels.length} models.`);
 
+          // Explicitly set the baseline model in the store after loading
+          if (loadedModels.length > 0 && typeof setBaselineModel === 'function') {
+            setBaselineModel(loadedModels[0]);
+            console.log(`[ProductSummary Effect] Baseline model set in store.`);
+          } else if (loadedModels.length === 0) {
+             if (typeof setBaselineModel === 'function') setBaselineModel(null); // Clear if no models
+             console.warn(`[ProductSummary Effect] No models found, clearing baseline.`);
+          }
+
           console.log(`[ProductSummary Effect] Fetching actuals for projectId: ${projectIdNum}`);
           const loadedActuals = await loadActuals(projectIdNum);
           console.log(`[ProductSummary Effect] Fetched ${loadedActuals.length} actuals.`);
 
+          // Load scenarios via store action
+          if (typeof loadScenarios === 'function') {
+            console.log(`[ProductSummary Effect] Fetching scenarios for projectId: ${projectIdNum}`);
+            await loadScenarios(projectIdNum);
+            console.log(`[ProductSummary Effect] Scenario fetch action dispatched.`);
+          } else {
+             console.warn("loadScenarios function not found in store!");
+          }
+
           setModels(loadedModels);
           setActuals(loadedActuals);
+          // Scenarios state updated by store
           console.log(`[ProductSummary Effect] State updated.`);
         } catch (error) {
           console.error('[ProductSummary Effect] Error loading data:', error);
@@ -389,7 +429,9 @@ const ProductSummary: React.FC = () => {
     };
 
     loadData();
-  }, [projectId, loadModels, loadActuals]);
+    // Clean up selected scenario when navigating away
+    // return () => { if (setCurrentScenario) setCurrentScenario(null); };
+  }, [projectId, loadModels, loadActuals, loadScenarios, setBaselineModel]); // Add setBaselineModel dependency
 
   // Initialize annotation from model when loaded
   useEffect(() => {
@@ -398,39 +440,44 @@ const ProductSummary: React.FC = () => {
     }
   }, [latestModel]);
 
-  // --- Conditional Returns BEFORE main render ---
-  if (loading.isLoading) {
-    return <div className="py-8 text-center">Loading product data...</div>;
-  }
+  // --- Calculate Scenario Comparison Deltas ---
+  const scenarioComparisonData = useMemo(() => {
+    if (!currentScenario || baselineForecastData.length === 0 || scenarioForecastData.length === 0) {
+      return null;
+    }
+    const baselineTotals = baselineForecastData[baselineForecastData.length - 1];
+    const scenarioTotals = scenarioForecastData[scenarioForecastData.length - 1];
 
-  // Show error state if there's an error
-  if (error.isError) {
-    return (
-      <div className="py-8 text-center">
-        <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-        <TypographyH4>Error Loading Data</TypographyH4>
-        <TypographyMuted className="mt-2">
-          {error.message || 'An error occurred while loading the product data.'}
-        </TypographyMuted>
-      </div>
-    );
-  }
+    if (!baselineTotals || !scenarioTotals) return null;
 
-  if (!currentProject) {
-    return <div className="py-8 text-center">Product not found</div>;
-  }
+    const revenueDelta = scenarioTotals.cumulativeRevenue - baselineTotals.cumulativeRevenue;
+    const costDelta = scenarioTotals.cumulativeCost - baselineTotals.cumulativeCost;
+    const profitDelta = scenarioTotals.cumulativeProfit - baselineTotals.cumulativeProfit;
 
-  if (!latestModel) {
-    return (
-      <div className="py-8 text-center">
-        <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-        <TypographyH4>No Forecasts Available</TypographyH4>
-        <TypographyMuted className="mt-2">
-          This product doesn't have any forecasts yet. Create a forecast to see financial projections.
-        </TypographyMuted>
-      </div>
-    );
-  }
+    return {
+      name: currentScenario.name,
+      revenueDelta,
+      costDelta,
+      profitDelta
+    };
+  }, [currentScenario, baselineForecastData, scenarioForecastData]);
+
+  // --- Memoize Scenario Items for Select ---
+  const scenarioSelectItems = useMemo(() => {
+    if (scenariosLoading) {
+      return <SelectItem value="loading" disabled>Loading...</SelectItem>;
+    }
+    return scenarios
+      .filter(scenario => scenario.id != null && scenario.id > 0)
+      .map((scenario) => (
+        // Check ID and name again for robustness
+        scenario.id && scenario.name ? (
+          <SelectItem key={scenario.id} value={scenario.id.toString()}>
+            {scenario.name}
+          </SelectItem>
+        ) : null
+      ));
+  }, [scenarios, scenariosLoading]);
 
   // --- Prepare data for rendering ---
   const { totalRevenue, totalCosts, totalProfit, profitMargin } = summaryMetrics;
@@ -591,19 +638,19 @@ const ProductSummary: React.FC = () => {
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Growth Model</dt>
-                <dd className="font-medium capitalize">{latestModel.assumptions.growthModel?.type || 'N/A'}</dd>
+                <dd className="font-medium capitalize">{latestModel?.assumptions.growthModel?.type || 'N/A'}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Growth Rate</dt>
-                <dd className="font-medium">{formatPercent(latestModel.assumptions.growthModel?.rate || 0)}</dd>
+                <dd className="font-medium">{formatPercent(latestModel?.assumptions.growthModel?.rate || 0)}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Model Created</dt>
-                <dd className="font-medium">{formatDateTime(latestModel.createdAt)}</dd>
+                <dd className="font-medium">{formatDateTime(latestModel?.createdAt)}</dd>
               </div>
                <div className="flex justify-between">
                 <dt className="text-muted-foreground">Last Updated</dt>
-                <dd className="font-medium">{formatDateTime(latestModel.updatedAt)}</dd>
+                <dd className="font-medium">{formatDateTime(latestModel?.updatedAt)}</dd>
               </div>
             </dl>
           </CardContent>
@@ -625,12 +672,12 @@ const ProductSummary: React.FC = () => {
              <dl className="space-y-2 text-sm">
                <div className="flex justify-between">
                  <dt className="text-muted-foreground">Avg Attendance (Initial)</dt>
-                 <dd className="font-medium">{latestModel.assumptions.metadata?.initialWeeklyAttendance?.toLocaleString() ?? 'N/A'}</dd>
+                 <dd className="font-medium">{latestModel?.assumptions.metadata?.initialWeeklyAttendance?.toLocaleString() ?? 'N/A'}</dd>
                </div>
                <div className="flex justify-between">
                  <dt className="text-muted-foreground">Avg Spend / Attendee</dt>
                  <dd className="font-medium">{
-                   latestModel.assumptions.metadata?.perCustomer ?
+                   latestModel?.assumptions.metadata?.perCustomer ?
                    formatCurrency(
                      (latestModel.assumptions.metadata.perCustomer.ticketPrice ?? 0) +
                      (latestModel.assumptions.metadata.perCustomer.fbSpend ?? 0) +
@@ -772,76 +819,131 @@ const ProductSummary: React.FC = () => {
         </Card>
       </div>
 
-      {/* === Section 5: Scenario Analysis Panel === */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Scenario Analysis ("What If")</CardTitle>
-        </CardHeader>
-        <CardContent>
-           <TypographyP className="text-muted-foreground">[Scenario adjustment controls placeholder]</TypographyP>
-          {/* TODO: Implement scenario dropdowns/buttons */}
-        </CardContent>
-      </Card>
+      {/* === Section 5: Scenario Analysis, Risk Flags, Notes === */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Scenario Analysis Card - Display Comparison */}
+          <Card className="lg:col-span-1">
+              <CardHeader>
+                  <CardTitle className="text-lg">Scenario Impact Overview</CardTitle>
+                  <CardDescription>Select a scenario to see its impact vs. baseline.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                 {/* Scenario Selector Dropdown */}
+                 <div>
+                    <Label htmlFor="scenario-select" className="mb-1 block text-sm font-medium">Selected Scenario</Label>
+                    <Select 
+                      value={currentScenario?.id?.toString() || ""} 
+                      onValueChange={(value) => {
+                        const selectedId = parseInt(value);
+                        const scenarioToSet = scenarios.find(s => s.id === selectedId) || null;
+                        if (setCurrentScenario) {
+                           setCurrentScenario(scenarioToSet);
+                        }
+                      }}
+                    >
+                       <SelectTrigger id="scenario-select">
+                         <SelectValue placeholder="Select scenario..." />
+                       </SelectTrigger>
+                       <SelectContent>
+                         {/* <SelectItem value="">None (Baseline)</SelectItem> */}
+                         {/* Render memoized items - Still commented out */}
+                         {/* {scenarioSelectItems} */}
+                          {/* Hardcode a test item */}
+                          <SelectItem value="test-scenario-1">Test Scenario 1</SelectItem>
+                       </SelectContent>
+                    </Select>
+                 </div>
 
-      {/* === Section 6: Risk Flags / Alerts === */}
-      <Card>
-        <CardHeader>
-           <CardTitle className="text-lg">Risk Flags & Alerts</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {warnings.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {warnings.map((warning, index) => {
-                    // Using smaller cards/badges for alerts might be better here
-                    let alertClasses = "p-3 border rounded-lg flex items-start gap-3 text-xs ";
-                    let iconColor = "text-blue-500";
-                    let titleColor = "font-semibold";
-                    if (warning.severity === 'error') {
-                        alertClasses += "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700/50";
-                        iconColor = "text-red-500";
-                    } else if (warning.severity === 'warning') {
-                        alertClasses += "bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700/50";
-                        iconColor = "text-amber-500";
-                    } else { // Info
-                        alertClasses += "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700/50";
-                    }
-                    return (
-                        <div key={index} className={alertClasses}>
-                            <AlertTriangle className={`h-4 w-4 ${iconColor} flex-shrink-0 mt-0.5`} />
-                            <div>
-                                <h4 className={titleColor}>{warning.type}</h4>
-                                <p>{warning.message}</p>
-                                {/* TODO: Link to relevant assumption/input */}
+                 {/* Display Scenario Comparison */}
+                 <Separator />
+                 <div>
+                    <TypographyMuted className="text-sm">Impact vs. Baseline:</TypographyMuted>
+                    <div className="mt-2 p-3 bg-muted/50 rounded-md border min-h-[80px]">
+                       {currentScenario && scenarioComparisonData ? (
+                         <Table>
+                           {/* Optional Header <TableHeader><TableRow><TableHead>Metric</TableHead><TableHead className="text-right">Impact</TableHead></TableRow></TableHeader> */}
+                           <TableBody>
+                              <TableRow>
+                                <TableCell>Revenue</TableCell>
+                                <TableCell className={cn("text-right", scenarioComparisonData.revenueDelta >= 0 ? 'text-green-600' : 'text-red-600')}>{formatCurrency(scenarioComparisonData.revenueDelta)}</TableCell>
+                              </TableRow>
+                              <TableRow>
+                                <TableCell>Cost</TableCell>
+                                <TableCell className={cn("text-right", scenarioComparisonData.costDelta <= 0 ? 'text-green-600' : 'text-red-600')}>{formatCurrency(scenarioComparisonData.costDelta)}</TableCell>
+                              </TableRow>
+                              <TableRow>
+                                <TableCell>Profit</TableCell>
+                                <TableCell className={cn("text-right", scenarioComparisonData.profitDelta >= 0 ? 'text-green-600' : 'text-red-600')}>{formatCurrency(scenarioComparisonData.profitDelta)}</TableCell>
+                              </TableRow>
+                           </TableBody>
+                         </Table>
+                       ) : (
+                         <p className="text-sm text-center py-4 text-muted-foreground">{scenarios.length > 0 ? "Select a scenario above to see its impact." : "No scenarios defined for this project."}</p>
+                       )}
+                    </div>
+                 </div>
+              </CardContent>
+          </Card>
+
+          {/* Risk Flags & Alerts / Notes & Commentary Cards */}
+          <Card className="lg:col-span-1">
+            <CardHeader>
+               <CardTitle className="text-lg">Risk Flags & Alerts</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {warnings.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {warnings.map((warning, index) => {
+                        // Using smaller cards/badges for alerts might be better here
+                        let alertClasses = "p-3 border rounded-lg flex items-start gap-3 text-xs ";
+                        let iconColor = "text-blue-500";
+                        let titleColor = "font-semibold";
+                        if (warning.severity === 'error') {
+                            alertClasses += "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700/50";
+                            iconColor = "text-red-500";
+                        } else if (warning.severity === 'warning') {
+                            alertClasses += "bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700/50";
+                            iconColor = "text-amber-500";
+                        } else { // Info
+                            alertClasses += "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700/50";
+                        }
+                        return (
+                            <div key={index} className={alertClasses}>
+                                <AlertTriangle className={`h-4 w-4 ${iconColor} flex-shrink-0 mt-0.5`} />
+                                <div>
+                                    <h4 className={titleColor}>{warning.type}</h4>
+                                    <p>{warning.message}</p>
+                                    {/* TODO: Link to relevant assumption/input */}
+                                </div>
                             </div>
-                        </div>
-                    );
-                })}
-            </div>
-          ) : (
-             <TypographyP className="text-muted-foreground">No specific risks flagged based on current forecast.</TypographyP>
-          )}
-        </CardContent>
-      </Card>
+                        );
+                    })}
+                </div>
+              ) : (
+                 <TypographyP className="text-muted-foreground">No specific risks flagged based on current forecast.</TypographyP>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* === Section 7: Notes & Commentary === */}
-      <Card>
-        <CardHeader>
-           <CardTitle className="text-lg">Notes & Commentary</CardTitle>
-        </CardHeader>
-        <CardContent>
-           <Label htmlFor="pm-notes" className="sr-only">PM Commentary</Label> {/* Screen reader label */}
-           <Textarea
-             id="pm-notes"
-             placeholder="Add notes or observations about this forecast..."
-             value={annotation}
-             onChange={(e) => setAnnotation(e.target.value)}
-             className="mt-1"
-             rows={4}
-           />
-           {/* TODO: Add save button, timestamp, author */}
-        </CardContent>
-      </Card>
-
+          {/* Notes & Commentary Card */}
+          <Card className="lg:col-span-1">
+            <CardHeader>
+               <CardTitle className="text-lg">Notes & Commentary</CardTitle>
+            </CardHeader>
+            <CardContent>
+               <Label htmlFor="pm-notes" className="sr-only">PM Commentary</Label> {/* Screen reader label */}
+               <Textarea
+                 id="pm-notes"
+                 placeholder="Add notes or observations about this forecast..."
+                 value={annotation}
+                 onChange={(e) => setAnnotation(e.target.value)}
+                 className="mt-1"
+                 rows={4}
+               />
+               {/* TODO: Add save button, timestamp, author */}
+            </CardContent>
+          </Card>
+      </div>
     </div>
   );
 };
