@@ -101,7 +101,8 @@ const calculateCostBreakdown = (timeSeries: ForecastPeriodData[], model: Financi
          "COGS": 0,
          "Marketing": 0,
          "Fixed/Setup": 0,
-         "Other Recurring": 0
+         "Other Recurring": 0,
+         "Staffing": 0
      };
      const { assumptions } = model;
      const metadata = assumptions.metadata;
@@ -134,7 +135,13 @@ const calculateCostBreakdown = (timeSeries: ForecastPeriodData[], model: Financi
         breakdown["COGS"] += (periodFBCRevenue * fbCogsPercent) / 100;
         breakdown["COGS"] += (periodMerchRevenue * merchCogsPercent) / 100;
 
-        // 2. Fixed/Recurring
+        // 2. Staff Costs
+        if (isWeekly && metadata?.costs?.staffCount && metadata?.costs?.staffCostPerPerson) {
+            const periodStaffCost = (metadata.costs.staffCount || 0) * (metadata.costs.staffCostPerPerson || 0);
+            breakdown["Staffing"] = (breakdown["Staffing"] || 0) + periodStaffCost;
+        }
+
+        // 3. Fixed/Recurring
         costs.forEach(cost => {
             const costType = cost.type?.toLowerCase();
             const baseValue = cost.value ?? 0;
@@ -149,7 +156,7 @@ const calculateCostBreakdown = (timeSeries: ForecastPeriodData[], model: Financi
             }
         });
 
-        // 3. Marketing
+        // 4. Marketing
         let periodMarketingCost = 0;
         if (marketingSetup.allocationMode === 'channels') {
             const budget = marketingSetup.channels.reduce((s, ch) => s + (ch.weeklyBudget ?? 0), 0);

@@ -6,94 +6,96 @@
  */
 
 import * as XLSX from 'xlsx';
-import { ExportDataType } from '@/store/types';
+import { ExportDataType /*, MarketingChannel, PerformancePeriod, PortfolioProject */ } from '@/store/types';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import { getPortfolioExportData } from '@/lib/portfolioExport';
+
+// Define inline types if specific ones aren't exported
+type PortfolioProjectType = {
+  name: string;
+  productType?: string;
+  totalRevenue?: number;
+  totalProfit?: number;
+  profitMargin?: number;
+  healthScore?: number;
+  riskLevel?: 'low' | 'medium' | 'high';
+  // Add other properties if needed
+};
+
+type PerformancePeriodType = {
+  name?: string;
+  attendanceForecast?: number;
+  attendanceActual?: number;
+  notes?: string;
+  forecast?: number; // Assuming revenue forecast
+  actual?: number;   // Assuming revenue actual
+  // Add other properties if needed
+};
+
+type ChannelLikeType = {
+  name: string;
+  forecast?: number;
+  actual?: number;
+  totalForecast?: number; // From marketingChannels
+  actualSpend?: number; // From marketingChannels
+  type?: string; // From marketingChannels
+  conversions?: number;
+  costPerResult?: number;
+  // Add other properties if needed
+};
 
 /**
  * Generate an Excel file from export data
  *
  * @param data The data to include in the Excel file
  * @param reportTitle The title of the report
+ * @param projectId Optional project ID. If provided, generates a project-specific report. Otherwise, portfolio report.
  * @returns A promise that resolves when the Excel file is generated
  */
-export async function generateExcelReport(data: ExportDataType, reportTitle: string): Promise<void> {
+export async function generateExcelReport(data: ExportDataType, reportTitle: string, projectId?: number | null): Promise<void> {
   try {
-    console.log('[Excel] Generating Excel report:', reportTitle);
+    console.log(`[Excel] Generating Excel report: ${reportTitle} (Project ID: ${projectId ?? 'N/A'})`);
     console.log('[Excel] Data:', data);
 
-    // Create a new workbook
     const workbook = XLSX.utils.book_new();
 
-    // Get portfolio data for additional context
-    const portfolioData = await getPortfolioExportData();
-    console.log('[Excel] Portfolio data:', portfolioData);
-
-    // Extract project name for file naming
-    let projectName = 'Fortress';
-    if (data['Product Data'] && data['Product Data'].projectName) {
-      projectName = data['Product Data'].projectName;
-      console.log(`[Excel] Found project name in Product Data: ${projectName}`);
-    } else if (data.projectName) {
-      projectName = data.projectName;
-      console.log(`[Excel] Found project name in root data: ${projectName}`);
+    // Determine project name for file naming (from project data or portfolio data)
+    let projectNameForFile = 'Fortress_Report';
+    if (projectId && data.projectName) { // Project export
+      projectNameForFile = data.projectName;
+    } else if (!projectId && data.title) { // Portfolio export might use title
+      projectNameForFile = data.title.includes('Overview') ? 'Portfolio_Overview' : data.title;
+    } else if (data.projectName) { // Fallback
+      projectNameForFile = data.projectName;
     }
 
-    // Special case for Trivia product - force the data
-    if (projectName === 'Trivia' || projectName.toLowerCase().includes('trivia')) {
-      console.log('[Excel] Trivia product detected - forcing data in main export function');
-
-      // Update the data object directly
-      if (!data['Product Data']) {
-        data['Product Data'] = {};
-      }
-
-      data['Product Data'].projectName = 'Trivia';
-      data['Product Data'].title = 'Trivia Night';
-      data['Product Data'].productType = 'Weekly Event';
-
-      // Add financial data
-      if (!data['Product Data'].summary) {
-        data['Product Data'].summary = {};
-      }
-      data['Product Data'].summary.totalForecast = 30000;
-      data['Product Data'].summary.totalActual = 28500;
-
-      // Add profit metrics
-      if (!data['Product Data'].profitMetrics) {
-        data['Product Data'].profitMetrics = {};
-      }
-      data['Product Data'].profitMetrics.forecastProfit = 14400;
-      data['Product Data'].profitMetrics.actualProfit = 13680;
-
-      // Add performance indicators
-      data['Product Data'].growthRate = 5.0;
-      data['Product Data'].healthScore = 83;
-      data['Product Data'].riskLevel = 'Low';
-      data['Product Data'].breakevenPoint = 'Week 3';
-    }
-
-    // Format date for file naming
     const exportDate = new Date();
-    const formattedDate = exportDate.toISOString().split('T')[0]; // YYYY-MM-DD
+    const formattedDate = exportDate.toISOString().split('T')[0];
+    const fileName = `${projectNameForFile.replace(/\s+/g, '')}_${reportTitle.replace(/\s+/g, '')}_${formattedDate}.xlsx`;
 
-    // Create file name according to requirements
-    const fileName = `${projectName.replace(/\s+/g, '')}_${reportTitle.replace(/\s+/g, '')}_${formattedDate}.xlsx`;
+    // --- Conditionally add sheets based on export type ---
 
-    // Add portfolio overview sheet first
-    addPortfolioOverviewSheet(workbook, portfolioData);
+    if (!projectId) {
+      // Portfolio Export: Add Portfolio Overview first
+      console.log('[Excel] Adding Portfolio Overview sheet (Portfolio Export)');
+      addPortfolioOverviewSheet(workbook, data); // Portfolio data is passed directly
+    } else {
+      // Project Export: Add project-specific sheets
+      console.log(`[Excel] Adding sheets for project ID: ${projectId}`);
 
-    // Add project-specific sheets
-    console.log('[Excel] Adding Summary sheet with data:', data);
-    addSummarySheet(workbook, data);
-    addAssumptionsSheet(workbook, data);
-    addScenarioParametersSheet(workbook, data);
-    addForecastVsActualSheet(workbook, data);
-    addMarketingSpendSheet(workbook, data);
-    addAttendanceSheet(workbook, data);
-    addRawDataSheet(workbook, data);
+      // Ensure we have project data (it might be nested under 'Product Data')
+      const projectData = data['Product Data'] || data;
 
-    // Write the Excel file
+      // Add project-specific sheets using the fetched projectData
+      addSummarySheet(workbook, projectData);
+      addAssumptionsSheet(workbook, projectData);
+      addScenarioParametersSheet(workbook, projectData); // Might need adjustment if scenarios are project-specific
+      addForecastVsActualSheet(workbook, projectData);
+      addMarketingSpendSheet(workbook, projectData);
+      addAttendanceSheet(workbook, projectData);
+      addRawDataSheet(workbook, projectData); // Add raw data sheet for project
+    }
+
     XLSX.writeFile(workbook, fileName);
     console.log('[Excel] Excel report generated:', fileName);
   } catch (error) {
@@ -104,14 +106,15 @@ export async function generateExcelReport(data: ExportDataType, reportTitle: str
 
 /**
  * Add the Portfolio Overview sheet to the workbook
+ * (Only called for Portfolio exports)
  */
-function addPortfolioOverviewSheet(workbook: XLSX.WorkBook, data: ExportDataType): void {
+function addPortfolioOverviewSheet(workbook: XLSX.WorkBook, portfolioData: ExportDataType): void {
   console.log('[Excel] Adding Portfolio Overview sheet');
-
-  // Extract portfolio summary data
-  const summary = data.summary || {};
-  const formattedSummary = data.formattedSummary || {};
-  const riskDistribution = data.riskDistribution || { highRisk: 0, mediumRisk: 0, lowRisk: 0 };
+  // Use portfolioData directly
+  const summary = portfolioData.summary || {};
+  const formattedSummary = portfolioData.formattedSummary || {};
+  const riskDistribution = portfolioData.riskDistribution || { highRisk: 0, mediumRisk: 0, lowRisk: 0 };
+  const projects = (portfolioData.projects as PortfolioProjectType[]) || []; // Use defined type
 
   // Create the portfolio summary section
   const portfolioSummary = [
@@ -143,11 +146,10 @@ function addPortfolioOverviewSheet(workbook: XLSX.WorkBook, data: ExportDataType
     ['Product', 'Type', 'Revenue', 'Profit', 'Margin', 'Health', 'Risk Level']
   ];
 
-  // Add project rows
-  const projects = data.projects || [];
-  const projectRows = projects.map(project => [
+  // Use defined type for project
+  const projectRows = projects.map((project: PortfolioProjectType) => [
     project.name,
-    project.productType,
+    project.productType || '',
     formatCurrency(project.totalRevenue || 0),
     formatCurrency(project.totalProfit || 0),
     `${(project.profitMargin || 0).toFixed(1)}%`,
@@ -179,128 +181,60 @@ function addPortfolioOverviewSheet(workbook: XLSX.WorkBook, data: ExportDataType
 
 /**
  * Add the Summary sheet to the workbook
+ * (Now relies purely on input data, no hardcoding)
  */
-function addSummarySheet(workbook: XLSX.WorkBook, data: ExportDataType): void {
-  console.log('[Excel] Adding Summary sheet');
+function addSummarySheet(workbook: XLSX.WorkBook, productData: ExportDataType): void {
+  console.log('[Excel] Adding Summary sheet using dynamic data:', productData);
 
-  // Extract data for the summary sheet
-  const productData = data['Product Data'] || data;
-  console.log('[Excel] Product data for summary sheet:', productData);
-  console.log('[Excel] Project name from product data:', productData.projectName);
-
-  // Get project name and product type
-  let projectName = productData.projectName || 'Unknown Project';
-  let productType = productData.productType || 'Unknown Type';
-  let productTitle = productData.title || '';
-
-  console.log(`[Excel] Summary sheet - Project name: ${projectName}`);
-  console.log(`[Excel] Summary sheet - Product type: ${productType}`);
-  console.log(`[Excel] Summary sheet - Product title: ${productTitle}`);
-
-  // Special case for Trivia product
-  if (projectName === 'Trivia' || projectName.toLowerCase().includes('trivia')) {
-    console.log('[Excel] Trivia product detected in summary sheet');
-    productTitle = 'Trivia Night';
-    productType = 'Weekly Event';
-  }
-
-  // Special case for Mead & Minis product
-  if (projectName === 'Mead & Minis' || projectName.toLowerCase().includes('mead')) {
-    console.log('[Excel] Mead & Minis product detected in summary sheet');
-    productTitle = 'Mead & Minis';
-    productType = 'Weekly Event';
-  }
-
+  const projectName = productData.projectName || 'Unknown Project';
+  const productType = productData.productType || 'Unknown Type';
+  const productTitle = productData.title || ''; // Might be report title
   const exportDate = new Date();
 
-  // Extract financial data
-  let totalForecastRevenue = productData.summary?.totalForecast || 0;
-  let totalActualRevenue = productData.summary?.totalActual || 0;
+  const summary = productData.summary || {};
+  const profitMetrics = productData.profitMetrics || {}; // Use profitMetrics if available
+  const formattedSummary = productData.formattedSummary || {}; // Use formatted if available
 
-  // Special case for Trivia product
-  if (projectName === 'Trivia' || projectName.toLowerCase().includes('trivia')) {
-    totalForecastRevenue = 30000;
-    totalActualRevenue = 28500;
-  }
+  const totalForecastRevenue = summary.totalForecast || 0;
+  const totalActualRevenue = summary.totalActual || 0;
 
-  // Special case for Mead & Minis product
-  if (projectName === 'Mead & Minis' || projectName.toLowerCase().includes('mead')) {
-    totalForecastRevenue = 19872;
-    totalActualRevenue = 18500;
-  }
+  // Calculate profit dynamically
+  const totalForecastProfit = profitMetrics.forecastProfit ?? (summary.totalForecastProfit || 0); // Prefer profitMetrics
+  const totalActualProfit = profitMetrics.actualProfit ?? (summary.totalActualProfit || 0);
+  const forecastProfitMargin = totalForecastRevenue > 0
+    ? (totalForecastProfit / totalForecastRevenue) * 100
+    : 0;
 
-  // Calculate profit metrics (if available)
-  let totalForecastProfit = 0;
-  let totalActualProfit = 0;
-  let forecastProfitMargin = 0;
-
-  // Special case for Trivia product
-  if (projectName === 'Trivia' || projectName.toLowerCase().includes('trivia')) {
-    totalForecastProfit = 14400; // 48% profit margin
-    totalActualProfit = 13680; // 48% profit margin
-    forecastProfitMargin = 48;
-  } else if (projectName === 'Mead & Minis' || projectName.toLowerCase().includes('mead')) {
-    totalForecastProfit = 13484; // 67.5% profit margin
-    totalActualProfit = 12488; // 67.5% profit margin
-    forecastProfitMargin = 67.5;
-  } else if (productData.profitMetrics) {
-    totalForecastProfit = productData.profitMetrics.forecastProfit || 0;
-    totalActualProfit = productData.profitMetrics.actualProfit || 0;
-    forecastProfitMargin = totalForecastRevenue > 0
-      ? (totalForecastProfit / totalForecastRevenue) * 100
-      : 0;
-  }
-
-  // Calculate variance
   const revenueVariance = totalActualRevenue - totalForecastRevenue;
   const revenueVariancePercent = totalForecastRevenue > 0
     ? (revenueVariance / totalForecastRevenue) * 100
     : 0;
 
-  // Determine breakeven point
-  let breakevenPoint = 'Week X';
-  if (projectName === 'Trivia' || projectName.toLowerCase().includes('trivia')) {
-    breakevenPoint = 'Week 3';
-  } else if (projectName === 'Mead & Minis' || projectName.toLowerCase().includes('mead')) {
-    breakevenPoint = 'Week 2';
-  } else {
-    breakevenPoint = productData.breakevenPoint || 'Week X';
-  }
+  // Get breakeven point from data, fallback to 'N/A'
+  const breakevenPoint = productData.breakevenPoint || 'N/A'; // Remove hardcoding
 
-  // Get performance indicators
-  let growthRate = productData.growthRate ? `${productData.growthRate}%` : 'N/A';
-  let healthScore = productData.healthScore || 'N/A';
-  let riskLevel = productData.riskLevel || 'N/A';
+  // Get performance indicators from data, fallback to 'N/A'
+  const growthRate = productData.growthRate != null ? `${productData.growthRate}%` : 'N/A';
+  const healthScore = productData.healthScore ?? 'N/A';
+  const riskLevel = productData.riskLevel || 'N/A';
 
-  // Special case for Trivia product
-  if (projectName === 'Trivia' || projectName.toLowerCase().includes('trivia')) {
-    growthRate = '5.0%';
-    healthScore = '83';
-    riskLevel = 'Low';
-  } else if (projectName === 'Mead & Minis' || projectName.toLowerCase().includes('mead')) {
-    growthRate = '3.5%';
-    healthScore = '85';
-    riskLevel = 'Low';
-  }
-
-  // Create the summary data
   const summaryData = [
     ['FORTRESS MODELER - PROJECT SUMMARY', ''],
     [''],
     ['PROJECT INFORMATION', ''],
-    ['Product Name', productTitle || projectName],
+    ['Product Name', productTitle || projectName], // Use title if available, else project name
     ['Project Name', projectName],
     ['Export Date', exportDate.toLocaleDateString()],
     ['Product Type', productType],
     [''],
     ['FINANCIAL SUMMARY', ''],
-    ['Total Forecast Revenue', formatCurrency(totalForecastRevenue)],
-    ['Total Forecast Profit', formatCurrency(totalForecastProfit)],
-    ['Forecast Profit Margin', `${forecastProfitMargin.toFixed(1)}%`],
-    ['Actual Revenue (if available)', formatCurrency(totalActualRevenue)],
-    ['Actual Profit (if available)', formatCurrency(totalActualProfit)],
-    ['Variance ($)', formatCurrency(revenueVariance)],
-    ['Variance (%)', `${revenueVariancePercent.toFixed(1)}%`],
+    ['Total Forecast Revenue', formattedSummary.totalForecast || formatCurrency(totalForecastRevenue)],
+    ['Total Forecast Profit', formattedSummary.totalForecastProfit || formatCurrency(totalForecastProfit)],
+    ['Forecast Profit Margin', formattedSummary.forecastProfitMargin || `${forecastProfitMargin.toFixed(1)}%`],
+    ['Actual Revenue (if available)', formattedSummary.totalActual || formatCurrency(totalActualRevenue)],
+    ['Actual Profit (if available)', formattedSummary.totalActualProfit || formatCurrency(totalActualProfit)],
+    ['Variance ($)', formattedSummary.revenueVariance || formatCurrency(revenueVariance)],
+    ['Variance (%)', formattedSummary.revenueVariancePercent || `${revenueVariancePercent.toFixed(1)}%`],
     ['Breakeven Point', breakevenPoint],
     [''],
     ['PERFORMANCE INDICATORS', ''],
@@ -325,101 +259,59 @@ function addSummarySheet(workbook: XLSX.WorkBook, data: ExportDataType): void {
 
 /**
  * Add the Assumptions sheet to the workbook
+ * (Now relies purely on input data, no hardcoding)
  */
-function addAssumptionsSheet(workbook: XLSX.WorkBook, data: ExportDataType): void {
-  console.log('[Excel] Adding Assumptions sheet');
+function addAssumptionsSheet(workbook: XLSX.WorkBook, productData: ExportDataType): void {
+  console.log('[Excel] Adding Assumptions sheet using dynamic data');
 
-  // Extract data for the assumptions sheet
-  const productData = data['Product Data'] || data;
-  const projectName = productData.projectName || 'Unknown Project';
+  // Extract data for the assumptions sheet (should be project data)
   const model = productData.model || {};
   const assumptions = model.assumptions || {};
   const metadata = assumptions.metadata || {};
   const growth = metadata.growth || {};
+  const perCustomer = metadata.perCustomer || {}; // Corrected: Was 'revenue'
+  const costs = metadata.costs || {};
+  const marketing = assumptions.marketing || {};
 
-  // Create the assumptions data array
-  let assumptionsData = [];
-
-  // Special case for Trivia product
-  if (projectName === 'Trivia' || projectName.toLowerCase().includes('trivia')) {
-    console.log('[Excel] Trivia product detected in assumptions sheet');
-    assumptionsData = [
-      ['FORTRESS MODELER - MODEL ASSUMPTIONS', ''],
-      [''],
-      ['GROWTH ASSUMPTIONS', ''],
-      ['Growth Model', 'Exponential'],
-      ['Weekly Growth Rate', '5.0%'],
-      ['Initial Weekly Attendance', '100'],
-      ['Weeks in Model', '12'],
-      [''],
-      ['REVENUE ASSUMPTIONS', ''],
-      ['Ticket Price per Attendee', '$25.00'],
-      ['F&B Spend per Attendee', '$5.00'],
-      ['Merchandise Spend per Attendee', '$0.00'],
-      ['Total Revenue per Attendee', '$30.00'],
-      [''],
-      ['COST ASSUMPTIONS', ''],
-      ['F&B COGS', '30.0%'],
-      ['Staff Count', '3'],
-      ['Staff Cost per Person', '$150.00'],
-      ['Management Fee', '$250.00'],
-      [''],
-      ['MARKETING ASSUMPTIONS', ''],
-      ['Weekly Marketing Budget', '$350.00'],
-      ['Total Marketing Budget', '$4,200.00']
-    ];
-  }
-  // Special case for Mead & Minis product
-  else if (projectName === 'Mead & Minis' || projectName.toLowerCase().includes('mead')) {
-    console.log('[Excel] Mead & Minis product detected in assumptions sheet');
-    assumptionsData = [
-      ['FORTRESS MODELER - MODEL ASSUMPTIONS', ''],
-      [''],
-      ['GROWTH ASSUMPTIONS', ''],
-      ['Growth Model', 'Exponential'],
-      ['Weekly Growth Rate', '3.5%'],
-      ['Initial Weekly Attendance', '80'],
-      ['Weeks in Model', '12'],
-      [''],
-      ['REVENUE ASSUMPTIONS', ''],
-      ['Ticket Price per Attendee', '$15.00'],
-      ['F&B Spend per Attendee', '$8.50'],
-      ['Merchandise Spend per Attendee', '$0.75'],
-      ['Total Revenue per Attendee', '$24.25'],
-      [''],
-      ['COST ASSUMPTIONS', ''],
-      ['F&B COGS', '25.0%'],
-      ['Staff Count', '2'],
-      ['Staff Cost per Person', '$125.00'],
-      ['Management Fee', '$200.00'],
-      [''],
-      ['MARKETING ASSUMPTIONS', ''],
-      ['Weekly Marketing Budget', '$275.00'],
-      ['Total Marketing Budget', '$3,300.00']
-    ];
-  }
-  // Default case for other products
-  else {
-    assumptionsData = [
-      ['FORTRESS MODELER - MODEL ASSUMPTIONS', ''],
-      [''],
-      ['GROWTH ASSUMPTIONS', ''],
-      ['Growth Model', assumptions.growthModel?.type || 'Unknown'],
-      ['Growth Rate', growth.attendanceGrowthRate ? `${(growth.attendanceGrowthRate * 100).toFixed(2)}%` : 'N/A'],
-      ['Avg Attendance (initial)', metadata.initialWeeklyAttendance?.toString() || 'N/A'],
-      ['Avg Spend per Attendee', metadata.perCustomer?.ticketPrice ? formatCurrency(metadata.perCustomer.ticketPrice) : 'N/A'],
-      [''],
-      ['COST ASSUMPTIONS', ''],
-      ['COGS Multiplier (if applied)', metadata.costs?.fbCOGSPercent ? `${(metadata.costs.fbCOGSPercent * 100).toFixed(2)}%` : 'N/A']
-    ];
-
-    // Add marketing spend changes if available
-    if (assumptions.marketing) {
-      assumptionsData.push(['']);
-      assumptionsData.push(['MARKETING ASSUMPTIONS', '']);
-      assumptionsData.push(['Marketing Budget', assumptions.marketing.totalBudget ? formatCurrency(assumptions.marketing.totalBudget) : 'N/A']);
-    }
-  }
+  // Default dynamic assumptions data build
+  let assumptionsData = [
+    ['FORTRESS MODELER - MODEL ASSUMPTIONS', ''],
+    [''],
+    ['GROWTH ASSUMPTIONS', ''],
+    ['Growth Model', metadata.growthModelType || growth.type || 'N/A'], // Use metadata or growth obj
+    ['Weekly Growth Rate', growth.rate != null ? formatPercent(growth.rate) : 'N/A'], // Use growth obj
+    ['Initial Weekly Attendance', metadata.initialWeeklyAttendance?.toString() || 'N/A'],
+    ['Weeks in Model', metadata.weeks?.toString() || 'N/A'],
+    [''],
+    ['REVENUE ASSUMPTIONS', ''],
+    ['Ticket Price per Attendee', perCustomer.ticketPrice != null ? formatCurrency(perCustomer.ticketPrice) : 'N/A'],
+    ['F&B Spend per Attendee', perCustomer.fbSpend != null ? formatCurrency(perCustomer.fbSpend) : 'N/A'],
+    ['Merchandise Spend per Attendee', perCustomer.merchandiseSpend != null ? formatCurrency(perCustomer.merchandiseSpend) : 'N/A'], // Corrected name
+    // Calculate total per attendee dynamically if possible
+    // ['Total Revenue per Attendee', formatCurrency(...) ],
+    [''],
+    ['COST ASSUMPTIONS', ''],
+    ['F&B COGS', costs.fbCOGSPercent != null ? formatPercent(costs.fbCOGSPercent) : 'N/A'], // Corrected name
+    ['Merchandise COGS', costs.merchandiseCogsPercent != null ? formatPercent(costs.merchandiseCogsPercent) : 'N/A'], // Was already correct
+    ['Staff Count', costs.staffCount?.toString() || 'N/A'],
+    ['Staff Cost per Person', costs.staffCostPerPerson != null ? formatCurrency(costs.staffCostPerPerson) : 'N/A'],
+    ['Management Fee', costs.managementFee != null ? formatCurrency(costs.managementFee) : 'N/A'],
+    // Add other fixed costs if available in data model
+    [''],
+    ['MARKETING ASSUMPTIONS', ''],
+    ['Weekly Marketing Budget', 
+      marketing?.allocationMode === 'channels' 
+        ? formatCurrency((marketing.channels || []).reduce((sum: number, ch: any) => sum + (ch.weeklyBudget || 0), 0))
+        : 'N/A' // Weekly budget only relevant for channels mode in this context
+    ],
+    ['Total Marketing Budget', 
+      marketing?.allocationMode === 'highLevel' 
+        ? formatCurrency(marketing.totalBudget || 0) 
+        : marketing?.allocationMode === 'channels'
+        ? formatCurrency((marketing.channels || []).reduce((sum: number, ch: any) => sum + (ch.weeklyBudget || 0), 0) * (metadata?.weeks || 12))
+        : '$0' // Default to $0 if mode is 'none' or unrecognized
+    ]
+  ];
 
   // Create the worksheet
   const worksheet = XLSX.utils.aoa_to_sheet(assumptionsData);
@@ -480,44 +372,36 @@ function addScenarioParametersSheet(workbook: XLSX.WorkBook, data: ExportDataTyp
 
 /**
  * Add the Forecast vs Actual sheet to the workbook
+ * (Now relies purely on input data, no hardcoding)
  */
-function addForecastVsActualSheet(workbook: XLSX.WorkBook, data: ExportDataType): void {
-  console.log('[Excel] Adding Forecast vs Actual sheet');
+function addForecastVsActualSheet(workbook: XLSX.WorkBook, productData: ExportDataType): void {
+  console.log('[Excel] Adding Forecast vs Actual sheet using dynamic data');
 
-  // Extract data
-  const productData = data['Product Data'] || data;
-  const projectName = productData.projectName || 'Unknown Project';
   const summary = productData.summary || {};
+  const performanceData = productData.performanceData || {};
+  const periodPerformance = (productData.performanceData?.periodPerformance as PerformancePeriodType[]) || []; // Use defined type
 
-  // Create the forecast vs actual data
   const forecastVsActualData = [
     ['FORTRESS MODELER - FORECAST VS ACTUAL', '', '', '', ''],
     [''],
     ['Metric', 'Forecast Value', 'Actual Value', 'Variance ($)', 'Variance (%)']
   ];
 
-  // Set revenue values based on product
-  let totalForecast = summary.totalForecast || 0;
-  let totalActual = summary.totalActual || 0;
-
-  // Special case for Trivia product
-  if (projectName === 'Trivia' || projectName.toLowerCase().includes('trivia')) {
-    console.log('[Excel] Trivia product detected in forecast vs actual sheet');
-    totalForecast = 30000;
-    totalActual = 28500;
-  }
-  // Special case for Mead & Minis product
-  else if (projectName === 'Mead & Minis' || projectName.toLowerCase().includes('mead')) {
-    console.log('[Excel] Mead & Minis product detected in forecast vs actual sheet');
-    totalForecast = 19872;
-    totalActual = 18500;
-  }
-
-  // Calculate variance
+  // Revenue
+  const totalForecast = summary.totalForecast || 0;
+  const totalActual = summary.totalActual || 0;
   const revenueVariance = totalActual - totalForecast;
-  const revenueVariancePercent = totalForecast > 0
-    ? (revenueVariance / totalForecast) * 100
-    : 0;
+  const revenueVariancePercent = totalForecast !== 0 ? (revenueVariance / totalForecast) * 100 : 0;
+
+  // Remove Trivia/Mead hardcoded overrides
+  /*
+  if (projectName === 'Trivia' || projectName.toLowerCase().includes('trivia')) {
+     // ... removed
+  }
+  else if (projectName === 'Mead & Minis' || projectName.toLowerCase().includes('mead')) {
+     // ... removed
+  }
+  */
 
   forecastVsActualData.push([
     'Revenue',
@@ -527,36 +411,29 @@ function addForecastVsActualSheet(workbook: XLSX.WorkBook, data: ExportDataType)
     `${revenueVariancePercent.toFixed(2)}%`
   ]);
 
-  // Add marketing spend data
-  let totalMarketingForecast = 0;
-  let totalMarketingActual = 0;
+  // Marketing Spend
+  const marketingChannels = (productData.marketingChannels as ChannelLikeType[]) || [];
+  const channelPerformance = (productData.performanceData?.channelPerformance as ChannelLikeType[]) || [];
+  const marketingDataSource: ChannelLikeType[] = marketingChannels.length > 0 ? marketingChannels : channelPerformance;
 
-  // Special case for Trivia product
+  let totalMarketingForecast = marketingDataSource.reduce((sum: number, channel: ChannelLikeType) => sum + (channel.forecast || channel.totalForecast || 0), 0);
+  let totalMarketingActual = marketingDataSource.reduce((sum: number, channel: ChannelLikeType) => sum + (channel.actual || channel.actualSpend || 0), 0);
+
+  // Remove Trivia/Mead hardcoded overrides
+  /*
   if (projectName === 'Trivia' || projectName.toLowerCase().includes('trivia')) {
-    totalMarketingForecast = 4200; // $350 per week for 12 weeks
-    totalMarketingActual = 4050;
+      // ... removed
   }
-  // Special case for Mead & Minis product
   else if (projectName === 'Mead & Minis' || projectName.toLowerCase().includes('mead')) {
-    totalMarketingForecast = 3300; // $275 per week for 12 weeks
-    totalMarketingActual = 3150;
+     // ... removed
   }
-  // Try to get data from performance data if available
-  else if (productData.performanceData && productData.performanceData.channelPerformance) {
-    const { channelPerformance } = productData.performanceData;
-    if (channelPerformance && channelPerformance.length > 0) {
-      totalMarketingForecast = channelPerformance.reduce((sum, channel) => sum + (channel.forecast || 0), 0);
-      totalMarketingActual = channelPerformance.reduce((sum, channel) => sum + (channel.actual || 0), 0);
-    }
-  }
+  */
 
-  // Add marketing spend row if we have data
   if (totalMarketingForecast > 0 || totalMarketingActual > 0) {
     const marketingVariance = totalMarketingActual - totalMarketingForecast;
-    const marketingVariancePercent = totalMarketingForecast > 0
+    const marketingVariancePercent = totalMarketingForecast !== 0
       ? (marketingVariance / totalMarketingForecast) * 100
       : 0;
-
     forecastVsActualData.push([
       'Marketing Spend',
       formatCurrency(totalMarketingForecast),
@@ -566,36 +443,25 @@ function addForecastVsActualSheet(workbook: XLSX.WorkBook, data: ExportDataType)
     ]);
   }
 
-  // Add attendance data
-  let totalAttendanceForecast = 0;
-  let totalAttendanceActual = 0;
+  // Attendance
+  let totalAttendanceForecast = periodPerformance.reduce((sum: number, period: PerformancePeriodType) => sum + (period.attendanceForecast || 0), 0);
+  let totalAttendanceActual = periodPerformance.reduce((sum: number, period: PerformancePeriodType) => sum + (period.attendanceActual || 0), 0);
 
-  // Special case for Trivia product
+  // Remove Trivia/Mead hardcoded overrides
+  /*
   if (projectName === 'Trivia' || projectName.toLowerCase().includes('trivia')) {
-    totalAttendanceForecast = 1200; // Average 100 per week for 12 weeks
-    totalAttendanceActual = 1140;
+      // ... removed
   }
-  // Special case for Mead & Minis product
   else if (projectName === 'Mead & Minis' || projectName.toLowerCase().includes('mead')) {
-    totalAttendanceForecast = 960; // Average 80 per week for 12 weeks
-    totalAttendanceActual = 912;
+      // ... removed
   }
-  // Try to get data from performance data if available
-  else if (productData.performanceData && productData.performanceData.periodPerformance) {
-    const { periodPerformance } = productData.performanceData;
-    if (periodPerformance && periodPerformance.length > 0) {
-      totalAttendanceForecast = periodPerformance.reduce((sum, period) => sum + (period.attendanceForecast || 0), 0);
-      totalAttendanceActual = periodPerformance.reduce((sum, period) => sum + (period.attendanceActual || 0), 0);
-    }
-  }
+  */
 
-  // Add attendance row if we have data
   if (totalAttendanceForecast > 0 || totalAttendanceActual > 0) {
     const attendanceVariance = totalAttendanceActual - totalAttendanceForecast;
-    const attendanceVariancePercent = totalAttendanceForecast > 0
+    const attendanceVariancePercent = totalAttendanceForecast !== 0
       ? (attendanceVariance / totalAttendanceForecast) * 100
       : 0;
-
     forecastVsActualData.push([
       'Attendance',
       totalAttendanceForecast.toString(),
@@ -625,30 +491,22 @@ function addForecastVsActualSheet(workbook: XLSX.WorkBook, data: ExportDataType)
 /**
  * Add the Marketing Spend sheet to the workbook
  */
-function addMarketingSpendSheet(workbook: XLSX.WorkBook, data: ExportDataType): void {
-  console.log('[Excel] Adding Marketing Spend sheet');
+function addMarketingSpendSheet(workbook: XLSX.WorkBook, productData: ExportDataType): void {
+  console.log('[Excel] Adding Marketing Spend sheet using dynamic data');
+  const marketingChannels = (productData.marketingChannels as ChannelLikeType[]) || [];
+  const channelPerformance = (productData.performanceData?.channelPerformance as ChannelLikeType[]) || [];
+  const combinedChannels: ChannelLikeType[] = marketingChannels.length > 0 ? marketingChannels : channelPerformance;
 
-  // Extract data
-  const productData = data['Product Data'] || data;
-  const marketingChannels = productData.marketingChannels || [];
-  const performanceData = productData.performanceData || {};
-  const channelPerformance = performanceData.channelPerformance || [];
-
-  // Combine data sources
-  const combinedChannels = marketingChannels.length > 0 ? marketingChannels : channelPerformance;
-
-  // Create the marketing spend data
   const marketingSpendData = [
     ['Channel Name', 'Forecast Spend', 'Actual Spend', 'Variance ($)', 'Variance (%)']
   ];
 
-  // Add each channel
-  combinedChannels.forEach(channel => {
+  // Add explicit type for channel parameter in forEach
+  combinedChannels.forEach((channel: ChannelLikeType) => {
     const forecast = channel.forecast || channel.totalForecast || 0;
     const actual = channel.actual || channel.actualSpend || 0;
     const variance = actual - forecast;
-    const variancePercent = forecast > 0 ? (variance / forecast) * 100 : 0;
-
+    const variancePercent = forecast !== 0 ? (variance / forecast) * 100 : 0;
     marketingSpendData.push([
       channel.name,
       formatCurrency(forecast),
@@ -661,6 +519,9 @@ function addMarketingSpendSheet(workbook: XLSX.WorkBook, data: ExportDataType): 
   // Create the worksheet
   const worksheet = XLSX.utils.aoa_to_sheet(marketingSpendData);
 
+  // Set reasonable column widths
+  worksheet['!cols'] = [{ wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
+
   // Add the worksheet to the workbook
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Marketing Spend');
 }
@@ -668,49 +529,38 @@ function addMarketingSpendSheet(workbook: XLSX.WorkBook, data: ExportDataType): 
 /**
  * Add the Attendance sheet to the workbook
  */
-function addAttendanceSheet(workbook: XLSX.WorkBook, data: ExportDataType): void {
-  console.log('[Excel] Adding Attendance sheet');
-
-  // Extract data
-  const productData = data['Product Data'] || data;
+function addAttendanceSheet(workbook: XLSX.WorkBook, productData: ExportDataType): void {
+  console.log('[Excel] Adding Attendance sheet using dynamic data');
   const performanceData = productData.performanceData || {};
-  const periodPerformance = performanceData.periodPerformance || [];
+  const periodPerformance = (productData.performanceData?.periodPerformance as PerformancePeriodType[]) || []; // Use defined type
 
-  // Create the attendance data
   const attendanceData = [
-    ['Week', 'Forecast Attendance', 'Actual Attendance', 'Variance', 'Notes']
+    ['Period', 'Forecast Attendance', 'Actual Attendance', 'Variance', 'Notes'] // Changed 'Week' to 'Period'
   ];
 
-  // Add each period
-  periodPerformance.forEach((period, index) => {
-    const forecastAttendance = period.attendanceForecast || 0;
-    const actualAttendance = period.attendanceActual || 0;
-    const variance = actualAttendance - forecastAttendance;
-
-    attendanceData.push([
-      period.name || `Week ${index + 1}`,
-      forecastAttendance.toString(),
-      actualAttendance.toString(),
-      variance.toString(),
-      period.notes || ''
-    ]);
-  });
-
-  // If no period performance data, add placeholder rows
-  if (periodPerformance.length === 0) {
-    for (let i = 1; i <= 12; i++) {
-      attendanceData.push([
-        `Week ${i}`,
-        '0',
-        '0',
-        '0',
-        ''
-      ]);
-    }
+  if (periodPerformance.length > 0) {
+      periodPerformance.forEach((period: PerformancePeriodType, index: number) => {
+        const forecastAttendance = period.attendanceForecast || 0;
+        const actualAttendance = period.attendanceActual || 0;
+        const variance = actualAttendance - forecastAttendance;
+        attendanceData.push([
+          period.name || `Period ${index + 1}`, // Use period name if available
+          forecastAttendance.toString(),
+          actualAttendance.toString(),
+          variance.toString(),
+          period.notes || ''
+        ]);
+      });
+  } else {
+    // Optional: Add placeholder if no data exists
+    attendanceData.push(['No attendance data available', '', '', '', '']);
   }
 
   // Create the worksheet
   const worksheet = XLSX.utils.aoa_to_sheet(attendanceData);
+
+  // Set column widths
+  worksheet['!cols'] = [{ wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 25 }];
 
   // Add the worksheet to the workbook
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance');
@@ -719,16 +569,13 @@ function addAttendanceSheet(workbook: XLSX.WorkBook, data: ExportDataType): void
 /**
  * Add the Raw Data sheet to the workbook
  */
-function addRawDataSheet(workbook: XLSX.WorkBook, data: ExportDataType): void {
-  console.log('[Excel] Adding Raw Data sheet');
+function addRawDataSheet(workbook: XLSX.WorkBook, productData: ExportDataType): void {
+  console.log('[Excel] Adding Raw Data sheet using dynamic data');
 
-  // Create the raw data array
-  const rawData = [
+  const rawData: any[][] = [
     ['Date', 'Metric Name', 'Value', 'Data Type', 'Source', 'Project', 'Category']
   ];
 
-  // Extract data
-  const productData = data['Product Data'] || data;
   const exportDate = new Date();
   const dateStr = exportDate.toISOString().split('T')[0];
   const projectName = productData.projectName || 'Unknown Project';
@@ -736,184 +583,48 @@ function addRawDataSheet(workbook: XLSX.WorkBook, data: ExportDataType): void {
   // Add summary metrics
   if (productData.summary) {
     const summary = productData.summary;
+    const addMetric = (name: string, value: any, type: string, category: string) => {
+      if (value != null) { // Add only if value exists
+          rawData.push([dateStr, name, value, type, 'System-calculated', projectName, category]);
+      }
+    };
 
-    // Revenue metrics
-    rawData.push([
-      dateStr,
-      'Total Forecast Revenue',
-      summary.totalForecast || 0,
-      'Forecast',
-      'System-calculated',
-      projectName,
-      'Revenue'
-    ]);
-
-    rawData.push([
-      dateStr,
-      'Total Actual Revenue',
-      summary.totalActual || 0,
-      'Actual',
-      'User input',
-      projectName,
-      'Revenue'
-    ]);
-
-    // Profit metrics (if available)
+    addMetric('Total Forecast Revenue', summary.totalForecast, 'Forecast', 'Revenue');
+    addMetric('Total Actual Revenue', summary.totalActual, 'Actual', 'Revenue');
+    // Add profit metrics if they exist (using profitMetrics structure)
     if (productData.profitMetrics) {
-      rawData.push([
-        dateStr,
-        'Total Forecast Profit',
-        productData.profitMetrics.forecastProfit || 0,
-        'Forecast',
-        'System-calculated',
-        projectName,
-        'Profit'
-      ]);
-
-      rawData.push([
-        dateStr,
-        'Total Actual Profit',
-        productData.profitMetrics.actualProfit || 0,
-        'Actual',
-        'User input',
-        projectName,
-        'Profit'
-      ]);
+        addMetric('Total Forecast Profit', productData.profitMetrics.forecastProfit, 'Forecast', 'Profit');
+        addMetric('Total Actual Profit', productData.profitMetrics.actualProfit, 'Actual', 'Profit');
     }
-
-    // Utilization percentage
-    rawData.push([
-      dateStr,
-      'Utilization Percentage',
-      summary.percentUtilized || 0,
-      'Calculated',
-      'System-calculated',
-      projectName,
-      'Performance'
-    ]);
+    addMetric('Utilization Percentage', summary.percentUtilized, 'Calculated', 'Performance');
+    addMetric('Marketing Forecast Spend', summary.marketingForecast, 'Forecast', 'Marketing');
+    addMetric('Marketing Actual Spend', summary.marketingActual, 'Actual', 'Marketing');
   }
 
   // Add marketing channel data
-  const marketingChannels = productData.marketingChannels || [];
-  marketingChannels.forEach(channel => {
-    // Forecast data
-    rawData.push([
-      dateStr,
-      `Marketing: ${channel.name} Forecast`,
-      channel.forecast || channel.totalForecast || 0,
-      'Forecast',
-      'System-calculated',
-      projectName,
-      'Marketing'
-    ]);
-
-    // Actual data
-    rawData.push([
-      dateStr,
-      `Marketing: ${channel.name} Actual`,
-      channel.actual || channel.actualSpend || 0,
-      'Actual',
-      'User input',
-      projectName,
-      'Marketing'
-    ]);
-
-    // Conversion data if available
-    if (channel.conversions !== undefined) {
-      rawData.push([
-        dateStr,
-        `Marketing: ${channel.name} Conversions`,
-        channel.conversions,
-        'Actual',
-        'User input',
-        projectName,
-        'Marketing'
-      ]);
-    }
-
-    // Cost per result if available
-    if (channel.costPerResult !== undefined) {
-      rawData.push([
-        dateStr,
-        `Marketing: ${channel.name} Cost Per Result`,
-        channel.costPerResult,
-        'Calculated',
-        'System-calculated',
-        projectName,
-        'Marketing'
-      ]);
-    }
+  const marketingChannels = (productData.marketingChannels as ChannelLikeType[]) || []; // Use defined type
+  marketingChannels.forEach((channel: ChannelLikeType) => { // Add type
+      rawData.push([dateStr, `Marketing: ${channel.name} Forecast`, channel.forecast || channel.totalForecast || 0, 'Forecast', 'System-calculated', projectName, 'Marketing']);
+      rawData.push([dateStr, `Marketing: ${channel.name} Actual`, channel.actual || channel.actualSpend || 0, 'Actual', 'User input', projectName, 'Marketing']);
+      if (channel.conversions != null) rawData.push([dateStr, `Marketing: ${channel.name} Conversions`, channel.conversions, 'Actual', 'User input', projectName, 'Marketing']);
+      if (channel.costPerResult != null) rawData.push([dateStr, `Marketing: ${channel.name} Cost Per Result`, channel.costPerResult, 'Calculated', 'System-calculated', projectName, 'Marketing']);
   });
 
   // Add period performance data
-  const performanceData = productData.performanceData || {};
-  const periodPerformance = performanceData.periodPerformance || [];
-
-  periodPerformance.forEach(period => {
-    // Forecast revenue
-    rawData.push([
-      dateStr,
-      `Period: ${period.name} Forecast Revenue`,
-      period.forecast || 0,
-      'Forecast',
-      'System-calculated',
-      projectName,
-      'Period Performance'
-    ]);
-
-    // Actual revenue
-    if (period.actual !== undefined) {
-      rawData.push([
-        dateStr,
-        `Period: ${period.name} Actual Revenue`,
-        period.actual || 0,
-        'Actual',
-        'User input',
-        projectName,
-        'Period Performance'
-      ]);
-    }
-
-    // Attendance data if available
-    if (period.attendanceForecast !== undefined) {
-      rawData.push([
-        dateStr,
-        `Period: ${period.name} Forecast Attendance`,
-        period.attendanceForecast,
-        'Forecast',
-        'System-calculated',
-        projectName,
-        'Attendance'
-      ]);
-    }
-
-    if (period.attendanceActual !== undefined) {
-      rawData.push([
-        dateStr,
-        `Period: ${period.name} Actual Attendance`,
-        period.attendanceActual,
-        'Actual',
-        'User input',
-        projectName,
-        'Attendance'
-      ]);
-    }
+  const periodPerformance = (productData.performanceData?.periodPerformance as PerformancePeriodType[]) || []; // Use defined type
+  periodPerformance.forEach((period: PerformancePeriodType) => { // Add type
+       const periodName = period.name || 'Unknown Period';
+       if (period.forecast != null) rawData.push([dateStr, `Period: ${periodName} Forecast Revenue`, period.forecast, 'Forecast', 'System-calculated', projectName, 'Period Performance']);
+       if (period.actual != null) rawData.push([dateStr, `Period: ${periodName} Actual Revenue`, period.actual, 'Actual', 'User input', projectName, 'Period Performance']);
+       if (period.attendanceForecast != null) rawData.push([dateStr, `Period: ${periodName} Forecast Attendance`, period.attendanceForecast, 'Forecast', 'System-calculated', projectName, 'Attendance']);
+       if (period.attendanceActual != null) rawData.push([dateStr, `Period: ${periodName} Actual Attendance`, period.attendanceActual, 'Actual', 'User input', projectName, 'Attendance']);
   });
 
   // Create the worksheet
   const worksheet = XLSX.utils.aoa_to_sheet(rawData);
 
   // Set column widths
-  const columnWidths = [
-    { wch: 12 },  // A - Date
-    { wch: 30 },  // B - Metric Name
-    { wch: 15 },  // C - Value
-    { wch: 12 },  // D - Data Type
-    { wch: 18 },  // E - Source
-    { wch: 20 },  // F - Project
-    { wch: 15 }   // G - Category
-  ];
-  worksheet['!cols'] = columnWidths;
+  worksheet['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 12 }, { wch: 18 }, { wch: 20 }, { wch: 15 }];
 
   // Add the worksheet to the workbook
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Raw Data');

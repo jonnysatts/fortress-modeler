@@ -33,7 +33,7 @@ export const calculateTotalRevenue = (model: FinancialModel): number => {
       // Calculate attendance for this week
       const attendanceGrowthRate = metadata.growth.attendanceGrowthRate / 100;
       const currentAttendance = Math.round(
-        initialAttendance * Math.pow(1 + attendanceGrowthRate, week - 1)
+        (initialAttendance ?? 0) * Math.pow(1 + attendanceGrowthRate, week - 1)
       );
 
       // Calculate per-customer values with growth if enabled
@@ -93,7 +93,7 @@ export const calculateTotalCosts = (model: FinancialModel): number => {
       // Calculate attendance for this week
       const attendanceGrowthRate = metadata.growth.attendanceGrowthRate / 100;
       const currentAttendance = Math.round(
-        initialAttendance * Math.pow(1 + attendanceGrowthRate, week - 1)
+        (initialAttendance ?? 0) * Math.pow(1 + attendanceGrowthRate, week - 1)
       );
 
       // Calculate F&B revenue for this week to determine COGS
@@ -259,7 +259,15 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
       periodCost += fbCOGS + merchCOGS;
       let currentCostBreakdown: Record<string, number> = { fbCOGS, merchCOGS };
 
-      // 2. Fixed/Recurring Costs from the list
+      // 2. Calculated Staff Costs (if applicable)
+      let periodStaffCost = 0;
+      if (isWeekly && metadata?.costs?.staffCount && metadata?.costs?.staffCostPerPerson) {
+        periodStaffCost = (metadata.costs.staffCount || 0) * (metadata.costs.staffCostPerPerson || 0);
+        periodCost += periodStaffCost;
+        if (periodStaffCost > 0) currentCostBreakdown["staffCost"] = periodStaffCost; // Add to breakdown
+      }
+
+      // 3. Fixed/Recurring Costs from the list
       costs.forEach(cost => {
         let costValue = 0;
         const costType = cost.type?.toLowerCase();
@@ -281,7 +289,7 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
         if (costValue > 0) currentCostBreakdown[costName] = costValue; // Now allowed
       });
 
-      // 3. Marketing Costs
+      // 4. Marketing Costs
       let periodMarketingCost = 0;
 
       // Ensure marketingSetup exists and has a valid allocationMode
@@ -314,14 +322,17 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
         // Log channel budgets for debugging
         console.log(`[ForecastCalc Period ${period}] Total Channel Budget: ${budget} per ${isWeekly ? 'week' : 'month'}`);
         console.log(`[ForecastCalc Period ${period}] Calculated Marketing Cost: ${periodMarketingCost}`);
-      } else if (marketingMode === 'highLevel') {
+      } else if (marketingMode === 'highLevel' && marketingSetup) {
+        // Assert the type within this block
+        const highLevelMarketing = marketingSetup as MarketingSetup;
+
         // Ensure we have valid values for all required fields
-        const totalBudget = typeof marketingSetup.totalBudget === 'number' ? marketingSetup.totalBudget : 0;
-        const application = ['upfront', 'spreadEvenly', 'spreadCustom'].includes(marketingSetup.budgetApplication)
-          ? marketingSetup.budgetApplication
+        const totalBudget = typeof highLevelMarketing.totalBudget === 'number' ? highLevelMarketing.totalBudget : 0;
+        const application = ['upfront', 'spreadEvenly', 'spreadCustom'].includes(highLevelMarketing.budgetApplication || '')
+          ? highLevelMarketing.budgetApplication
           : 'spreadEvenly';
-        const spreadDuration = typeof marketingSetup.spreadDuration === 'number' && marketingSetup.spreadDuration > 0
-          ? marketingSetup.spreadDuration
+        const spreadDuration = typeof highLevelMarketing.spreadDuration === 'number' && highLevelMarketing.spreadDuration > 0
+          ? highLevelMarketing.spreadDuration
           : duration; // Default to full duration
         const modelDuration = duration;
 

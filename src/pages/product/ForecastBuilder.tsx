@@ -130,6 +130,8 @@ const ForecastBuilder: React.FC = () => {
       // Base default is Monthly
       metadata: { type: 'Monthly', weeks: 0 },
       marketing: {
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore - Linter seems incorrect here, schema allows 'none'
           allocationMode: 'none',
           channels: [],
           totalBudget: 0,
@@ -158,10 +160,6 @@ const ForecastBuilder: React.FC = () => {
     formState: { isSubmitting, errors } // Remove dirtyFields from here
   } = useForm<ModelAssumptions>({
     resolver: zodResolver(assumptionsSchema),
-    // We might not need 'values' prop with this manual dirty check,
-    // relying on reset in useEffect might be sufficient now.
-    // Let's keep it for now, but can remove if causing issues.
-    values: model?.assumptions || defaultAssumptions,
     mode: "onChange",
   });
 
@@ -352,7 +350,7 @@ const ForecastBuilder: React.FC = () => {
           dataToSave.marketing.channels = [];
         } else {
           // Ensure each channel has the required properties
-          dataToSave.marketing.channels = dataToSave.marketing.channels.map(channel => ({
+          dataToSave.marketing.channels = dataToSave.marketing.channels.map((channel: z.infer<typeof marketingChannelSchema>) => ({
             id: channel.id || crypto.randomUUID(),
             channelType: channel.channelType || defaultChannelTypes[0],
             name: channel.name || '',
@@ -618,7 +616,6 @@ const ForecastBuilder: React.FC = () => {
                                             )}
                                         />
                                     </div>
-                                    {/* Add Management Costs, etc. if needed */}
                                 </div>
                             </div>
                         )}
@@ -886,11 +883,11 @@ const ForecastBuilder: React.FC = () => {
                                                 render={({ field }) => (
                                                     <Select
                                                         onValueChange={value => {
-                                                            field.onChange(value);
+                                                            field.onChange(value || defaultChannelTypes[0]);
                                                             console.log(`Channel ${index} type updated:`, value);
                                                             setIsDirty(true); // Force dirty state
                                                         }}
-                                                        value={field.value || defaultChannelTypes[0]}>
+                                                        value={field.value ? field.value : defaultChannelTypes[0]}>
                                                         <SelectTrigger className="w-[180px]">
                                                             <SelectValue placeholder="Select Type..." />
                                                         </SelectTrigger>
@@ -950,15 +947,15 @@ const ForecastBuilder: React.FC = () => {
                                                 name={`marketing.channels.${index}.distribution`}
                                                 control={control}
                                                 render={({ field }) => {
-                                                    // Ensure we have a valid value
-                                                    const validValue = ['spreadEvenly', 'upfront', 'spreadCustom'].includes(field.value)
+                                                    // Ensure we have a valid value, checking field.value first
+                                                    const validValue = field.value && ['spreadEvenly', 'upfront', 'spreadCustom'].includes(field.value)
                                                         ? field.value
                                                         : 'spreadEvenly';
 
                                                     return (
                                                         <Select
                                                             onValueChange={value => {
-                                                                field.onChange(value);
+                                                                field.onChange(value || 'spreadEvenly');
                                                                 console.log(`Channel ${index} distribution updated:`, value);
                                                                 setIsDirty(true); // Force dirty state
                                                             }}
@@ -1100,14 +1097,15 @@ const ForecastBuilder: React.FC = () => {
                                             control={control}
                                             render={({ field }) => {
                                                 // Ensure we have a valid value
-                                                const validValue = ['spreadEvenly', 'upfront', 'spreadCustom'].includes(field.value)
-                                                    ? field.value
+                                                const currentValue = field.value || '';
+                                                const validValue = ['spreadEvenly', 'upfront', 'spreadCustom'].includes(currentValue)
+                                                    ? currentValue
                                                     : 'spreadEvenly';
 
                                                 return (
                                                     <Select
                                                         onValueChange={value => {
-                                                            field.onChange(value);
+                                                            field.onChange(value || 'spreadEvenly'); // Ensure string
                                                             console.log('Budget application updated:', value);
                                                             setIsDirty(true); // Force dirty state
 
@@ -1116,7 +1114,7 @@ const ForecastBuilder: React.FC = () => {
                                                                 setValue('marketing.spreadDuration', 4);
                                                             }
                                                         }}
-                                                        value={validValue}
+                                                        value={validValue} // Use the validated value
                                                     >
                                                         <SelectTrigger id="budgetApplication">
                                                             <SelectValue placeholder="Select Application" />

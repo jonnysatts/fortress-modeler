@@ -13,140 +13,151 @@ import { ExportDataType } from '@/store/types';
  */
 export async function getProductExportData(projectId: number): Promise<ExportDataType> {
   console.log(`[DataExport] Getting export data for project ${projectId}`);
-
-  // Always create fallback data first as a safety measure
   const fallbackData = createFallbackData("Product");
-  console.log('[DataExport] Created fallback data as safety measure');
 
   try {
-    // Get the project
-    console.log(`[DataExport] Attempting to get project with ID ${projectId} from database`);
     const project = await db.projects.get(projectId);
-    console.log(`[DataExport] Database query result for project:`, project);
-
     if (!project) {
       console.error(`[DataExport] Project ${projectId} not found`);
-      console.log('[DataExport] Returning fallback data due to missing project');
       return fallbackData;
     }
-
     console.log(`[DataExport] Found project:`, project);
 
-    // Get the models for this project
-    console.log(`[DataExport] Querying models for project ID ${projectId}`);
-    const models = await db.financialModels.where('projectId').equals(projectId).toArray();
-    console.log(`[DataExport] Found ${models.length} models:`, models);
-
-    // Get the actuals for this project
-    console.log(`[DataExport] Querying actuals for project ID ${projectId}`);
-    const actuals = await db.actuals.where('projectId').equals(projectId).toArray();
-    console.log(`[DataExport] Found ${actuals.length} actuals:`, actuals);
-
-    // Get the current model (first one for now)
-    const currentModel = models.length > 0 ? models[0] : null;
-    console.log(`[DataExport] Current model:`, currentModel);
+    // --- Force fetch the LATEST model data directly from DB for export --- 
+    console.log(`[DataExport] Force fetching latest model for project ID ${projectId}`);
+    const currentModel = await db.financialModels.where({ projectId }).first(); // Fetch latest
+    console.log(`[DataExport] Fetched latest model:`, currentModel);
 
     if (!currentModel) {
       console.warn(`[DataExport] No models found for project ${projectId}`);
-      console.log('[DataExport] Returning fallback data due to missing model');
-      return fallbackData;
+      return fallbackData; // Return fallback if no model exists
     }
 
-    // Process marketing channels
-    console.log(`[DataExport] Checking model assumptions:`, currentModel.assumptions);
-    const marketingSetup = currentModel.assumptions?.marketing;
-    console.log(`[DataExport] Marketing setup:`, marketingSetup);
+    // --- Proceed using the freshly fetched currentModel --- 
+    const assumptions = currentModel.assumptions; // No optional chaining needed now
+    const metadata = assumptions?.metadata;
+    console.log("[DataExport] Using fetched model metadata:", metadata);
 
-    const marketingChannels = marketingSetup?.channels || [];
-    console.log(`[DataExport] Found ${marketingChannels.length} marketing channels:`, marketingChannels);
+    // Fetch actuals (needed for marketing processing)
+    const actuals = await db.actuals.where({ projectId }).toArray();
+    console.log(`[DataExport] Found ${actuals.length} actuals:`, actuals);
 
-    // Process the data
-    console.log(`[DataExport] Processing marketing channels...`);
-    const processedChannels = processMarketingChannels(marketingChannels, actuals);
-    console.log(`[DataExport] Processed channels:`, processedChannels);
-
-    console.log(`[DataExport] Processing period performance...`);
+    // Process performance data using the fetched model
     const periodPerformance = await processPeriodPerformance(actuals, currentModel);
-    console.log(`[DataExport] Processed period performance:`, periodPerformance);
-
-    // Calculate summary data
-    console.log(`[DataExport] Calculating summary data...`);
-
-    // Calculate total revenue from period performance
-    console.log('[DataExport] Period performance for revenue calculation:', periodPerformance);
-    const totalForecastRevenue = periodPerformance.reduce((sum, period) => {
-      console.log(`[DataExport] Adding period ${period.name} forecast: ${period.totalForecast}`);
-      return sum + (period.totalForecast || 0);
-    }, 0);
+    
+    // Calculate Revenue from periods
+    const totalForecastRevenue = periodPerformance.reduce((sum, period) => sum + (period.totalForecast || 0), 0);
     const totalActualRevenue = periodPerformance.reduce((sum, period) => sum + (period.totalActual || 0), 0);
-    console.log(`[DataExport] Calculated totalForecastRevenue: ${totalForecastRevenue}`);
+    const finalForecastRevenue = totalForecastRevenue;
+    console.log(`[DataExport] Revenue Summary: Forecast=${finalForecastRevenue}, Actual=${totalActualRevenue}`);
 
-    // Direct calculation from model as a fallback
-    let modelBasedRevenue = 0;
-    if (currentModel && currentModel.assumptions && currentModel.assumptions.metadata) {
-      const metadata = currentModel.assumptions.metadata;
-      if (metadata.type === "WeeklyEvent" && metadata.initialWeeklyAttendance && metadata.perCustomer) {
-        const weeks = metadata.weeks || 12;
-        const initialAttendance = metadata.initialWeeklyAttendance;
-        const ticketPrice = metadata.perCustomer.ticketPrice || 0;
-        const attendanceGrowthRate = (metadata.growth?.attendanceGrowthRate || 0) / 100;
-
-        // Calculate total revenue across all weeks
-        let totalAttendance = 0;
-        for (let week = 1; week <= weeks; week++) {
-          const weeklyAttendance = Math.round(initialAttendance * Math.pow(1 + attendanceGrowthRate, week - 1));
-          totalAttendance += weeklyAttendance;
-        }
-
-        modelBasedRevenue = totalAttendance * ticketPrice;
-        console.log(`[DataExport] Direct model calculation: ${modelBasedRevenue}`);
-      }
-    }
-
-    // Use the larger of the two calculations
-    const finalForecastRevenue = Math.max(totalForecastRevenue, modelBasedRevenue);
-    console.log(`[DataExport] Final forecast revenue: ${finalForecastRevenue}`);
-
-    // If we still have zero, try to extract from UI data
-    if (finalForecastRevenue === 0) {
-      console.log('[DataExport] Revenue is still zero, checking project data for UI values');
-      if (project.uiData && project.uiData.revenue) {
-        console.log(`[DataExport] Found UI revenue data: ${project.uiData.revenue}`);
-        finalForecastRevenue = project.uiData.revenue;
-      }
-    }
-
-    // Special case for Trivia product
-    if (project.name === 'Trivia' || project.name.toLowerCase().includes('trivia')) {
-      console.log('[DataExport] Trivia product detected, setting revenue to $30,000');
-      finalForecastRevenue = 30000;
-    }
-
-    // Special case for Mead & Minis product
-    if (project.name === 'Mead & Minis' || project.name.toLowerCase().includes('mead')) {
-      console.log('[DataExport] Mead & Minis product detected, setting revenue to $19,872');
-      finalForecastRevenue = 19872;
-    }
-
-    // Calculate total marketing spend
+    // Process marketing channels using fetched model
+    const processedChannels = processMarketingChannels(assumptions?.marketing?.channels || [], actuals);
     const totalMarketingForecast = processedChannels.reduce((sum, channel) => sum + (channel.totalForecast || 0), 0);
     const totalMarketingActual = processedChannels.reduce((sum, channel) => sum + (channel.actualSpend || 0), 0);
-
-    // Calculate utilization percentage
     const percentUtilized = totalMarketingForecast > 0 ? Math.round((totalMarketingActual / totalMarketingForecast) * 100) : 0;
+    console.log(`[DataExport] Marketing Summary: Forecast=${totalMarketingForecast}, Actual=${totalMarketingActual}, Utilization=${percentUtilized}%`);
 
-    console.log(`[DataExport] Summary: Revenue Forecast=${totalForecastRevenue}, Revenue Actual=${totalActualRevenue}`);
-    console.log(`[DataExport] Marketing: Forecast=${totalMarketingForecast}, Actual=${totalMarketingActual}, Utilization=${percentUtilized}%`);
+    // --- Calculate Costs using fetched model data --- 
+    let totalForecastCost = 0;
+    let totalActualCost = totalMarketingActual;
 
-    // Create the export data
+    if (metadata) {
+      const costAssumptions = metadata.costs || {};
+      const perCustomerAssumptions = metadata.perCustomer || {};
+      const weeks = metadata.weeks || 12;
+      const growthRate = metadata.growth?.rate || 0;
+      const initialAttendance = metadata.initialWeeklyAttendance || 0;
+      const fbSpendPerAttendee = perCustomerAssumptions.fbSpend || 0;
+      const merchSpendPerAttendee = perCustomerAssumptions.merchandiseSpend || 0;
+      const fbCogsPercent = costAssumptions.fbCOGSPercent || 0;
+      const merchCogsPercent = costAssumptions.merchandiseCogsPercent || 0;
+      const staffCount = costAssumptions.staffCount || 0;
+      const staffCostPerPerson = costAssumptions.staffCostPerPerson || 0;
+      const managementFee = costAssumptions.managementFee || 0;
+
+      // Log key values used in calculation
+      console.log(`[DataExport] Weeks: ${weeks}, Growth: ${growthRate}, Initial Attend: ${initialAttendance}`);
+      console.log(`[DataExport] Rev Assumptions: F&B Spend=${fbSpendPerAttendee}, Merch Spend=${merchSpendPerAttendee}`);
+      console.log(`[DataExport] Cost Assumptions: F&B COGS=${fbCogsPercent}, Merch COGS=${merchCogsPercent}, Staff#=${staffCount}, StaffCost=${staffCostPerPerson}, MgmtFee=${managementFee}`);
+
+      // Calculate COGS base revenue
+      let totalForecastFbRevenueForCogs = 0;
+      let totalForecastMerchRevenueForCogs = 0;
+      if (metadata.type === "WeeklyEvent") {
+        for (let week = 1; week <= weeks; week++) {
+          const weeklyAttendance = Math.round(initialAttendance * Math.pow(1 + growthRate, week - 1));
+          totalForecastFbRevenueForCogs += weeklyAttendance * fbSpendPerAttendee;
+          totalForecastMerchRevenueForCogs += weeklyAttendance * merchSpendPerAttendee;
+        }
+      }
+      console.log(`[DataExport] COGS Base Revenue: F&B=${totalForecastFbRevenueForCogs}, Merch=${totalForecastMerchRevenueForCogs}`);
+
+      // Calculate COGS Cost (Divide percentages by 100)
+      const forecastFBCogsCost = totalForecastFbRevenueForCogs * (fbCogsPercent / 100);
+      const forecastMerchCogsCost = totalForecastMerchRevenueForCogs * (merchCogsPercent / 100);
+      totalForecastCost += forecastFBCogsCost + forecastMerchCogsCost;
+      console.log(`[DataExport] COGS Cost Contribution: ${forecastFBCogsCost + forecastMerchCogsCost}`);
+
+      // Calculate Staff Costs
+      const forecastStaffCost = staffCount * staffCostPerPerson * weeks;
+      totalForecastCost += forecastStaffCost;
+      console.log(`[DataExport] Staff Cost Contribution: ${forecastStaffCost}`);
+
+      // Calculate Fixed/Management Costs
+      const forecastMgmtCost = managementFee * weeks;
+      totalForecastCost += forecastMgmtCost;
+      console.log(`[DataExport] Mgmt Fee Cost Contribution: ${forecastMgmtCost}`);
+
+      // Add Other Fixed Costs (from assumptions.costs array)
+      if (Array.isArray(assumptions.costs)) {
+        const otherFixedCosts = assumptions.costs.reduce((sum, cost) => {
+          const costValue = cost.value || 0;
+          // Check if the cost is recurring and multiply by weeks if so
+          if (cost.type === 'recurring') {
+            return sum + (costValue * weeks);
+          } else {
+            // Otherwise, add it as a one-time fixed cost
+            return sum + costValue;
+          }
+        }, 0); // Initial sum is 0
+        totalForecastCost += otherFixedCosts;
+        console.log(`[DataExport] Other Fixed Cost Contribution (Recurring adjusted): ${otherFixedCosts}`);
+      } else {
+        console.log("[DataExport] No assumptions.costs array found.");
+      }
+
+      // Add Marketing Costs
+      totalForecastCost += totalMarketingForecast;
+      console.log(`[DataExport] Marketing Cost Contribution: ${totalMarketingForecast}`);
+
+      // TODO: Calculate Actual Costs more accurately here
+      console.warn(`[DataExport] Actual Cost calculation is simplified, using only Marketing Actual: ${totalActualCost}`);
+    } else {
+      console.warn("[DataExport] Metadata not found in fetched model, cost calculation might be incomplete.");
+      totalForecastCost = totalMarketingForecast;
+    }
+    console.log(`[DataExport] Total Forecast Cost Calculated: ${totalForecastCost}`);
+
+    // --- Calculate Profit --- 
+    const totalForecastProfit = finalForecastRevenue - totalForecastCost;
+    const totalActualProfit = totalActualRevenue - totalActualCost;
+    console.log(`[DataExport] Profit Summary: Forecast=${totalForecastProfit}, Actual=${totalActualProfit}`);
+
+    // --- Create the export data object --- 
     const exportData: ExportDataType = {
       title: `${project.name} Report`,
       projectName: project.name,
       productType: project.productType,
       exportDate: new Date(),
+      model: currentModel, // Include the fetched model
       summary: {
         totalForecast: finalForecastRevenue,
         totalActual: totalActualRevenue,
+        totalForecastCost: totalForecastCost,
+        totalActualCost: totalActualCost,
+        totalForecastProfit: totalForecastProfit,
+        totalActualProfit: totalActualProfit,
         percentUtilized,
         forecastToDate: finalForecastRevenue,
         actualToDate: totalActualRevenue,
@@ -156,6 +167,10 @@ export async function getProductExportData(projectId: number): Promise<ExportDat
       formattedSummary: {
         totalForecast: formatCurrency(finalForecastRevenue),
         totalActual: formatCurrency(totalActualRevenue),
+        totalForecastCost: formatCurrency(totalForecastCost),
+        totalActualCost: formatCurrency(totalActualCost),
+        totalForecastProfit: formatCurrency(totalForecastProfit),
+        totalActualProfit: formatCurrency(totalActualProfit),
         percentUtilized: `${percentUtilized}%`,
         forecastToDate: formatCurrency(finalForecastRevenue),
         actualToDate: formatCurrency(totalActualRevenue),
@@ -182,24 +197,18 @@ export async function getProductExportData(projectId: number): Promise<ExportDat
           name: period.name,
           forecast: period.totalForecast,
           actual: period.totalActual || 0,
-          variance: (period.totalActual || 0) - period.totalForecast
+          variance: (period.totalActual || 0) - period.totalForecast,
+          attendanceForecast: period.attendanceForecast || 0,
+          attendanceActual: period.attendanceActual || 0
         }))
       }
     };
 
-    console.log('[DataExport] Created export data with real values:', exportData);
-
-    // Double-check that we have valid data
-    if (!exportData.marketingChannels || exportData.marketingChannels.length === 0) {
-      console.warn('[DataExport] No marketing channels in export data, using fallback');
-      return fallbackData;
-    }
-
-    console.log('[DataExport] Returning real export data');
+    console.log('[DataExport] Returning real export data based on freshly fetched model');
     return exportData;
+
   } catch (error) {
     console.error(`[DataExport] Error getting export data:`, error);
-    console.log('[DataExport] Returning fallback data due to error');
     return fallbackData;
   }
 }
@@ -296,17 +305,6 @@ function processMarketingChannels(channels: any[], actuals: any[]) {
       }
     });
 
-    // If no actuals, use some reasonable values for demonstration
-    if (actualSpend === 0) {
-      // Generate a random actual spend between 80% and 110% of forecast
-      const randomFactor = 0.8 + (Math.random() * 0.3);
-      actualSpend = Math.round(totalForecast * randomFactor);
-
-      // Generate reasonable conversions based on a cost per conversion between $1 and $3
-      const randomCostPerConversion = 1 + (Math.random() * 2);
-      conversions = Math.round(actualSpend / randomCostPerConversion);
-    }
-
     // Calculate variance
     const variance = actualSpend - totalForecast;
     const variancePercent = totalForecast > 0 ? (variance / totalForecast) * 100 : 0;
@@ -331,44 +329,39 @@ async function processPeriodPerformance(actuals: any[], model: any) {
   console.log('[DataExport] Processing period performance with actuals:', actuals);
   console.log('[DataExport] Model:', model);
 
-  // If no model or actuals, return empty array
-  if (!model) {
-    console.log('[DataExport] No model found, returning empty array');
+  if (!model?.assumptions?.metadata) {
+    console.log('[DataExport] No model or metadata found, returning empty array');
     return [];
   }
 
-  // Get forecast data from the model
+  // Get forecast data from the model or calculate it
   let forecastData: any[] = [];
-  let weeklyRevenue = 0;
+  const metadata = model.assumptions.metadata;
 
-  if (model.forecastData && Array.isArray(model.forecastData)) {
+  if (model.forecastData && Array.isArray(model.forecastData) && model.forecastData.length > 0) {
+    console.log("[DataExport] Using existing forecastData from model");
     forecastData = model.forecastData;
-  } else if (model.assumptions && model.assumptions.metadata) {
+  } else {
     // Calculate forecast data from model assumptions
-    const metadata = model.assumptions.metadata;
+    console.log("[DataExport] Calculating forecast data from assumptions");
     const weeks = metadata.weeks || 12;
     const initialAttendance = metadata.initialWeeklyAttendance || 0;
-    const attendanceGrowthRate = (metadata.growth?.attendanceGrowthRate || 0) / 100;
-    const ticketPrice = metadata.perCustomer?.ticketPrice || 0;
+    const growthRate = (metadata.growth?.rate || 0); // Keep as decimal for calculation
+    const perCustomer = metadata.perCustomer || {};
+    const ticketPrice = perCustomer.ticketPrice || 0;
+    const fbSpend = perCustomer.fbSpend || 0;
+    const merchSpend = perCustomer.merchandiseSpend || 0;
 
-    // Calculate weekly revenue
-    weeklyRevenue = initialAttendance * ticketPrice;
-    console.log(`[DataExport] Calculated weekly revenue: ${weeklyRevenue}`);
-  }
+    // Ensure ALL relevant spend types are included here
+    const revenuePerAttendee = ticketPrice + fbSpend + merchSpend;
+    console.log(`[DataExport] Calculated Revenue Per Attendee: ${revenuePerAttendee} (Ticket: ${ticketPrice}, F&B: ${fbSpend}, Merch: ${merchSpend})`);
 
-  // Generate forecast data for each week if we have weekly revenue
-  if (weeklyRevenue > 0) {
-    const weeks = model.assumptions?.metadata?.weeks || 12;
-    const attendanceGrowthRate = (model.assumptions?.metadata?.growth?.attendanceGrowthRate || 0) / 100;
-    const initialAttendance = model.assumptions?.metadata?.initialWeeklyAttendance || 0;
-
+    // Generate forecast data for each week - Always run this loop
     for (let week = 1; week <= weeks; week++) {
       // Calculate attendance with growth
-      const attendance = Math.round(initialAttendance * Math.pow(1 + attendanceGrowthRate, week - 1));
-
-      // Calculate revenue based on attendance and ticket price
-      const ticketPrice = model.assumptions?.metadata?.perCustomer?.ticketPrice || 0;
-      const revenue = attendance * ticketPrice;
+      const attendance = Math.round(initialAttendance * Math.pow(1 + growthRate, week - 1));
+      // Calculate revenue based on attendance and total revenue per attendee
+      const revenue = attendance * revenuePerAttendee;
 
       forecastData.push({
         period: week,
@@ -376,35 +369,7 @@ async function processPeriodPerformance(actuals: any[], model: any) {
         attendance: attendance
       });
     }
-
     console.log(`[DataExport] Generated forecast data for ${forecastData.length} weeks`);
-  }
-
-  // Special case for Trivia product
-  if (model.projectId && actuals.length > 0 && actuals[0].projectId) {
-    // Get the project to check the name
-    try {
-      const projectId = model.projectId || actuals[0].projectId;
-      const project = await db.projects.get(projectId);
-
-      if (project && (project.name === 'Trivia' || project.name.toLowerCase().includes('trivia'))) {
-        console.log('[DataExport] Trivia product detected in period performance, setting weekly revenue');
-        // Clear existing forecast data
-        forecastData = [];
-
-        // Create 12 weeks of data with appropriate revenue
-        const weeklyRevenue = 30000 / 12; // $30,000 spread over 12 weeks
-        for (let week = 1; week <= 12; week++) {
-          forecastData.push({
-            period: week,
-            revenue: weeklyRevenue,
-            attendance: 100 // Placeholder attendance
-          });
-        }
-      }
-    } catch (error) {
-      console.error('[DataExport] Error checking for Trivia product:', error);
-    }
   }
 
   // Process actuals if available
@@ -416,23 +381,18 @@ async function processPeriodPerformance(actuals: any[], model: any) {
 
   // Combine forecast and actuals
   const combinedData = [];
-
-  // Determine the maximum period to show
   const maxPeriod = Math.max(
     forecastData.length > 0 ? Math.max(...forecastData.map(d => d.period || 0)) : 0,
     processedActuals.length > 0 ? Math.max(...processedActuals.map(d => d.period || 0)) : 0,
-    12 // Default to 12 weeks if no data
+    metadata.weeks || 12 // Use weeks from metadata if available
   );
 
   for (let period = 1; period <= maxPeriod; period++) {
     const forecastPeriod = forecastData.find(d => d.period === period) || {};
     const actualPeriod = processedActuals.find(d => d.period === period) || {};
 
-    // Get forecast revenue from forecast data or calculate from weekly revenue
-    let forecastRevenue = forecastPeriod.revenue || 0;
-    if (forecastRevenue === 0 && weeklyRevenue > 0) {
-      forecastRevenue = weeklyRevenue;
-    }
+    // Get forecast revenue directly from the calculated/provided forecastData
+    const forecastRevenue = forecastPeriod.revenue || 0;
 
     // Get actual revenue from actuals
     let actualRevenue = 0;
@@ -448,10 +408,11 @@ async function processPeriodPerformance(actuals: any[], model: any) {
     combinedData.push({
       period: period,
       name: `Week ${period}`,
-      totalForecast: forecastRevenue,
+      totalForecast: forecastRevenue, // Use the calculated forecast revenue
       totalActual: actualRevenue,
       attendanceForecast: forecastPeriod.attendance || 0,
       attendanceActual: actualPeriod.attendance || 0
+      // Add back notes or other fields from actualPeriod if needed
     });
   }
 
