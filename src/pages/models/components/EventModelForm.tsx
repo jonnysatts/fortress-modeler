@@ -44,6 +44,7 @@ interface WeeklyCosts {
   setupCosts: number;
   spreadSetupCosts: boolean;
   fbCOGSPercent: number;
+  merchCogsPercent: number;
   staffCount: number;
   staffCostPerPerson: number;
   managementCosts: number;
@@ -61,8 +62,8 @@ interface GrowthSettings {
 
 const formSchema = z.object({
   name: z.string().min(1, "Model name is required"),
-  weeks: z.coerce.number().int().min(1, "Must have at least one week"),
-  initialWeeklyAttendance: z.coerce.number().int().min(1, "Must have at least one attendee"),
+  weeks: z.coerce.number().int().min(1, "Duration must be at least 1 week"),
+  initialWeeklyAttendance: z.coerce.number().int().min(1, "Initial attendance required"),
   perCustomer: z.object({
     ticketPrice: z.coerce.number().min(0),
     fbSpend: z.coerce.number().min(0),
@@ -72,20 +73,21 @@ const formSchema = z.object({
   }),
   costs: z.object({
     setupCosts: z.coerce.number().min(0),
-    spreadSetupCosts: z.boolean().default(false),
-    fbCOGSPercent: z.coerce.number().min(0).max(100).default(30),
+    spreadSetupCosts: z.boolean(),
+    fbCOGSPercent: z.coerce.number().min(0).max(100),
+    merchCogsPercent: z.coerce.number().min(0).max(100),
     staffCount: z.coerce.number().int().min(0),
     staffCostPerPerson: z.coerce.number().min(0),
     managementCosts: z.coerce.number().min(0),
   }),
   growth: z.object({
-    attendanceGrowthRate: z.coerce.number().default(0),
-    useCustomerSpendGrowth: z.boolean().default(false),
-    ticketPriceGrowth: z.coerce.number().default(0),
-    fbSpendGrowth: z.coerce.number().default(0),
-    merchandiseSpendGrowth: z.coerce.number().default(0),
-    onlineSpendGrowth: z.coerce.number().default(0),
-    miscSpendGrowth: z.coerce.number().default(0),
+    attendanceGrowthRate: z.coerce.number(),
+    useCustomerSpendGrowth: z.boolean(),
+    ticketPriceGrowth: z.coerce.number(),
+    fbSpendGrowth: z.coerce.number(),
+    merchandiseSpendGrowth: z.coerce.number(),
+    onlineSpendGrowth: z.coerce.number(),
+    miscSpendGrowth: z.coerce.number(),
   }),
 });
 
@@ -99,65 +101,56 @@ interface EventModelFormProps {
 }
 
 const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: EventModelFormProps) => {
-  const eventMetadata = existingModel?.assumptions.metadata as any;
-  
+  // Define default structures clearly
+  const defaultPerCustomer: PerCustomerRevenue = {
+    ticketPrice: 0,
+    fbSpend: 0,
+    merchandiseSpend: 0,
+    onlineSpend: 0,
+    miscSpend: 0,
+  };
+  const defaultCosts: WeeklyCosts = {
+    setupCosts: 0,
+    spreadSetupCosts: false,
+    fbCOGSPercent: 30, // Default to 30
+    merchCogsPercent: 0, // Default to 0 initially
+    staffCount: 0,
+    staffCostPerPerson: 0,
+    managementCosts: 0,
+  };
+  const defaultGrowth: GrowthSettings = {
+    attendanceGrowthRate: 0,
+    useCustomerSpendGrowth: false,
+    ticketPriceGrowth: 0,
+    fbSpendGrowth: 0,
+    merchandiseSpendGrowth: 0,
+    onlineSpendGrowth: 0,
+    miscSpendGrowth: 0,
+  };
+
+  // Use loaded metadata, falling back to defaults more carefully
+  const loadedMetadata = existingModel?.assumptions?.metadata as any; // Keep as any for flexibility for now
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: existingModel ? {
-      name: existingModel.name,
-      weeks: eventMetadata?.weeks || 12,
-      initialWeeklyAttendance: eventMetadata?.initialWeeklyAttendance || 100,
-      perCustomer: eventMetadata?.perCustomer || {
-        ticketPrice: 0,
-        fbSpend: 0,
-        merchandiseSpend: 0,
-        onlineSpend: 0,
-        miscSpend: 0,
-      },
-      costs: eventMetadata?.costs || {
-        setupCosts: 0,
-        spreadSetupCosts: false,
-        fbCOGSPercent: 30,
-        staffCount: 0,
-        staffCostPerPerson: 0,
-        managementCosts: 0,
-      },
-      growth: eventMetadata?.growth || {
-        attendanceGrowthRate: 0,
-        useCustomerSpendGrowth: false,
-        ticketPriceGrowth: 0,
-        fbSpendGrowth: 0,
-        merchandiseSpendGrowth: 0,
-        onlineSpendGrowth: 0,
-        miscSpendGrowth: 0,
-      },
-    } : {
-      name: "Weekly Event Model",
-      weeks: 12,
-      initialWeeklyAttendance: 100,
+    defaultValues: {
+      name: existingModel?.name || "Weekly Event Model",
+      weeks: loadedMetadata?.weeks ?? 12,
+      initialWeeklyAttendance: loadedMetadata?.initialWeeklyAttendance ?? 100,
+      // Merge defaults with loaded data for nested objects
       perCustomer: {
-        ticketPrice: 0,
-        fbSpend: 0,
-        merchandiseSpend: 0,
-        onlineSpend: 0,
-        miscSpend: 0,
+        ...defaultPerCustomer,
+        ...(loadedMetadata?.perCustomer || {}),
       },
       costs: {
-        setupCosts: 0,
-        spreadSetupCosts: false,
-        fbCOGSPercent: 30,
-        staffCount: 0,
-        staffCostPerPerson: 0,
-        managementCosts: 0,
+        ...defaultCosts,
+        ...(loadedMetadata?.costs || {}),
+        // Ensure boolean type for checkbox
+        spreadSetupCosts: !!loadedMetadata?.costs?.spreadSetupCosts,
       },
       growth: {
-        attendanceGrowthRate: 0,
-        useCustomerSpendGrowth: false,
-        ticketPriceGrowth: 0,
-        fbSpendGrowth: 0,
-        merchandiseSpendGrowth: 0,
-        onlineSpendGrowth: 0,
-        miscSpendGrowth: 0,
+        ...defaultGrowth,
+        ...(loadedMetadata?.growth || {}),
       },
     },
   });
@@ -180,6 +173,7 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
   const weeklyRevenue = calculateWeeklyRevenue();
   
   const fbCOGS = (weeklyRevenue.fbSales * watchFbCOGSPercent) / 100;
+  const merchCOGS = (weeklyRevenue.merchandiseSales * form.watch("costs.merchCogsPercent")) / 100;
 
   const onSubmit = async (data: FormValues) => {
     try {
@@ -204,6 +198,7 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
       const costAssumptions = [
         { name: "Setup Costs", value: data.costs.setupCosts, type: setupCostType, category: "operations" as const },
         { name: "F&B COGS", value: fbCOGS, type: "variable" as const, category: "operations" as const },
+        { name: "Merch COGS", value: merchCOGS, type: "variable" as const, category: "operations" as const },
         { name: "Staff Costs", value: data.costs.staffCount * data.costs.staffCostPerPerson, type: "recurring" as const, category: "staffing" as const },
         { name: "Management Costs", value: data.costs.managementCosts, type: "recurring" as const, category: "operations" as const },
       ];
@@ -225,31 +220,40 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
         weeks: data.weeks,
         initialWeeklyAttendance: data.initialWeeklyAttendance,
         perCustomer: data.perCustomer,
-        costs: {
-          ...data.costs,
+        costs: { // Ensure all cost fields from form are included
+          setupCosts: data.costs.setupCosts,
           spreadSetupCosts: !!data.costs.spreadSetupCosts,
+          fbCOGSPercent: data.costs.fbCOGSPercent,
+          merchCogsPercent: data.costs.merchCogsPercent,
+          staffCount: data.costs.staffCount,
+          staffCostPerPerson: data.costs.staffCostPerPerson,
+          managementCosts: data.costs.managementCosts,
         },
         growth: data.growth,
       };
 
+      // Log the metadata just before saving
+      console.log("[EventModelForm] Saving eventMetadata:", JSON.stringify(eventMetadata, null, 2));
+
       const modelData = {
-        projectId,
-        name: data.name,
-        assumptions: {
-          revenue: revenueAssumptions,
-          costs: costAssumptions,
-          growthModel,
-          metadata: eventMetadata,
-        },
-        updatedAt: new Date(),
+         projectId,
+         name: data.name,
+         assumptions: {
+           // Keep revenue/costs arrays if they are used elsewhere, 
+           // but primary assumptions live in metadata for WeeklyEvent
+           revenue: [], // Or potentially map from weekly calculation if needed?
+           costs: [],   // Or potentially map from weekly calculation if needed?
+           growthModel, // Simplified growth model
+           metadata: eventMetadata, // Detailed assumptions
+         },
+         updatedAt: new Date(),
       };
 
-      console.log("Saving model with setup costs spread:", data.costs.spreadSetupCosts);
-      console.log("Setup cost type:", setupCostType);
+      // Log the full model data being saved/updated
+      console.log("[EventModelForm] Full modelData for DB operation:", JSON.stringify(modelData, null, 2));
 
-      if (existingModel) {
+      if (existingModel && existingModel.id) {
         await db.financialModels.update(existingModel.id, modelData);
-        
         toast({
           title: "Event model updated",
           description: `Successfully updated "${data.name}" weekly event model.`,
@@ -259,7 +263,6 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
           ...modelData,
           createdAt: new Date(),
         });
-        
         toast({
           title: "Event model created",
           description: `Successfully created "${data.name}" weekly event model.`,
@@ -562,7 +565,23 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
                               <Input type="number" min={0} max={100} step={0.1} {...field} />
                             </FormControl>
                             <FormDescription>
-                              Calculated F&B COGS: ${fbCOGS.toFixed(2)}
+                              Calculated Weekly F&B COGS: ${((calculateWeeklyRevenue().fbSales * field.value) / 100).toFixed(2)}
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="costs.merchCogsPercent"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Merchandise COGS Percentage</FormLabel>
+                            <FormControl>
+                              <Input type="number" min={0} max={100} step={0.1} {...field} />
+                            </FormControl>
+                            <FormDescription>
+                              Calculated Weekly Merch COGS: ${((calculateWeeklyRevenue().merchandiseSales * field.value) / 100).toFixed(2)}
                             </FormDescription>
                             <FormMessage />
                           </FormItem>

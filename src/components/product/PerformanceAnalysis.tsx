@@ -64,7 +64,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       <div className="bg-white dark:bg-gray-800 p-3 border rounded shadow-lg text-xs">
         <p className="font-semibold mb-1">{label}</p>
         {payload.map((entry: any, index: number) => {
-          let valueText = formatCurrency(entry.value);
+          const valueText = formatCurrency(entry.value);
           let varianceText = '';
           let varianceColor = 'text-muted-foreground';
 

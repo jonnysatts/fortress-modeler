@@ -3,7 +3,6 @@ import { Outlet, NavLink, useParams, useNavigate, useLocation } from "react-rout
 import { ChevronLeft, Pencil, Download, FileJson, FileSpreadsheet, FileText, MenuSquare } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
-import { TriviaExportButton } from "@/components/TriviaExportButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -134,9 +133,9 @@ const ProductLayout: React.FC = () => {
                       </Button>
 
                       {/* Special Trivia Export Button - only show for Trivia project */}
-                      {currentProject?.name === 'Trivia' && (
+                      {/* {currentProject?.name === 'Trivia' && (
                         <TriviaExportButton />
-                      )}
+                      )} */}
 
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -158,29 +157,26 @@ const ProductLayout: React.FC = () => {
                             <span>Export as JSON</span>
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => {
-                            triggerFullExport('xlsx');
-                            toast({
-                              title: "Excel Export",
-                              description: "Exporting data as Excel spreadsheet...",
-                              variant: "default"
-                            });
+                            // Always trigger full export, passing the current project ID
+                            if (currentProject?.id) {
+                              triggerFullExport('xlsx', currentProject.id);
+                              toast({
+                                title: "Excel Export",
+                                description: `Exporting data for ${currentProject.name}...`,
+                                variant: "default"
+                              });
+                            } else {
+                               toast({
+                                title: "Export Error",
+                                description: "Cannot export Excel: Project ID not found.",
+                                variant: "destructive"
+                               });
+                            }
                           }}>
                             <FileSpreadsheet className="mr-2 h-4 w-4" />
                             <span>Export as Excel</span>
                           </DropdownMenuItem>
-                          {currentProject?.name === 'Trivia' && (
-                            <DropdownMenuItem onClick={() => {
-                              toast({
-                                title: "Trivia Excel Export",
-                                description: "Exporting Trivia data with correct values...",
-                                variant: "default"
-                              });
-                              useStore.getState().triggerTriviaExport();
-                            }}>
-                              <FileSpreadsheet className="mr-2 h-4 w-4 text-fortress-emerald" />
-                              <span>Export Trivia Data</span>
-                            </DropdownMenuItem>
-                          )}
+                          {/* Removed extra Trivia item */}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

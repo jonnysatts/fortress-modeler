@@ -39,90 +39,69 @@ export async function getPortfolioExportData(): Promise<ExportDataType> {
       let healthScore = 0;
       let riskLevel: 'low' | 'medium' | 'high' = 'medium';
 
-      if (latestModel) {
-        // Extract revenue and profit from model assumptions
-        if (latestModel.assumptions && latestModel.assumptions.metadata) {
-          const metadata = latestModel.assumptions.metadata;
+      if (latestModel?.assumptions?.metadata) {
+        const metadata = latestModel.assumptions.metadata;
 
-          // Calculate revenue based on attendance and ticket price
-          if (metadata.type === "WeeklyEvent" && metadata.initialWeeklyAttendance && metadata.perCustomer) {
-            const weeks = metadata.weeks || 12;
-            const initialAttendance = metadata.initialWeeklyAttendance;
-            const ticketPrice = metadata.perCustomer.ticketPrice || 0;
-            const attendanceGrowthRate = (metadata.growth?.attendanceGrowthRate || 0) / 100;
+        // Calculate Revenue (based on model type or revenue streams)
+        if (metadata.type === "WeeklyEvent" && metadata.initialWeeklyAttendance && metadata.perCustomer) {
+          const weeks = metadata.weeks || 12;
+          const initialAttendance = metadata.initialWeeklyAttendance;
+          const ticketPrice = metadata.perCustomer.ticketPrice || 0;
+          const attendanceGrowthRate = (metadata.growth?.attendanceGrowthRate || 0) / 100;
 
-            // Calculate total revenue across all weeks
-            let totalAttendance = 0;
-            for (let week = 1; week <= weeks; week++) {
-              const weeklyAttendance = Math.round(initialAttendance * Math.pow(1 + attendanceGrowthRate, week - 1));
-              totalAttendance += weeklyAttendance;
-            }
-
-            totalRevenue = totalAttendance * ticketPrice;
-            console.log(`[PortfolioExport] Calculated revenue for ${project.name}: ${totalRevenue}`);
-          } else if (latestModel.assumptions.revenue) {
-            // Fallback to revenue streams if not a weekly event
-            totalRevenue = latestModel.assumptions.revenue.reduce((sum, stream) => sum + (stream.value || 0), 0);
+          // Calculate total revenue across all weeks
+          let totalAttendance = 0;
+          for (let week = 1; week <= weeks; week++) {
+            const weeklyAttendance = Math.round(initialAttendance * Math.pow(1 + attendanceGrowthRate, week - 1));
+            totalAttendance += weeklyAttendance;
           }
 
-          // Calculate total costs
-          let totalCosts = 0;
-          if (latestModel.assumptions.costs) {
-            totalCosts = latestModel.assumptions.costs.reduce((sum, cost) => sum + (cost.value || 0), 0);
-          }
+          totalRevenue = totalAttendance * ticketPrice;
+          console.log(`[PortfolioExport] Calculated revenue for ${project.name}: ${totalRevenue}`);
+        } else if (latestModel.assumptions.revenue && Array.isArray(latestModel.assumptions.revenue)) {
+          // Fallback for other models: sum up revenue streams
+          totalRevenue = latestModel.assumptions.revenue.reduce((sum, stream) => sum + (stream.value || 0), 0);
+        }
 
-          // Add marketing costs if available
-          if (latestModel.assumptions.marketing && latestModel.assumptions.marketing.channels) {
-            const marketingCosts = latestModel.assumptions.marketing.channels.reduce(
-              (sum, channel) => sum + ((channel.weeklyBudget || 0) * (metadata.weeks || 12)), 0
-            );
-            totalCosts += marketingCosts;
-          }
-
-          // Calculate profit and margin
-          totalProfit = totalRevenue - totalCosts;
-          profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-
-          // Special case for Trivia product
-          if (project.name === 'Trivia' || project.name.toLowerCase().includes('trivia')) {
-            console.log('[PortfolioExport] Trivia product detected, setting revenue to $30,000');
-            totalRevenue = 30000;
-            totalProfit = 14400; // 48% profit margin
-            profitMargin = 48;
-          }
-
-          // Special case for Mead & Minis product
-          if (project.name === 'Mead & Minis' || project.name.toLowerCase().includes('mead')) {
-            console.log('[PortfolioExport] Mead & Minis product detected, setting revenue to $19,872');
-            totalRevenue = 19872;
-            totalProfit = 13484; // 67.5% profit margin
-            profitMargin = 67.5;
-          }
-
-          // Determine if project has broken even
-          breakeven = totalProfit > 0;
-
-          // Extract growth rate from model
-          if (latestModel.assumptions.growthModel) {
-            growthRate = latestModel.assumptions.growthModel.rate * 100;
-          }
-
-          // Calculate health score (simple algorithm)
-          healthScore = (
-            (profitMargin > 0 ? 30 : 0) +
-            (breakeven ? 30 : 0) +
-            (growthRate > 0 ? 20 : 0) +
-            (actuals.length > 0 ? 20 : 0)
+        // Calculate Costs (from cost assumptions and marketing)
+        let totalCosts = 0;
+        if (latestModel.assumptions.costs && Array.isArray(latestModel.assumptions.costs)) {
+          totalCosts += latestModel.assumptions.costs.reduce((sum, cost) => sum + (cost.value || 0), 0);
+        }
+        if (latestModel.assumptions.marketing?.channels && Array.isArray(latestModel.assumptions.marketing.channels)) {
+          const marketingCosts = latestModel.assumptions.marketing.channels.reduce(
+            (sum, channel) => sum + ((channel.weeklyBudget || 0) * (metadata.weeks || 12)), 0
           );
+          totalCosts += marketingCosts;
+        }
 
-          // Determine risk level based on health score
-          if (healthScore >= 70) {
-            riskLevel = 'low';
-          } else if (healthScore >= 40) {
-            riskLevel = 'medium';
-          } else {
-            riskLevel = 'high';
-          }
+        // Calculate Profit and Margin dynamically
+        totalProfit = totalRevenue - totalCosts;
+        profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+        console.log(`[PortfolioExport] Calculated metrics for ${project.name}: Revenue=${totalRevenue}, Profit=${totalProfit}, Margin=${profitMargin}%`);
+
+        // Determine breakeven dynamically
+        breakeven = totalProfit > 0;
+
+        // Extract growth rate dynamically from metadata
+        growthRate = (latestModel.assumptions.metadata?.growth?.rate || 0) * 100;
+
+        // Calculate health score dynamically
+        healthScore = (
+          (profitMargin > 15 ? 30 : (profitMargin > 0 ? 15 : 0)) + // Tiered profit margin score
+          (breakeven ? 30 : 0) +
+          (growthRate > 0 ? 20 : 0) +
+          (actuals.length > 0 ? 20 : 0) // Score for having actuals entered
+        );
+        healthScore = Math.min(Math.max(healthScore, 0), 100); // Clamp score 0-100
+
+        // Determine risk level based on health score
+        if (healthScore >= 70) {
+          riskLevel = 'low';
+        } else if (healthScore >= 40) {
+          riskLevel = 'medium';
+        } else {
+          riskLevel = 'high';
         }
       }
 
@@ -148,8 +127,8 @@ export async function getPortfolioExportData(): Promise<ExportDataType> {
     // Calculate portfolio totals
     const portfolioTotals = projectsWithMetrics.reduce((totals, project) => {
       return {
-        revenue: totals.revenue + project.totalRevenue,
-        profit: totals.profit + project.totalProfit,
+        revenue: totals.revenue + (project.totalRevenue || 0),
+        profit: totals.profit + (project.totalProfit || 0),
         projectsWithActuals: totals.projectsWithActuals + (project.hasActuals ? 1 : 0),
         projectsWithWarnings: totals.projectsWithWarnings + (
           project.revenueConcentration > 80 ||
@@ -218,12 +197,12 @@ export async function getPortfolioExportData(): Promise<ExportDataType> {
         name: project.name,
         productType: project.productType,
         createdAt: project.createdAt,
-        totalRevenue: project.totalRevenue,
-        totalProfit: project.totalProfit,
-        profitMargin: project.profitMargin,
-        growthRate: project.growthRate,
+        totalRevenue: project.totalRevenue || 0,
+        totalProfit: project.totalProfit || 0,
+        profitMargin: project.profitMargin || 0,
+        growthRate: project.growthRate || 0,
         riskLevel: project.riskLevel,
-        healthScore: project.healthScore
+        healthScore: project.healthScore || 0
       }))
     };
 

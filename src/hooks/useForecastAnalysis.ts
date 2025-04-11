@@ -130,9 +130,9 @@ export const useForecastAnalysis = (
         let latestActualPeriod = 0;
 
         // Initialize cumulative trackers for forecast (already present)
-        let cumulativeRevenueForecast = 0;
-        let cumulativeCostForecast = 0;
-        let cumulativeProfitForecast = 0;
+        const cumulativeRevenueForecast = 0;
+        const cumulativeCostForecast = 0;
+        const cumulativeProfitForecast = 0;
 
         // 3. Merge Forecast and Actuals
         const periodicAnalysisData: AnalysisPeriodData[] = forecastTrendData.map(forecastPeriod => {

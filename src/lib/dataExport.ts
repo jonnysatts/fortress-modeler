@@ -51,9 +51,25 @@ export async function getProductExportData(projectId: number): Promise<ExportDat
     const finalForecastRevenue = totalForecastRevenue;
     console.log(`[DataExport] Revenue Summary: Forecast=${finalForecastRevenue}, Actual=${totalActualRevenue}`);
 
-    // Process marketing channels using fetched model
-    const processedChannels = processMarketingChannels(assumptions?.marketing?.channels || [], actuals);
-    const totalMarketingForecast = processedChannels.reduce((sum, channel) => sum + (channel.totalForecast || 0), 0);
+    // --- Process Marketing --- 
+    const marketingSetup = assumptions?.marketing || { allocationMode: 'none' };
+    const weeksForMarketing = metadata?.weeks || 12; // Use model duration for total calc
+    let totalMarketingForecast = 0;
+
+    if (marketingSetup.allocationMode === 'channels') {
+      const channels = Array.isArray(marketingSetup.channels) ? marketingSetup.channels : [];
+      const weeklyBudget = channels.reduce((sum, ch) => sum + (ch.weeklyBudget || 0), 0);
+      totalMarketingForecast = weeklyBudget * weeksForMarketing;
+    } else if (marketingSetup.allocationMode === 'highLevel') {
+      totalMarketingForecast = marketingSetup.totalBudget || 0;
+    }
+    // If allocationMode is 'none', totalMarketingForecast remains 0
+
+    // Process actuals (remains the same) - Pass channels only if mode is 'channels'
+    const channelsToProcess = marketingSetup.allocationMode === 'channels' && Array.isArray(marketingSetup.channels) 
+                             ? marketingSetup.channels 
+                             : [];
+    const processedChannels = processMarketingChannels(channelsToProcess, actuals);
     const totalMarketingActual = processedChannels.reduce((sum, channel) => sum + (channel.actualSpend || 0), 0);
     const percentUtilized = totalMarketingForecast > 0 ? Math.round((totalMarketingActual / totalMarketingForecast) * 100) : 0;
     console.log(`[DataExport] Marketing Summary: Forecast=${totalMarketingForecast}, Actual=${totalMarketingActual}, Utilization=${percentUtilized}%`);
@@ -75,6 +91,11 @@ export async function getProductExportData(projectId: number): Promise<ExportDat
       const staffCount = costAssumptions.staffCount || 0;
       const staffCostPerPerson = costAssumptions.staffCostPerPerson || 0;
       const managementFee = costAssumptions.managementFee || 0;
+
+      // --- Verification Logs --- 
+      console.log(`[DataExport VERIFY] Read Staff#: ${costAssumptions.staffCount}, Read StaffCost: ${costAssumptions.staffCostPerPerson}`);
+      console.log(`[DataExport VERIFY] assumptions.costs array:`, assumptions.costs);
+      // --- End Verification Logs ---
 
       // Log key values used in calculation
       console.log(`[DataExport] Weeks: ${weeks}, Growth: ${growthRate}, Initial Attend: ${initialAttendance}`);

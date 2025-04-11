@@ -4,7 +4,6 @@ import { generatePdfReport } from '@/lib/simplePdfExport';
 import { generateExcelReport } from '@/lib/excelExport';
 import { getProductExportData } from '@/lib/dataExport';
 import { getPortfolioExportData } from '@/lib/portfolioExport';
-import { generateTriviaExcelReport } from '@/lib/triviaExport';
 
 // Define the Export Store slice
 export interface ExportState extends BaseState {
@@ -15,8 +14,7 @@ export interface ExportState extends BaseState {
   registerExportFunction: (key: string, fn: () => ExportDataType | Promise<ExportDataType>) => void;
   unregisterExportFunction: (key: string) => void;
   triggerExport: (reportKey: string, format: ExportFormat) => Promise<void>;
-  triggerFullExport: (format: ExportFormat) => Promise<void>;
-  triggerTriviaExport: () => Promise<void>;
+  triggerFullExport: (format: ExportFormat, projectId?: number | null) => Promise<void>;
 }
 
 // Create the export store slice
@@ -66,7 +64,7 @@ export const createExportSlice: StateCreator<ExportState> = (set, get) => ({
           await handlePdfExport(data, reportKey);
           break;
         case 'xlsx':
-          await handleXlsxExport(data, reportKey);
+          await handleXlsxExport(data, reportKey, null);
           break;
         case 'json':
           handleJsonExport(data, reportKey);
@@ -88,96 +86,38 @@ export const createExportSlice: StateCreator<ExportState> = (set, get) => ({
     }
   },
 
-  triggerTriviaExport: async () => {
+  triggerFullExport: async (format: ExportFormat, projectId?: number | null) => {
     try {
       set(state => ({ loading: { isLoading: true } }));
 
-      console.log('[Store] Triggering Trivia-specific Excel export');
+      let reportData: ExportDataType = {};
+      let reportKey: string = "Export";
 
-      // Call the Trivia-specific export function
-      await generateTriviaExcelReport();
-
-      console.log('[Store] Trivia Excel export completed successfully');
-
-      set(state => ({
-        loading: { isLoading: false },
-        error: { isError: false, message: null }
-      }));
-    } catch (error) {
-      console.error('[Store] Error generating Trivia Excel export:', error);
-      set(state => ({
-        loading: { isLoading: false },
-        error: { isError: true, message: `Failed to export Trivia data: ${error}` }
-      }));
-    }
-  },
-
-  triggerFullExport: async (format: ExportFormat) => {
-    try {
-      set(state => ({ loading: { isLoading: true } }));
-
-      console.log(`[Store] Triggering full export as ${format}`);
-
-      // Get the current project ID
-      const state = get();
-      console.log('[Store] Current state:', state);
-
-      const currentProject = state.currentProject;
-      console.log('[Store] Current project from state:', currentProject);
-
-      if (!currentProject) {
-        console.error('[Store] No current project for full export');
-        throw new Error('No current project selected');
+      if (projectId) {
+        console.log(`[Store] Triggering export for project ID: ${projectId} as ${format}`);
+        reportData = await getProductExportData(projectId);
+        reportKey = reportData.projectName ? `${reportData.projectName} Export` : `Project_${projectId}_Export`;
+        console.log(`[Store] Fetched data for project ${projectId}:`, reportData);
+      } else {
+        console.log(`[Store] Triggering portfolio export as ${format}`);
+        reportData = await getPortfolioExportData();
+        reportKey = 'Portfolio Export';
+        console.log('[Store] Fetched portfolio data:', reportData);
       }
 
-      console.log(`[Store] Getting data for project ${currentProject.id} (${currentProject.name})`);
-
-      // Get real product data directly from the database
-      const productData = await getProductExportData(currentProject.id);
-      console.log('[Store] Got product data:', productData);
-
-      // Get portfolio data for context
-      const portfolioData = await getPortfolioExportData();
-      console.log('[Store] Got portfolio data:', portfolioData);
-
-      // Collect data from all export functions as well
-      const exportFunctions = get().exportFunctions;
-      const allData: Record<string, ExportDataType> = {
-        // Add the real product data first
-        'Product Data': productData,
-        // Add portfolio data
-        'Portfolio Data': portfolioData
-      };
-
-      console.log(`[Store] Found ${Object.keys(exportFunctions).length} export functions:`, Object.keys(exportFunctions));
-
-      // Add data from other export functions
-      for (const [key, fn] of Object.entries(exportFunctions)) {
-        // Skip the 'Product Data' function since we already have real data
-        if (key === 'Product Data') continue;
-
-        console.log(`[Store] Collecting data for ${key}...`);
-        try {
-          const data = await fn();
-          console.log(`[Store] Data collected for ${key}:`, data);
-          allData[key] = data;
-        } catch (error) {
-          console.error(`[Store] Error collecting data for ${key}:`, error);
-        }
+      if (!reportData || Object.keys(reportData).length === 0) {
+         throw new Error('No data found for the export.');
       }
 
-      console.log(`[Store] All data collected for full export:`, allData);
-
-      // Handle the export based on the format
       switch (format) {
         case 'pdf':
-          await handlePdfExport(allData, 'Full Export');
+          await handlePdfExport(reportData, reportKey);
           break;
         case 'xlsx':
-          await handleXlsxExport(allData, 'Full Export');
+          await handleXlsxExport(reportData, reportKey, projectId);
           break;
         case 'json':
-          handleJsonExport(allData, 'Full Export');
+          handleJsonExport(reportData, reportKey);
           break;
         default:
           throw new Error(`Unsupported export format: ${format}`);
@@ -188,7 +128,7 @@ export const createExportSlice: StateCreator<ExportState> = (set, get) => ({
         error: { isError: false, message: null }
       }));
     } catch (error) {
-      console.error(`Error triggering full export:`, error);
+      console.error(`Error triggering export:`, error);
       set(state => ({
         loading: { isLoading: false },
         error: { isError: true, message: `Failed to export: ${error}` }
@@ -202,10 +142,8 @@ async function handlePdfExport(data: ExportDataType, reportKey: string) {
   try {
     console.log(`[Store] PDF Export for ${reportKey} started with data:`, data);
 
-    // Check if data is empty
     if (!data || (typeof data === 'object' && Object.keys(data).length === 0)) {
       console.warn(`[Store] Warning: Empty data for ${reportKey} PDF export`);
-
       // Create a simple document with a warning message
       const warningDoc = {
         content: [
@@ -241,14 +179,14 @@ async function handlePdfExport(data: ExportDataType, reportKey: string) {
           }
         ]
       };
-
       await generatePdfReport(warningDoc, reportKey);
       return;
     }
 
-    // Use our simplified PDF export implementation
     console.log(`[Store] Generating PDF for ${reportKey}...`);
-    await generatePdfReport(data, reportKey);
+    // Generate the document definition using the helper
+    const docDefinition = createDocDefinition(data, reportKey);
+    await generatePdfReport(docDefinition, reportKey);
     console.log(`[Store] PDF generation for ${reportKey} completed successfully`);
   } catch (error) {
     console.error(`[Store] Error generating PDF for ${reportKey}:`, error);
@@ -256,59 +194,12 @@ async function handlePdfExport(data: ExportDataType, reportKey: string) {
   }
 }
 
-async function handleXlsxExport(data: ExportDataType, reportKey: string) {
+async function handleXlsxExport(data: ExportDataType, reportKey: string, projectId?: number | null) {
   try {
-    console.log('[Store] XLSX Export started for', reportKey);
+    console.log(`[Store] XLSX Export started for ${reportKey} (Project ID: ${projectId ?? 'N/A'})`);
     console.log('[Store] XLSX Export Data:', data);
 
-    // Check if this is for the Trivia project
-    let projectName = '';
-    if (data['Product Data'] && data['Product Data'].projectName) {
-      projectName = data['Product Data'].projectName;
-    } else if (data.projectName) {
-      projectName = data.projectName;
-    }
-
-    console.log(`[Store] XLSX Export - Project name: ${projectName}`);
-
-    // Special case for Trivia product
-    if (projectName === 'Trivia' || (projectName && projectName.toLowerCase().includes('trivia'))) {
-      console.log('[Store] Trivia product detected in XLSX export - forcing data');
-
-      // Update the data object directly
-      if (!data['Product Data']) {
-        data['Product Data'] = {};
-      }
-
-      data['Product Data'].projectName = 'Trivia';
-      data['Product Data'].title = 'Trivia Night';
-      data['Product Data'].productType = 'Weekly Event';
-
-      // Add financial data
-      if (!data['Product Data'].summary) {
-        data['Product Data'].summary = {};
-      }
-      data['Product Data'].summary.totalForecast = 30000;
-      data['Product Data'].summary.totalActual = 28500;
-
-      // Add profit metrics
-      if (!data['Product Data'].profitMetrics) {
-        data['Product Data'].profitMetrics = {};
-      }
-      data['Product Data'].profitMetrics.forecastProfit = 14400;
-      data['Product Data'].profitMetrics.actualProfit = 13680;
-
-      // Add performance indicators
-      data['Product Data'].growthRate = 5.0;
-      data['Product Data'].healthScore = 83;
-      data['Product Data'].riskLevel = 'Low';
-      data['Product Data'].breakevenPoint = 'Week 3';
-
-      console.log('[Store] Updated data for Trivia product:', data);
-    }
-
-    // Use our enhanced Excel export functionality
-    await generateExcelReport(data, reportKey);
+    await generateExcelReport(data, reportKey, projectId);
     console.log(`[Store] XLSX generation for ${reportKey} completed successfully`);
   } catch (error) {
     console.error('[Store] Error generating XLSX:', error);
@@ -320,21 +211,17 @@ function handleJsonExport(data: ExportDataType, reportKey: string) {
   try {
     console.log('JSON Export Data:', data);
 
-    // Convert data to JSON string
     const jsonString = JSON.stringify(data, null, 2);
 
-    // Create blob and download link
     const blob = new Blob([jsonString], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
 
-    // Create download link and trigger download
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${reportKey.replace(/\s+/g, '_')}.json`;
+    a.download = `${reportKey.replace(/\\s+/g, '_')}.json`;
     document.body.appendChild(a);
     a.click();
 
-    // Clean up
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   } catch (error) {
@@ -344,13 +231,12 @@ function handleJsonExport(data: ExportDataType, reportKey: string) {
 }
 
 // Helper function to create PDF document definition
-function createDocDefinition(data: ExportDataType, reportKey: string) {
+function createDocDefinition(data: ExportDataType, reportKey: string): any { // Return type any for flexibility with pdfmake
   console.log("Creating pdfmake doc definition for:", reportKey, data);
 
-  // Create a professional document definition
-  const docDefinition = {
+  // Base structure
+  const docDefinition: any = {
     content: [
-      // Header with logo placeholder
       {
         columns: [
           {
@@ -365,7 +251,6 @@ function createDocDefinition(data: ExportDataType, reportKey: string) {
           }
         ]
       },
-      // Title
       {
         text: reportKey,
         style: 'title',
@@ -376,7 +261,7 @@ function createDocDefinition(data: ExportDataType, reportKey: string) {
       header: {
         fontSize: 18,
         bold: true,
-        color: '#1A2942' // Fortress Blue
+        color: '#1A2942'
       },
       title: {
         fontSize: 24,
@@ -415,11 +300,10 @@ function createDocDefinition(data: ExportDataType, reportKey: string) {
 
   // Add data content based on report type
   if (reportKey === 'Marketing Analysis') {
-    // Add executive summary
     if (data.summary) {
       docDefinition.content.push(
         { text: 'Executive Summary', style: 'subheader' },
-        {
+        { // Corrected structure for columns
           columns: [
             {
               width: '33%',
@@ -448,76 +332,74 @@ function createDocDefinition(data: ExportDataType, reportKey: string) {
       );
     }
 
-    // Add marketing channels table
     if (data.marketingChannels && Array.isArray(data.marketingChannels)) {
       docDefinition.content.push(
         { text: 'Marketing Channels', style: 'subheader', margin: [0, 10, 0, 10] },
-        createMarketingChannelsTable(data.marketingChannels)
+        createMarketingChannelsTable(data.marketingChannels) // Assuming this returns valid pdfmake content
       );
     }
 
-    // Add performance data
     if (data.performanceData && data.performanceData.channelPerformance) {
       docDefinition.content.push(
-        { text: 'Channel Performance', style: 'subheader', margin: [0, 20, 0, 10], pageBreak: 'before' },
-        createPerformanceTable(data.performanceData.channelPerformance)
+        // Use empty text element for pageBreak
+        { text: '', pageBreak: 'before' },
+        { text: 'Channel Performance', style: 'subheader', margin: [0, 20, 0, 10] },
+        createPerformanceTable(data.performanceData.channelPerformance) // Assuming this returns valid pdfmake content
       );
     }
 
-    // Add period performance data
     if (data.performanceData && data.performanceData.periodPerformance) {
       docDefinition.content.push(
         { text: 'Period Performance', style: 'subheader', margin: [0, 20, 0, 10] },
-        createPerformanceTable(data.performanceData.periodPerformance)
+        createPerformanceTable(data.performanceData.periodPerformance) // Assuming this returns valid pdfmake content
       );
     }
-  } else if (reportKey === 'Full Export') {
-    // Handle the full export with multiple sections
-    // Each section represents a different report
-    for (const [sectionKey, sectionData] of Object.entries(data)) {
+  } else if (reportKey === 'Full Export' || reportKey.endsWith('Export')) { // Handle Portfolio or Project Exports
+    const reportData = (reportKey === 'Portfolio Export') ? data : { 'Project Data': data };
+
+    let isFirstSection = true;
+    for (const [sectionKey, sectionData] of Object.entries(reportData)) {
       if (sectionData && typeof sectionData === 'object' && Object.keys(sectionData).length > 0) {
-        // Add a section header with page break (except for the first section)
+
+        // Add page break before sections (except the first)
+        if (!isFirstSection) {
+           docDefinition.content.push({ text: '', pageBreak: 'before' });
+        }
+
         docDefinition.content.push(
           {
-            text: sectionKey,
-            style: 'subheader',
-            fontSize: 18,
-            color: '#1A2942',
-            margin: [0, 20, 0, 15],
-            pageBreak: docDefinition.content.length > 2 ? 'before' : undefined
+            text: sectionKey, // Like 'Project Data' or 'Portfolio Overview'
+            style: 'subheader', // Keep main sections as subheader
+            margin: [0, 20, 0, 15]
           }
         );
+        isFirstSection = false; // Subsequent sections will get a page break
 
-        // Add project name and date if available
         if (sectionData.projectName) {
           docDefinition.content.push({
             text: `Project: ${sectionData.projectName}`,
-            fontSize: 12,
             margin: [0, 0, 0, 10]
           });
         }
 
-        // Add executive summary section
         if (sectionData.summary) {
           docDefinition.content.push(
             { text: 'Executive Summary', style: 'subsubheader', margin: [0, 15, 0, 10] }
           );
-
-          // Create a summary row with key metrics
           docDefinition.content.push({
             columns: [
               {
                 width: '33%',
                 text: [
                   { text: 'Total Forecast: ', bold: true },
-                  { text: sectionData.formattedSummary?.totalForecast || `$${sectionData.summary.totalForecast.toLocaleString()}` }
+                  { text: sectionData.formattedSummary?.totalForecast || `$${sectionData.summary.totalForecast?.toLocaleString() || '0'}` }
                 ]
               },
               {
                 width: '33%',
                 text: [
                   { text: 'Total Actual: ', bold: true },
-                  { text: sectionData.formattedSummary?.totalActual || `$${sectionData.summary.totalActual.toLocaleString()}` }
+                  { text: sectionData.formattedSummary?.totalActual || `$${sectionData.summary.totalActual?.toLocaleString() || '0'}` }
                 ]
               },
               {
@@ -525,7 +407,7 @@ function createDocDefinition(data: ExportDataType, reportKey: string) {
                 text: [
                   { text: 'Utilization: ', bold: true },
                   {
-                    text: sectionData.formattedSummary?.percentUtilized || `${sectionData.summary.percentUtilized}%`,
+                    text: sectionData.formattedSummary?.percentUtilized || `${sectionData.summary.percentUtilized || '0'}%`,
                     color: sectionData.summary.percentUtilized >= 90 ? '#10B981' :
                            sectionData.summary.percentUtilized >= 75 ? '#FBBF24' : '#EF4444'
                   }
@@ -536,171 +418,48 @@ function createDocDefinition(data: ExportDataType, reportKey: string) {
           });
         }
 
-        // Add marketing channels if available
-        if (sectionData.marketingChannels && Array.isArray(sectionData.marketingChannels)) {
-          docDefinition.content.push(
-            { text: 'Marketing Channels', style: 'subsubheader', margin: [0, 15, 0, 10] }
-          );
-
-          // Create a table for marketing channels
-          const channelTableBody = [
-            // Header row
-            [
-              { text: 'Channel', style: 'tableHeader' },
-              { text: 'Type', style: 'tableHeader' },
-              { text: 'Forecast', style: 'tableHeader', alignment: 'right' },
-              { text: 'Actual', style: 'tableHeader', alignment: 'right' },
-              { text: 'Variance', style: 'tableHeader', alignment: 'right' }
-            ]
-          ];
-
-          // Add data rows
-          sectionData.marketingChannels.forEach(channel => {
-            channelTableBody.push([
-              { text: channel.name, bold: true },
-              { text: channel.type },
-              { text: `$${channel.forecast.toLocaleString()}`, alignment: 'right' },
-              { text: `$${channel.actual.toLocaleString()}`, alignment: 'right' },
-              {
-                text: `$${channel.variance.toLocaleString()}`,
-                alignment: 'right',
-                color: channel.variance >= 0 ? '#10B981' : '#EF4444' // Green for positive, red for negative
-              }
-            ]);
-          });
-
-          docDefinition.content.push({
-            table: {
-              headerRows: 1,
-              widths: ['*', '*', 'auto', 'auto', 'auto'],
-              body: channelTableBody
-            },
-            layout: {
-              fillColor: function(rowIndex) {
-                return (rowIndex % 2 === 0) ? '#f9f9f9' : null;
-              }
-            },
-            margin: [0, 0, 0, 15]
-          });
+        // Check for projects array (Portfolio)
+        if (sectionData.projects && Array.isArray(sectionData.projects)) {
+           docDefinition.content.push(
+             { text: 'Product Performance', style: 'subsubheader', margin: [0, 15, 0, 10] },
+             createProjectsTable(sectionData.projects)
+           );
+           docDefinition.content.push(
+             { text: 'Risk Distribution', style: 'subsubheader', margin: [0, 15, 0, 10] },
+             createRiskDistributionTable(sectionData.riskDistribution)
+           );
         }
 
-        // Add performance data if available
+        // Marketing Channels (Project)
+        if (sectionData.marketingChannels && Array.isArray(sectionData.marketingChannels)) {
+          docDefinition.content.push(
+            { text: 'Marketing Channels', style: 'subsubheader', margin: [0, 15, 0, 10] },
+            createMarketingChannelsTable(sectionData.marketingChannels)
+          );
+        }
+
+        // Performance Data (Project)
         if (sectionData.performanceData) {
-          // Add channel performance
           if (sectionData.performanceData.channelPerformance && sectionData.performanceData.channelPerformance.length > 0) {
             docDefinition.content.push(
-              { text: 'Channel Performance', style: 'subsubheader', margin: [0, 15, 0, 10] }
+              { text: 'Channel Performance', style: 'subsubheader', margin: [0, 15, 0, 10] },
+              createPerformanceTable(sectionData.performanceData.channelPerformance)
             );
-
-            // Create a table for channel performance
-            const channelPerfTableBody = [
-              // Header row
-              [
-                { text: 'Channel', style: 'tableHeader' },
-                { text: 'Forecast', style: 'tableHeader', alignment: 'right' },
-                { text: 'Actual', style: 'tableHeader', alignment: 'right' },
-                { text: 'Variance', style: 'tableHeader', alignment: 'right' },
-                { text: 'Variance %', style: 'tableHeader', alignment: 'right' }
-              ]
-            ];
-
-            // Add data rows
-            sectionData.performanceData.channelPerformance.forEach(item => {
-              const variancePercent = item.forecast > 0 ? (item.variance / item.forecast) * 100 : 0;
-
-              channelPerfTableBody.push([
-                { text: item.name, bold: true },
-                { text: `$${item.forecast.toLocaleString()}`, alignment: 'right' },
-                { text: `$${item.actual.toLocaleString()}`, alignment: 'right' },
-                {
-                  text: `$${item.variance.toLocaleString()}`,
-                  alignment: 'right',
-                  color: item.variance >= 0 ? '#10B981' : '#EF4444' // Green for positive, red for negative
-                },
-                {
-                  text: `${variancePercent.toFixed(1)}%`,
-                  alignment: 'right',
-                  color: variancePercent >= 0 ? '#10B981' : '#EF4444' // Green for positive, red for negative
-                }
-              ]);
-            });
-
-            docDefinition.content.push({
-              table: {
-                headerRows: 1,
-                widths: ['*', 'auto', 'auto', 'auto', 'auto'],
-                body: channelPerfTableBody
-              },
-              layout: {
-                fillColor: function(rowIndex) {
-                  return (rowIndex % 2 === 0) ? '#f9f9f9' : null;
-                }
-              },
-              margin: [0, 0, 0, 15]
-            });
           }
-
-          // Add period performance
           if (sectionData.performanceData.periodPerformance && sectionData.performanceData.periodPerformance.length > 0) {
             docDefinition.content.push(
-              { text: 'Period Performance', style: 'subsubheader', margin: [0, 15, 0, 10] }
+              { text: 'Period Performance', style: 'subsubheader', margin: [0, 15, 0, 10] },
+              createPerformanceTable(sectionData.performanceData.periodPerformance)
             );
-
-            // Create a table for period performance
-            const periodPerfTableBody = [
-              // Header row
-              [
-                { text: 'Period', style: 'tableHeader' },
-                { text: 'Forecast', style: 'tableHeader', alignment: 'right' },
-                { text: 'Actual', style: 'tableHeader', alignment: 'right' },
-                { text: 'Variance', style: 'tableHeader', alignment: 'right' },
-                { text: 'Variance %', style: 'tableHeader', alignment: 'right' }
-              ]
-            ];
-
-            // Add data rows
-            sectionData.performanceData.periodPerformance.forEach(item => {
-              const variancePercent = item.forecast > 0 ? (item.variance / item.forecast) * 100 : 0;
-
-              periodPerfTableBody.push([
-                { text: item.name, bold: true },
-                { text: `$${item.forecast.toLocaleString()}`, alignment: 'right' },
-                { text: `$${item.actual.toLocaleString()}`, alignment: 'right' },
-                {
-                  text: `$${item.variance.toLocaleString()}`,
-                  alignment: 'right',
-                  color: item.variance >= 0 ? '#10B981' : '#EF4444' // Green for positive, red for negative
-                },
-                {
-                  text: `${variancePercent.toFixed(1)}%`,
-                  alignment: 'right',
-                  color: variancePercent >= 0 ? '#10B981' : '#EF4444' // Green for positive, red for negative
-                }
-              ]);
-            });
-
-            docDefinition.content.push({
-              table: {
-                headerRows: 1,
-                widths: ['*', 'auto', 'auto', 'auto', 'auto'],
-                body: periodPerfTableBody
-              },
-              layout: {
-                fillColor: function(rowIndex) {
-                  return (rowIndex % 2 === 0) ? '#f9f9f9' : null;
-                }
-              },
-              margin: [0, 0, 0, 15]
-            });
           }
         }
       }
     }
   } else {
-    // Generic data display for other report types
+    // Generic fallback
     docDefinition.content.push(
       { text: 'Report Data', style: 'subheader', margin: [0, 10, 0, 10] },
-      { text: JSON.stringify(data, null, 2), fontSize: 10 }
+      { text: JSON.stringify(data, null, 2) }
     );
   }
 
@@ -712,182 +471,158 @@ function createDocDefinition(data: ExportDataType, reportKey: string) {
   return docDefinition;
 }
 
+// --- PDF Table Helper Functions ---
 
-
-// Helper function to create a summary table
-function createSummaryTable(summary: any, formattedSummary?: any) {
-  if (!summary) {
-    return { text: 'No summary data available', italics: true };
+// Corrected return type for table helpers to 'any' for pdfmake compatibility
+function createProjectsTable(projects: any[]): any {
+  if (!projects || projects.length === 0) {
+    return { text: 'No project data available', italics: true, margin: [0, 5, 0, 15] };
   }
+  const body = [
+    ['Product', 'Type', 'Revenue', 'Profit', 'Margin', 'Health', 'Risk'].map(h => ({ text: h, style: 'tableHeader' }))
+  ];
+  projects.forEach(p => {
+    body.push([
+      { text: p.name, bold: true },
+      { text: p.productType || '' },
+      { text: `$${(p.totalRevenue || 0).toLocaleString()}`, alignment: 'right' },
+      { text: `$${(p.totalProfit || 0).toLocaleString()}`, alignment: 'right' },
+      { text: `${(p.profitMargin || 0).toFixed(1)}%`, alignment: 'right' },
+      { text: (p.healthScore || 0).toString(), alignment: 'center' },
+      { text: p.riskLevel || 'medium', alignment: 'center' }
+    ]);
+  });
+  return {
+    table: {
+      headerRows: 1,
+      widths: ['*', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto'],
+      body: body
+    },
+    layout: 'lightHorizontalLines',
+    margin: [0, 5, 0, 15]
+  };
+}
 
-  // Get the keys from the summary object
+function createRiskDistributionTable(distribution: any): any {
+   if (!distribution) {
+      return { text: 'No risk data available', italics: true, margin: [0, 5, 0, 15] };
+   }
+   const body = [
+      ['Risk Level', 'Count'].map(h => ({ text: h, style: 'tableHeader' })),
+      ['Low', { text: (distribution.lowRisk || 0).toString(), alignment: 'right' }],
+      ['Medium', { text: (distribution.mediumRisk || 0).toString(), alignment: 'right' }],
+      ['High', { text: (distribution.highRisk || 0).toString(), alignment: 'right' }]
+   ];
+   return {
+      table: {
+         headerRows: 1,
+         widths: ['*', 'auto'],
+         body: body
+      },
+      layout: 'lightHorizontalLines',
+      margin: [0, 5, 0, 15]
+   };
+}
+
+function createSummaryTable(summary: any, formattedSummary?: any): any {
+  if (!summary) {
+    return { text: 'No summary data available', italics: true, margin: [0, 5, 0, 15] };
+  }
   const keys = Object.keys(summary);
-
-  // Create table body
-  const body = [];
-
-  // Add data rows
-  keys.forEach(key => {
+  const body = keys.map(key => {
     const value = summary[key];
     const formattedValue = formattedSummary && formattedSummary[key] ? formattedSummary[key] : value;
-
-    // Format the key for display
     const displayKey = key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1');
-
-    // Format the value based on its type
-    let displayValue;
-    if (typeof value === 'number') {
-      if (key.toLowerCase().includes('percent')) {
-        displayValue = `${value.toFixed(2)}%`;
-      } else {
-        displayValue = `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      }
-    } else {
-      displayValue = formattedValue ? formattedValue.toString() : (value ? value.toString() : '');
-    }
-
-    body.push([{ text: displayKey, bold: true }, { text: displayValue, alignment: 'right' }]);
+    let displayValue = formattedValue ? formattedValue.toString() : (value != null ? value.toString() : '');
+    return [{ text: displayKey, bold: true }, { text: displayValue, alignment: 'right' }];
   });
-
   return {
     table: {
       widths: ['*', 'auto'],
       body: body
     },
-    layout: {
-      fillColor: function(rowIndex: number) {
-        return (rowIndex % 2 === 0) ? '#f9f9f9' : null;
-      },
-      hLineWidth: function() { return 0; },
-      vLineWidth: function() { return 0; }
-    },
+    layout: 'noBorders',
     margin: [0, 5, 0, 15]
   };
 }
 
-// Helper function to create a table for marketing channels
-function createMarketingChannelsTable(channels: any[]) {
+function createMarketingChannelsTable(channels: any[]): any {
   if (!channels || channels.length === 0) {
-    return { text: 'No marketing channels data available', italics: true };
+    return { text: 'No marketing channel data available', italics: true, margin: [0, 5, 0, 15] };
   }
-
-  // Create table headers based on the first channel's properties
-  const firstChannel = channels[0];
-  const headers = Object.keys(firstChannel).filter(key =>
-    typeof firstChannel[key] !== 'object' && key !== 'id'
-  );
-
-  // Create table body
   const body = [
-    // Header row
-    headers.map(header => ({
-      text: header.charAt(0).toUpperCase() + header.slice(1).replace(/([A-Z])/g, ' $1'),
-      style: 'tableHeader'
-    }))
+    ['Channel', 'Type', 'Forecast', 'Actual', 'Variance', 'Var %'].map(h => ({ text: h, style: 'tableHeader' }))
   ];
-
-  // Add data rows
   channels.forEach(channel => {
-    const row = headers.map(key => {
-      const value = channel[key];
-      // Format numbers and currency values
-      if (typeof value === 'number') {
-        if (key.toLowerCase().includes('budget') || key.toLowerCase().includes('cost')) {
-          return { text: `$${value.toFixed(2)}` };
-        }
-        return { text: value.toString() };
+    const variance = (channel.actual || 0) - (channel.forecast || 0);
+    const variancePercent = (channel.forecast || 0) !== 0 ? (variance / channel.forecast) * 100 : 0;
+    body.push([
+      { text: channel.name, bold: true },
+      { text: channel.type || '' },
+      { text: `$${(channel.forecast || 0).toLocaleString()}`, alignment: 'right' },
+      { text: `$${(channel.actual || 0).toLocaleString()}`, alignment: 'right' },
+      {
+        text: `$${variance.toLocaleString()}`,
+        alignment: 'right',
+        color: variance >= 0 ? '#10B981' : '#EF4444'
+      },
+      {
+        text: `${variancePercent.toFixed(1)}%`,
+        alignment: 'right',
+        color: variancePercent >= 0 ? '#10B981' : '#EF4444'
       }
-      return { text: value ? value.toString() : '' };
-    });
-    body.push(row);
+    ]);
   });
-
   return {
     table: {
       headerRows: 1,
-      widths: Array(headers.length).fill('*'),
+      widths: ['*', '*', 'auto', 'auto', 'auto', 'auto'],
       body: body
     },
-    layout: {
-      fillColor: function(rowIndex: number) {
-        return (rowIndex % 2 === 0) ? '#f9f9f9' : null;
-      }
-    },
+    layout: 'lightHorizontalLines',
     margin: [0, 5, 0, 15]
   };
 }
 
-// Helper function to create a performance data table
-function createPerformanceTable(performanceData: any[]) {
+function createPerformanceTable(performanceData: any[]): any {
   if (!performanceData || performanceData.length === 0) {
-    return { text: 'No performance data available', italics: true };
+    return { text: 'No performance data available', italics: true, margin: [0, 5, 0, 15] };
   }
-
-  // Define the columns we want to show
-  const columns = ['name', 'forecast', 'actual', 'variance'];
-  const columnTitles = {
-    name: 'Name',
-    forecast: 'Forecast',
-    actual: 'Actual',
-    variance: 'Variance'
-  };
-
-  // Create table body
   const body = [
-    // Header row
-    columns.map(col => ({ text: columnTitles[col as keyof typeof columnTitles], style: 'tableHeader' }))
+    ['Name', 'Forecast', 'Actual', 'Variance', 'Var %'].map(h => ({ text: h, style: 'tableHeader' }))
   ];
-
-  // Add data rows
   performanceData.forEach(item => {
-    const row = columns.map(col => {
-      const key = col as keyof typeof item;
-      const value = item[key];
-
-      // Format based on column type
-      if (col === 'name') {
-        return { text: value ? value.toString() : '', bold: true };
-      } else if (typeof value === 'number') {
-        // Format currency values
-        const formattedValue = `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-        // Color variances based on positive/negative
-        if (col === 'variance') {
-          return {
-            text: formattedValue,
-            alignment: 'right',
-            color: value >= 0 ? '#10B981' : '#EF4444' // Green for positive, red for negative
-          };
-        }
-
-        return { text: formattedValue, alignment: 'right' };
+    const variance = (item.actual || 0) - (item.forecast || 0);
+    const variancePercent = (item.forecast || 0) !== 0 ? (variance / item.forecast) * 100 : 0;
+    body.push([
+      { text: item.name, bold: true },
+      { text: `$${(item.forecast || 0).toLocaleString()}`, alignment: 'right' },
+      { text: `$${(item.actual || 0).toLocaleString()}`, alignment: 'right' },
+      {
+        text: `$${variance.toLocaleString()}`,
+        alignment: 'right',
+        color: variance >= 0 ? '#10B981' : '#EF4444'
+      },
+      {
+        text: `${variancePercent.toFixed(1)}%`,
+        alignment: 'right',
+        color: variancePercent >= 0 ? '#10B981' : '#EF4444'
       }
-
-      return { text: value ? value.toString() : '', alignment: 'right' };
-    });
-
-    body.push(row);
+    ]);
   });
-
   return {
     table: {
       headerRows: 1,
-      widths: ['*', 'auto', 'auto', 'auto'],
+      widths: ['*', 'auto', 'auto', 'auto', 'auto'],
       body: body
     },
-    layout: {
-      fillColor: function(rowIndex: number) {
-        return (rowIndex % 2 === 0) ? '#f9f9f9' : null;
-      }
-    },
+    layout: 'lightHorizontalLines',
     margin: [0, 5, 0, 15]
   };
 }
 
-// Helper function to load fonts from CDN
 async function loadFontsFromCDN() {
   return new Promise<void>((resolve, reject) => {
-    // Load Roboto fonts from Google Fonts
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = 'https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap';
