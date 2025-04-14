@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { db } from "@/lib/db";
 import useStore from "@/store/useStore";
 import ErrorBoundary from "@/components/common/ErrorBoundary";
+import RouteTransition from "@/components/common/RouteTransition";
 
 const PortfolioLayout: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -18,10 +19,10 @@ const PortfolioLayout: React.FC = () => {
       try {
         // Check if DB is initialized
         const isInitialized = await db.projects.count() > 0;
-        
+
         // Load projects into store
         loadProjects();
-        
+
         console.log("Projects loaded into store");
       } catch (error) {
         console.error("Error initializing data:", error);
@@ -39,14 +40,18 @@ const PortfolioLayout: React.FC = () => {
     <div className="flex h-screen overflow-hidden">
       <Toaster />
       <Sidebar isCollapsed={isSidebarCollapsed} toggleSidebar={toggleSidebar} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <main 
-          className={`flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 transition-all duration-300 ease-in-out`}
+      <div className="flex-1 flex flex-col overflow-hidden" style={{ marginLeft: isSidebarCollapsed ? '80px' : '256px', transition: 'margin-left 0.3s ease-in-out' }}>
+        <main
+          className={`flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 transition-all duration-300 ease-in-out main-content`}
         >
           <ResponsiveContainer className="py-6">
             <ErrorBoundary>
               <AppHeader />
-              <Outlet />
+              <RouteTransition>
+                <div className="content-transition">
+                  <Outlet />
+                </div>
+              </RouteTransition>
             </ErrorBoundary>
           </ResponsiveContainer>
         </main>

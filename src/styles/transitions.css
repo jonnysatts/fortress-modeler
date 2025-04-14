@@ -1,0 +1,120 @@
+/**
+ * CSS Transitions
+ *
+ * This file contains CSS transitions for smoother UI changes.
+ */
+
+/* Apply to main content areas */
+.content-transition {
+  transition: opacity 0.15s ease-in-out;
+  opacity: 1;
+  position: relative;
+  z-index: 10;
+  background-color: inherit;
+}
+
+/* Apply to route transitions */
+.route-transition-enter {
+  opacity: 0;
+}
+
+.route-transition-enter-active {
+  opacity: 1;
+  transition: opacity 0.15s ease-in-out;
+}
+
+.route-transition-exit {
+  opacity: 1;
+}
+
+.route-transition-exit-active {
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
+}
+
+/* Apply to sidebar items */
+.sidebar-item {
+  transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
+  position: relative;
+  z-index: 10;
+  backdrop-filter: blur(4px);
+}
+
+/* Ensure sidebar has proper background */
+aside {
+  background-color: white;
+  position: fixed;
+  z-index: 1000;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Fix for sidebar items */
+.sidebar-item {
+  position: relative;
+  z-index: 1005;
+  background-color: white;
+}
+
+/* Fix for project items */
+.project-item {
+  position: relative;
+  z-index: 1015;
+  background-color: #f9fafb;
+}
+
+/* Fix for project container */
+.project-container {
+  position: relative;
+  z-index: 1010;
+  background-color: #f9fafb;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Apply to loading states */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 0.15s ease-in-out;
+}
+
+/* Improve tab transitions */
+.tab-content {
+  transition: opacity 0.15s ease-in-out;
+}
+
+/* Fix for flickering sidebar */
+.main-content {
+  position: relative;
+  z-index: 5;
+  background-color: #f9fafb; /* Light gray background */
+}
+
+.main-content-inner {
+  position: relative;
+  z-index: 10;
+  background-color: white;
+}
+
+/* Prevent flickering during navigation */
+.nav-link-active {
+  position: relative;
+  z-index: 1001;
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(5px);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+/* Ensure sidebar is always on top */
+.sidebar-container {
+  isolation: isolate;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 1000;
+  background-color: white;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}

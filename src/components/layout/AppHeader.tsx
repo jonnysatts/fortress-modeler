@@ -131,7 +131,7 @@ const AppHeader: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col space-y-4 mb-6">
+    <div className="flex flex-col space-y-4 mb-6 relative z-10">
       <div className="flex justify-between items-center">
         <Breadcrumbs items={getBreadcrumbItems()} className="mb-2" />
       </div>

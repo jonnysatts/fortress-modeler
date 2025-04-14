@@ -24,6 +24,7 @@ import ResponsiveContainer from "@/components/layout/ResponsiveContainer";
 import { Toaster } from "@/components/ui/toaster";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import RouteTransition from "@/components/common/RouteTransition";
 
 const ProductLayout: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -86,11 +87,11 @@ const ProductLayout: React.FC = () => {
       {/* Export functionality temporarily disabled */}
       <Toaster />
       <Sidebar isCollapsed={isSidebarCollapsed} toggleSidebar={toggleSidebar} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 transition-all duration-300 ease-in-out">
+      <div className="flex-1 flex flex-col overflow-hidden" style={{ marginLeft: isSidebarCollapsed ? '80px' : '256px', transition: 'margin-left 0.3s ease-in-out' }}>
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 transition-all duration-300 ease-in-out main-content">
           <ResponsiveContainer className="py-6">
             <ErrorBoundary>
-              <header className="bg-white dark:bg-gray-800 border-b mb-4 rounded-lg shadow-sm">
+              <header className="bg-white dark:bg-gray-800 border-b mb-4 rounded-lg shadow-sm main-content-inner">
                 <div className="px-4 py-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -192,7 +193,7 @@ const ProductLayout: React.FC = () => {
                          to={`/projects/${projectId}/${step.path}`}
                          className={({ isActive }) =>
                            cn(
-                             "px-4 py-2 text-sm font-medium transition-colors border-b-2",
+                             "px-4 py-2 text-sm font-medium transition-colors border-b-2 sidebar-item",
                              isActive
                                ? "border-fortress-blue text-fortress-blue"
                                : "border-transparent text-muted-foreground hover:text-gray-700 hover:border-gray-300 dark:hover:text-gray-200 dark:hover:border-gray-600"
@@ -205,8 +206,12 @@ const ProductLayout: React.FC = () => {
                 </div>
               </nav>
 
-              <main className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm min-w-0">
-                 <Outlet />
+              <main className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm min-w-0 main-content-inner">
+                <RouteTransition>
+                  <div className="content-transition">
+                    <Outlet />
+                  </div>
+                </RouteTransition>
               </main>
             </ErrorBoundary>
           </ResponsiveContainer>

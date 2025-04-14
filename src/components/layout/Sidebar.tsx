@@ -9,7 +9,8 @@ import {
   ChevronsLeft,
   ChevronsRight,
   ChevronDown,
-  ChevronRight as ChevronRightIcon
+  ChevronRight as ChevronRightIcon,
+  Activity
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -53,22 +54,29 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
   const mainNavItems = [
     { name: "Portfolio Dashboard", path: "/", icon: Home },
     { name: "Products", path: "/projects", icon: FolderKanban, expandable: true },
+    { name: "Performance", path: "/performance", icon: Activity },
     { name: "Settings", path: "/settings", icon: Settings },
   ];
 
   return (
     <aside
       className={cn(
-        "flex flex-col h-screen bg-white border-r border-gray-200 text-gray-800 transition-all duration-300 ease-in-out shadow-sm",
+        "flex flex-col h-screen border-r border-gray-200 text-gray-800 transition-all duration-300 ease-in-out shadow-sm sidebar-container",
         isCollapsed ? "w-20" : "w-64"
       )}
+      style={{
+        backgroundColor: 'white',
+        position: 'fixed',
+        zIndex: 9000,
+        boxShadow: '0 0 10px rgba(0, 0, 0, 0.1)',
+      }}
     >
-      <div className="flex items-center justify-center h-16 border-b border-gray-200">
+      <div className="flex items-center justify-center h-16 border-b border-gray-200 bg-white">
         <span className={cn("font-bold text-xl text-fortress-blue", isCollapsed && "hidden")}>Fortress</span>
         <LineChart className={cn("h-6 w-6 text-fortress-blue", !isCollapsed && "hidden")} />
       </div>
 
-      <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto bg-white">
         {mainNavItems.map((item) => (
           <div key={item.name}>
             {item.expandable ? (
@@ -76,12 +84,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
                 <button
                   onClick={() => toggleSection('projects')}
                   className={cn(
-                    "flex items-center w-full px-4 py-2.5 rounded-md text-sm font-medium transition-colors",
+                    "flex items-center w-full px-4 py-2.5 rounded-md text-sm font-medium transition-colors bg-white relative",
                     isProjectsActive
                       ? "bg-fortress-blue/10 text-fortress-blue font-medium"
                       : "text-gray-600 hover:bg-gray-100 hover:text-fortress-blue",
                     isCollapsed ? "justify-center" : ""
                   )}
+                  style={{ zIndex: 9005, backgroundColor: 'white', position: 'relative' }}
                 >
                   <item.icon className={cn("h-5 w-5 text-gray-700", !isCollapsed && "mr-3")} />
                   {!isCollapsed && (
@@ -97,7 +106,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
                 </button>
 
                 {!isCollapsed && expandedSections.projects && (
-                  <div className="mt-1 ml-6 space-y-1 border-l border-gray-200 pl-3 bg-gray-50 rounded-r-md">
+                  <div className="mt-1 ml-6 space-y-1 border-l border-gray-200 pl-3 rounded-r-md project-container" style={{ backgroundColor: '#f9fafb', position: 'relative', zIndex: 9010 }}>
                     {loading.isLoading ? (
                       // Loading state
                       <div className="flex items-center px-4 py-2 text-sm text-gray-500">
@@ -117,12 +126,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
                             to={`/projects/${project.id}/summary`}
                             className={({ isActive }) =>
                               cn(
-                                "flex items-center px-4 py-2 rounded-md text-sm transition-colors",
+                                "flex items-center px-4 py-2 rounded-md text-sm transition-colors sidebar-item project-item",
                                 isActive
-                                  ? "bg-fortress-blue/5 text-fortress-blue font-medium"
+                                  ? "bg-fortress-blue/5 text-fortress-blue font-medium nav-link-active"
                                   : "text-gray-700 hover:bg-gray-50 hover:text-fortress-blue font-medium"
                               )
                             }
+                            style={{ zIndex: 9015, backgroundColor: '#f9fafb', position: 'relative' }}
                           >
                             {project.name.length > 20
                               ? `${project.name.substring(0, 20)}...`
@@ -133,7 +143,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
                         {projects.length > 5 && (
                           <NavLink
                             to="/projects"
-                            className="flex items-center px-4 py-2 rounded-md text-sm text-gray-500 hover:bg-gray-100 hover:text-fortress-blue"
+                            className="flex items-center px-4 py-2 rounded-md text-sm text-gray-500 hover:bg-gray-100 hover:text-fortress-blue project-item"
+                            style={{ zIndex: 9015, backgroundColor: '#f9fafb', position: 'relative' }}
                           >
                             View all ({projects.length})
                           </NavLink>
@@ -148,13 +159,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
                 to={item.path}
                 className={({ isActive }) =>
                   cn(
-                    "flex items-center px-4 py-2.5 rounded-md text-sm font-medium transition-colors",
+                    "flex items-center px-4 py-2.5 rounded-md text-sm font-medium transition-colors sidebar-item relative bg-white",
                     isActive
-                      ? "bg-fortress-blue/10 text-fortress-blue font-medium"
+                      ? "bg-fortress-blue/10 text-fortress-blue font-medium nav-link-active"
                       : "text-gray-600 hover:bg-gray-100 hover:text-fortress-blue",
                     isCollapsed ? "justify-center" : ""
                   )
                 }
+                style={{ zIndex: 9005, backgroundColor: 'white', position: 'relative' }}
               >
                 <item.icon className={cn("h-5 w-5 text-gray-700", !isCollapsed && "mr-3")} />
                 <span className={cn("font-medium", isCollapsed && "hidden")}>{item.name}</span>
