@@ -170,12 +170,20 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
           // Use the attendance growth rate from the model
           let rate = (metadata.growth?.attendanceGrowthRate ?? 0) / 100;
 
-          // Log what growth settings we're using
-          console.log(`[FinancialCalc Period ${period}] Growth settings: attendanceGrowthRate=${metadata.growth?.attendanceGrowthRate ?? 0}%, useCustomerSpendGrowth=${metadata.growth?.useCustomerSpendGrowth}, growthModel.type=${growthModel?.type}, growthModel.rate=${growthModel?.rate ?? 0}`);
+          // CRITICAL: Check for useGrowth flag at both levels
+          const useGrowth = metadata.useGrowth || metadata.growth?.useCustomerSpendGrowth;
 
+          // Log what growth settings we're using
+          console.log(`[FinancialCalc Period ${period}] Growth settings: attendanceGrowthRate=${metadata.growth?.attendanceGrowthRate ?? 0}%, useGrowth=${useGrowth}, useCustomerSpendGrowth=${metadata.growth?.useCustomerSpendGrowth}, growthModel.type=${growthModel?.type}, growthModel.rate=${growthModel?.rate ?? 0}`);
+
+          // If we're not using growth, force the rate to 0
+          if (!useGrowth) {
+            console.log(`[FinancialCalc] Growth disabled, setting rate to 0`);
+            rate = 0;
+          }
           // If attendance growth rate is 0 but we have an overall growth model with exponential type,
           // use that rate instead
-          if (rate === 0 && growthModel?.type === 'exponential' && growthModel?.rate > 0) {
+          else if (rate === 0 && growthModel?.type === 'exponential' && growthModel?.rate > 0) {
             rate = growthModel.rate;
             console.log(`[FinancialCalc] Using overall growth rate: ${rate * 100}% instead of attendance growth rate: 0%`);
           }
@@ -211,7 +219,9 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
           }
 
           // Apply growth if applicable
-          if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
+          // CRITICAL: Check for useGrowth flag at both levels
+          const useCustomerSpendGrowth = metadata.useGrowth || metadata.growth?.useCustomerSpendGrowth;
+          if (period > 1 && useCustomerSpendGrowth) {
               const ticketGrowth = (metadata.growth.ticketPriceGrowth ?? 0) / 100;
               const fbGrowth = (metadata.growth.fbSpendGrowth ?? 0) / 100;
               const merchGrowth = (metadata.growth.merchandiseSpendGrowth ?? 0) / 100;

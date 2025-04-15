@@ -31,8 +31,9 @@ function ensureModelStructure(model: FinancialModel): void {
     model.assumptions.metadata.initialWeeklyAttendance = 75;
   }
 
-  // Ensure useGrowth is set
+  // CRITICAL: Ensure useGrowth is set at the model level
   model.assumptions.metadata.useGrowth = true;
+  console.log('Forced useGrowth to true at model level');
 
   // Ensure growth structure exists
   if (!model.assumptions.metadata.growth) {
@@ -341,6 +342,10 @@ function applyAttendanceDeltas(
   growth.useCustomerSpendGrowth = true;
   modifiedModel.assumptions.metadata.useCustomerSpendGrowth = true; // Set at both levels to ensure it's picked up
   console.log(`Enabled useCustomerSpendGrowth: ${growth.useCustomerSpendGrowth}`);
+
+  // CRITICAL: Force enable growth at the model level
+  modifiedModel.assumptions.metadata.useGrowth = true;
+  console.log(`Enabled useGrowth at model level: ${modifiedModel.assumptions.metadata.useGrowth}`);
 
   // Configure the growth model
   modifiedModel.assumptions.growthModel.type = 'exponential';
