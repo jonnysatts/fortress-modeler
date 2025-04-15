@@ -19,6 +19,21 @@ function ensureModelStructure(model: FinancialModel): void {
     model.assumptions.metadata = {};
   }
 
+  // Set model type if not set
+  if (!model.assumptions.metadata.type) {
+    console.log('Setting default model type to WeeklyEvent');
+    model.assumptions.metadata.type = 'WeeklyEvent';
+  }
+
+  // Ensure initial attendance is set
+  if (!model.assumptions.metadata.initialWeeklyAttendance) {
+    console.log('Setting default initial attendance');
+    model.assumptions.metadata.initialWeeklyAttendance = 75;
+  }
+
+  // Ensure useGrowth is set
+  model.assumptions.metadata.useGrowth = true;
+
   // Ensure growth structure exists
   if (!model.assumptions.metadata.growth) {
     console.log('Creating growth structure');
@@ -29,6 +44,14 @@ function ensureModelStructure(model: FinancialModel): void {
       fbSpendGrowth: 2,
       merchandiseSpendGrowth: 2
     };
+  } else {
+    // Ensure all growth properties exist
+    const growth = model.assumptions.metadata.growth;
+    growth.useCustomerSpendGrowth = true;
+    if (growth.attendanceGrowthRate === undefined) growth.attendanceGrowthRate = 0;
+    if (growth.ticketPriceGrowth === undefined) growth.ticketPriceGrowth = 2;
+    if (growth.fbSpendGrowth === undefined) growth.fbSpendGrowth = 2;
+    if (growth.merchandiseSpendGrowth === undefined) growth.merchandiseSpendGrowth = 2;
   }
 
   // Ensure perCustomer structure exists
@@ -39,6 +62,12 @@ function ensureModelStructure(model: FinancialModel): void {
       fbSpend: 5,
       merchandiseSpend: 2
     };
+  } else {
+    // Ensure all perCustomer properties exist
+    const perCustomer = model.assumptions.metadata.perCustomer;
+    if (perCustomer.ticketPrice === undefined) perCustomer.ticketPrice = 10;
+    if (perCustomer.fbSpend === undefined) perCustomer.fbSpend = 5;
+    if (perCustomer.merchandiseSpend === undefined) perCustomer.merchandiseSpend = 2;
   }
 
   // Ensure costs structure exists
@@ -50,6 +79,13 @@ function ensureModelStructure(model: FinancialModel): void {
       staffCount: 5,
       staffCostPerPerson: 100
     };
+  } else {
+    // Ensure all costs properties exist
+    const costs = model.assumptions.metadata.costs;
+    if (costs.fbCOGSPercent === undefined) costs.fbCOGSPercent = 30;
+    if (costs.merchandiseCogsPercent === undefined) costs.merchandiseCogsPercent = 50;
+    if (costs.staffCount === undefined) costs.staffCount = 5;
+    if (costs.staffCostPerPerson === undefined) costs.staffCostPerPerson = 100;
   }
 
   // Ensure growth model exists
@@ -59,6 +95,12 @@ function ensureModelStructure(model: FinancialModel): void {
       type: 'exponential',
       rate: 0.05
     };
+  } else {
+    // Ensure growth model properties are set
+    model.assumptions.growthModel.type = 'exponential';
+    if (model.assumptions.growthModel.rate === undefined) {
+      model.assumptions.growthModel.rate = 0.05;
+    }
   }
 
   // Ensure marketing structure exists
@@ -71,7 +113,17 @@ function ensureModelStructure(model: FinancialModel): void {
       budgetApplication: 'spreadEvenly',
       spreadDuration: model.assumptions.metadata.weeks || 12
     };
+  } else {
+    // Ensure marketing properties are set
+    const marketing = model.assumptions.marketing;
+    if (!marketing.channels) marketing.channels = [];
+    if (!marketing.totalBudget) marketing.totalBudget = 1000;
+    if (!marketing.budgetApplication) marketing.budgetApplication = 'spreadEvenly';
+    if (!marketing.spreadDuration) marketing.spreadDuration = model.assumptions.metadata.weeks || 12;
   }
+
+  // Log the structure to ensure it's properly set up
+  console.log('Model structure ensured with type:', model.assumptions.metadata.type);
 }
 
 /**
@@ -252,6 +304,14 @@ function applyPricingDeltas(
       return stream;
     });
   }
+
+  // Log the final pricing settings for debugging
+  console.log('Final pricing settings:', JSON.stringify({
+    ticketPrice: perCustomer.ticketPrice,
+    fbSpend: perCustomer.fbSpend,
+    merchandiseSpend: perCustomer.merchandiseSpend,
+    pricingDelta: deltas.pricingPercent
+  }, null, 2));
 }
 
 /**
@@ -279,6 +339,7 @@ function applyAttendanceDeltas(
 
   // CRITICAL: Ensure that growth-related settings are ALWAYS enabled
   growth.useCustomerSpendGrowth = true;
+  modifiedModel.assumptions.metadata.useCustomerSpendGrowth = true; // Set at both levels to ensure it's picked up
   console.log(`Enabled useCustomerSpendGrowth: ${growth.useCustomerSpendGrowth}`);
 
   // Configure the growth model
@@ -289,6 +350,14 @@ function applyAttendanceDeltas(
   const growthRate = Math.max(0.01, growth.attendanceGrowthRate / 100);
   modifiedModel.assumptions.growthModel.rate = growthRate;
   console.log('Growth model set to type: exponential, rate:', modifiedModel.assumptions.growthModel.rate);
+
+  // CRITICAL: Ensure the model knows to use the growth settings
+  if (modifiedModel.assumptions.metadata.type === 'WeeklyEvent' ||
+      modifiedModel.assumptions.metadata.type === 'Weekly') {
+    console.log('Setting weekly event growth parameters');
+    // Force enable growth for weekly events
+    modifiedModel.assumptions.metadata.useGrowth = true;
+  }
 
   // Ensure all growth rates are set to reasonable values
   if (!growth.ticketPriceGrowth || growth.ticketPriceGrowth === 0) {
@@ -305,6 +374,14 @@ function applyAttendanceDeltas(
     growth.merchandiseSpendGrowth = 2.0; // Default 2% growth
     console.log(`Set default merchandise spend growth: ${growth.merchandiseSpendGrowth}%`);
   }
+
+  // Log the final growth settings for debugging
+  console.log('Final growth settings:', JSON.stringify({
+    attendanceGrowthRate: growth.attendanceGrowthRate,
+    useCustomerSpendGrowth: growth.useCustomerSpendGrowth,
+    useGrowth: modifiedModel.assumptions.metadata.useGrowth,
+    growthModel: modifiedModel.assumptions.growthModel
+  }, null, 2));
 }
 
 /**
