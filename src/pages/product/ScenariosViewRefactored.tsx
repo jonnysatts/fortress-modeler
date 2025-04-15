@@ -1,6 +1,6 @@
 /**
  * Scenarios View (Refactored)
- * 
+ *
  * This component integrates the refactored scenario module with the existing application.
  */
 
@@ -16,11 +16,11 @@ import { toast } from '@/components/ui/use-toast';
 const ScenariosViewRefactored: React.FC = () => {
   const { projectId, scenarioId } = useParams<{ projectId: string; scenarioId: string }>();
   const navigate = useNavigate();
-  
+
   // Local state
   const [isCreating, setIsCreating] = useState(false);
   const [isComparing, setIsComparing] = useState(false);
-  
+
   // Get data and actions from store
   const {
     scenarios,
@@ -36,7 +36,7 @@ const ScenariosViewRefactored: React.FC = () => {
     duplicateScenario,
     setCurrentScenario,
     setBaselineModel,
-    loadFinancialModel,
+    loadModelById,
     toggleComparisonMode
   } = useStore(state => ({
     scenarios: state.scenarios,
@@ -52,33 +52,33 @@ const ScenariosViewRefactored: React.FC = () => {
     duplicateScenario: state.duplicateScenario,
     setCurrentScenario: state.setCurrentScenario,
     setBaselineModel: state.setBaselineModel,
-    loadFinancialModel: state.loadFinancialModel,
+    loadModelById: state.loadModelById,
     toggleComparisonMode: state.toggleComparisonMode
   }));
-  
+
   // Load scenarios when the component mounts
   useEffect(() => {
     if (projectId) {
       loadScenarios(parseInt(projectId));
     }
   }, [projectId, loadScenarios]);
-  
+
   // Load the current scenario when scenarioId changes
   useEffect(() => {
     if (scenarioId && scenarios.length > 0) {
       const scenario = scenarios.find(s => s.id === parseInt(scenarioId));
       if (scenario) {
         setCurrentScenario(scenario);
-        
+
         // Load the baseline model if needed
         if (!baselineModel || baselineModel.id !== scenario.baseModelId) {
-          loadFinancialModel(scenario.baseModelId).then(model => {
+          loadModelById(scenario.baseModelId).then(model => {
             if (model) {
               setBaselineModel(model);
             }
           });
         }
-        
+
         // Set comparison mode to false when viewing a scenario
         toggleComparisonMode(false);
         setIsComparing(false);
@@ -88,21 +88,21 @@ const ScenariosViewRefactored: React.FC = () => {
       setCurrentScenario(null);
     }
   }, [scenarioId, scenarios, setCurrentScenario, baselineModel, loadFinancialModel, setBaselineModel, toggleComparisonMode, isCreating]);
-  
+
   // Handle scenario selection
   const handleSelectScenario = (scenario: Scenario) => {
     navigate(`/projects/${projectId}/scenarios/${scenario.id}`);
   };
-  
+
   // Handle scenario creation
   const handleCreateScenario = () => {
     setIsCreating(true);
-    
+
     // Load the default model for the project
     loadFinancialModel(parseInt(projectId)).then(model => {
       if (model) {
         setBaselineModel(model);
-        
+
         // Create a new scenario with default values
         createScenario(
           parseInt(projectId),
@@ -125,7 +125,7 @@ const ScenariosViewRefactored: React.FC = () => {
       }
     });
   };
-  
+
   // Handle scenario duplication
   const handleDuplicateScenario = async (scenarioId: number, newName: string) => {
     try {
@@ -140,12 +140,12 @@ const ScenariosViewRefactored: React.FC = () => {
       });
     }
   };
-  
+
   // Handle scenario deletion
   const handleDeleteScenario = async (scenarioId: number) => {
     try {
       await deleteScenario(scenarioId);
-      
+
       // Navigate back to the scenarios list
       navigate(`/projects/${projectId}/scenarios`);
     } catch (error) {
@@ -157,7 +157,7 @@ const ScenariosViewRefactored: React.FC = () => {
       });
     }
   };
-  
+
   // Handle scenario save
   const handleSaveScenario = async (updatedScenario: Scenario) => {
     try {
@@ -176,19 +176,19 @@ const ScenariosViewRefactored: React.FC = () => {
       throw error; // Re-throw to let the component handle the error
     }
   };
-  
+
   // Handle cancel
   const handleCancel = () => {
     // Navigate back to the scenarios list
     navigate(`/projects/${projectId}/scenarios`);
   };
-  
+
   // Toggle comparison mode
   const handleToggleComparison = () => {
     setIsComparing(!isComparing);
     toggleComparisonMode(!isComparing);
   };
-  
+
   // Render the appropriate view based on the current state
   const renderContent = () => {
     if (currentScenario && baselineModel) {
@@ -202,7 +202,7 @@ const ScenariosViewRefactored: React.FC = () => {
                 Back to Editor
               </Button>
             </div>
-            
+
             <ScenarioComparison
               scenario={currentScenario}
               baselineModel={baselineModel}
@@ -212,7 +212,7 @@ const ScenariosViewRefactored: React.FC = () => {
           </div>
         );
       }
-      
+
       // Otherwise, show the editor
       return (
         <div className="space-y-6">
@@ -221,12 +221,12 @@ const ScenariosViewRefactored: React.FC = () => {
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Scenarios
             </Button>
-            
+
             <Button onClick={handleToggleComparison}>
               View Detailed Comparison
             </Button>
           </div>
-          
+
           <ScenarioEditor
             scenario={currentScenario}
             baseModel={baselineModel}
@@ -238,7 +238,7 @@ const ScenariosViewRefactored: React.FC = () => {
         </div>
       );
     }
-    
+
     // If no scenario is selected, show the list
     return (
       <ScenariosList
@@ -253,7 +253,7 @@ const ScenariosViewRefactored: React.FC = () => {
       />
     );
   };
-  
+
   return (
     <div className="container mx-auto py-6">
       {renderContent()}
