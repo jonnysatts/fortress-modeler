@@ -1,6 +1,6 @@
 /**
  * Scenario Editor Component
- * 
+ *
  * This component provides a UI for editing scenario parameters.
  */
 
@@ -53,7 +53,7 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
   isNew = false
 }) => {
   const navigate = useNavigate();
-  
+
   // Use the scenario editor hook
   const {
     localDeltas,
@@ -72,7 +72,7 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
     onSave,
     onCancel
   });
-  
+
   // Set up hotkeys
   useHotkeys('mod+s', (e) => {
     e.preventDefault();
@@ -80,11 +80,11 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
       handleSave();
     }
   }, [isDirty, isSaving, handleSave]);
-  
+
   useHotkeys('escape', () => {
     handleCancel();
   }, [handleCancel]);
-  
+
   // Prompt user before leaving if there are unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -94,14 +94,25 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
         return '';
       }
     };
-    
+
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  // Render nothing if no scenario or base model
+  // Handle loading state
   if (!scenario || !baseModel) {
-    return null;
+    return (
+      <div className="container mx-auto py-6">
+        <Card>
+          <CardContent className="p-8">
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <p className="text-muted-foreground">Loading scenario data...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (

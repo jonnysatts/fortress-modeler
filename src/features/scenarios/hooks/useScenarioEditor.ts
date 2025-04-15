@@ -1,6 +1,6 @@
 /**
  * useScenarioEditor Hook
- * 
+ *
  * Custom hook for managing scenario editor state and logic.
  */
 
@@ -45,20 +45,40 @@ export default function useScenarioEditor({
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('marketing');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  
+
   // Refs
   const originalDeltasRef = useRef<ScenarioParameterDeltas | null>(null);
-  
+
   // Initialize local deltas from scenario
   useEffect(() => {
     if (scenario) {
-      setLocalDeltas(scenario.parameterDeltas);
-      originalDeltasRef.current = JSON.parse(JSON.stringify(scenario.parameterDeltas));
+      // Create a deep copy of the parameter deltas
+      const deltaCopy = JSON.parse(JSON.stringify(scenario.parameterDeltas));
+
+      // Ensure all required properties exist
+      const completeDeltas = {
+        marketingSpendPercent: 0,
+        marketingSpendByChannel: {},
+        pricingPercent: 0,
+        attendanceGrowthPercent: 0,
+        cogsMultiplier: 0,
+        ...deltaCopy
+      };
+
+      // Set the local deltas
+      setLocalDeltas(completeDeltas);
+
+      // Store the original deltas for comparison
+      originalDeltasRef.current = JSON.parse(JSON.stringify(completeDeltas));
+
+      // Reset state
       setIsDirty(false);
       setHasUnsavedChanges(false);
+
+      console.log('Initialized scenario editor with deltas:', completeDeltas);
     }
   }, [scenario]);
-  
+
   // Check for unsaved changes
   useEffect(() => {
     if (originalDeltasRef.current) {
@@ -67,29 +87,32 @@ export default function useScenarioEditor({
       setHasUnsavedChanges(!isEqual);
     }
   }, [localDeltas]);
-  
+
   // Handle parameter change
   const handleParamChange = (param: keyof ScenarioParameterDeltas, value: number) => {
+    console.log(`Parameter change: ${param} = ${value}`);
+
     // Update the local deltas
     const updatedDeltas = {
       ...localDeltas,
       [param]: value
     };
-    
-    setLocalDeltas(updatedDeltas);
-    
-    // Calculate related changes
+
+    // Calculate related changes before updating state
     const relatedChanges = calculateRelatedChanges(param, value, updatedDeltas);
-    
-    // If there are related changes, update the local deltas again
-    if (Object.keys(relatedChanges).length > 0) {
-      setLocalDeltas(prev => ({
-        ...prev,
-        ...relatedChanges
-      }));
-    }
+    console.log('Related changes:', relatedChanges);
+
+    // Combine all changes into a single update to prevent flickering
+    const finalDeltas = {
+      ...updatedDeltas,
+      ...relatedChanges
+    };
+
+    // Update state with all changes at once
+    setLocalDeltas(finalDeltas);
+    console.log('Updated deltas:', finalDeltas);
   };
-  
+
   // Handle channel-specific parameter change
   const handleChannelParamChange = (channelId: string, value: number) => {
     setLocalDeltas(prev => ({
@@ -100,31 +123,31 @@ export default function useScenarioEditor({
       }
     }));
   };
-  
+
   // Handle save
   const handleSave = async () => {
     if (!scenario) return;
-    
+
     try {
       setIsSaving(true);
-      
+
       // Create updated scenario with new deltas
       const updatedScenario: Scenario = {
         ...scenario,
         parameterDeltas: { ...localDeltas },
         updatedAt: new Date()
       };
-      
+
       // Call the onSave callback
       await onSave(updatedScenario);
-      
+
       // Update the original deltas reference
       originalDeltasRef.current = JSON.parse(JSON.stringify(localDeltas));
-      
+
       // Reset dirty state
       setIsDirty(false);
       setHasUnsavedChanges(false);
-      
+
       toast({
         title: 'Success',
         description: 'Scenario saved successfully',
@@ -140,7 +163,7 @@ export default function useScenarioEditor({
       setIsSaving(false);
     }
   };
-  
+
   // Handle reset
   const handleReset = () => {
     if (originalDeltasRef.current) {
@@ -149,7 +172,7 @@ export default function useScenarioEditor({
       setHasUnsavedChanges(false);
     }
   };
-  
+
   // Handle cancel
   const handleCancel = () => {
     if (isDirty) {
@@ -162,7 +185,7 @@ export default function useScenarioEditor({
       onCancel();
     }
   };
-  
+
   return {
     localDeltas,
     isDirty,
