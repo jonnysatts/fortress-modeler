@@ -1,5 +1,6 @@
-import { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { FinancialModel } from "@/lib/db";
+import { devLog, appError } from "@/lib/logUtils";
 import {
   LineChart,
   Line,
@@ -17,7 +18,7 @@ interface ModelProjectionsProps {
   shouldSpreadSetupCosts?: boolean;
 }
 
-const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsProps) => {
+const ModelProjections = React.memo(({ model, shouldSpreadSetupCosts }: ModelProjectionsProps) => {
   const [projectionMonths, setProjectionMonths] = useState<number>(12);
   const [showCumulative, setShowCumulative] = useState<boolean>(true);
 
@@ -35,7 +36,7 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
     try {
       const data = [];
       const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
-      
+
       const totalInitialRevenue = model.assumptions.revenue.reduce(
         (sum, item) => sum + item.value,
         0
@@ -49,19 +50,19 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
         const metadata = model.assumptions.metadata;
         const weeks = metadata.weeks || 12;
         const timePoints = Math.min(weeks, projectionMonths);
-        
+
         // Find the setup cost item from the main costs array
         const setupCosts = model.assumptions.costs.find(cost => cost.name === "Setup Costs")?.value || 0;
-        
+
         let totalCumulativeRevenue = 0;
         let totalCumulativeCosts = setupCosts; // Start with setup costs
         let totalCumulativeProfit = -setupCosts; // Initial profit is negative setup costs
         let totalAttendance = 0;
-        
+
         // Add starting point (Week 0) with initial values but no growth
         const initialAttendance = metadata.initialWeeklyAttendance;
         const initialPerCustomer = metadata.perCustomer;
-        
+
         // Add Week 0 data point
         data.push({
           point: "Start",
@@ -74,7 +75,7 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
           cumulativeProfit: -setupCosts,
           totalAttendance: initialAttendance
         });
-        
+
         // Calculate weeks 1 through N
         for (let week = 1; week <= timePoints; week++) {
           // Calculate attendance with compounding growth rate
@@ -82,26 +83,26 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
           const currentAttendance = Math.round(
             initialAttendance * Math.pow(1 + attendanceGrowthRate, week - 1)
           );
-          
+
           totalAttendance += currentAttendance;
-          
+
           // Calculate per-customer values with growth if enabled
           let currentPerCustomer = { ...metadata.perCustomer };
           if (metadata.growth.useCustomerSpendGrowth) {
             currentPerCustomer = {
-              ticketPrice: metadata.perCustomer.ticketPrice * 
+              ticketPrice: metadata.perCustomer.ticketPrice *
                 Math.pow(1 + (metadata.growth.ticketPriceGrowth / 100), week - 1),
-              fbSpend: metadata.perCustomer.fbSpend * 
+              fbSpend: metadata.perCustomer.fbSpend *
                 Math.pow(1 + (metadata.growth.fbSpendGrowth / 100), week - 1),
-              merchandiseSpend: metadata.perCustomer.merchandiseSpend * 
+              merchandiseSpend: metadata.perCustomer.merchandiseSpend *
                 Math.pow(1 + (metadata.growth.merchandiseSpendGrowth / 100), week - 1),
-              onlineSpend: metadata.perCustomer.onlineSpend * 
+              onlineSpend: metadata.perCustomer.onlineSpend *
                 Math.pow(1 + (metadata.growth.onlineSpendGrowth / 100), week - 1),
-              miscSpend: metadata.perCustomer.miscSpend * 
+              miscSpend: metadata.perCustomer.miscSpend *
                 Math.pow(1 + (metadata.growth.miscSpendGrowth / 100), week - 1),
             };
           }
-          
+
           // Calculate revenue based on attendance and per-customer values
           const weeklyRevenue = {
             ticketSales: currentAttendance * (currentPerCustomer.ticketPrice || 0),
@@ -110,21 +111,21 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
             onlineSales: currentAttendance * (currentPerCustomer.onlineSpend || 0),
             miscRevenue: currentAttendance * (currentPerCustomer.miscSpend || 0),
           };
-          
+
           const totalWeeklyRevenue = Object.values(weeklyRevenue).reduce((sum, val) => sum + val, 0);
-          
+
           // Calculate weekly costs
           const fbCOGS = (weeklyRevenue.fbSales * (metadata.costs.fbCOGSPercent || 30)) / 100;
           const staffCosts = (metadata.costs.staffCount || 0) * (metadata.costs.staffCostPerPerson || 0);
           const managementCosts = metadata.costs.managementCosts || 0;
-          
+
           const totalWeeklyCosts = fbCOGS + staffCosts + managementCosts;
           const weeklyProfit = totalWeeklyRevenue - totalWeeklyCosts;
-          
+
           totalCumulativeRevenue += totalWeeklyRevenue;
           totalCumulativeCosts += totalWeeklyCosts;
           totalCumulativeProfit += weeklyProfit;
-          
+
           data.push({
             point: `Week ${week}`,
             revenue: Math.round(totalWeeklyRevenue * 100) / 100,
@@ -146,7 +147,7 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
 
         for (let month = 0; month <= projectionMonths; month++) {
           const { type, rate, seasonalFactors } = model.assumptions.growthModel;
-          
+
           if (month > 0) {
             if (type === "linear") {
               // For linear models, apply the compound growth rate correctly
@@ -167,7 +168,7 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
           }
 
           const profit = currentRevenue - currentCosts;
-          
+
           cumulativeRevenue += currentRevenue;
           cumulativeCosts += currentCosts;
           cumulativeProfit += profit;
@@ -186,13 +187,14 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
 
       return data;
     } catch (error) {
-      console.error("Error calculating projections:", error);
+      appError("Error calculating projections", error);
       return [];
     }
   };
 
-  const projectionData = calculateProjections();
-  
+  // Memoize the projection data calculation to avoid recalculating on every render
+  const projectionData = useMemo(() => calculateProjections(), [model, projectionMonths, shouldSpreadSetupCosts]);
+
   if (!projectionData || projectionData.length === 0) {
     return (
       <div className="p-4 border border-red-200 rounded-md bg-red-50">
@@ -202,13 +204,13 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
       </div>
     );
   }
-  
+
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
-  
+
   const finalDataPoint = projectionData[projectionData.length - 1];
-  
-  const displayData = showCumulative ? 
+
+  const displayData = showCumulative ?
     projectionData.map(point => ({
       ...point,
       displayRevenue: point.cumulativeRevenue,
@@ -272,24 +274,24 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
             margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis 
-              dataKey="point" 
+            <XAxis
+              dataKey="point"
               tick={{ fontSize: 12 }}
               tickFormatter={(value) => value === "Start" ? value : value.split(" ")[1]}
             />
-            <YAxis 
+            <YAxis
               tick={{ fontSize: 12 }}
               tickFormatter={(value) => `$${value.toLocaleString()}`}
             />
             {isWeeklyEvent && 'attendance' in finalDataPoint && (
-              <YAxis 
-                yAxisId="right" 
+              <YAxis
+                yAxisId="right"
                 orientation="right"
                 tick={{ fontSize: 12 }}
                 tickFormatter={(value) => value.toLocaleString()}
               />
             )}
-            <Tooltip 
+            <Tooltip
               formatter={(value: number, name: string) => {
                 if (name === "attendance" && typeof value === "number") {
                   return [value.toLocaleString(), "Attendance"];
@@ -346,7 +348,7 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
             {formatCurrency(showCumulative ? finalDataPoint.cumulativeRevenue : finalDataPoint.revenue)}
           </p>
           <p className="text-xs text-green-600">
-            {showCumulative ? "Cumulative across all " : "Last "} 
+            {showCumulative ? "Cumulative across all " : "Last "}
             {projectionMonths} {timeUnit.toLowerCase()}{showCumulative ? "s" : ""}
           </p>
         </div>
@@ -390,7 +392,14 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default ModelProjections;
+export default React.memo(ModelProjections, (prevProps, nextProps) => {
+  // Only re-render if the model ID changes or the shouldSpreadSetupCosts prop changes
+  return (
+    prevProps.model.id === nextProps.model.id &&
+    prevProps.shouldSpreadSetupCosts === nextProps.shouldSpreadSetupCosts
+  );
+});
+
