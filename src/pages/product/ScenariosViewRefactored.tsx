@@ -87,7 +87,7 @@ const ScenariosViewRefactored: React.FC = () => {
       // Clear current scenario when no scenarioId is provided
       setCurrentScenario(null);
     }
-  }, [scenarioId, scenarios, setCurrentScenario, baselineModel, loadFinancialModel, setBaselineModel, toggleComparisonMode, isCreating]);
+  }, [scenarioId, scenarios, setCurrentScenario, baselineModel, loadModelById, setBaselineModel, toggleComparisonMode, isCreating]);
 
   // Handle scenario selection
   const handleSelectScenario = (scenario: Scenario) => {
