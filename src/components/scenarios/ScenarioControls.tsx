@@ -27,10 +27,10 @@ const ScenarioControls: React.FC<ScenarioControlsProps> = ({
     updateScenario: state.updateScenario,
     calculateScenarioForecast: state.calculateScenarioForecast
   }));
-  
+
   // Add a state to track if we're currently saving
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // Add a local copy of the dirty state to ensure buttons don't flicker
   const [localIsDirty, setLocalIsDirty] = useState(isDirty);
 
@@ -48,36 +48,36 @@ const ScenarioControls: React.FC<ScenarioControlsProps> = ({
   const handleSave = async () => {
     try {
       console.log('Saving scenario with deltas:', localDeltas);
-      
+
       // Set saving state
       setIsSaving(true);
       // Immediately disable the button by setting local state
       setLocalIsDirty(false);
-      
+
       // Show loading toast
       toast({
         title: 'Saving...',
         description: 'Saving your scenario changes',
       });
-      
+
       // Update timestamp
       const updatedScenario = {
         ...scenario,
         parameterDeltas: { ...localDeltas },
         updatedAt: new Date()
       };
-      
+
       // Save to database and update store
       await updateScenario(updatedScenario);
-      
+
       // Calculate forecast with updated data
       calculateScenarioForecast();
-      
+
       // Dispatch a saved event to reset dirty state in parent components
       document.dispatchEvent(new CustomEvent('scenario:saved', {
         detail: { scenarioId: scenario.id }
       }));
-      
+
       // Show success toast
       toast({
         title: 'Success',
@@ -85,10 +85,10 @@ const ScenarioControls: React.FC<ScenarioControlsProps> = ({
       });
     } catch (error) {
       console.error('Error saving scenario:', error);
-      
+
       // If there was an error, re-enable the buttons
       setLocalIsDirty(true);
-      
+
       // Show error toast
       toast({
         title: 'Error',
@@ -100,23 +100,23 @@ const ScenarioControls: React.FC<ScenarioControlsProps> = ({
       setIsSaving(false);
     }
   };
-  
+
   // Handle reset
   const handleReset = () => {
     try {
       console.log('Resetting scenario');
-      
+
       // Immediately disable buttons
       setLocalIsDirty(false);
-      
+
       // Call the provided reset function
       onReset();
     } catch (error) {
       console.error('Error resetting scenario:', error);
-      
+
       // If there was an error, re-enable the buttons
       setLocalIsDirty(true);
-      
+
       // Show error toast
       toast({
         title: 'Error',
@@ -128,30 +128,29 @@ const ScenarioControls: React.FC<ScenarioControlsProps> = ({
 
   return (
     <div className="flex space-x-2">
+      <div className={`px-3 py-1 text-xs rounded-md flex items-center ${!localIsDirty ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+        {!localIsDirty ? 'No Changes' : 'Unsaved Changes'}
+      </div>
+      <div className="flex-1"></div>
       <Button
         variant="outline"
         size="sm"
         onClick={handleReset}
         disabled={!localIsDirty}
+        className="h-8 text-xs"
       >
-        <RefreshCcw className="mr-2 h-4 w-4" />
         Reset
       </Button>
       <Button
         size="sm"
         onClick={handleSave}
         disabled={!localIsDirty || isSaving}
+        className="h-8 text-xs bg-blue-600 hover:bg-blue-700"
       >
         {isSaving ? (
-          <>
-            <span className="mr-2 h-4 w-4 animate-spin">⟳</span>
-            Saving...
-          </>
+          <>Saving...</>
         ) : (
-          <>
-            <Save className="mr-2 h-4 w-4" />
-            Save Changes
-          </>
+          <>Save Changes</>
         )}
       </Button>
     </div>

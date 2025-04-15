@@ -11,13 +11,13 @@ export interface ScenarioParameterDeltas {
   // Marketing adjustments
   marketingSpendPercent: number; // Overall marketing budget adjustment
   marketingSpendByChannel: Record<string, number>; // Per-channel adjustments
-  
+
   // Pricing adjustments
   pricingPercent: number; // Average ticket price adjustment
-  
+
   // Attendance adjustments
   attendanceGrowthPercent: number; // Attendance growth rate adjustment
-  
+
   // Cost adjustments
   cogsMultiplier: number; // Cost of goods sold adjustment
 }
@@ -30,7 +30,7 @@ export interface Scenario {
   id?: number; // Auto-generated ID
   name: string; // User-friendly name
   description?: string; // Optional description
-  baseModelId: number; // Reference to the base financial model
+  modelId: number; // Reference to the base financial model
   projectId: number; // Reference to the project
   parameterDeltas: ScenarioParameterDeltas; // Parameter adjustments
   createdAt: Date; // Creation timestamp

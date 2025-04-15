@@ -43,6 +43,7 @@ interface ScenariosListProps {
   scenarios: Scenario[];
   loading: boolean;
   onSelect: (scenario: Scenario) => void;
+  onCreate: () => void;
   projectId: number;
   baseModelId: number;
 }
@@ -55,6 +56,7 @@ const ScenariosList: React.FC<ScenariosListProps> = ({
   scenarios,
   loading,
   onSelect,
+  onCreate,
   projectId,
   baseModelId
 }) => {
@@ -134,11 +136,10 @@ const ScenariosList: React.FC<ScenariosListProps> = ({
             Create your first scenario to start modeling different business outcomes.
           </TypographyMuted>
 
-          <CreateScenarioDialog
-            projectId={projectId}
-            baseModelId={baseModelId}
-            onScenarioCreated={() => setIsCreateDialogOpen(false)}
-          />
+          <Button onClick={onCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create New Scenario
+          </Button>
         </CardContent>
       </Card>
     );
@@ -154,11 +155,10 @@ const ScenariosList: React.FC<ScenariosListProps> = ({
             Create and manage different business scenarios
           </CardDescription>
         </div>
-        <CreateScenarioDialog
-          projectId={projectId}
-          baseModelId={baseModelId}
-          onScenarioCreated={() => setIsCreateDialogOpen(false)}
-        />
+        <Button onClick={onCreate}>
+          <Plus className="mr-2 h-4 w-4" />
+          Create New Scenario
+        </Button>
       </CardHeader>
       <CardContent>
         <Table>

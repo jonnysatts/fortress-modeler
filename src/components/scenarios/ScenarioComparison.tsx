@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
 } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Scenario } from '@/types/scenarios';
@@ -28,7 +28,7 @@ const ScenarioComparison: React.FC<ScenarioComparisonProps> = ({
   baselineModel
 }) => {
   const [activeTab, setActiveTab] = React.useState('revenue');
-  
+
   // Get data from store
   const {
     scenarioForecastData,
@@ -41,27 +41,27 @@ const ScenarioComparison: React.FC<ScenarioComparisonProps> = ({
     calculateScenarioForecast: state.calculateScenarioForecast,
     toggleComparisonMode: state.toggleComparisonMode
   }));
-  
+
   // Calculate forecast and enable comparison mode when component mounts
   useEffect(() => {
-    calculateScenarioForecast();
+    calculateScenarioForecast(baselineModel, scenario.parameterDeltas);
     toggleComparisonMode(true);
-    
+
     // Disable comparison mode when component unmounts
     return () => {
       toggleComparisonMode(false);
     };
-  }, [calculateScenarioForecast, toggleComparisonMode]);
-  
+  }, [calculateScenarioForecast, toggleComparisonMode, baselineModel, scenario]);
+
   // Prepare data for charts
   const prepareChartData = () => {
     if (!baselineForecastData.length || !scenarioForecastData.length) {
       return [];
     }
-    
+
     return baselineForecastData.map((baselineData, index) => {
       const scenarioData = scenarioForecastData[index] || baselineData;
-      
+
       return {
         name: baselineData.point,
         baselineRevenue: baselineData.revenue,
@@ -79,14 +79,14 @@ const ScenarioComparison: React.FC<ScenarioComparisonProps> = ({
       };
     });
   };
-  
+
   const chartData = prepareChartData();
-  
+
   // Custom tooltip formatter
   const formatTooltip = (value: number) => {
     return formatCurrency(value);
   };
-  
+
   return (
     <div className="space-y-6">
       <Card>
@@ -104,7 +104,7 @@ const ScenarioComparison: React.FC<ScenarioComparisonProps> = ({
               <TabsTrigger value="profit">Profit</TabsTrigger>
               <TabsTrigger value="cumulative">Cumulative</TabsTrigger>
             </TabsList>
-            
+
             {/* Revenue Tab */}
             <TabsContent value="revenue" className="space-y-6">
               <div className="h-[400px]">
@@ -115,26 +115,26 @@ const ScenarioComparison: React.FC<ScenarioComparisonProps> = ({
                       margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="name" 
-                        angle={-45} 
-                        textAnchor="end" 
-                        height={70} 
+                      <XAxis
+                        dataKey="name"
+                        angle={-45}
+                        textAnchor="end"
+                        height={70}
                       />
                       <YAxis tickFormatter={formatTooltip} />
                       <Tooltip formatter={formatTooltip} />
                       <Legend />
-                      <Bar 
-                        dataKey="baselineRevenue" 
-                        name="Baseline Revenue" 
-                        fill="#1A2942" 
-                        barSize={20} 
+                      <Bar
+                        dataKey="baselineRevenue"
+                        name="Baseline Revenue"
+                        fill="#1A2942"
+                        barSize={20}
                       />
-                      <Bar 
-                        dataKey="scenarioRevenue" 
-                        name="Scenario Revenue" 
-                        fill="#10B981" 
-                        barSize={20} 
+                      <Bar
+                        dataKey="scenarioRevenue"
+                        name="Scenario Revenue"
+                        fill="#10B981"
+                        barSize={20}
                       />
                     </BarChart>
                   </ResponsiveContainer>
@@ -145,7 +145,7 @@ const ScenarioComparison: React.FC<ScenarioComparisonProps> = ({
                 )}
               </div>
             </TabsContent>
-            
+
             {/* Costs Tab */}
             <TabsContent value="costs" className="space-y-6">
               <div className="h-[400px]">
@@ -156,26 +156,26 @@ const ScenarioComparison: React.FC<ScenarioComparisonProps> = ({
                       margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="name" 
-                        angle={-45} 
-                        textAnchor="end" 
-                        height={70} 
+                      <XAxis
+                        dataKey="name"
+                        angle={-45}
+                        textAnchor="end"
+                        height={70}
                       />
                       <YAxis tickFormatter={formatTooltip} />
                       <Tooltip formatter={formatTooltip} />
                       <Legend />
-                      <Bar 
-                        dataKey="baselineCost" 
-                        name="Baseline Costs" 
-                        fill="#1A2942" 
-                        barSize={20} 
+                      <Bar
+                        dataKey="baselineCost"
+                        name="Baseline Costs"
+                        fill="#1A2942"
+                        barSize={20}
                       />
-                      <Bar 
-                        dataKey="scenarioCost" 
-                        name="Scenario Costs" 
-                        fill="#EF4444" 
-                        barSize={20} 
+                      <Bar
+                        dataKey="scenarioCost"
+                        name="Scenario Costs"
+                        fill="#EF4444"
+                        barSize={20}
                       />
                     </BarChart>
                   </ResponsiveContainer>
@@ -186,7 +186,7 @@ const ScenarioComparison: React.FC<ScenarioComparisonProps> = ({
                 )}
               </div>
             </TabsContent>
-            
+
             {/* Profit Tab */}
             <TabsContent value="profit" className="space-y-6">
               <div className="h-[400px]">
@@ -197,26 +197,26 @@ const ScenarioComparison: React.FC<ScenarioComparisonProps> = ({
                       margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="name" 
-                        angle={-45} 
-                        textAnchor="end" 
-                        height={70} 
+                      <XAxis
+                        dataKey="name"
+                        angle={-45}
+                        textAnchor="end"
+                        height={70}
                       />
                       <YAxis tickFormatter={formatTooltip} />
                       <Tooltip formatter={formatTooltip} />
                       <Legend />
-                      <Bar 
-                        dataKey="baselineProfit" 
-                        name="Baseline Profit" 
-                        fill="#1A2942" 
-                        barSize={20} 
+                      <Bar
+                        dataKey="baselineProfit"
+                        name="Baseline Profit"
+                        fill="#1A2942"
+                        barSize={20}
                       />
-                      <Bar 
-                        dataKey="scenarioProfit" 
-                        name="Scenario Profit" 
-                        fill="#6366F1" 
-                        barSize={20} 
+                      <Bar
+                        dataKey="scenarioProfit"
+                        name="Scenario Profit"
+                        fill="#6366F1"
+                        barSize={20}
                       />
                     </BarChart>
                   </ResponsiveContainer>
@@ -227,7 +227,7 @@ const ScenarioComparison: React.FC<ScenarioComparisonProps> = ({
                 )}
               </div>
             </TabsContent>
-            
+
             {/* Cumulative Tab */}
             <TabsContent value="cumulative" className="space-y-6">
               <div className="h-[400px]">
@@ -238,48 +238,48 @@ const ScenarioComparison: React.FC<ScenarioComparisonProps> = ({
                       margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="name" 
-                        angle={-45} 
-                        textAnchor="end" 
-                        height={70} 
+                      <XAxis
+                        dataKey="name"
+                        angle={-45}
+                        textAnchor="end"
+                        height={70}
                       />
                       <YAxis tickFormatter={formatTooltip} />
                       <Tooltip formatter={formatTooltip} />
                       <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="baselineCumulativeRevenue" 
-                        name="Baseline Revenue" 
-                        stroke="#1A2942" 
-                        strokeWidth={2} 
-                        dot={{ r: 4 }} 
+                      <Line
+                        type="monotone"
+                        dataKey="baselineCumulativeRevenue"
+                        name="Baseline Revenue"
+                        stroke="#1A2942"
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
                       />
-                      <Line 
-                        type="monotone" 
-                        dataKey="scenarioCumulativeRevenue" 
-                        name="Scenario Revenue" 
-                        stroke="#10B981" 
-                        strokeWidth={2} 
-                        dot={{ r: 4 }} 
+                      <Line
+                        type="monotone"
+                        dataKey="scenarioCumulativeRevenue"
+                        name="Scenario Revenue"
+                        stroke="#10B981"
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
                       />
-                      <Line 
-                        type="monotone" 
-                        dataKey="baselineCumulativeCost" 
-                        name="Baseline Costs" 
-                        stroke="#94A3B8" 
-                        strokeWidth={2} 
-                        dot={{ r: 4 }} 
-                        strokeDasharray="5 5" 
+                      <Line
+                        type="monotone"
+                        dataKey="baselineCumulativeCost"
+                        name="Baseline Costs"
+                        stroke="#94A3B8"
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                        strokeDasharray="5 5"
                       />
-                      <Line 
-                        type="monotone" 
-                        dataKey="scenarioCumulativeCost" 
-                        name="Scenario Costs" 
-                        stroke="#EF4444" 
-                        strokeWidth={2} 
-                        dot={{ r: 4 }} 
-                        strokeDasharray="5 5" 
+                      <Line
+                        type="monotone"
+                        dataKey="scenarioCumulativeCost"
+                        name="Scenario Costs"
+                        stroke="#EF4444"
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                        strokeDasharray="5 5"
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -293,7 +293,7 @@ const ScenarioComparison: React.FC<ScenarioComparisonProps> = ({
           </Tabs>
         </CardContent>
       </Card>
-      
+
       {/* Summary Table */}
       <Card>
         <CardHeader>
@@ -324,19 +324,19 @@ const ScenarioComparison: React.FC<ScenarioComparisonProps> = ({
                       </td>
                       <td className="text-right py-2 px-4">
                         {formatCurrency(
-                          chartData[chartData.length - 1].scenarioCumulativeRevenue - 
+                          chartData[chartData.length - 1].scenarioCumulativeRevenue -
                           chartData[chartData.length - 1].baselineCumulativeRevenue
                         )}
                       </td>
                       <td className={`text-right py-2 px-4 ${
-                        chartData[chartData.length - 1].scenarioCumulativeRevenue > 
+                        chartData[chartData.length - 1].scenarioCumulativeRevenue >
                         chartData[chartData.length - 1].baselineCumulativeRevenue
                           ? 'text-green-600'
                           : 'text-red-600'
                       }`}>
                         {(
-                          ((chartData[chartData.length - 1].scenarioCumulativeRevenue - 
-                            chartData[chartData.length - 1].baselineCumulativeRevenue) / 
+                          ((chartData[chartData.length - 1].scenarioCumulativeRevenue -
+                            chartData[chartData.length - 1].baselineCumulativeRevenue) /
                             chartData[chartData.length - 1].baselineCumulativeRevenue) * 100
                         ).toFixed(1)}%
                       </td>
@@ -351,19 +351,19 @@ const ScenarioComparison: React.FC<ScenarioComparisonProps> = ({
                       </td>
                       <td className="text-right py-2 px-4">
                         {formatCurrency(
-                          chartData[chartData.length - 1].scenarioCumulativeCost - 
+                          chartData[chartData.length - 1].scenarioCumulativeCost -
                           chartData[chartData.length - 1].baselineCumulativeCost
                         )}
                       </td>
                       <td className={`text-right py-2 px-4 ${
-                        chartData[chartData.length - 1].scenarioCumulativeCost < 
+                        chartData[chartData.length - 1].scenarioCumulativeCost <
                         chartData[chartData.length - 1].baselineCumulativeCost
                           ? 'text-green-600'
                           : 'text-red-600'
                       }`}>
                         {(
-                          ((chartData[chartData.length - 1].scenarioCumulativeCost - 
-                            chartData[chartData.length - 1].baselineCumulativeCost) / 
+                          ((chartData[chartData.length - 1].scenarioCumulativeCost -
+                            chartData[chartData.length - 1].baselineCumulativeCost) /
                             chartData[chartData.length - 1].baselineCumulativeCost) * 100
                         ).toFixed(1)}%
                       </td>
@@ -378,20 +378,20 @@ const ScenarioComparison: React.FC<ScenarioComparisonProps> = ({
                       </td>
                       <td className="text-right py-2 px-4">
                         {formatCurrency(
-                          chartData[chartData.length - 1].scenarioCumulativeProfit - 
+                          chartData[chartData.length - 1].scenarioCumulativeProfit -
                           chartData[chartData.length - 1].baselineCumulativeProfit
                         )}
                       </td>
                       <td className={`text-right py-2 px-4 ${
-                        chartData[chartData.length - 1].scenarioCumulativeProfit > 
+                        chartData[chartData.length - 1].scenarioCumulativeProfit >
                         chartData[chartData.length - 1].baselineCumulativeProfit
                           ? 'text-green-600'
                           : 'text-red-600'
                       }`}>
                         {chartData[chartData.length - 1].baselineCumulativeProfit !== 0 ? (
                           (
-                            ((chartData[chartData.length - 1].scenarioCumulativeProfit - 
-                              chartData[chartData.length - 1].baselineCumulativeProfit) / 
+                            ((chartData[chartData.length - 1].scenarioCumulativeProfit -
+                              chartData[chartData.length - 1].baselineCumulativeProfit) /
                               Math.abs(chartData[chartData.length - 1].baselineCumulativeProfit)) * 100
                           ).toFixed(1) + '%'
                         ) : (
@@ -403,38 +403,38 @@ const ScenarioComparison: React.FC<ScenarioComparisonProps> = ({
                       <td className="py-2 px-4 font-medium">Profit Margin</td>
                       <td className="text-right py-2 px-4">
                         {(
-                          (chartData[chartData.length - 1].baselineCumulativeProfit / 
+                          (chartData[chartData.length - 1].baselineCumulativeProfit /
                             chartData[chartData.length - 1].baselineCumulativeRevenue) * 100
                         ).toFixed(1)}%
                       </td>
                       <td className="text-right py-2 px-4">
                         {(
-                          (chartData[chartData.length - 1].scenarioCumulativeProfit / 
+                          (chartData[chartData.length - 1].scenarioCumulativeProfit /
                             chartData[chartData.length - 1].scenarioCumulativeRevenue) * 100
                         ).toFixed(1)}%
                       </td>
                       <td className="text-right py-2 px-4">
                         {(
-                          ((chartData[chartData.length - 1].scenarioCumulativeProfit / 
-                            chartData[chartData.length - 1].scenarioCumulativeRevenue) * 100) - 
-                          ((chartData[chartData.length - 1].baselineCumulativeProfit / 
+                          ((chartData[chartData.length - 1].scenarioCumulativeProfit /
+                            chartData[chartData.length - 1].scenarioCumulativeRevenue) * 100) -
+                          ((chartData[chartData.length - 1].baselineCumulativeProfit /
                             chartData[chartData.length - 1].baselineCumulativeRevenue) * 100)
                         ).toFixed(1)}%
                       </td>
                       <td className={`text-right py-2 px-4 ${
-                        (chartData[chartData.length - 1].scenarioCumulativeProfit / 
-                          chartData[chartData.length - 1].scenarioCumulativeRevenue) > 
-                        (chartData[chartData.length - 1].baselineCumulativeProfit / 
+                        (chartData[chartData.length - 1].scenarioCumulativeProfit /
+                          chartData[chartData.length - 1].scenarioCumulativeRevenue) >
+                        (chartData[chartData.length - 1].baselineCumulativeProfit /
                           chartData[chartData.length - 1].baselineCumulativeRevenue)
                           ? 'text-green-600'
                           : 'text-red-600'
                       }`}>
                         {(
-                          (((chartData[chartData.length - 1].scenarioCumulativeProfit / 
-                            chartData[chartData.length - 1].scenarioCumulativeRevenue) - 
-                            (chartData[chartData.length - 1].baselineCumulativeProfit / 
-                            chartData[chartData.length - 1].baselineCumulativeRevenue)) / 
-                            (chartData[chartData.length - 1].baselineCumulativeProfit / 
+                          (((chartData[chartData.length - 1].scenarioCumulativeProfit /
+                            chartData[chartData.length - 1].scenarioCumulativeRevenue) -
+                            (chartData[chartData.length - 1].baselineCumulativeProfit /
+                            chartData[chartData.length - 1].baselineCumulativeRevenue)) /
+                            (chartData[chartData.length - 1].baselineCumulativeProfit /
                             chartData[chartData.length - 1].baselineCumulativeRevenue)) * 100
                         ).toFixed(1)}%
                       </td>
