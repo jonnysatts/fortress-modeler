@@ -1,17 +1,27 @@
 import { FinancialModel } from "@/lib/db";
 
 // Import statements (will be commented out progressively)
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Tooltip } from "recharts";
 import { Card } from "@/components/ui/card";
-import { calculateTotalRevenue, calculateTotalCosts } from "@/lib/financialCalculations";
-import { 
+import {
+  calculateTotalRevenue,
+  calculateTotalCosts,
+  calculateRevenueBreakdown,
+  calculateCostBreakdown,
+  calculateCostTypeBreakdown
+} from "@/lib/finance/modules";
+import { useCalculationEngine } from "@/hooks/useCalculationEngine";
+import { calculationLogger, generateCalculationId } from "@/lib/finance/logging/calculationLogger";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
   prepareRevenueDataForWeek,
   prepareCostDataForWeek,
   prepareTypeCategorizedDataForWeek,
   RevenueData,
   CostData,
-  TypeCategoryData 
+  TypeCategoryData
 } from "./breakdownCalculations";
 import RevenueBreakdownView from "./RevenueBreakdownView";
 import CostBreakdownView from "./CostBreakdownView";
@@ -29,7 +39,7 @@ interface CategoryBreakdownProps {
 }
 
 // Define consistent colors, adding Marketing Budget
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#a855f7', '#ef4444', '#f97316', '#eab308', '#84cc16', '#14b8a6']; 
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#a855f7', '#ef4444', '#f97316', '#eab308', '#84cc16', '#14b8a6'];
 const COST_COLOR_MAP: Record<string, string> = {
   "Setup Costs": "#ef4444",
   "Marketing Budget": "#a855f7",
@@ -58,43 +68,395 @@ const CustomTooltip = ({ active, payload }: any) => {
 };
 
 const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryBreakdownProps) => {
+  // Generate a unique ID for this component instance
+  const componentId = useMemo(() => generateCalculationId(), []);
+
   const [breakdownView, setBreakdownView] = useState<"revenue" | "costs">("revenue");
   const [selectedWeek, setSelectedWeek] = useState<number>(1); // Default to week 1
-  
+
+  // Get version information from the calculation engine
+  const { versionString, featureFlags } = useCalculationEngine();
+
+  // Determine if we should show version information
+  const showVersionInfo = featureFlags.showVersionInfo;
+
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month"; // Define timeUnit here
   const totalWeeks = model.assumptions.metadata?.weeks || 0;
 
-  // Log the received cost data prop
-  console.log(`[CategoryBreakdown Render] Received costTrendData:`, costTrendData);
-
-  console.log(`[CategoryBreakdown] View: ${breakdownView}, Selected Week: ${selectedWeek}`);
+  // Log component initialization
+  calculationLogger.debug(
+    'Category breakdown component initialized',
+    {
+      modelId: model.id,
+      modelName: model.name,
+      view: breakdownView,
+      selectedWeek,
+      timeUnit,
+      totalWeeks
+    },
+    componentId,
+    'CategoryBreakdown.init'
+  );
 
   // Find the data point for the selected week
   // Note: Assumes trendData arrays start from Week 1 at index 0
   const selectedRevenuePoint = revenueTrendData?.[selectedWeek - 1] || null;
   const selectedCostPoint = costTrendData?.[selectedWeek - 1] || null;
-  
-  // Log the selected data point
-  console.log(`[CategoryBreakdown Render] Selected cost point for ${timeUnit} ${selectedWeek}:`, selectedCostPoint);
-  
-  // Calculate breakdown data for the selected week
-  const revenueData = useMemo(() => 
-    prepareRevenueDataForWeek(selectedRevenuePoint), 
-    [selectedRevenuePoint]
-  );
-  const costData = useMemo(() => 
-    prepareCostDataForWeek(selectedCostPoint, model), 
-    [selectedCostPoint, model]
-  );
-  const typeCategorizedData = useMemo(() => 
-    prepareTypeCategorizedDataForWeek(selectedCostPoint, model), 
-    [selectedCostPoint, model]
-  );
+
+  // Define calculation functions with performance tracking
+  const calculateRevenueData = useCallback(() => {
+    // Generate a unique ID for this calculation
+    const calculationId = generateCalculationId();
+
+    // Log the start of the calculation
+    calculationLogger.debug(
+      'Starting revenue breakdown calculation',
+      {
+        modelId: model.id,
+        modelName: model.name,
+        selectedWeek
+      },
+      calculationId,
+      'CategoryBreakdown.calculateRevenueData'
+    );
+
+    // Start performance tracking
+    const startTime = performance.now();
+
+    try {
+      // Try to use the centralized calculation engine first
+      if (selectedWeek > 0) {
+        const revenueBreakdown = calculateRevenueBreakdown(model, selectedWeek);
+
+        if (revenueBreakdown && Object.keys(revenueBreakdown).length > 0) {
+          // Convert the breakdown to the format expected by the component
+          const result = Object.entries(revenueBreakdown).map(([name, value]) => ({
+            name,
+            value: Math.round(value as number),
+            percentage: 0 // Will be calculated below
+          }));
+
+          // Calculate total revenue for percentage calculation
+          const totalRevenue = result.reduce((sum, item) => sum + item.value, 0);
+
+          // Calculate percentages
+          result.forEach(item => {
+            item.percentage = totalRevenue > 0 ? Math.round((item.value / totalRevenue) * 100) : 0;
+          });
+
+          // End performance tracking
+          const endTime = performance.now();
+          const duration = endTime - startTime;
+
+          // Log the result
+          calculationLogger.debug(
+            'Completed revenue breakdown calculation using centralized engine',
+            {
+              modelId: model.id,
+              modelName: model.name,
+              selectedWeek,
+              categories: result.length,
+              duration: `${duration.toFixed(2)}ms`
+            },
+            calculationId,
+            'CategoryBreakdown.calculateRevenueData'
+          );
+
+          return result;
+        }
+      }
+
+      // Fallback to the original calculation method
+      const result = prepareRevenueDataForWeek(selectedRevenuePoint);
+
+      // End performance tracking
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+
+      // Log the result
+      calculationLogger.debug(
+        'Completed revenue breakdown calculation using fallback method',
+        {
+          modelId: model.id,
+          modelName: model.name,
+          selectedWeek,
+          categories: result.length,
+          duration: `${duration.toFixed(2)}ms`
+        },
+        calculationId,
+        'CategoryBreakdown.calculateRevenueData'
+      );
+
+      return result;
+    } catch (error) {
+      // End performance tracking
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+
+      // Log the error
+      calculationLogger.error(
+        'Error calculating revenue breakdown',
+        {
+          modelId: model.id,
+          modelName: model.name,
+          selectedWeek,
+          error,
+          duration: `${duration.toFixed(2)}ms`
+        },
+        calculationId,
+        'CategoryBreakdown.calculateRevenueData'
+      );
+
+      // Return empty array
+      return [];
+    }
+  }, [model, selectedWeek, selectedRevenuePoint]);
+
+  const calculateCostData = useCallback(() => {
+    // Generate a unique ID for this calculation
+    const calculationId = generateCalculationId();
+
+    // Log the start of the calculation
+    calculationLogger.debug(
+      'Starting cost breakdown calculation',
+      {
+        modelId: model.id,
+        modelName: model.name,
+        selectedWeek
+      },
+      calculationId,
+      'CategoryBreakdown.calculateCostData'
+    );
+
+    // Start performance tracking
+    const startTime = performance.now();
+
+    try {
+      // Try to use the centralized calculation engine first
+      if (selectedWeek > 0) {
+        const costBreakdown = calculateCostBreakdown(model, selectedWeek);
+
+        if (costBreakdown && Object.keys(costBreakdown).length > 0) {
+          // Convert the breakdown to the format expected by the component
+          const result = Object.entries(costBreakdown).map(([key, value]) => {
+            // Map the keys to more readable names
+            let name = key;
+            if (key === 'fbCOGS') name = 'F&B COGS';
+            if (key === 'merchCOGS') name = 'Merchandise COGS';
+            if (key === 'staffCosts') name = 'Staff Costs';
+            if (key === 'managementCosts') name = 'Management Costs';
+            if (key === 'setupCosts') name = 'Setup Costs';
+            if (key === 'marketingCost') name = 'Marketing Budget';
+
+            return {
+              name,
+              value: Math.round(value as number),
+              percentage: 0 // Will be calculated below
+            };
+          });
+
+          // Calculate total costs for percentage calculation
+          const totalCosts = result.reduce((sum, item) => sum + item.value, 0);
+
+          // Calculate percentages
+          result.forEach(item => {
+            item.percentage = totalCosts > 0 ? Math.round((item.value / totalCosts) * 100) : 0;
+          });
+
+          // End performance tracking
+          const endTime = performance.now();
+          const duration = endTime - startTime;
+
+          // Log the result
+          calculationLogger.debug(
+            'Completed cost breakdown calculation using centralized engine',
+            {
+              modelId: model.id,
+              modelName: model.name,
+              selectedWeek,
+              categories: result.length,
+              duration: `${duration.toFixed(2)}ms`
+            },
+            calculationId,
+            'CategoryBreakdown.calculateCostData'
+          );
+
+          return result;
+        }
+      }
+
+      // Fallback to the original calculation method
+      const result = prepareCostDataForWeek(selectedCostPoint, model);
+
+      // End performance tracking
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+
+      // Log the result
+      calculationLogger.debug(
+        'Completed cost breakdown calculation using fallback method',
+        {
+          modelId: model.id,
+          modelName: model.name,
+          selectedWeek,
+          categories: result.length,
+          duration: `${duration.toFixed(2)}ms`
+        },
+        calculationId,
+        'CategoryBreakdown.calculateCostData'
+      );
+
+      return result;
+    } catch (error) {
+      // End performance tracking
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+
+      // Log the error
+      calculationLogger.error(
+        'Error calculating cost breakdown',
+        {
+          modelId: model.id,
+          modelName: model.name,
+          selectedWeek,
+          error,
+          duration: `${duration.toFixed(2)}ms`
+        },
+        calculationId,
+        'CategoryBreakdown.calculateCostData'
+      );
+
+      // Return empty array
+      return [];
+    }
+  }, [model, selectedWeek, selectedCostPoint]);
+
+  const calculateTypeCategorizedData = useCallback(() => {
+    // Generate a unique ID for this calculation
+    const calculationId = generateCalculationId();
+
+    // Log the start of the calculation
+    calculationLogger.debug(
+      'Starting cost type breakdown calculation',
+      {
+        modelId: model.id,
+        modelName: model.name,
+        selectedWeek
+      },
+      calculationId,
+      'CategoryBreakdown.calculateTypeCategorizedData'
+    );
+
+    // Start performance tracking
+    const startTime = performance.now();
+
+    try {
+      // Try to use the centralized calculation engine first
+      if (selectedWeek > 0) {
+        const costTypeBreakdown = calculateCostTypeBreakdown(model, selectedWeek);
+
+        if (costTypeBreakdown && Object.keys(costTypeBreakdown).length > 0) {
+          // Convert the breakdown to the format expected by the component
+          const result = Object.entries(costTypeBreakdown).map(([key, value]) => {
+            // Map the keys to more readable names
+            let name = key;
+            if (key === 'fixedCosts') name = 'Fixed Costs';
+            if (key === 'variableCosts') name = 'Variable Costs';
+            if (key === 'marketingCosts') name = 'Marketing Costs';
+
+            return {
+              name,
+              value: Math.round(value as number),
+              percentage: 0, // Will be calculated below
+              type: key.replace('Costs', '')
+            };
+          });
+
+          // Calculate total costs for percentage calculation
+          const totalCosts = result.reduce((sum, item) => sum + item.value, 0);
+
+          // Calculate percentages
+          result.forEach(item => {
+            item.percentage = totalCosts > 0 ? Math.round((item.value / totalCosts) * 100) : 0;
+          });
+
+          // End performance tracking
+          const endTime = performance.now();
+          const duration = endTime - startTime;
+
+          // Log the result
+          calculationLogger.debug(
+            'Completed cost type breakdown calculation using centralized engine',
+            {
+              modelId: model.id,
+              modelName: model.name,
+              selectedWeek,
+              categories: result.length,
+              duration: `${duration.toFixed(2)}ms`
+            },
+            calculationId,
+            'CategoryBreakdown.calculateTypeCategorizedData'
+          );
+
+          return result;
+        }
+      }
+
+      // Fallback to the original calculation method
+      const result = prepareTypeCategorizedDataForWeek(selectedCostPoint, model);
+
+      // End performance tracking
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+
+      // Log the result
+      calculationLogger.debug(
+        'Completed cost type breakdown calculation using fallback method',
+        {
+          modelId: model.id,
+          modelName: model.name,
+          selectedWeek,
+          categories: result.length,
+          duration: `${duration.toFixed(2)}ms`
+        },
+        calculationId,
+        'CategoryBreakdown.calculateTypeCategorizedData'
+      );
+
+      return result;
+    } catch (error) {
+      // End performance tracking
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+
+      // Log the error
+      calculationLogger.error(
+        'Error calculating cost type breakdown',
+        {
+          modelId: model.id,
+          modelName: model.name,
+          selectedWeek,
+          error,
+          duration: `${duration.toFixed(2)}ms`
+        },
+        calculationId,
+        'CategoryBreakdown.calculateTypeCategorizedData'
+      );
+
+      // Return empty array
+      return [];
+    }
+  }, [model, selectedWeek, selectedCostPoint]);
+
+  // Memoize the calculation results
+  const revenueData = useMemo(() => calculateRevenueData(), [calculateRevenueData]);
+  const costData = useMemo(() => calculateCostData(), [calculateCostData]);
+  const typeCategorizedData = useMemo(() => calculateTypeCategorizedData(), [calculateTypeCategorizedData]);
 
   // Log the costData just before rendering
   console.log("[CategoryBreakdown Render] costData state before JSX:", costData);
-  
+
   const weeklyTotals = useMemo(() => {
     if (!isWeeklyEvent) return null;
     const totalRevenue = calculateTotalRevenue(model);
@@ -103,17 +465,36 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
     const profitMarginPercentage = totalRevenue > 0 ? ((profit / totalRevenue) * 100).toFixed(1) : "0.0";
     return { totalRevenue, totalCosts, profit, profitMargin: profitMarginPercentage };
   }, [model, isWeeklyEvent]);
-  
+
   // Function to get color for cost category, falling back to COLORS array
   const getCostColor = (name: string, index: number): string => {
     return COST_COLOR_MAP[name] || COLORS[index % COLORS.length];
   };
-  
+
   const tooltipElement = <Tooltip content={<CustomTooltip />} />;
-  
+
   return (
     <div className="space-y-6">
-      {/* Title, Toggles, and Week Selector */}
+      {/* Title with Version Info */}
+      <div className="flex items-center gap-2 mb-2">
+        <h3 className="text-lg font-medium">Category Breakdown</h3>
+        {showVersionInfo && (
+          <TooltipProvider>
+            <UITooltip>
+              <TooltipTrigger>
+                <Badge variant="outline" className="ml-2 text-xs">
+                  {versionString}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Using calculation engine version {versionString}</p>
+              </TooltipContent>
+            </UITooltip>
+          </TooltipProvider>
+        )}
+      </div>
+
+      {/* Toggles and Week Selector */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <button
@@ -133,13 +514,13 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
             Costs
           </button>
         </div>
-        
-        {/* Week Selector */} 
+
+        {/* Week Selector */}
         {isWeeklyEvent && totalWeeks > 0 && (
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">View Week:</span>
-            <Select 
-              value={selectedWeek.toString()} 
+            <Select
+              value={selectedWeek.toString()}
               onValueChange={(value) => setSelectedWeek(Number(value))}
             >
               <SelectTrigger className="w-[80px] h-9">
@@ -160,13 +541,13 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
           {breakdownView === "revenue" ? "Revenue" : "Cost"} Breakdown for Week {selectedWeek}
         </h3>
       </div>
-      
+
       {breakdownView === "revenue" && (
-        <RevenueBreakdownView 
-          data={revenueData} 
-          colors={COLORS} 
-          tooltip={tooltipElement} 
-          selectedWeek={selectedWeek} 
+        <RevenueBreakdownView
+          data={revenueData}
+          colors={COLORS}
+          tooltip={tooltipElement}
+          selectedWeek={selectedWeek}
         />
       )}
 
@@ -195,14 +576,14 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
                     ))}
                   </Pie>
                   <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                  <Legend 
+                  <Legend
                      formatter={(value, entry) => <span style={{ color: entry.color }}>{value}</span>}
                   />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
-          
+
           {/* Cost Categories Bar Chart */}
           <Card>
             <CardHeader><CardTitle className="text-base font-semibold">Cost Categories By Amount for {timeUnit} {selectedWeek}</CardTitle></CardHeader>
@@ -222,7 +603,7 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
               </ResponsiveContainer>
             </CardContent>
           </Card>
-          
+
           {/* Costs By Type Bar Chart */}
           <Card>
             <CardHeader><CardTitle className="text-base font-semibold">Costs By Type for {timeUnit} {selectedWeek}</CardTitle></CardHeader>
@@ -242,7 +623,7 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
               </ResponsiveContainer>
             </CardContent>
           </Card>
-          
+
           {/* Cost Category Details Table */}
           <Card className="lg:col-span-2">
             <CardHeader><CardTitle className="text-base font-semibold">Cost Category Details for {timeUnit} {selectedWeek}</CardTitle></CardHeader>

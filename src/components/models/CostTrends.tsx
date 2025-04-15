@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { FinancialModel, CostAssumption } from "@/lib/db";
 import {
   AreaChart,
@@ -12,6 +12,17 @@ import {
 } from "recharts";
 import FinancialMatrix from "./FinancialMatrix";
 import { MarketingSetup, ModelMetadata, GrowthModel } from "@/types/models";
+import {
+  calculateAttendance,
+  calculateCustomerSpend,
+  calculateCOGS,
+  calculateCostBreakdown,
+  generateForecastTimeSeries
+} from "@/lib/finance/calculationEngine";
+import { useCalculationEngine } from "@/hooks/useCalculationEngine";
+import { calculationLogger, generateCalculationId } from "@/lib/finance/logging/calculationLogger";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Define a type for the data points generated in costData
 interface CostDataPoint {
@@ -31,144 +42,179 @@ interface CostTrendsProps {
   onUpdateCostData: (data: CostDataPoint[]) => void; // Use specific type
 }
 
-const CostTrends = ({ 
-  costs, 
-  marketingSetup, 
-  metadata, 
-  growthModel, 
+const CostTrends = ({
+  costs,
+  marketingSetup,
+  metadata,
+  growthModel,
   model,
-  onUpdateCostData 
+  onUpdateCostData
 }: CostTrendsProps) => {
   const [timePoints, setTimePoints] = useState<number>(12);
   const isWeeklyEvent = metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
-  
-  // Memoize the cost data calculation
-  const costData: CostDataPoint[] = useMemo(() => {
-    console.log("[CostTrends] Recalculating costData...");
+
+  // Use the calculation engine hook
+  const { calculateCostBreakdown: versionedCalculateCostBreakdown, versionString, featureFlags } = useCalculationEngine();
+
+  // Determine if we should show version information
+  const showVersionInfo = featureFlags.showVersionInfo;
+
+  // Define the calculation function with performance tracking
+  const calculateCostData = useCallback((): CostDataPoint[] => {
+    // Generate a unique ID for this calculation
+    const calculationId = generateCalculationId();
+
+    // Log the start of the calculation
+    calculationLogger.debug(
+      'Starting cost trends calculation',
+      {
+        modelId: model.id,
+        modelName: model.name,
+        timePoints
+      },
+      calculationId,
+      'CostTrends.calculateCostData'
+    );
+
+    // Start performance tracking
+    const startTime = performance.now();
+
     try {
-      const data: CostDataPoint[] = [];
-      // Ensure required base data exists
-      if (!costs || !metadata) { 
-          console.warn("[CostTrends] Missing costs or metadata, cannot calculate.");
-          return []; 
-      }
-      
-      const currentMarketingSetup = marketingSetup || { allocationMode: 'channels', channels: [] }; 
-      const isWeekly = isWeeklyEvent; 
-      // Provide default for duration if metadata.weeks is missing
-      const duration = isWeekly ? (metadata.weeks ?? 12) : 12; // Use nullish coalescing
-      
-      if (isWeeklyEvent) {
-        // Use the calculated duration (which has a default)
-        const weeks = Math.min(duration, timePoints); 
-        
-        for (let week = 1; week <= weeks; week++) {
-          const point: CostDataPoint = { point: `Week ${week}`, costs: 0, cumulativeCosts: 0 };
-          let weeklyTotal = 0;
-          
-          // Provide default for initial attendance
-          const initialAttendance = metadata.initialWeeklyAttendance ?? 0; // Use nullish coalescing
-          let currentAttendance = initialAttendance;
-          
-          // Calculate attendance with growth if applicable
-          // Check for metadata.growth before accessing its properties
-          if (week > 1 && metadata.growth) {
-            const growthRate = (metadata.growth.attendanceGrowthRate ?? 0) / 100; // Default growth rate to 0
-            currentAttendance = initialAttendance * Math.pow(1 + growthRate, week - 1);
-          } else if (week > 1) {
-              // Handle case where week > 1 but no growth info exists - attendance stays initial?
-              // Or apply some default? For now, it stays initialAttendance.
+      // Try to use the centralized forecast generation function first
+      const forecastData = generateForecastTimeSeries(model);
+
+      if (forecastData && forecastData.length > 0) {
+        // Limit to the requested number of periods
+        const limitedData = forecastData.slice(0, Math.min(forecastData.length, timePoints));
+
+        // Convert the forecast data to the format expected by this component
+        const data: CostDataPoint[] = limitedData.map(period => {
+          if (!period.period) return null;
+
+          // Get cost breakdown for this period
+          const costBreakdown = calculateCostBreakdown(model, period.period);
+
+          // Create the data point
+          const point: CostDataPoint = {
+            point: period.point || `Week ${period.period}`,
+            costs: period.cost || 0,
+            cumulativeCosts: period.cumulativeCost || 0,
+            attendance: period.attendance
+          };
+
+          // Add individual cost categories
+          if (costBreakdown) {
+            // Map cost breakdown to the expected format
+            if (costBreakdown.fbCOGS) point['FBCOGS'] = Math.ceil(costBreakdown.fbCOGS);
+            if (costBreakdown.merchCOGS) point['MerchandiseCOGS'] = Math.ceil(costBreakdown.merchCOGS);
+            if (costBreakdown.staffCosts) point['StaffCosts'] = Math.ceil(costBreakdown.staffCosts);
+            if (costBreakdown.managementCosts) point['ManagementCosts'] = Math.ceil(costBreakdown.managementCosts);
+            if (costBreakdown.setupCosts) point['SetupCosts'] = Math.ceil(costBreakdown.setupCosts);
+            if (costBreakdown.marketingCost) point['MarketingBudget'] = Math.ceil(costBreakdown.marketingCost);
           }
 
-          // Calculate F&B revenue for this week
-          let fbSpendPerCustomer = metadata.perCustomer?.fbSpend ?? 0;
-          // Check metadata.growth before accessing fbSpendGrowth
-          if (week > 1 && metadata.growth?.useCustomerSpendGrowth) {
-            const fbSpendGrowthRate = (metadata.growth.fbSpendGrowth ?? 0) / 100; // Default growth rate to 0
-            fbSpendPerCustomer *= Math.pow(1 + fbSpendGrowthRate, week - 1);
-          }
-          const fbRevenue = currentAttendance * fbSpendPerCustomer;
-          
-          // Add regular costs
-          costs.forEach(cost => {
-            const costType = cost.type?.toLowerCase();
-            const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
-            let costValue = 0;
-            
-            if (costType === "fixed") {
-              costValue = week === 1 ? cost.value : 0;
-            } else if (costType === "variable") {
-              if (cost.name === "F&B COGS") {
-                const cogsPct = metadata.costs?.fbCOGSPercent ?? 30; // Default COGS % if needed
-                costValue = (fbRevenue * cogsPct) / 100;
-              } else {
-                costValue = cost.value;
-                // Check metadata.growth before accessing fbSpendGrowth
-                if (week > 1) {
-                  const growthRate = metadata.growth?.useCustomerSpendGrowth 
-                    ? (metadata.growth?.fbSpendGrowth ?? 0) / 100 // Default growth rate
-                    : (growthModel?.rate ?? 0); // Default growth rate
-                  costValue *= Math.pow(1 + growthRate, week - 1);
-                }
-              }
-            } else if (costType === "recurring") {
-              // Check metadata.weeks before dividing
-              if (cost.name === "Setup Costs" && duration > 0) { // Use duration (has default)
-                 costValue = cost.value / duration;
-              } else {
-                 costValue = cost.value;
-              }
-            } else {
-              costValue = cost.value;
+          return point;
+        }).filter(Boolean) as CostDataPoint[];
+
+        // End performance tracking
+        const endTime = performance.now();
+        const duration = endTime - startTime;
+
+        // Log the result
+        calculationLogger.debug(
+          'Completed cost trends calculation using centralized engine',
+          {
+            modelId: model.id,
+            modelName: model.name,
+            periods: data.length,
+            duration: `${duration.toFixed(2)}ms`
+          },
+          calculationId,
+          'CostTrends.calculateCostData'
+        );
+
+        return data;
+      }
+
+      // Fallback to manual calculation if the centralized function fails
+      const data: CostDataPoint[] = [];
+      // Ensure required base data exists
+      if (!costs || !metadata) {
+          console.warn("[CostTrends] Missing costs or metadata, cannot calculate.");
+          return [];
+      }
+
+      const currentMarketingSetup = marketingSetup || { allocationMode: 'channels', channels: [] };
+      const isWeekly = isWeeklyEvent;
+      // Provide default for duration if metadata.weeks is missing
+      const duration = isWeekly ? (metadata.weeks ?? 12) : 12; // Use nullish coalescing
+
+      if (isWeeklyEvent) {
+        // Use the calculated duration (which has a default)
+        const weeks = Math.min(duration, timePoints);
+
+        // Track cumulative costs
+        let cumulativeCosts = 0;
+
+        for (let week = 1; week <= weeks; week++) {
+          // Get cost breakdown using the centralized function
+          const costBreakdownResult = versionedCalculateCostBreakdown(model, week);
+          const costBreakdown = costBreakdownResult.value;
+
+          // Create the data point
+          const point: CostDataPoint = {
+            point: `Week ${week}`,
+            costs: 0,
+            cumulativeCosts: 0
+          };
+
+          // Calculate attendance using the centralized function
+          const initialAttendance = metadata.initialWeeklyAttendance ?? 0;
+          const attendanceGrowthRate = metadata.growth?.attendanceGrowthRate ?? 0;
+          const currentAttendance = calculateAttendance(initialAttendance, attendanceGrowthRate, week);
+          point.attendance = currentAttendance;
+
+          // Add individual cost categories from the breakdown
+          let weeklyTotal = 0;
+
+          if (costBreakdown) {
+            // Map cost breakdown to the expected format
+            if (costBreakdown.fbCOGS) {
+              point['FBCOGS'] = Math.ceil(costBreakdown.fbCOGS);
+              weeklyTotal += costBreakdown.fbCOGS;
             }
-            
-            point[safeName] = Math.ceil(costValue);
-            weeklyTotal += costValue;
-          });
-          
-          // --- Calculate Marketing Cost based on mode ---
-          let periodMarketingCost = 0;
-          if (currentMarketingSetup.allocationMode === 'channels') {
-             periodMarketingCost = currentMarketingSetup.channels.reduce((sum, ch) => sum + (ch.weeklyBudget ?? 0), 0); // Default weeklyBudget to 0
-          } else if (currentMarketingSetup.allocationMode === 'highLevel') {
-             // Check for totalBudget before using it
-             const totalBudget = currentMarketingSetup.totalBudget ?? 0;
-             const application = currentMarketingSetup.budgetApplication || 'spreadEvenly';
-             const modelDuration = duration; // Use calculated duration (has default)
-             
-             if (application === 'upfront') {
-                periodMarketingCost = (week === 1) ? totalBudget : 0;
-             } else if (application === 'spreadEvenly' && modelDuration > 0) { // Avoid division by zero
-                periodMarketingCost = totalBudget / modelDuration; 
-             } else if (application === 'spreadCustom') {
-                // Check spreadDuration before using it
-                const spreadDuration = currentMarketingSetup.spreadDuration ?? 0;
-                if (spreadDuration > 0 && week <= spreadDuration) { // Avoid division by zero
-                  periodMarketingCost = totalBudget / spreadDuration;
-                } else {
-                  periodMarketingCost = 0;
-                }
-             }
+            if (costBreakdown.merchCOGS) {
+              point['MerchandiseCOGS'] = Math.ceil(costBreakdown.merchCOGS);
+              weeklyTotal += costBreakdown.merchCOGS;
+            }
+            if (costBreakdown.staffCosts) {
+              point['StaffCosts'] = Math.ceil(costBreakdown.staffCosts);
+              weeklyTotal += costBreakdown.staffCosts;
+            }
+            if (costBreakdown.managementCosts) {
+              point['ManagementCosts'] = Math.ceil(costBreakdown.managementCosts);
+              weeklyTotal += costBreakdown.managementCosts;
+            }
+            if (costBreakdown.setupCosts) {
+              point['SetupCosts'] = Math.ceil(costBreakdown.setupCosts);
+              weeklyTotal += costBreakdown.setupCosts;
+            }
+            if (costBreakdown.marketingCost) {
+              point['MarketingBudget'] = Math.ceil(costBreakdown.marketingCost);
+              weeklyTotal += costBreakdown.marketingCost;
+            }
           }
-          
-          // Add calculated marketing cost
-          if (periodMarketingCost > 0) {
-             point["MarketingBudget"] = Math.ceil(periodMarketingCost);
-             weeklyTotal += periodMarketingCost;
-          }
-          
+
+          // Update total costs
           point.costs = Math.ceil(weeklyTotal);
-          
-          // Add attendance for merging later
-          point.attendance = Math.round(currentAttendance);
-          
-          if (week === 1) {
-            point.cumulativeCosts = Math.ceil(weeklyTotal);
-          } else {
-            point.cumulativeCosts = Math.ceil(data[week - 2].cumulativeCosts + weeklyTotal);
-          }
-          
+          cumulativeCosts += weeklyTotal;
+          point.cumulativeCosts = Math.ceil(cumulativeCosts);
+
+          // Add marketing cost (already included in the breakdown)
+          // No need to add it again
+
+          // Add the point to the data array
           data.push(point);
         }
       } else {
@@ -184,7 +230,7 @@ const CostTrends = ({
               const costType = cost.type?.toLowerCase();
               const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
               let costValue = 0;
-              
+
               if (costType === "fixed") {
                 costValue = month === 1 ? cost.value : 0;
               } else if (costType === "variable") {
@@ -198,24 +244,24 @@ const CostTrends = ({
               } else {
                 costValue = cost.value;
               }
-              
+
               point[safeName] = Math.ceil(costValue);
               monthlyTotal += costValue;
            });
 
-           // Calculate Monthly Marketing Cost 
+           // Calculate Monthly Marketing Cost
            let periodMarketingCost = 0;
            if (currentMarketingSetup.allocationMode === 'channels') {
                const totalWeeklyBudget = currentMarketingSetup.channels.reduce((sum, ch) => sum + (ch.weeklyBudget ?? 0), 0); // Default weeklyBudget
-               periodMarketingCost = totalWeeklyBudget * (365.25 / 7 / 12); 
+               periodMarketingCost = totalWeeklyBudget * (365.25 / 7 / 12);
            } else if (currentMarketingSetup.allocationMode === 'highLevel') {
                const totalBudget = currentMarketingSetup.totalBudget ?? 0; // Default totalBudget
                const application = currentMarketingSetup.budgetApplication || 'spreadEvenly';
-              
+
                if (application === 'upfront') {
                  periodMarketingCost = (month === 1) ? totalBudget : 0;
                } else if (application === 'spreadEvenly' && modelDuration > 0) { // Avoid division by zero
-                 periodMarketingCost = totalBudget / modelDuration; 
+                 periodMarketingCost = totalBudget / modelDuration;
                } else if (application === 'spreadCustom') {
                  const spreadDuration = currentMarketingSetup.spreadDuration ?? 0; // Default spreadDuration
                  if (spreadDuration > 0 && month <= spreadDuration) { // Avoid division by zero
@@ -231,49 +277,116 @@ const CostTrends = ({
              point["MarketingBudget"] = Math.ceil(periodMarketingCost);
              monthlyTotal += periodMarketingCost;
            }
-           
+
            // Rename keys for monthly consistency
-           point.costs = Math.ceil(monthlyTotal); 
-           
+           point.costs = Math.ceil(monthlyTotal);
+
            if (month === 1) {
              point.cumulativeCosts = Math.ceil(monthlyTotal);
            } else {
-             point.cumulativeCosts = Math.ceil(data[month - 2].cumulativeCosts + monthlyTotal); 
+             point.cumulativeCosts = Math.ceil(data[month - 2].cumulativeCosts + monthlyTotal);
            }
-           
+
            data.push(point);
          }
       }
-      console.log("[CostTrends] Finished calculating costData.");
+      // End performance tracking for fallback calculation
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+
+      // Log the result
+      calculationLogger.debug(
+        'Completed cost trends calculation using fallback method',
+        {
+          modelId: model.id,
+          modelName: model.name,
+          periods: data.length,
+          duration: `${duration.toFixed(2)}ms`
+        },
+        calculationId,
+        'CostTrends.calculateCostData'
+      );
+
       return data;
     } catch (error) {
+      // End performance tracking
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+
+      // Log the error
+      calculationLogger.error(
+        'Error calculating cost trends',
+        {
+          modelId: model.id,
+          modelName: model.name,
+          error,
+          duration: `${duration.toFixed(2)}ms`
+        },
+        calculationId,
+        'CostTrends.calculateCostData'
+      );
+
       console.error("Error calculating cost trends:", error);
       return [];
     }
   }, [
-      costs, 
-      marketingSetup, 
-      metadata, 
-      growthModel, 
-      timePoints, 
+      model,
+      costs,
+      marketingSetup,
+      metadata,
+      growthModel,
+      timePoints,
       isWeeklyEvent // Dependency needed as it affects calculation logic
   ]);
 
+  // Memoize the cost data calculation to avoid recalculating on every render
+  const costData = useMemo(() => calculateCostData(), [calculateCostData]);
+
   // Ref to store the previous costData string representation
   const prevCostDataStringRef = useRef<string | null>(null);
-  
+
   useEffect(() => {
-    if (onUpdateCostData && costData) { 
+    if (onUpdateCostData && costData) {
       const currentCostDataString = JSON.stringify(costData);
       if (currentCostDataString !== prevCostDataStringRef.current) {
-          console.log("[CostTrends] Data changed, calling onUpdateCostData");
+          // Generate a unique ID for this operation
+          const operationId = generateCalculationId();
+
+          // Log the update
+          calculationLogger.debug(
+            'Updating cost data',
+            { dataLength: costData.length },
+            operationId,
+            'CostTrends.onUpdateCostData'
+          );
+
+          // Start performance tracking
+          const startTime = performance.now();
+
+          // Update the data
           onUpdateCostData(costData);
+
+          // End performance tracking
+          const endTime = performance.now();
+          const duration = endTime - startTime;
+
+          // Log the completion
+          calculationLogger.debug(
+            'Completed updating cost data',
+            {
+              dataLength: costData.length,
+              duration: `${duration.toFixed(2)}ms`
+            },
+            operationId,
+            'CostTrends.onUpdateCostData'
+          );
+
           prevCostDataStringRef.current = currentCostDataString;
       }
     }
     // Dependencies remain costData (the result of useMemo) and the callback
   }, [costData, onUpdateCostData]);
-  
+
   // MOVED: costKeys calculation before the early return
   const costKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -287,8 +400,8 @@ const CostTrends = ({
     const presentKeys = Array.from(keys);
 
     const costRenderOrder = [
-        "SetupCosts",       
-        "MarketingBudget",  
+        "SetupCosts",
+        "MarketingBudget",
         "FBCOGS",
         "StaffCosts",
         "ManagementCosts",
@@ -301,12 +414,12 @@ const CostTrends = ({
         if (indexB === -1) indexB = costRenderOrder.length;
         return indexA - indexB;
     });
-    
+
     console.log("[CostTrends] Sorted Keys for Rendering:", sortedKeys);
-    return sortedKeys; 
+    return sortedKeys;
 
   }, [costs, costData]); // costData is now a dependency
-  
+
   // Early return if data calculation failed or resulted in empty array
   if (!costData || costData.length === 0) {
     return (
@@ -321,7 +434,7 @@ const CostTrends = ({
   // Define a color mapping function or object
   const getColor = (key: string): string => { // Removed index param, not needed with map lookup
      const colorMap: Record<string, string> = {
-         "MarketingBudget": "#a855f7", // Purple 
+         "MarketingBudget": "#a855f7", // Purple
          "SetupCosts": "#ef4444",      // Red
          "FBCOGS": "#f97316",          // Orange
          "StaffCosts": "#eab308",      // Yellow
@@ -337,7 +450,23 @@ const CostTrends = ({
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Cost Trends Over Time</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-medium">Cost Trends Over Time</h3>
+          {showVersionInfo && (
+            <TooltipProvider>
+              <UITooltip>
+                <TooltipTrigger>
+                  <Badge variant="outline" className="ml-2 text-xs">
+                    {versionString}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">Using calculation engine version {versionString}</p>
+                </TooltipContent>
+              </UITooltip>
+            </TooltipProvider>
+          )}
+        </div>
         <div className="flex items-center space-x-2">
           <span className="text-sm">Projection Period:</span>
           <select
@@ -371,15 +500,15 @@ const CostTrends = ({
             margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis 
-              dataKey="point" 
+            <XAxis
+              dataKey="point"
               tick={{ fontSize: 12 }}
             />
-            <YAxis 
+            <YAxis
               tick={{ fontSize: 12 }}
               tickFormatter={(value) => `$${Math.ceil(value).toLocaleString()}`}
             />
-            <Tooltip 
+            <Tooltip
               formatter={(value: number, name: string) => [
                   `$${Math.ceil(value).toLocaleString()}`,
                   name
@@ -389,17 +518,17 @@ const CostTrends = ({
             <Legend />
 
             {/* Map over the SORTED costKeys */}
-            {costKeys.map((key) => { 
+            {costKeys.map((key) => {
                 const color = getColor(key);
                 console.log(`[CostTrends] Rendering Area - Key: ${key}, Color: ${color}`);
-                
+
                 return (
                   <Area
-                    key={key} 
+                    key={key}
                     type="monotone"
                     dataKey={key}
-                    name={key === 'MarketingBudget' ? 'Marketing Budget' : key.replace(/([A-Z])/g, ' $1').trim()} 
-                    stackId="1" 
+                    name={key === 'MarketingBudget' ? 'Marketing Budget' : key.replace(/([A-Z])/g, ' $1').trim()}
+                    stackId="1"
                     stroke={color}
                     fill={color}
                     fillOpacity={0.6}
@@ -412,10 +541,10 @@ const CostTrends = ({
 
       {/* FinancialMatrix rendering */}
       {!marketingSetup?.channels && (
-        <FinancialMatrix 
+        <FinancialMatrix
           model={model}
-          trendData={costData} 
-          costData={true} 
+          trendData={costData}
+          costData={true}
         />
       )}
     </div>

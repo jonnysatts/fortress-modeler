@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { FinancialModel } from "@/lib/db";
 import { devLog, appError } from "@/lib/logUtils";
 import {
@@ -12,6 +12,18 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { formatCurrency } from "@/lib/utils";
+import {
+  calculateAttendance,
+  calculateCustomerSpend,
+  calculateCOGS,
+  calculateRevenueBreakdown,
+  calculateCostBreakdown,
+  generateForecastTimeSeries
+} from "@/lib/finance/calculationEngine";
+import { useCalculationEngine } from "@/hooks/useCalculationEngine";
+import { calculationLogger, generateCalculationId } from "@/lib/finance/logging/calculationLogger";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ModelProjectionsProps {
   model: FinancialModel;
@@ -32,8 +44,57 @@ const ModelProjections = React.memo(({ model, shouldSpreadSetupCosts }: ModelPro
     );
   }
 
-  const calculateProjections = () => {
+  const calculateProjections = useCallback(() => {
+    // Generate a unique ID for this calculation
+    const calculationId = generateCalculationId();
+
+    // Log the start of the calculation
+    calculationLogger.debug(
+      'Starting model projections calculation',
+      {
+        modelId: model.id,
+        modelName: model.name,
+        projectionMonths,
+        shouldSpreadSetupCosts
+      },
+      calculationId,
+      'ModelProjections.calculateProjections'
+    );
+
+    // Start performance tracking
+    const startTime = performance.now();
+
     try {
+      // Use the centralized function to generate forecast time series
+      const forecastData = generateForecastTimeSeries(model);
+
+      // If we have forecast data, use it directly
+      if (forecastData && forecastData.length > 0) {
+        // Limit to the requested number of periods
+        const timePoints = Math.min(forecastData.length, projectionMonths + 1); // +1 for the starting point
+        const result = forecastData.slice(0, timePoints);
+
+        // End performance tracking
+        const endTime = performance.now();
+        const duration = endTime - startTime;
+
+        // Log the result
+        calculationLogger.debug(
+          'Completed model projections calculation using centralized engine',
+          {
+            modelId: model.id,
+            modelName: model.name,
+            periods: result.length,
+            duration: `${duration.toFixed(2)}ms`
+          },
+          calculationId,
+          'ModelProjections.calculateProjections'
+        );
+
+        return result;
+      }
+
+      // Fallback to manual calculation if the centralized function fails
       const data = [];
       const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
 
@@ -61,7 +122,6 @@ const ModelProjections = React.memo(({ model, shouldSpreadSetupCosts }: ModelPro
 
         // Add starting point (Week 0) with initial values but no growth
         const initialAttendance = metadata.initialWeeklyAttendance;
-        const initialPerCustomer = metadata.perCustomer;
 
         // Add Week 0 data point
         data.push({
@@ -78,50 +138,26 @@ const ModelProjections = React.memo(({ model, shouldSpreadSetupCosts }: ModelPro
 
         // Calculate weeks 1 through N
         for (let week = 1; week <= timePoints; week++) {
-          // Calculate attendance with compounding growth rate
-          const attendanceGrowthRate = metadata.growth.attendanceGrowthRate / 100;
-          const currentAttendance = Math.round(
-            initialAttendance * Math.pow(1 + attendanceGrowthRate, week - 1)
-          );
+          // Get revenue breakdown using the centralized function
+          const revenueBreakdown = calculateRevenueBreakdown(model, week);
 
-          totalAttendance += currentAttendance;
+          // Calculate total revenue
+          const totalWeeklyRevenue = Object.values(revenueBreakdown).reduce((sum, val) => sum + (val || 0), 0);
 
-          // Calculate per-customer values with growth if enabled
-          let currentPerCustomer = { ...metadata.perCustomer };
-          if (metadata.growth.useCustomerSpendGrowth) {
-            currentPerCustomer = {
-              ticketPrice: metadata.perCustomer.ticketPrice *
-                Math.pow(1 + (metadata.growth.ticketPriceGrowth / 100), week - 1),
-              fbSpend: metadata.perCustomer.fbSpend *
-                Math.pow(1 + (metadata.growth.fbSpendGrowth / 100), week - 1),
-              merchandiseSpend: metadata.perCustomer.merchandiseSpend *
-                Math.pow(1 + (metadata.growth.merchandiseSpendGrowth / 100), week - 1),
-              onlineSpend: metadata.perCustomer.onlineSpend *
-                Math.pow(1 + (metadata.growth.onlineSpendGrowth / 100), week - 1),
-              miscSpend: metadata.perCustomer.miscSpend *
-                Math.pow(1 + (metadata.growth.miscSpendGrowth / 100), week - 1),
-            };
-          }
+          // Get cost breakdown using the centralized function
+          const costBreakdown = calculateCostBreakdown(model, week);
 
-          // Calculate revenue based on attendance and per-customer values
-          const weeklyRevenue = {
-            ticketSales: currentAttendance * (currentPerCustomer.ticketPrice || 0),
-            fbSales: currentAttendance * (currentPerCustomer.fbSpend || 0),
-            merchandiseSales: currentAttendance * (currentPerCustomer.merchandiseSpend || 0),
-            onlineSales: currentAttendance * (currentPerCustomer.onlineSpend || 0),
-            miscRevenue: currentAttendance * (currentPerCustomer.miscSpend || 0),
-          };
+          // Calculate total costs
+          const totalWeeklyCosts = Object.values(costBreakdown).reduce((sum, val) => sum + (val || 0), 0);
 
-          const totalWeeklyRevenue = Object.values(weeklyRevenue).reduce((sum, val) => sum + val, 0);
-
-          // Calculate weekly costs
-          const fbCOGS = (weeklyRevenue.fbSales * (metadata.costs.fbCOGSPercent || 30)) / 100;
-          const staffCosts = (metadata.costs.staffCount || 0) * (metadata.costs.staffCostPerPerson || 0);
-          const managementCosts = metadata.costs.managementCosts || 0;
-
-          const totalWeeklyCosts = fbCOGS + staffCosts + managementCosts;
+          // Calculate profit
           const weeklyProfit = totalWeeklyRevenue - totalWeeklyCosts;
 
+          // Calculate attendance using the centralized function
+          const attendanceGrowthRate = metadata.growth?.attendanceGrowthRate ?? 0;
+          const currentAttendance = calculateAttendance(initialAttendance, attendanceGrowthRate, week);
+
+          totalAttendance += currentAttendance;
           totalCumulativeRevenue += totalWeeklyRevenue;
           totalCumulativeCosts += totalWeeklyCosts;
           totalCumulativeProfit += weeklyProfit;
@@ -185,15 +221,49 @@ const ModelProjections = React.memo(({ model, shouldSpreadSetupCosts }: ModelPro
         }
       }
 
+      // End performance tracking for fallback calculation
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+
+      // Log the result
+      calculationLogger.debug(
+        'Completed model projections calculation using fallback method',
+        {
+          modelId: model.id,
+          modelName: model.name,
+          periods: data.length,
+          duration: `${duration.toFixed(2)}ms`
+        },
+        calculationId,
+        'ModelProjections.calculateProjections'
+      );
+
       return data;
     } catch (error) {
+      // End performance tracking
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+
+      // Log the error
+      calculationLogger.error(
+        'Error calculating model projections',
+        {
+          modelId: model.id,
+          modelName: model.name,
+          error,
+          duration: `${duration.toFixed(2)}ms`
+        },
+        calculationId,
+        'ModelProjections.calculateProjections'
+      );
+
       appError("Error calculating projections", error);
       return [];
     }
-  };
+  }, [model, projectionMonths, shouldSpreadSetupCosts]);
 
   // Memoize the projection data calculation to avoid recalculating on every render
-  const projectionData = useMemo(() => calculateProjections(), [model, projectionMonths, shouldSpreadSetupCosts]);
+  const projectionData = useMemo(() => calculateProjections(), [calculateProjections]);
 
   if (!projectionData || projectionData.length === 0) {
     return (
@@ -204,6 +274,12 @@ const ModelProjections = React.memo(({ model, shouldSpreadSetupCosts }: ModelPro
       </div>
     );
   }
+
+  // Get version information from the calculation engine
+  const { versionString, featureFlags } = useCalculationEngine();
+
+  // Determine if we should show version information
+  const showVersionInfo = featureFlags.showVersionInfo;
 
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
@@ -227,7 +303,23 @@ const ModelProjections = React.memo(({ model, shouldSpreadSetupCosts }: ModelPro
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h3 className="text-lg font-medium">Financial Projections</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-medium">Financial Projections</h3>
+          {showVersionInfo && (
+            <TooltipProvider>
+              <UITooltip>
+                <TooltipTrigger>
+                  <Badge variant="outline" className="ml-2 text-xs">
+                    {versionString}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">Using calculation engine version {versionString}</p>
+                </TooltipContent>
+              </UITooltip>
+            </TooltipProvider>
+          )}
+        </div>
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
             <span className="text-sm">Display:</span>
