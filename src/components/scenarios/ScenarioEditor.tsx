@@ -25,7 +25,7 @@ import { AlertCircle, ArrowRight, Check, Info, Lightbulb, Save, X } from 'lucide
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { appError, devLog, logGroup } from '@/lib/logging';
+
 import { useConfirm } from '@/hooks/useConfirm';
 import ScenarioChart from './ScenarioChart';
 import ScenarioSummaryTable from './ScenarioSummaryTable';
@@ -93,14 +93,14 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
   }));
 
   // Add debug logging for isDirty changes
-  useEffect(() => {
-    devLog(`isDirty state changed to: ${isDirty}`);
-  }, [isDirty]);
+ useEffect(() => {
+   console.log(`isDirty state changed to: ${isDirty}`);
+ }, [isDirty]);
 
   // Initialize local deltas from scenario
   useEffect(() => {
     if (scenario) {
-      logGroup(`Initializing scenario: ${scenario.name}`, () => {
+      console.log(`Initializing scenario: ${scenario.name}`, () => {
         try {
           // Create a fresh default deltas object
           const defaultDeltas: ScenarioParameterDeltas = {

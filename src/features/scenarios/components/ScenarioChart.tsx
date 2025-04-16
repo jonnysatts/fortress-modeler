@@ -19,22 +19,30 @@ import {
 import { ForecastPeriodData } from '@/lib/financialCalculations';
 import { formatCurrency } from '@/lib/utils';
 import { useScenarioCalculation } from '../hooks';
+import type { FinancialModel } from '@/lib/db';
+import type { ActualsPeriodEntry } from '@/lib/finance/types';
 
 interface ScenarioChartProps {
   baselineData: ForecastPeriodData[];
   scenarioData: ForecastPeriodData[];
   height?: number;
+  model?: FinancialModel;
+  actuals?: ActualsPeriodEntry[];
 }
 
 const ScenarioChart: React.FC<ScenarioChartProps> = ({
   baselineData,
   scenarioData,
-  height = 300
+  height = 300,
+  model,
+  actuals
 }) => {
   // Use the scenario calculation hook to get chart data
   const { chartData } = useScenarioCalculation({
     baselineData,
-    scenarioData
+    scenarioData,
+    model,
+    actuals
   });
 
   if (!baselineData || !scenarioData || baselineData.length === 0) {

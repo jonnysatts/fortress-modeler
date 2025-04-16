@@ -28,7 +28,7 @@ const ScenarioSummaryTable: React.FC<ScenarioSummaryTableProps> = ({
     );
   }
 
-  // Calculate totals
+  // Calculate totals (legacy method, UI unchanged)
   const baselineTotals = baselineData.reduce(
     (acc, period) => {
       acc.revenue += period.revenue;

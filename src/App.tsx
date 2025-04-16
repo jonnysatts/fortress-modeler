@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import React, { Suspense, lazy, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,7 +7,6 @@ import ErrorBoundary from "@/components/common/ErrorBoundary";
 import GlobalErrorBoundary from "@/components/common/GlobalErrorBoundary";
 import PageLoader from "@/components/common/PageLoader";
 import NavigationOverlay from "@/components/common/NavigationOverlay";
-import ServiceWorkerManager from "@/components/common/ServiceWorkerManager";
 import useStore from "@/store/useStore";
 import { db } from "@/lib/db";
 import { devLog, appError } from "@/lib/logUtils";
@@ -29,7 +28,7 @@ const NewProject = lazy(() => import("@/pages/projects/NewProject.tsx"));
 const Settings = lazy(() => import("@/pages/Settings.tsx"));
 
 // Product Pages
-const ProductSummary = lazy(() => import("@/pages/product/ProductSummary.tsx"));
+const ProductSummary = lazy(() => import("@/pages/product/summary.tsx"));
 const ForecastBuilder = lazy(() => import("@/pages/product/ForecastBuilder.tsx"));
 const ActualsTracker = lazy(() => import("@/pages/product/ActualsTracker.tsx"));
 const RisksAndScenariosView = lazy(() => import("@/pages/product/RisksAndScenariosView.tsx"));
@@ -134,53 +133,44 @@ const StoreInitializer = () => {
 };
 
 const App = () => (
-  <ServiceWorkerManager>
-    <GlobalErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <BrowserRouter>
-            <NavigationOverlay />
-            <ErrorBoundary>
-              <StoreInitializer />
-              <Suspense fallback={<PageLoader message="Loading application..." />}>
-                <Routes>
-              {/* Main Routes */}
-
-              {/* Portfolio Layout Routes */}
-              <Route path="/*" element={<PortfolioLayout />}>
-                <Route index element={<PortfolioDashboard />} />
-                <Route path="projects" element={<ProjectsList />} />
-                <Route path="projects/new" element={<NewProject />} />
-                <Route path="settings" element={<Settings />} />
-                <Route path="performance" element={<PerformanceMonitoring />} />
-              </Route>
-
-              {/* Product/Project Layout Routes (Standardizing on /projects/) */}
-              <Route path="/projects/:projectId/*" element={<ProductLayout />}>
-                <Route index element={<ProductSummary />} />
-                <Route path="summary" element={<ProductSummary />} />
-                <Route path="forecast-builder" element={<ForecastBuilder />} />
-                <Route path="actuals-tracker" element={<ActualsTracker />} />
-                <Route path="performance-analysis" element={<PerfAnalysisView />} />
-                <Route path="marketing-analysis" element={<MarketingAnalysis />} />
-                <Route path="risks-scenarios" element={<RisksAndScenariosView />} />
-                <Route path="edit-project" element={<EditProject />} />
-                <Route path="models/new" element={<NewFinancialModel />} />
-                <Route path="models/:modelId" element={<FinancialModelDetail />} />
-                <Route path="models/:modelId/edit" element={<EditFinancialModel />} />
-              </Route>
-
-              {/* Fallback Route */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-              </Suspense>
-            </ErrorBoundary>
-          </BrowserRouter>
-        </TooltipProvider>
-      </QueryClientProvider>
-    </GlobalErrorBoundary>
-  </ServiceWorkerManager>
+  <GlobalErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <BrowserRouter>
+          <NavigationOverlay />
+          <ErrorBoundary>
+            <StoreInitializer />
+            <Suspense fallback={<PageLoader message="Loading application..." />}>
+              <Routes>
+                <Route path="/*" element={<PortfolioLayout />}>
+                  <Route index element={<PortfolioDashboard />} />
+                  <Route path="projects" element={<ProjectsList />} />
+                  <Route path="projects/new" element={<NewProject />} />
+                  <Route path="settings" element={<Settings />} />
+                  <Route path="performance" element={<PerformanceMonitoring />} />
+                </Route>
+                <Route path="/projects/:projectId/*" element={<ProductLayout />}>
+                  <Route index element={<Navigate to="summary" replace />} />
+                  <Route path="summary" element={<ProductSummary />} />
+                  <Route path="forecast-builder" element={<ForecastBuilder />} />
+                  <Route path="actuals-tracker" element={<ActualsTracker />} />
+                  <Route path="performance-analysis" element={<PerfAnalysisView />} />
+                  <Route path="marketing-analysis" element={<MarketingAnalysis />} />
+                  <Route path="risks-scenarios" element={<RisksAndScenariosView />} />
+                  <Route path="edit-project" element={<EditProject />} />
+                  <Route path="models/new" element={<NewFinancialModel />} />
+                  <Route path="models/:modelId" element={<FinancialModelDetail />} />
+                  <Route path="models/:modelId/edit" element={<EditFinancialModel />} />
+                </Route>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </GlobalErrorBoundary>
 );
 
 export default App;

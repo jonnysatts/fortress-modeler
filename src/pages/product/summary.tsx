@@ -1,3 +1,6 @@
+// Add a log to confirm summary mount
+console.log('ProductSummary mounted');
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FinancialModel, ActualsPeriodEntry, Scenario } from '@/lib/db';
@@ -169,7 +172,7 @@ const calculateCostBreakdown = (timeSeries: ForecastPeriodData[], model: Financi
         if (marketingSetup.allocationMode === 'channels') {
             const budget = marketingSetup.channels.reduce((s, ch) => s + (ch.weeklyBudget ?? 0), 0);
             periodMarketingCost = isWeekly ? budget : budget * (365.25 / 7 / 12);
-        } else if (marketingSetup.allocationMode === 'highLevel') {
+        } else if (marketingSetup.allocationMode === 'highLevel' && marketingSetup.totalBudget) {
             const totalBudget = marketingSetup.totalBudget ?? 0;
             const application = marketingSetup.budgetApplication || 'spreadEvenly';
             const spreadDuration = marketingSetup.spreadDuration ?? duration;
@@ -255,6 +258,12 @@ const ProductSummary: React.FC = () => {
   const latestModel = useMemo(() => (models.length > 0 ? models[0] : null), [models]);
 
   const timeSeriesData = baselineForecastData;
+
+  // Debug logs
+  console.log('[ProductSummary] models:', models);
+  console.log('[ProductSummary] actuals:', actuals);
+  console.log('[ProductSummary] latestModel:', latestModel);
+  console.log('[ProductSummary] timeSeriesData:', timeSeriesData);
 
   // Restore Sparkline calculations (using baselineForecastData)
   const sparklineLength = 8;

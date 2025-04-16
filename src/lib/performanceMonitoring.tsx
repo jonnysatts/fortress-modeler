@@ -4,7 +4,7 @@
  * This module provides utilities for monitoring and profiling application performance.
  */
 
-import { perfLog, startPerf, endPerf, devLog } from './logUtils';
+import { perfLog, devLog } from './logUtils';
 import { useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 
 // Store for performance metrics
@@ -31,7 +31,6 @@ const MAX_METRICS = 100;
  */
 export function startMeasure(name: string, metadata?: Record<string, any>): number {
   const startTime = performance.now();
-  startPerf(name);
 
   // Add to metrics store
   const metricId = metrics.length;
@@ -73,8 +72,6 @@ export function endMeasure(metricId: number, additionalMetadata?: Record<string,
       ...additionalMetadata
     };
   }
-
-  endPerf(metric.name, metric.startTime);
 
   return duration;
 }

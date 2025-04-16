@@ -7,10 +7,15 @@
 import { useMemo } from 'react';
 import { ForecastPeriodData } from '@/lib/financialCalculations';
 import { ScenarioSummaryMetrics, ScenarioComparisonMetrics } from '../types/scenarioTypes';
+import { metricsSummaryAdapter, scenarioComparisonAdapter } from '@/lib/finance/centralizationAdapters';
+import type { FinancialModel } from '@/lib/db';
+import type { ActualsPeriodEntry } from '@/lib/finance/types';
 
 interface UseScenarioCalculationProps {
   baselineData: ForecastPeriodData[];
   scenarioData: ForecastPeriodData[];
+  model?: FinancialModel;
+  actuals?: ActualsPeriodEntry[];
 }
 
 interface UseScenarioCalculationReturn {
@@ -21,8 +26,18 @@ interface UseScenarioCalculationReturn {
 
 /**
  * Calculate summary metrics from forecast data
+ * (Migrated: now uses centralized engine adapter)
  */
-function calculateSummaryMetrics(data: ForecastPeriodData[]): ScenarioSummaryMetrics {
+function calculateSummaryMetrics(
+  data: ForecastPeriodData[],
+  model?: FinancialModel,
+  actuals?: ActualsPeriodEntry[]
+): ScenarioSummaryMetrics {
+  // If model and actuals are provided and actuals is non-empty, use centralized adapter
+  if (model && actuals && actuals.length > 0) {
+    return metricsSummaryAdapter(model, actuals) as ScenarioSummaryMetrics;
+  }
+  // Otherwise, fallback to forecast-only summary (legacy logic)
   if (!data || data.length === 0) {
     return {
       totalRevenue: 0,
@@ -61,8 +76,8 @@ function calculateSummaryMetrics(data: ForecastPeriodData[]): ScenarioSummaryMet
   }
   
   // Calculate profit margin
-  const profitMargin = lastPeriod.totalRevenue > 0 
-    ? (lastPeriod.totalProfit / lastPeriod.totalRevenue) * 100 
+  const profitMargin = lastPeriod.cumulativeRevenue > 0 
+    ? (lastPeriod.cumulativeProfit / lastPeriod.cumulativeRevenue) * 100 
     : 0;
   
   return {
@@ -82,53 +97,14 @@ function calculateSummaryMetrics(data: ForecastPeriodData[]): ScenarioSummaryMet
 
 /**
  * Calculate comparison metrics between baseline and scenario
+ * (Migrated: now uses centralized engine adapter)
  */
 function calculateComparisonMetrics(
   baselineMetrics: ScenarioSummaryMetrics,
   scenarioMetrics: ScenarioSummaryMetrics
 ): ScenarioComparisonMetrics {
-  // Calculate absolute differences
-  const revenueDelta = scenarioMetrics.totalRevenue - baselineMetrics.totalRevenue;
-  const costsDelta = scenarioMetrics.totalCosts - baselineMetrics.totalCosts;
-  const profitDelta = scenarioMetrics.totalProfit - baselineMetrics.totalProfit;
-  const marginDelta = scenarioMetrics.profitMargin - baselineMetrics.profitMargin;
-  
-  // Calculate percentage differences
-  const revenueDeltaPercent = baselineMetrics.totalRevenue !== 0 
-    ? (revenueDelta / baselineMetrics.totalRevenue) * 100 
-    : 0;
-    
-  const costsDeltaPercent = baselineMetrics.totalCosts !== 0 
-    ? (costsDelta / baselineMetrics.totalCosts) * 100 
-    : 0;
-    
-  const profitDeltaPercent = baselineMetrics.totalProfit !== 0 
-    ? (profitDelta / baselineMetrics.totalProfit) * 100 
-    : 0;
-  
-  // Calculate break-even delta
-  const baselineBreakEven = baselineMetrics.breakEvenPeriod.index;
-  const scenarioBreakEven = scenarioMetrics.breakEvenPeriod.index;
-  
-  let breakEvenDelta = 0;
-  if (baselineBreakEven !== null && scenarioBreakEven !== null) {
-    breakEvenDelta = scenarioBreakEven - baselineBreakEven;
-  } else if (baselineBreakEven === null && scenarioBreakEven !== null) {
-    breakEvenDelta = -scenarioBreakEven; // Negative because scenario reaches break-even but baseline doesn't
-  } else if (baselineBreakEven !== null && scenarioBreakEven === null) {
-    breakEvenDelta = baselineBreakEven; // Positive because baseline reaches break-even but scenario doesn't
-  }
-  
-  return {
-    revenueDelta,
-    revenueDeltaPercent,
-    costsDelta,
-    costsDeltaPercent,
-    profitDelta,
-    profitDeltaPercent,
-    marginDelta,
-    breakEvenDelta
-  };
+  // Use centralized adapter
+  return scenarioComparisonAdapter(baselineMetrics, scenarioMetrics);
 }
 
 /**
@@ -154,17 +130,19 @@ function prepareChartData(baselineData: ForecastPeriodData[], scenarioData: Fore
  */
 export default function useScenarioCalculation({
   baselineData,
-  scenarioData
+  scenarioData,
+  model,
+  actuals
 }: UseScenarioCalculationProps): UseScenarioCalculationReturn {
   // Calculate summary metrics
   const baselineSummary = useMemo(() => 
-    calculateSummaryMetrics(baselineData), 
-    [baselineData]
+    calculateSummaryMetrics(baselineData, model, actuals), 
+    [baselineData, model, actuals]
   );
   
   const scenarioSummary = useMemo(() => 
-    calculateSummaryMetrics(scenarioData), 
-    [scenarioData]
+    calculateSummaryMetrics(scenarioData, model, actuals), 
+    [scenarioData, model, actuals]
   );
   
   // Calculate comparison metrics

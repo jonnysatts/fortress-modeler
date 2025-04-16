@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { FinancialModel } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
+import { totalRevenueAdapter, totalCostsAdapter } from "@/lib/finance/centralizationAdapters";
 
 interface FinancialMatrixProps {
   model: FinancialModel;
@@ -176,6 +177,10 @@ const FinancialMatrix = ({
       };
     }).filter(Boolean);
   };
+
+  // Use adapters for total revenue/costs for summary (safe, logs discrepancies, UI unchanged)
+  const totalRevenue = totalRevenueAdapter(model);
+  const totalCosts = totalCostsAdapter(model);
 
   // Combined data view - both revenue and cost data in one table
   if (combinedView) {

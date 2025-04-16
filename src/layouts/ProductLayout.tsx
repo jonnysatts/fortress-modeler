@@ -82,6 +82,8 @@ const ProductLayout: React.FC = () => {
     }
   ];
 
+  console.log('ProductLayout rendered');
+
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Export functionality temporarily disabled */}

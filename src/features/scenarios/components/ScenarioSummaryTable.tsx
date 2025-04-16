@@ -17,20 +17,28 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import type { FinancialModel } from '@/lib/db';
+import type { ActualsPeriodEntry } from '@/lib/finance/types';
 
 interface ScenarioSummaryTableProps {
   baselineData: ForecastPeriodData[];
   scenarioData: ForecastPeriodData[];
+  model?: FinancialModel;
+  actuals?: ActualsPeriodEntry[];
 }
 
 const ScenarioSummaryTable: React.FC<ScenarioSummaryTableProps> = ({
   baselineData,
-  scenarioData
+  scenarioData,
+  model,
+  actuals
 }) => {
   // Use the scenario calculation hook
   const { summaryMetrics, comparisonMetrics } = useScenarioCalculation({
     baselineData,
-    scenarioData
+    scenarioData,
+    model,
+    actuals
   });
   
   // Helper function to determine the color class based on the value

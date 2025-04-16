@@ -33,6 +33,8 @@ import ScenarioSummaryTable from './ScenarioSummaryTable';
 // Import custom hooks
 import { useScenarioEditor } from '../hooks';
 
+import type { ActualsPeriodEntry } from '@/lib/finance/types';
+
 interface ScenarioEditorProps {
   scenario: Scenario | null;
   baseModel: FinancialModel | null;
@@ -41,6 +43,7 @@ interface ScenarioEditorProps {
   onSave: (updatedScenario: Scenario) => Promise<void>;
   onCancel: () => void;
   isNew?: boolean;
+  actuals?: ActualsPeriodEntry[];
 }
 
 const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
@@ -50,7 +53,8 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
   scenarioForecastData,
   onSave,
   onCancel,
-  isNew = false
+  isNew = false,
+  actuals
 }) => {
   const navigate = useNavigate();
 
@@ -125,10 +129,10 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleCancel}>
+          <Button className="btn-outline" onClick={handleCancel}>
             Cancel
           </Button>
-          <Button variant="outline" onClick={handleReset} disabled={!isDirty || isSaving}>
+          <Button className="btn-outline" onClick={handleReset} disabled={!isDirty || isSaving}>
             Reset
           </Button>
           <Button onClick={handleSave} disabled={!isDirty || isSaving}>
@@ -231,10 +235,10 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
                 <div></div>
               )}
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleReset} disabled={!isDirty || isSaving}>
+                <Button className="btn-outline btn-sm" onClick={handleReset} disabled={!isDirty || isSaving}>
                   Reset
                 </Button>
-                <Button size="sm" onClick={handleSave} disabled={!isDirty || isSaving}>
+                <Button className="btn-sm" onClick={handleSave} disabled={!isDirty || isSaving}>
                   {isSaving ? 'Saving...' : 'Save'}
                 </Button>
               </div>
@@ -256,6 +260,8 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
                 baselineData={baselineForecastData}
                 scenarioData={scenarioForecastData}
                 height={300}
+                model={baseModel}
+                actuals={actuals}
               />
             </CardContent>
           </Card>
@@ -272,6 +278,8 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
               <ScenarioSummaryTable
                 baselineData={baselineForecastData}
                 scenarioData={scenarioForecastData}
+                model={baseModel}
+                actuals={actuals}
               />
             </CardContent>
           </Card>

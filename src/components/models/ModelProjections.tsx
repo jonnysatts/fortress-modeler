@@ -12,16 +12,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { formatCurrency } from "@/lib/utils";
-import {
-  calculateAttendance,
-  calculateCustomerSpend,
-  calculateCOGS,
-  calculateRevenueBreakdown,
-  calculateCostBreakdown,
-  generateForecastTimeSeries
-} from "@/lib/finance/calculationEngine";
-import { useCalculationEngine } from "@/hooks/useCalculationEngine";
-import { calculationLogger, generateCalculationId } from "@/lib/finance/logging/calculationLogger";
+import { generateForecastTimeSeries } from "@/lib/financialCalculations";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -45,25 +36,6 @@ const ModelProjections = React.memo(({ model, shouldSpreadSetupCosts }: ModelPro
   }
 
   const calculateProjections = useCallback(() => {
-    // Generate a unique ID for this calculation
-    const calculationId = generateCalculationId();
-
-    // Log the start of the calculation
-    calculationLogger.debug(
-      'Starting model projections calculation',
-      {
-        modelId: model.id,
-        modelName: model.name,
-        projectionMonths,
-        shouldSpreadSetupCosts
-      },
-      calculationId,
-      'ModelProjections.calculateProjections'
-    );
-
-    // Start performance tracking
-    const startTime = performance.now();
-
     try {
       // Use the centralized function to generate forecast time series
       const forecastData = generateForecastTimeSeries(model);
@@ -74,189 +46,11 @@ const ModelProjections = React.memo(({ model, shouldSpreadSetupCosts }: ModelPro
         const timePoints = Math.min(forecastData.length, projectionMonths + 1); // +1 for the starting point
         const result = forecastData.slice(0, timePoints);
 
-        // End performance tracking
-        const endTime = performance.now();
-        const duration = endTime - startTime;
-
-        // Log the result
-        calculationLogger.debug(
-          'Completed model projections calculation using centralized engine',
-          {
-            modelId: model.id,
-            modelName: model.name,
-            periods: result.length,
-            duration: `${duration.toFixed(2)}ms`
-          },
-          calculationId,
-          'ModelProjections.calculateProjections'
-        );
-
         return result;
       }
 
-      // Fallback to manual calculation if the centralized function fails
-      const data = [];
-      const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
-
-      const totalInitialRevenue = model.assumptions.revenue.reduce(
-        (sum, item) => sum + item.value,
-        0
-      );
-      const totalInitialCosts = model.assumptions.costs.reduce(
-        (sum, item) => sum + item.value,
-        0
-      );
-
-      if (isWeeklyEvent && model.assumptions.metadata) {
-        const metadata = model.assumptions.metadata;
-        const weeks = metadata.weeks || 12;
-        const timePoints = Math.min(weeks, projectionMonths);
-
-        // Find the setup cost item from the main costs array
-        const setupCosts = model.assumptions.costs.find(cost => cost.name === "Setup Costs")?.value || 0;
-
-        let totalCumulativeRevenue = 0;
-        let totalCumulativeCosts = setupCosts; // Start with setup costs
-        let totalCumulativeProfit = -setupCosts; // Initial profit is negative setup costs
-        let totalAttendance = 0;
-
-        // Add starting point (Week 0) with initial values but no growth
-        const initialAttendance = metadata.initialWeeklyAttendance;
-
-        // Add Week 0 data point
-        data.push({
-          point: "Start",
-          revenue: 0,
-          costs: setupCosts,
-          profit: -setupCosts,
-          attendance: initialAttendance,
-          cumulativeRevenue: 0,
-          cumulativeCosts: setupCosts,
-          cumulativeProfit: -setupCosts,
-          totalAttendance: initialAttendance
-        });
-
-        // Calculate weeks 1 through N
-        for (let week = 1; week <= timePoints; week++) {
-          // Get revenue breakdown using the centralized function
-          const revenueBreakdown = calculateRevenueBreakdown(model, week);
-
-          // Calculate total revenue
-          const totalWeeklyRevenue = Object.values(revenueBreakdown).reduce((sum, val) => sum + (val || 0), 0);
-
-          // Get cost breakdown using the centralized function
-          const costBreakdown = calculateCostBreakdown(model, week);
-
-          // Calculate total costs
-          const totalWeeklyCosts = Object.values(costBreakdown).reduce((sum, val) => sum + (val || 0), 0);
-
-          // Calculate profit
-          const weeklyProfit = totalWeeklyRevenue - totalWeeklyCosts;
-
-          // Calculate attendance using the centralized function
-          const attendanceGrowthRate = metadata.growth?.attendanceGrowthRate ?? 0;
-          const currentAttendance = calculateAttendance(initialAttendance, attendanceGrowthRate, week);
-
-          totalAttendance += currentAttendance;
-          totalCumulativeRevenue += totalWeeklyRevenue;
-          totalCumulativeCosts += totalWeeklyCosts;
-          totalCumulativeProfit += weeklyProfit;
-
-          data.push({
-            point: `Week ${week}`,
-            revenue: Math.round(totalWeeklyRevenue * 100) / 100,
-            costs: Math.round(totalWeeklyCosts * 100) / 100,
-            profit: Math.round(weeklyProfit * 100) / 100,
-            attendance: currentAttendance,
-            cumulativeRevenue: Math.round(totalCumulativeRevenue * 100) / 100,
-            cumulativeCosts: Math.round(totalCumulativeCosts * 100) / 100,
-            cumulativeProfit: Math.round(totalCumulativeProfit * 100) / 100,
-            totalAttendance: Math.round(totalAttendance),
-          });
-        }
-      } else {
-        let currentRevenue = totalInitialRevenue;
-        let currentCosts = totalInitialCosts;
-        let cumulativeRevenue = 0;
-        let cumulativeCosts = 0;
-        let cumulativeProfit = 0;
-
-        for (let month = 0; month <= projectionMonths; month++) {
-          const { type, rate, seasonalFactors } = model.assumptions.growthModel;
-
-          if (month > 0) {
-            if (type === "linear") {
-              // For linear models, apply the compound growth rate correctly
-              currentRevenue = totalInitialRevenue * Math.pow(1 + rate, month);
-            } else if (type === "exponential") {
-              currentRevenue = totalInitialRevenue * Math.pow(1 + rate, month);
-            } else if (type === "seasonal" && seasonalFactors && seasonalFactors.length > 0) {
-              const seasonIndex = (month - 1) % seasonalFactors.length;
-              const seasonFactor = seasonalFactors[seasonIndex];
-              currentRevenue = totalInitialRevenue * Math.pow(1 + rate, month) * seasonFactor;
-            } else {
-              // Default to compound growth
-              currentRevenue = totalInitialRevenue * Math.pow(1 + rate, month);
-            }
-
-            // Apply compounding growth to costs as well, using 70% of the rate
-            currentCosts = totalInitialCosts * Math.pow(1 + (rate * 0.7), month);
-          }
-
-          const profit = currentRevenue - currentCosts;
-
-          cumulativeRevenue += currentRevenue;
-          cumulativeCosts += currentCosts;
-          cumulativeProfit += profit;
-
-          data.push({
-            point: month === 0 ? "Start" : `Month ${month}`,
-            revenue: Math.round(currentRevenue * 100) / 100,
-            costs: Math.round(currentCosts * 100) / 100,
-            profit: Math.round(profit * 100) / 100,
-            cumulativeRevenue: Math.round(cumulativeRevenue * 100) / 100,
-            cumulativeCosts: Math.round(cumulativeCosts * 100) / 100,
-            cumulativeProfit: Math.round(cumulativeProfit * 100) / 100,
-          });
-        }
-      }
-
-      // End performance tracking for fallback calculation
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-
-      // Log the result
-      calculationLogger.debug(
-        'Completed model projections calculation using fallback method',
-        {
-          modelId: model.id,
-          modelName: model.name,
-          periods: data.length,
-          duration: `${duration.toFixed(2)}ms`
-        },
-        calculationId,
-        'ModelProjections.calculateProjections'
-      );
-
-      return data;
+      return [];
     } catch (error) {
-      // End performance tracking
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-
-      // Log the error
-      calculationLogger.error(
-        'Error calculating model projections',
-        {
-          modelId: model.id,
-          modelName: model.name,
-          error,
-          duration: `${duration.toFixed(2)}ms`
-        },
-        calculationId,
-        'ModelProjections.calculateProjections'
-      );
-
       appError("Error calculating projections", error);
       return [];
     }
@@ -275,12 +69,6 @@ const ModelProjections = React.memo(({ model, shouldSpreadSetupCosts }: ModelPro
     );
   }
 
-  // Get version information from the calculation engine
-  const { versionString, featureFlags } = useCalculationEngine();
-
-  // Determine if we should show version information
-  const showVersionInfo = featureFlags.showVersionInfo;
-
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
 
@@ -290,14 +78,14 @@ const ModelProjections = React.memo(({ model, shouldSpreadSetupCosts }: ModelPro
     projectionData.map(point => ({
       ...point,
       displayRevenue: point.cumulativeRevenue,
-      displayCosts: point.cumulativeCosts,
-      displayProfit: point.cumulativeProfit
+      displayCost: point.cumulativeCost,
+      displayProfit: point.cumulativeRevenue - point.cumulativeCost
     })) :
     projectionData.map(point => ({
       ...point,
       displayRevenue: point.revenue,
-      displayCosts: point.costs,
-      displayProfit: point.profit
+      displayCost: point.cost,
+      displayProfit: point.revenue - point.cost
     }));
 
   return (
@@ -305,20 +93,6 @@ const ModelProjections = React.memo(({ model, shouldSpreadSetupCosts }: ModelPro
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <h3 className="text-lg font-medium">Financial Projections</h3>
-          {showVersionInfo && (
-            <TooltipProvider>
-              <UITooltip>
-                <TooltipTrigger>
-                  <Badge variant="outline" className="ml-2 text-xs">
-                    {versionString}
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-xs">Using calculation engine version {versionString}</p>
-                </TooltipContent>
-              </UITooltip>
-            </TooltipProvider>
-          )}
         </div>
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
@@ -389,7 +163,7 @@ const ModelProjections = React.memo(({ model, shouldSpreadSetupCosts }: ModelPro
                   return [value.toLocaleString(), "Attendance"];
                 }
                 if (name === "displayRevenue") return [`$${value.toLocaleString()}`, "Revenue"];
-                if (name === "displayCosts") return [`$${value.toLocaleString()}`, "Costs"];
+                if (name === "displayCost") return [`$${value.toLocaleString()}`, "Cost"];
                 if (name === "displayProfit") return [`$${value.toLocaleString()}`, "Profit"];
                 return [`$${value.toLocaleString()}`, name.charAt(0).toUpperCase() + name.slice(1)];
               }}
@@ -405,8 +179,8 @@ const ModelProjections = React.memo(({ model, shouldSpreadSetupCosts }: ModelPro
             />
             <Line
               type="monotone"
-              dataKey="displayCosts"
-              name="Costs"
+              dataKey="displayCost"
+              name="Cost"
               stroke="#FF5722"
               strokeWidth={2}
             />
@@ -450,7 +224,7 @@ const ModelProjections = React.memo(({ model, shouldSpreadSetupCosts }: ModelPro
             {showCumulative ? "Total Costs" : `Costs (${timeUnit} ${projectionMonths})`}
           </h4>
           <p className="text-2xl font-bold text-red-800">
-            {formatCurrency(showCumulative ? finalDataPoint.cumulativeCosts : finalDataPoint.costs)}
+            {formatCurrency(showCumulative ? finalDataPoint.cumulativeCost : finalDataPoint.cost)}
           </p>
           <p className="text-xs text-red-600">
             {showCumulative ? "Cumulative across all " : "Last "}
@@ -463,7 +237,7 @@ const ModelProjections = React.memo(({ model, shouldSpreadSetupCosts }: ModelPro
             {showCumulative ? "Total Profit" : `Profit (${timeUnit} ${projectionMonths})`}
           </h4>
           <p className="text-2xl font-bold text-blue-800">
-            {formatCurrency(showCumulative ? finalDataPoint.cumulativeProfit : finalDataPoint.profit)}
+            {formatCurrency(showCumulative ? finalDataPoint.cumulativeRevenue - finalDataPoint.cumulativeCost : finalDataPoint.revenue - finalDataPoint.cost)}
           </p>
           <p className="text-xs text-blue-600">
             {showCumulative ? "Cumulative across all " : "Last "}
@@ -472,11 +246,11 @@ const ModelProjections = React.memo(({ model, shouldSpreadSetupCosts }: ModelPro
         </div>
       </div>
 
-      {isWeeklyEvent && 'totalAttendance' in (projectionData[projectionData.length - 1] || {}) && (
+      {isWeeklyEvent && 'attendance' in (projectionData[projectionData.length - 1] || {}) && (
         <div className="border rounded-lg p-4 bg-purple-50">
           <h4 className="text-sm font-medium text-purple-700">Total Attendance</h4>
           <p className="text-2xl font-bold text-purple-800">
-            {projectionData[projectionData.length - 1].totalAttendance?.toLocaleString() || "N/A"} customers
+            {projectionData[projectionData.length - 1].attendance?.toLocaleString() || "N/A"} customers
           </p>
           <p className="text-xs text-purple-600">
             Total projected customers over {projectionMonths} weeks
@@ -484,8 +258,8 @@ const ModelProjections = React.memo(({ model, shouldSpreadSetupCosts }: ModelPro
         </div>
       )}
     </div>
-  )
-}
+  );
+});
 
 export default React.memo(ModelProjections, (prevProps, nextProps) => {
   // Only re-render if the model ID changes or the shouldSpreadSetupCosts prop changes
@@ -494,4 +268,3 @@ export default React.memo(ModelProjections, (prevProps, nextProps) => {
     prevProps.shouldSpreadSetupCosts === nextProps.shouldSpreadSetupCosts
   );
 });
-

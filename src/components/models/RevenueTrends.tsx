@@ -11,12 +11,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import FinancialMatrix from "./FinancialMatrix";
-import {
-  calculateRevenueBreakdown,
-  generateForecastTimeSeries
-} from "@/lib/finance/calculationEngine";
-import { useCalculationEngine } from "@/hooks/useCalculationEngine";
-import { calculationLogger, generateCalculationId } from "@/lib/finance/logging/calculationLogger";
+import { generateForecastTimeSeries } from "@/lib/financialCalculations";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -42,32 +37,8 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
 
-  // Get version information from the calculation engine
-  const { versionString, featureFlags } = useCalculationEngine();
-
-  // Determine if we should show version information
-  const showVersionInfo = featureFlags.showVersionInfo;
-
-  // Define the calculation function with performance tracking
+  // Define the calculation function 
   const calculateTrendData = useCallback((): TrendDataPoint[] => {
-    // Generate a unique ID for this calculation
-    const calculationId = generateCalculationId();
-
-    // Log the start of the calculation
-    calculationLogger.debug(
-      'Starting revenue trends calculation',
-      {
-        modelId: model.id,
-        modelName: model.name,
-        timePoints
-      },
-      calculationId,
-      'RevenueTrends.calculateTrendData'
-    );
-
-    // Start performance tracking
-    const startTime = performance.now();
-
     try {
       // Try to use the centralized calculation engine first
       const forecastData = generateForecastTimeSeries(model);
@@ -85,34 +56,8 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
             attendance: period.attendance
           };
 
-          // Add revenue breakdown categories
-          if (period.revenueBreakdown) {
-            Object.entries(period.revenueBreakdown).forEach(([key, value]) => {
-              // Convert keys like 'ticketSales' to 'TicketSales' for consistency
-              const formattedKey = key.charAt(0).toUpperCase() + key.slice(1);
-              result[formattedKey] = value;
-            });
-          }
-
           return result;
         });
-
-        // End performance tracking
-        const endTime = performance.now();
-        const duration = endTime - startTime;
-
-        // Log the result
-        calculationLogger.debug(
-          'Completed revenue trends calculation using centralized engine',
-          {
-            modelId: model.id,
-            modelName: model.name,
-            periods: processedData.length,
-            duration: `${duration.toFixed(2)}ms`
-          },
-          calculationId,
-          'RevenueTrends.calculateTrendData'
-        );
 
         return processedData;
       }
@@ -224,42 +169,9 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
           data.push(point);
         }
       }
-      // End performance tracking for fallback calculation
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-
-      // Log the result
-      calculationLogger.debug(
-        'Completed revenue trends calculation using fallback method',
-        {
-          modelId: model.id,
-          modelName: model.name,
-          periods: data.length,
-          duration: `${duration.toFixed(2)}ms`
-        },
-        calculationId,
-        'RevenueTrends.calculateTrendData'
-      );
 
       return data;
     } catch (error) {
-      // End performance tracking
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-
-      // Log the error
-      calculationLogger.error(
-        'Error calculating revenue trends',
-        {
-          modelId: model.id,
-          modelName: model.name,
-          error,
-          duration: `${duration.toFixed(2)}ms`
-        },
-        calculationId,
-        'RevenueTrends.calculateTrendData'
-      );
-
       console.error("Error calculating revenue trends:", error);
       return [];
     }
@@ -270,12 +182,6 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
 
   useEffect(() => {
     if (setCombinedData && trendData) {
-      calculationLogger.debug(
-        'Updating combined data with revenue trends',
-        { dataLength: trendData.length },
-        generateCalculationId(),
-        'RevenueTrends.setCombinedData'
-      );
       setCombinedData(trendData);
     }
   }, [trendData, setCombinedData]);
@@ -304,20 +210,6 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
           <h3 className="text-lg font-medium">Revenue Growth Over Time</h3>
-          {showVersionInfo && (
-            <TooltipProvider>
-              <UITooltip>
-                <TooltipTrigger>
-                  <Badge variant="outline" className="ml-2 text-xs">
-                    {versionString}
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-xs">Using calculation engine version {versionString}</p>
-                </TooltipContent>
-              </UITooltip>
-            </TooltipProvider>
-          )}
         </div>
         <div className="flex items-center space-x-2">
           <span className="text-sm">Projection Period:</span>

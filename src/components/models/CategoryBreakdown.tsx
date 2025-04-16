@@ -4,15 +4,6 @@ import { FinancialModel } from "@/lib/db";
 import { useState, useMemo, useCallback } from "react";
 import { Tooltip } from "recharts";
 import { Card } from "@/components/ui/card";
-import {
-  calculateTotalRevenue,
-  calculateTotalCosts,
-  calculateRevenueBreakdown,
-  calculateCostBreakdown,
-  calculateCostTypeBreakdown
-} from "@/lib/finance/modules";
-import { useCalculationEngine } from "@/hooks/useCalculationEngine";
-import { calculationLogger, generateCalculationId } from "@/lib/finance/logging/calculationLogger";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -31,6 +22,7 @@ import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
+import { calculateTotalRevenue, calculateTotalCosts } from '@/lib/financialCalculations';
 
 interface CategoryBreakdownProps {
   model: FinancialModel;
@@ -68,394 +60,35 @@ const CustomTooltip = ({ active, payload }: any) => {
 };
 
 const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryBreakdownProps) => {
-  // Generate a unique ID for this component instance
-  const componentId = useMemo(() => generateCalculationId(), []);
-
   const [breakdownView, setBreakdownView] = useState<"revenue" | "costs">("revenue");
   const [selectedWeek, setSelectedWeek] = useState<number>(1); // Default to week 1
-
-  // Get version information from the calculation engine
-  const { versionString, featureFlags } = useCalculationEngine();
-
-  // Determine if we should show version information
-  const showVersionInfo = featureFlags.showVersionInfo;
 
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month"; // Define timeUnit here
   const totalWeeks = model.assumptions.metadata?.weeks || 0;
-
-  // Log component initialization
-  calculationLogger.debug(
-    'Category breakdown component initialized',
-    {
-      modelId: model.id,
-      modelName: model.name,
-      view: breakdownView,
-      selectedWeek,
-      timeUnit,
-      totalWeeks
-    },
-    componentId,
-    'CategoryBreakdown.init'
-  );
 
   // Find the data point for the selected week
   // Note: Assumes trendData arrays start from Week 1 at index 0
   const selectedRevenuePoint = revenueTrendData?.[selectedWeek - 1] || null;
   const selectedCostPoint = costTrendData?.[selectedWeek - 1] || null;
 
-  // Define calculation functions with performance tracking
+  // Define calculation functions
   const calculateRevenueData = useCallback(() => {
-    // Generate a unique ID for this calculation
-    const calculationId = generateCalculationId();
-
-    // Log the start of the calculation
-    calculationLogger.debug(
-      'Starting revenue breakdown calculation',
-      {
-        modelId: model.id,
-        modelName: model.name,
-        selectedWeek
-      },
-      calculationId,
-      'CategoryBreakdown.calculateRevenueData'
-    );
-
-    // Start performance tracking
-    const startTime = performance.now();
-
-    try {
-      // Try to use the centralized calculation engine first
-      if (selectedWeek > 0) {
-        const revenueBreakdown = calculateRevenueBreakdown(model, selectedWeek);
-
-        if (revenueBreakdown && Object.keys(revenueBreakdown).length > 0) {
-          // Convert the breakdown to the format expected by the component
-          const result = Object.entries(revenueBreakdown).map(([name, value]) => ({
-            name,
-            value: Math.round(value as number),
-            percentage: 0 // Will be calculated below
-          }));
-
-          // Calculate total revenue for percentage calculation
-          const totalRevenue = result.reduce((sum, item) => sum + item.value, 0);
-
-          // Calculate percentages
-          result.forEach(item => {
-            item.percentage = totalRevenue > 0 ? Math.round((item.value / totalRevenue) * 100) : 0;
-          });
-
-          // End performance tracking
-          const endTime = performance.now();
-          const duration = endTime - startTime;
-
-          // Log the result
-          calculationLogger.debug(
-            'Completed revenue breakdown calculation using centralized engine',
-            {
-              modelId: model.id,
-              modelName: model.name,
-              selectedWeek,
-              categories: result.length,
-              duration: `${duration.toFixed(2)}ms`
-            },
-            calculationId,
-            'CategoryBreakdown.calculateRevenueData'
-          );
-
-          return result;
-        }
-      }
-
-      // Fallback to the original calculation method
-      const result = prepareRevenueDataForWeek(selectedRevenuePoint);
-
-      // End performance tracking
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-
-      // Log the result
-      calculationLogger.debug(
-        'Completed revenue breakdown calculation using fallback method',
-        {
-          modelId: model.id,
-          modelName: model.name,
-          selectedWeek,
-          categories: result.length,
-          duration: `${duration.toFixed(2)}ms`
-        },
-        calculationId,
-        'CategoryBreakdown.calculateRevenueData'
-      );
-
-      return result;
-    } catch (error) {
-      // End performance tracking
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-
-      // Log the error
-      calculationLogger.error(
-        'Error calculating revenue breakdown',
-        {
-          modelId: model.id,
-          modelName: model.name,
-          selectedWeek,
-          error,
-          duration: `${duration.toFixed(2)}ms`
-        },
-        calculationId,
-        'CategoryBreakdown.calculateRevenueData'
-      );
-
-      // Return empty array
-      return [];
-    }
-  }, [model, selectedWeek, selectedRevenuePoint]);
+    return prepareRevenueDataForWeek(selectedRevenuePoint);
+  }, [selectedRevenuePoint]);
 
   const calculateCostData = useCallback(() => {
-    // Generate a unique ID for this calculation
-    const calculationId = generateCalculationId();
-
-    // Log the start of the calculation
-    calculationLogger.debug(
-      'Starting cost breakdown calculation',
-      {
-        modelId: model.id,
-        modelName: model.name,
-        selectedWeek
-      },
-      calculationId,
-      'CategoryBreakdown.calculateCostData'
-    );
-
-    // Start performance tracking
-    const startTime = performance.now();
-
-    try {
-      // Try to use the centralized calculation engine first
-      if (selectedWeek > 0) {
-        const costBreakdown = calculateCostBreakdown(model, selectedWeek);
-
-        if (costBreakdown && Object.keys(costBreakdown).length > 0) {
-          // Convert the breakdown to the format expected by the component
-          const result = Object.entries(costBreakdown).map(([key, value]) => {
-            // Map the keys to more readable names
-            let name = key;
-            if (key === 'fbCOGS') name = 'F&B COGS';
-            if (key === 'merchCOGS') name = 'Merchandise COGS';
-            if (key === 'staffCosts') name = 'Staff Costs';
-            if (key === 'managementCosts') name = 'Management Costs';
-            if (key === 'setupCosts') name = 'Setup Costs';
-            if (key === 'marketingCost') name = 'Marketing Budget';
-
-            return {
-              name,
-              value: Math.round(value as number),
-              percentage: 0 // Will be calculated below
-            };
-          });
-
-          // Calculate total costs for percentage calculation
-          const totalCosts = result.reduce((sum, item) => sum + item.value, 0);
-
-          // Calculate percentages
-          result.forEach(item => {
-            item.percentage = totalCosts > 0 ? Math.round((item.value / totalCosts) * 100) : 0;
-          });
-
-          // End performance tracking
-          const endTime = performance.now();
-          const duration = endTime - startTime;
-
-          // Log the result
-          calculationLogger.debug(
-            'Completed cost breakdown calculation using centralized engine',
-            {
-              modelId: model.id,
-              modelName: model.name,
-              selectedWeek,
-              categories: result.length,
-              duration: `${duration.toFixed(2)}ms`
-            },
-            calculationId,
-            'CategoryBreakdown.calculateCostData'
-          );
-
-          return result;
-        }
-      }
-
-      // Fallback to the original calculation method
-      const result = prepareCostDataForWeek(selectedCostPoint, model);
-
-      // End performance tracking
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-
-      // Log the result
-      calculationLogger.debug(
-        'Completed cost breakdown calculation using fallback method',
-        {
-          modelId: model.id,
-          modelName: model.name,
-          selectedWeek,
-          categories: result.length,
-          duration: `${duration.toFixed(2)}ms`
-        },
-        calculationId,
-        'CategoryBreakdown.calculateCostData'
-      );
-
-      return result;
-    } catch (error) {
-      // End performance tracking
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-
-      // Log the error
-      calculationLogger.error(
-        'Error calculating cost breakdown',
-        {
-          modelId: model.id,
-          modelName: model.name,
-          selectedWeek,
-          error,
-          duration: `${duration.toFixed(2)}ms`
-        },
-        calculationId,
-        'CategoryBreakdown.calculateCostData'
-      );
-
-      // Return empty array
-      return [];
-    }
-  }, [model, selectedWeek, selectedCostPoint]);
+    return prepareCostDataForWeek(selectedCostPoint, model);
+  }, [selectedCostPoint, model]);
 
   const calculateTypeCategorizedData = useCallback(() => {
-    // Generate a unique ID for this calculation
-    const calculationId = generateCalculationId();
-
-    // Log the start of the calculation
-    calculationLogger.debug(
-      'Starting cost type breakdown calculation',
-      {
-        modelId: model.id,
-        modelName: model.name,
-        selectedWeek
-      },
-      calculationId,
-      'CategoryBreakdown.calculateTypeCategorizedData'
-    );
-
-    // Start performance tracking
-    const startTime = performance.now();
-
-    try {
-      // Try to use the centralized calculation engine first
-      if (selectedWeek > 0) {
-        const costTypeBreakdown = calculateCostTypeBreakdown(model, selectedWeek);
-
-        if (costTypeBreakdown && Object.keys(costTypeBreakdown).length > 0) {
-          // Convert the breakdown to the format expected by the component
-          const result = Object.entries(costTypeBreakdown).map(([key, value]) => {
-            // Map the keys to more readable names
-            let name = key;
-            if (key === 'fixedCosts') name = 'Fixed Costs';
-            if (key === 'variableCosts') name = 'Variable Costs';
-            if (key === 'marketingCosts') name = 'Marketing Costs';
-
-            return {
-              name,
-              value: Math.round(value as number),
-              percentage: 0, // Will be calculated below
-              type: key.replace('Costs', '')
-            };
-          });
-
-          // Calculate total costs for percentage calculation
-          const totalCosts = result.reduce((sum, item) => sum + item.value, 0);
-
-          // Calculate percentages
-          result.forEach(item => {
-            item.percentage = totalCosts > 0 ? Math.round((item.value / totalCosts) * 100) : 0;
-          });
-
-          // End performance tracking
-          const endTime = performance.now();
-          const duration = endTime - startTime;
-
-          // Log the result
-          calculationLogger.debug(
-            'Completed cost type breakdown calculation using centralized engine',
-            {
-              modelId: model.id,
-              modelName: model.name,
-              selectedWeek,
-              categories: result.length,
-              duration: `${duration.toFixed(2)}ms`
-            },
-            calculationId,
-            'CategoryBreakdown.calculateTypeCategorizedData'
-          );
-
-          return result;
-        }
-      }
-
-      // Fallback to the original calculation method
-      const result = prepareTypeCategorizedDataForWeek(selectedCostPoint, model);
-
-      // End performance tracking
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-
-      // Log the result
-      calculationLogger.debug(
-        'Completed cost type breakdown calculation using fallback method',
-        {
-          modelId: model.id,
-          modelName: model.name,
-          selectedWeek,
-          categories: result.length,
-          duration: `${duration.toFixed(2)}ms`
-        },
-        calculationId,
-        'CategoryBreakdown.calculateTypeCategorizedData'
-      );
-
-      return result;
-    } catch (error) {
-      // End performance tracking
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-
-      // Log the error
-      calculationLogger.error(
-        'Error calculating cost type breakdown',
-        {
-          modelId: model.id,
-          modelName: model.name,
-          selectedWeek,
-          error,
-          duration: `${duration.toFixed(2)}ms`
-        },
-        calculationId,
-        'CategoryBreakdown.calculateTypeCategorizedData'
-      );
-
-      // Return empty array
-      return [];
-    }
-  }, [model, selectedWeek, selectedCostPoint]);
+    return prepareTypeCategorizedDataForWeek(selectedCostPoint, model);
+  }, [selectedCostPoint, model]);
 
   // Memoize the calculation results
   const revenueData = useMemo(() => calculateRevenueData(), [calculateRevenueData]);
   const costData = useMemo(() => calculateCostData(), [calculateCostData]);
   const typeCategorizedData = useMemo(() => calculateTypeCategorizedData(), [calculateTypeCategorizedData]);
-
-  // Log the costData just before rendering
-  console.log("[CategoryBreakdown Render] costData state before JSX:", costData);
 
   const weeklyTotals = useMemo(() => {
     if (!isWeeklyEvent) return null;
@@ -475,23 +108,9 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
 
   return (
     <div className="space-y-6">
-      {/* Title with Version Info */}
+      {/* Title */}
       <div className="flex items-center gap-2 mb-2">
         <h3 className="text-lg font-medium">Category Breakdown</h3>
-        {showVersionInfo && (
-          <TooltipProvider>
-            <UITooltip>
-              <TooltipTrigger>
-                <Badge variant="outline" className="ml-2 text-xs">
-                  {versionString}
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="text-xs">Using calculation engine version {versionString}</p>
-              </TooltipContent>
-            </UITooltip>
-          </TooltipProvider>
-        )}
       </div>
 
       {/* Toggles and Week Selector */}
