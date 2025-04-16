@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { clearMetrics, logMetrics } from '@/lib/performanceMonitoring.tsx';
-import { devLog } from '@/lib/logUtils';
+// import { devLog } from '@/lib/logUtils';
 
 /**
  * Performance Monitoring Page
@@ -23,13 +23,13 @@ const PerformanceMonitoring: React.FC = () => {
   // Handle log metrics button click
   const handleLogMetrics = () => {
     logMetrics();
-    devLog('Metrics logged to console');
+    // devLog('Metrics logged to console');
   };
 
   // Handle clear metrics button click
   const handleClearMetrics = () => {
     clearMetrics();
-    devLog('Metrics cleared');
+    // devLog('Metrics cleared');
   };
 
   return (

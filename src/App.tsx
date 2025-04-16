@@ -9,7 +9,7 @@ import PageLoader from "@/components/common/PageLoader";
 import NavigationOverlay from "@/components/common/NavigationOverlay";
 import useStore from "@/store/useStore";
 import { db } from "@/lib/db";
-import { devLog, appError } from "@/lib/logUtils";
+import { appError } from "@/lib/logUtils";
 
 // Direct import for performance analysis view
 import PerfAnalysisView from "@/pages/product/PerfAnalysisView.tsx";
@@ -86,27 +86,27 @@ const StoreInitializer = () => {
   // Initialize store data
   useEffect(() => {
     const initializeStore = async () => {
-      devLog('Initializing store...');
+      // devLog('Initializing store...');
 
       // Load all projects from the database
       await loadProjects();
 
       // Get persisted state to restore specific projects
       const persistedState = getPersistedState();
-      devLog('Persisted state:', persistedState);
+      // devLog('Persisted state:', persistedState);
 
       if (persistedState?.state?.currentProjectId) {
         try {
           // Restore the current project
           const currentProjectId = persistedState.state.currentProjectId;
-          devLog(`Restoring current project ID: ${currentProjectId}`);
+          // devLog(`Restoring current project ID: ${currentProjectId}`);
 
           const project = await loadProjectById(currentProjectId);
           if (project) {
-            devLog(`Restored current project: ${project.name}`);
+            // devLog(`Restored current project: ${project.name}`);
             setCurrentProject(project);
           } else {
-            devLog(`Current project ID ${currentProjectId} not found in database`);
+            // devLog(`Current project ID ${currentProjectId} not found in database`);
           }
         } catch (error) {
           appError('Failed to restore current project', error);
@@ -117,7 +117,7 @@ const StoreInitializer = () => {
           const projects = await db.projects.toArray();
           if (projects.length > 0) {
             const firstProject = projects[0];
-            devLog(`Setting first available project as current: ${firstProject.name}`);
+            // devLog(`Setting first available project as current: ${firstProject.name}`);
             setCurrentProject(firstProject);
           }
         } catch (error) {

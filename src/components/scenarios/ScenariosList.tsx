@@ -136,9 +136,12 @@ const ScenariosList: React.FC<ScenariosListProps> = ({
             Create your first scenario to start modeling different business outcomes.
           </TypographyMuted>
 
-          <Button onClick={onCreate}>
+          <Button onClick={() => {
+            console.log('[LegacyScenariosList] Create Your First Scenario button clicked');
+            onCreate();
+          }} variant="outline" disabled={loading}>
             <Plus className="mr-2 h-4 w-4" />
-            Create New Scenario
+            Create Your First Scenario
           </Button>
         </CardContent>
       </Card>
@@ -155,7 +158,10 @@ const ScenariosList: React.FC<ScenariosListProps> = ({
             Create and manage different business scenarios
           </CardDescription>
         </div>
-        <Button onClick={onCreate}>
+        <Button onClick={() => {
+          console.log('[LegacyScenariosList] Create New Scenario button clicked');
+          onCreate();
+        }} disabled={loading}>
           <Plus className="mr-2 h-4 w-4" />
           Create New Scenario
         </Button>

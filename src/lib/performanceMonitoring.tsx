@@ -4,7 +4,7 @@
  * This module provides utilities for monitoring and profiling application performance.
  */
 
-import { perfLog, devLog } from './logUtils';
+import { perfLog } from './logUtils';
 import { useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 
 // Store for performance metrics
@@ -146,7 +146,7 @@ export function clearMetrics(): void {
  * Log all performance metrics
  */
 export function logMetrics(): void {
-  devLog('Performance Metrics:', metrics);
+  // devLog('Performance Metrics:', metrics);
 }
 
 /**

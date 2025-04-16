@@ -96,10 +96,13 @@ const ScenariosViewRefactored: React.FC = () => {
 
   // Handle scenario creation
   const handleCreateScenario = () => {
+    if (isCreating) return; // Prevent double clicks
     setIsCreating(true);
+    console.log('[Scenarios] handleCreateScenario: started for projectId', projectId);
 
     // Load the default model for the project
     loadFinancialModel(parseInt(projectId)).then(model => {
+      console.log('[Scenarios] handleCreateScenario: loaded model', model);
       if (model) {
         setBaselineModel(model);
 
@@ -110,11 +113,12 @@ const ScenariosViewRefactored: React.FC = () => {
           'New Scenario',
           'Created on ' + new Date().toLocaleDateString()
         ).then(newScenario => {
+          console.log('[Scenarios] handleCreateScenario: created scenario', newScenario);
           // Navigate to the new scenario
           navigate(`/projects/${projectId}/scenarios/${newScenario.id}`);
           setIsCreating(false);
         }).catch(error => {
-          console.error('Error creating scenario:', error);
+          console.error('[Scenarios] handleCreateScenario: error creating scenario', error);
           toast({
             title: 'Error',
             description: 'Failed to create scenario',
@@ -122,7 +126,23 @@ const ScenariosViewRefactored: React.FC = () => {
           });
           setIsCreating(false);
         });
+      } else {
+        console.error('[Scenarios] handleCreateScenario: no model returned');
+        toast({
+          title: 'Error',
+          description: 'Could not load a baseline model for this project',
+          variant: 'destructive',
+        });
+        setIsCreating(false);
       }
+    }).catch(error => {
+      console.error('[Scenarios] handleCreateScenario: error loading model', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load baseline model',
+        variant: 'destructive',
+      });
+      setIsCreating(false);
     });
   };
 
@@ -250,6 +270,7 @@ const ScenariosViewRefactored: React.FC = () => {
         onDelete={handleDeleteScenario}
         projectId={parseInt(projectId || '0')}
         baseModelId={baselineModel?.id || 0}
+        isCreating={isCreating}
       />
     );
   };

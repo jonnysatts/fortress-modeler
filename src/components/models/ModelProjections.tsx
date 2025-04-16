@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from "react";
 import { FinancialModel } from "@/lib/db";
-import { devLog, appError } from "@/lib/logUtils";
+import { appError } from "@/lib/logUtils";
 import {
   LineChart,
   Line,

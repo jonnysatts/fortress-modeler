@@ -49,6 +49,7 @@ interface ScenariosListProps {
   onDelete: (scenarioId: number) => Promise<void>;
   projectId: number;
   baseModelId: number;
+  isCreating?: boolean;
 }
 
 const ScenariosList: React.FC<ScenariosListProps> = ({
@@ -59,7 +60,8 @@ const ScenariosList: React.FC<ScenariosListProps> = ({
   onDuplicate,
   onDelete,
   projectId,
-  baseModelId
+  baseModelId,
+  isCreating = false
 }) => {
   // State for dialogs
   const [duplicateScenarioName, setDuplicateScenarioName] = useState('');
@@ -125,7 +127,10 @@ const ScenariosList: React.FC<ScenariosListProps> = ({
               Create and manage different business scenarios
             </CardDescription>
           </div>
-          <Button onClick={onCreate}>
+          <Button onClick={() => {
+            console.log('[ScenariosList] Create New Scenario button clicked');
+            onCreate();
+          }} disabled={isCreating}>
             <Plus className="mr-2 h-4 w-4" />
             Create New Scenario
           </Button>
@@ -138,7 +143,10 @@ const ScenariosList: React.FC<ScenariosListProps> = ({
           ) : scenarios.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground mb-4">No scenarios found</p>
-              <Button onClick={onCreate} variant="outline">
+              <Button onClick={() => {
+                console.log('[ScenariosList] Create Your First Scenario button clicked');
+                onCreate();
+              }} variant="outline" disabled={isCreating}>
                 <Plus className="mr-2 h-4 w-4" />
                 Create Your First Scenario
               </Button>

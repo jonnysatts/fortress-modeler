@@ -78,6 +78,28 @@ const ScenariosView: React.FC = () => {
     }
   };
 
+  // Handle scenario save
+  const handleSaveScenario = async (updatedScenario: Scenario) => {
+    try {
+      if (typeof useStore.getState().updateScenario === 'function') {
+        await useStore.getState().updateScenario(updatedScenario);
+        if (typeof setCurrentScenario === 'function') {
+          setCurrentScenario(updatedScenario);
+        }
+        console.log('[ScenariosView] Scenario saved successfully', updatedScenario);
+      } else {
+        console.error('[ScenariosView] updateScenario is not a function');
+      }
+    } catch (error) {
+      console.error('[ScenariosView] Error saving scenario', error);
+    }
+  };
+
+  // Handle cancel (return to scenario list)
+  const handleCancel = () => {
+    setActiveTab('scenarios');
+  };
+
   // If no baseline model is available, show a message
   if (!baselineModel) {
     return (
@@ -115,16 +137,47 @@ const ScenariosView: React.FC = () => {
             scenarios={scenarios}
             loading={scenariosLoading}
             onSelect={handleScenarioSelect}
+            onCreate={async () => {
+              if (!baselineModel || !projectId) {
+                console.error('[ScenariosView] Cannot create scenario: missing baselineModel or projectId');
+                return;
+              }
+              try {
+                const name = `New Scenario ${scenarios.length + 1}`;
+                const description = `Created on ${new Date().toLocaleDateString()}`;
+                const createdScenario = await useStore.getState().createScenario(
+                  parseInt(projectId),
+                  baselineModel.id,
+                  name,
+                  description
+                );
+                if (typeof setCurrentScenario === 'function') {
+                  setCurrentScenario(createdScenario);
+                }
+                setActiveTab('editor');
+                console.log('[ScenariosView] Scenario created and editor tab activated', createdScenario);
+              } catch (error) {
+                console.error('[ScenariosView] Error creating scenario', error);
+              }
+            }}
             projectId={parseInt(projectId || '0')}
             baseModelId={baselineModel?.id || 0}
           />
         </TabsContent>
 
         <TabsContent value="editor" className="space-y-6">
+          {(() => {
+            console.log('[ScenariosView] scenarios:', scenarios);
+            console.log('[ScenariosView] currentScenario:', currentScenario);
+            console.log('[ScenariosView] baselineModel:', baselineModel);
+            return null;
+          })()}
           {currentScenario ? (
             <ScenarioEditor
               scenario={currentScenario}
-              baselineModel={baselineModel}
+              baseModel={baselineModel}
+              onSave={handleSaveScenario}
+              onCancel={handleCancel}
             />
           ) : (
             <div className="py-8 text-center">
