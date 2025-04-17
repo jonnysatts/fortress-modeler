@@ -44,14 +44,14 @@ const ScenarioComparison: React.FC<ScenarioComparisonProps> = ({
 
   // Calculate forecast and enable comparison mode when component mounts
   useEffect(() => {
-    calculateScenarioForecast(baselineModel, scenario.parameterDeltas);
+    calculateScenarioForecast(scenario.parameterDeltas);
     toggleComparisonMode(true);
 
     // Disable comparison mode when component unmounts
     return () => {
       toggleComparisonMode(false);
     };
-  }, [calculateScenarioForecast, toggleComparisonMode, baselineModel, scenario]);
+  }, [calculateScenarioForecast, toggleComparisonMode, scenario]);
 
   // Prepare data for charts
   const prepareChartData = () => {

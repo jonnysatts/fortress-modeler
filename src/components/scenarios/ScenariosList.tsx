@@ -68,11 +68,18 @@ const ScenariosList: React.FC<ScenariosListProps> = ({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
 
+  // --- Edit Scenario Dialog State ---
+  const [scenarioToEdit, setScenarioToEdit] = useState<Scenario | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
   // Get actions from store
-  const { createScenario, deleteScenario, duplicateScenario } = useStore(state => ({
+  const { createScenario, deleteScenario, duplicateScenario, updateScenario } = useStore(state => ({
     createScenario: state.createScenario,
     deleteScenario: state.deleteScenario,
-    duplicateScenario: state.duplicateScenario
+    duplicateScenario: state.duplicateScenario,
+    updateScenario: state.updateScenario
   }));
 
   // Handle create scenario - now handled by CreateScenarioDialog
@@ -98,6 +105,21 @@ const ScenariosList: React.FC<ScenariosListProps> = ({
     setScenarioToDuplicate(null);
     setDuplicateScenarioName('');
     setIsDuplicateDialogOpen(false);
+  };
+
+  // --- Handle Edit Scenario ---
+  const handleEditScenario = (scenario: Scenario) => {
+    setScenarioToEdit(scenario);
+    setEditName(scenario.name || '');
+    setEditDescription(scenario.description || '');
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!scenarioToEdit) return;
+    await updateScenario({ ...scenarioToEdit, name: editName, description: editDescription });
+    setIsEditDialogOpen(false);
+    setScenarioToEdit(null);
   };
 
   // Render loading state
@@ -210,7 +232,7 @@ const ScenariosList: React.FC<ScenariosListProps> = ({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onSelect(scenario)}>
+                      <DropdownMenuItem onClick={() => handleEditScenario(scenario)}>
                         Edit Scenario
                       </DropdownMenuItem>
                       <DropdownMenuItem
@@ -296,6 +318,46 @@ const ScenariosList: React.FC<ScenariosListProps> = ({
               disabled={!duplicateScenarioName.trim()}
             >
               Duplicate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Scenario Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Scenario</DialogTitle>
+            <DialogDescription>
+              Update the name and description for this scenario.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="edit-name" className="text-sm font-medium">Scenario Name</label>
+              <Input
+                id="edit-name"
+                placeholder="Scenario Name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="edit-description" className="text-sm font-medium">Description</label>
+              <Input
+                id="edit-description"
+                placeholder="Description"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleSaveEdit} disabled={!editName.trim()}>
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -31,7 +31,7 @@ export interface ScenarioState {
   setCurrentScenario: (scenario: Scenario | null) => void;
   setBaselineModel: (model: FinancialModel | null) => void;
   updateScenarioDeltas: (deltas: Partial<ScenarioParameterDeltas>) => void;
-  calculateScenarioForecast: () => void;
+  calculateScenarioForecast: (deltas?: ScenarioParameterDeltas) => void;
   toggleComparisonMode: (isEnabled: boolean) => void;
   resetScenarioDeltas: () => void;
 }
@@ -354,11 +354,11 @@ export const createScenarioSlice: StateCreator<ScenarioState> = (set, get) => ({
   },
 
   /**
-   * Calculate scenario forecast based on provided model and deltas or current state
+   * Calculate scenario forecast based on provided deltas or current state
    */
-  calculateScenarioForecast: (model?: FinancialModel, deltas?: ScenarioParameterDeltas) => {
-    // Use provided model and deltas or fall back to current state
-    const baseModel = model || get().baselineModel;
+  calculateScenarioForecast: (deltas?: ScenarioParameterDeltas) => {
+    // Use provided deltas or fall back to current state
+    const baseModel = get().baselineModel;
     const paramDeltas = deltas || get().currentScenario?.parameterDeltas;
     const { currentScenario } = get();
 
@@ -369,7 +369,11 @@ export const createScenarioSlice: StateCreator<ScenarioState> = (set, get) => ({
     });
 
     if (!baseModel || !paramDeltas) {
-      console.error('Missing baseline model or parameter deltas');
+      toast({
+        title: 'Calculation Error',
+        description: 'Missing base model or scenario parameters',
+        variant: 'destructive',
+      });
       return;
     }
 

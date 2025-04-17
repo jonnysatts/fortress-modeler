@@ -19,13 +19,23 @@ interface ScenarioChartProps {
   baselineData: ForecastPeriodData[] | null;
   scenarioData: ForecastPeriodData[] | null;
   height?: number;
+  isCalculating?: boolean;
 }
 
 const ScenarioChart: React.FC<ScenarioChartProps> = ({
   baselineData,
   scenarioData,
-  height = 300
+  height = 300,
+  isCalculating = false
 }) => {
+  if (isCalculating) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mr-2" />
+        <span className="ml-2 text-muted-foreground">Calculating forecast...</span>
+      </div>
+    );
+  }
   if (!baselineData || !scenarioData) {
     return (
       <div className="flex items-center justify-center h-64">

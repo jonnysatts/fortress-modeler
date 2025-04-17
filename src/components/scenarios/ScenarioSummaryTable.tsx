@@ -14,12 +14,22 @@ import { Badge } from '@/components/ui/badge';
 interface ScenarioSummaryTableProps {
   baselineData: ForecastPeriodData[] | null;
   scenarioData: ForecastPeriodData[] | null;
+  isCalculating?: boolean;
 }
 
 const ScenarioSummaryTable: React.FC<ScenarioSummaryTableProps> = ({
   baselineData,
-  scenarioData
+  scenarioData,
+  isCalculating = false
 }) => {
+  if (isCalculating) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mr-2" />
+        <span className="ml-2 text-muted-foreground">Calculating summary...</span>
+      </div>
+    );
+  }
   if (!baselineData || !scenarioData) {
     return (
       <div className="flex items-center justify-center h-64">
