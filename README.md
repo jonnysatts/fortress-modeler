@@ -1,73 +1,106 @@
-# Welcome to your Lovable project
+# Fortress Modeler Refactor
 
-## Project info
+A modern, interactive scenario modeling tool for business and financial forecasting. This codebase features a robust Scenario Editor with real-time updates, advanced comparison tools, and a polished, user-friendly UI.
 
-**URL**: https://lovable.dev/projects/083af2d7-5a91-4d42-8248-1c36fd24e935
+---
 
-## How can I edit this code?
+## 🚀 Features
 
-There are several ways of editing your application.
+- **Scenario Editor:**
+  - Real-time, debounced updates to charts and summary tables as you adjust parameters (sliders, etc).
+  - Two-column layout: parameter controls, suggestions, scenario controls, charts, and summary tables.
+  - Edit scenario name and description at any time.
+  - Modern, card-based UI with responsive design and accessible controls.
+  - Parameter suggestions with actionable advice and one-click application.
 
-**Use Lovable**
+- **Scenario Comparison:**
+  - Visual and tabular comparison of scenario vs. baseline forecasts.
+  - Revenue, costs, profit, and cumulative views.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/083af2d7-5a91-4d42-8248-1c36fd24e935) and start prompting.
+- **State Management:**
+  - Powered by Zustand for fast, reliable state updates.
+  - Calculation engine robustly handles rapid user changes.
 
-Changes made via Lovable will be committed automatically to this repo.
+- **UI/UX:**
+  - Built with React, TypeScript, shadcn-ui, and Tailwind CSS.
+  - Loading overlays, animated cards, and polished component styling.
 
-**Use your preferred IDE**
+- **Extensible:**
+  - Modular design for easy addition of new scenario parameters, charts, or business logic.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+---
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 🛠️ Tech Stack
 
-Follow these steps:
+- **Framework:** React + Vite
+- **Language:** TypeScript
+- **UI:** shadcn-ui, Tailwind CSS
+- **State:** Zustand
+- **Icons:** Lucide React
+- **Build Tooling:** Vite
 
+---
+
+## 🏁 Getting Started
+
+### 1. Clone the repository
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+git clone https://github.com/jonnysatts/fortress-modeler-refactor.git
+cd fortress-modeler-refactor
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 2. Install dependencies
+```sh
+npm install
+```
 
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+### 3. Start the development server
+```sh
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### 4. Open in your browser
+Visit [http://localhost:5173](http://localhost:5173) (or the port shown in your terminal)
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+---
 
-**Use GitHub Codespaces**
+## 🧑‍💻 Project Structure
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- `/src/components/scenarios/` — Scenario Editor, Comparison, List, Suggestions, and related UI
+- `/src/store/` — Zustand store slices for scenarios, models, etc.
+- `/src/pages/product/` — Main app views and page-level routing
 
-## What technologies are used for this project?
+---
 
-This project is built with .
+## ✨ Key Concepts
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- **Real-Time Modeling:** All parameter changes immediately update forecasts and charts, with debouncing to prevent UI lag.
+- **Scenario Management:** Create, duplicate, delete, and edit scenarios. All scenario meta (name, description) is editable post-creation.
+- **Suggestions Engine:** Get actionable parameter suggestions based on your changes.
+- **Comparison Mode:** Instantly compare any scenario to the baseline with clear visualizations and summary metrics.
+- **Robust Calculation Engine:** Designed to avoid flicker, lag, and stale data even under rapid user interaction.
 
-## How can I deploy this project?
+---
 
-Simply open [Lovable](https://lovable.dev/projects/083af2d7-5a91-4d42-8248-1c36fd24e935) and click on Share -> Publish.
+## 📝 Contributing
 
-## Can I connect a custom domain to my Lovable project?
+Pull requests and issues are welcome! Please open an issue for bugs or feature requests, or fork and submit a PR for improvements.
 
-Yes it is!
+---
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 📄 License
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+This project is private and proprietary to the project owner.
+
+---
+
+## 🙏 Acknowledgments
+
+- Built with ❤️ using React, Zustand, shadcn-ui, and the open-source ecosystem.
+- Special thanks to all contributors and testers!
+
+---
+
+For further documentation or architectural details, see the `/docs` directory (if present) or open an issue.
+
+---
