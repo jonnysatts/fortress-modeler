@@ -68,58 +68,45 @@ export const parameterRelationships: Record<keyof ScenarioParameterDeltas, Param
 
 /**
  * Calculate suggested parameter changes based on a change to a source parameter
- * @param sourceParam The parameter that was changed
- * @param sourceValue The new value of the source parameter
- * @param currentDeltas The current state of all deltas
+ * @param param The parameter that was changed
+ * @param value The new value of the source parameter
+ * @param localDeltas The current state of all deltas
+ * @param options Calculation mode options for attendance growth and cogs
  * @returns An object with suggested changes to other parameters
  */
 export function calculateRelatedChanges(
-  sourceParam: keyof ScenarioParameterDeltas,
-  sourceValue: number,
-  currentDeltas: ScenarioParameterDeltas
-): Partial<ScenarioParameterDeltas> {
-  console.log(`Calculating related changes for ${sourceParam} = ${sourceValue}`);
-  
-  // Get relationships for the source parameter
-  const relationships = parameterRelationships[sourceParam] || [];
-  
-  console.log(`Found ${relationships.length} relationships for ${sourceParam}`);
-  
-  if (relationships.length === 0) {
-    return {}; // No relationships defined
+  param: keyof ScenarioParameterDeltas,
+  value: number,
+  localDeltas: ScenarioParameterDeltas,
+  options?: {
+    attendanceGrowthMode?: 'replace' | 'add',
+    cogsMode?: 'multiply' | 'add'
   }
-  
-  // Calculate suggested changes for each relationship
-  const suggestedChanges: Partial<ScenarioParameterDeltas> = {};
-  
-  relationships.forEach(relationship => {
-    const targetParam = relationship.targetParam;
-    const currentTargetValue = currentDeltas[targetParam];
-    
-    // Handle special case for marketingSpendByChannel which is an object
-    if (targetParam === 'marketingSpendByChannel') {
-      // Skip for now as this is a complex object
-      return;
+): Partial<ScenarioParameterDeltas> {
+  // Example: if marketingSpendPercent changes, suggest a related attendance growth adjustment
+  const suggestions: Partial<ScenarioParameterDeltas> = {};
+
+  if (param === 'marketingSpendPercent') {
+    // If marketing spend goes up, attendance growth might also go up
+    // If attendance growth mode is 'replace', suggest a new value; if 'add', suggest an increment
+    if (options?.attendanceGrowthMode === 'replace') {
+      suggestions.attendanceGrowthPercent = Math.max(0, value * 0.2); // e.g., 20% of marketing change
+    } else {
+      suggestions.attendanceGrowthPercent = (localDeltas.attendanceGrowthPercent || 0) + value * 0.2;
     }
-    
-    const suggestedValue = relationship.calculateSuggestion(
-      sourceValue, 
-      currentTargetValue as number,
-      currentDeltas
-    );
-    
-    console.log(`Suggested value for ${targetParam}: ${suggestedValue} (current: ${currentTargetValue})`);
-    
-    // Always suggest if there's any change at all
-    if (Math.abs(suggestedValue - (currentTargetValue as number)) > 0.01) {
-      // Ensure we're setting the right type based on parameter
-      if (typeof suggestedValue === 'number') {
-        (suggestedChanges as any)[targetParam] = suggestedValue;
-      }
+  }
+  if (param === 'pricingPercent') {
+    // If pricing goes up, attendance growth might go down
+    if (options?.attendanceGrowthMode === 'replace') {
+      suggestions.attendanceGrowthPercent = Math.max(0, localDeltas.attendanceGrowthPercent - value * 0.1);
+    } else {
+      suggestions.attendanceGrowthPercent = (localDeltas.attendanceGrowthPercent || 0) - value * 0.1;
     }
-  });
-  
-  console.log('Final suggested changes:', suggestedChanges);
-  
-  return suggestedChanges;
+  }
+  if (param === 'cogsMultiplier') {
+    // Suggest nothing for now, but could add logic for related changes
+  }
+  // More sophisticated logic can be added here
+
+  return suggestions;
 }

@@ -31,7 +31,10 @@ export interface ScenarioState {
   setCurrentScenario: (scenario: Scenario | null) => void;
   setBaselineModel: (model: FinancialModel | null) => void;
   updateScenarioDeltas: (deltas: Partial<ScenarioParameterDeltas>) => void;
-  calculateScenarioForecast: (deltas?: ScenarioParameterDeltas) => void;
+  calculateScenarioForecast: (deltas?: ScenarioParameterDeltas, options?: {
+    attendanceGrowthMode?: 'replace' | 'add',
+    cogsMode?: 'multiply' | 'add'
+  }) => void;
   toggleComparisonMode: (isEnabled: boolean) => void;
   resetScenarioDeltas: () => void;
 }
@@ -356,7 +359,10 @@ export const createScenarioSlice: StateCreator<ScenarioState> = (set, get) => ({
   /**
    * Calculate scenario forecast based on provided deltas or current state
    */
-  calculateScenarioForecast: (deltas?: ScenarioParameterDeltas) => {
+  calculateScenarioForecast: (deltas?: ScenarioParameterDeltas, options?: {
+    attendanceGrowthMode?: 'replace' | 'add',
+    cogsMode?: 'multiply' | 'add'
+  }) => {
     // Use provided deltas or fall back to current state
     const baseModel = get().baselineModel;
     const paramDeltas = deltas || get().currentScenario?.parameterDeltas;
@@ -385,7 +391,7 @@ export const createScenarioSlice: StateCreator<ScenarioState> = (set, get) => ({
       console.log('Starting forecast recalculation...');
 
       // Create a modified model by applying deltas
-      const modifiedModel = applyScenarioDeltas(baseModel, paramDeltas);
+      const modifiedModel = applyScenarioDeltas(baseModel, paramDeltas, options);
       console.log('Modified model created');
 
       // Generate forecast data using the modified model
@@ -505,9 +511,16 @@ export const createScenarioSlice: StateCreator<ScenarioState> = (set, get) => ({
  */
 function applyScenarioDeltas(
   baselineModel: FinancialModel,
-  deltas: ScenarioParameterDeltas
+  deltas: ScenarioParameterDeltas,
+  options?: {
+    attendanceGrowthMode?: 'replace' | 'add',
+    cogsMode?: 'multiply' | 'add'
+  }
 ): FinancialModel {
-  console.log('Applying scenario deltas:', deltas);
+  console.log('Applying scenario deltas:', deltas, options);
+
+  const attendanceGrowthMode = options?.attendanceGrowthMode || 'replace';
+  const cogsMode = options?.cogsMode || 'multiply';
 
   // Create a deep copy of the baseline model
   const modifiedModel: FinancialModel = JSON.parse(JSON.stringify(baselineModel));
@@ -625,16 +638,15 @@ function applyScenarioDeltas(
 
   // Apply attendance growth rate delta
   if (modifiedModel.assumptions.metadata?.growth) {
-    // Always apply the attendance growth delta, even if it's 0
-    // This ensures the growth settings are properly configured
     const originalRate = modifiedModel.assumptions.metadata.growth.attendanceGrowthRate || 0;
-
-    // Add the delta to the existing growth rate (not multiply)
-    // Always apply the delta, even if it's 0, to ensure consistent calculation
-    modifiedModel.assumptions.metadata.growth.attendanceGrowthRate = originalRate + deltas.attendanceGrowthPercent;
-    console.log(`Attendance growth rate: Original: ${originalRate}% -> Modified: ${modifiedModel.assumptions.metadata.growth.attendanceGrowthRate}%, Change: ${deltas.attendanceGrowthPercent}%`);
-
-    // CRITICAL: Ensure that growth-related settings are ALWAYS enabled
+    let newGrowthRate = originalRate;
+    if (attendanceGrowthMode === 'replace') {
+      newGrowthRate = deltas.attendanceGrowthPercent;
+    } else if (attendanceGrowthMode === 'add') {
+      newGrowthRate = originalRate + deltas.attendanceGrowthPercent;
+    }
+    modifiedModel.assumptions.metadata.growth.attendanceGrowthRate = newGrowthRate;
+    console.log(`Attendance growth rate: Original: ${originalRate}% -> Modified: ${newGrowthRate}%, Mode: ${attendanceGrowthMode}`);
     // Force enable customer spend growth to ensure growth calculations are used
     modifiedModel.assumptions.metadata.growth.useCustomerSpendGrowth = true;
     console.log(`Enabled useCustomerSpendGrowth: ${modifiedModel.assumptions.metadata.growth.useCustomerSpendGrowth}`);
@@ -682,34 +694,43 @@ function applyScenarioDeltas(
 
   // Apply COGS multiplier delta
   if (modifiedModel.assumptions.metadata?.costs) {
-    // Always apply the COGS multiplier, even if it's 0
-    // This ensures the cost settings are properly configured
-
-    // Adjust F&B COGS percentage
-    if (modifiedModel.assumptions.metadata.costs.fbCOGSPercent !== undefined && deltas.cogsMultiplier !== 0) {
+    // F&B COGS
+    if (modifiedModel.assumptions.metadata.costs.fbCOGSPercent !== undefined) {
       const originalFbCogs = modifiedModel.assumptions.metadata.costs.fbCOGSPercent;
-      modifiedModel.assumptions.metadata.costs.fbCOGSPercent =
-        originalFbCogs * (1 + deltas.cogsMultiplier / 100);
-
-      console.log(`F&B COGS: Original: ${originalFbCogs}% -> Modified: ${modifiedModel.assumptions.metadata.costs.fbCOGSPercent}%, Change: ${deltas.cogsMultiplier}%`);
+      let newFbCogs = originalFbCogs;
+      if (cogsMode === 'multiply') {
+        newFbCogs = originalFbCogs * (1 + deltas.cogsMultiplier / 100);
+      } else if (cogsMode === 'add') {
+        newFbCogs = originalFbCogs + deltas.cogsMultiplier;
+      }
+      modifiedModel.assumptions.metadata.costs.fbCOGSPercent = newFbCogs;
+      console.log(`F&B COGS: Original: ${originalFbCogs}% -> Modified: ${newFbCogs}%, Mode: ${cogsMode}`);
     }
 
-    // Adjust merchandise COGS percentage
-    if (modifiedModel.assumptions.metadata.costs.merchandiseCogsPercent !== undefined && deltas.cogsMultiplier !== 0) {
+    // Merchandise COGS
+    if (modifiedModel.assumptions.metadata.costs.merchandiseCogsPercent !== undefined) {
       const originalMerchCogs = modifiedModel.assumptions.metadata.costs.merchandiseCogsPercent;
-      modifiedModel.assumptions.metadata.costs.merchandiseCogsPercent =
-        originalMerchCogs * (1 + deltas.cogsMultiplier / 100);
-
-      console.log(`Merchandise COGS: Original: ${originalMerchCogs}% -> Modified: ${modifiedModel.assumptions.metadata.costs.merchandiseCogsPercent}%, Change: ${deltas.cogsMultiplier}%`);
+      let newMerchCogs = originalMerchCogs;
+      if (cogsMode === 'multiply') {
+        newMerchCogs = originalMerchCogs * (1 + deltas.cogsMultiplier / 100);
+      } else if (cogsMode === 'add') {
+        newMerchCogs = originalMerchCogs + deltas.cogsMultiplier;
+      }
+      modifiedModel.assumptions.metadata.costs.merchandiseCogsPercent = newMerchCogs;
+      console.log(`Merchandise COGS: Original: ${originalMerchCogs}% -> Modified: ${newMerchCogs}%, Mode: ${cogsMode}`);
     }
 
     // Adjust staff costs if they exist
     if (modifiedModel.assumptions.metadata.costs.staffCostPerPerson !== undefined && deltas.cogsMultiplier !== 0) {
       const originalStaffCost = modifiedModel.assumptions.metadata.costs.staffCostPerPerson;
-      modifiedModel.assumptions.metadata.costs.staffCostPerPerson =
-        originalStaffCost * (1 + deltas.cogsMultiplier / 100);
-
-      console.log(`Staff cost per person: Original: $${originalStaffCost.toFixed(2)} -> Modified: $${modifiedModel.assumptions.metadata.costs.staffCostPerPerson.toFixed(2)}, Change: ${deltas.cogsMultiplier}%`);
+      let newStaffCost = originalStaffCost;
+      if (cogsMode === 'multiply') {
+        newStaffCost = originalStaffCost * (1 + deltas.cogsMultiplier / 100);
+      } else if (cogsMode === 'add') {
+        newStaffCost = originalStaffCost + deltas.cogsMultiplier;
+      }
+      modifiedModel.assumptions.metadata.costs.staffCostPerPerson = newStaffCost;
+      console.log(`Staff cost per person: Original: $${originalStaffCost.toFixed(2)} -> Modified: $${newStaffCost.toFixed(2)}, Mode: ${cogsMode}`);
     }
   }
 

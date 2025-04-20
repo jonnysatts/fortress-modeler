@@ -34,8 +34,16 @@ export const createModelSlice: StateCreator<ModelState> = (set, get) => ({
 
       if (projectId) {
         models = await db.financialModels.where('projectId').equals(projectId).toArray();
+        console.log('[ModelStore][RAW] Models loaded from IndexedDB (by projectId):', JSON.parse(JSON.stringify(models)));
       } else {
         models = await db.financialModels.toArray();
+        console.log('[ModelStore][RAW] All models loaded from IndexedDB:', JSON.parse(JSON.stringify(models)));
+      }
+
+      // --- DEBUG LOG ---
+      console.log('[ModelStore] Loaded models:', JSON.parse(JSON.stringify(models)));
+      if (models.length > 0 && models[0].assumptions?.marketing?.channels) {
+        console.log('[ModelStore] Loaded marketing channels:', models[0].assumptions.marketing.channels);
       }
 
       set(state => ({
@@ -110,7 +118,16 @@ export const createModelSlice: StateCreator<ModelState> = (set, get) => ({
         updatedAt: now
       };
 
+      // --- DEBUG LOG ---
+      console.log('[ModelStore] Adding model:', JSON.parse(JSON.stringify(newModel)));
+      if (newModel.assumptions?.marketing?.channels) {
+        console.log('[ModelStore] Adding marketing channels:', newModel.assumptions.marketing.channels);
+      }
+      // Log the exact object to be saved
+      console.log('[ModelStore][RAW] Object to add to IndexedDB:', JSON.parse(JSON.stringify(newModel)));
+
       const id = await db.financialModels.add(newModel as FinancialModel);
+      console.log('[ModelStore][RAW] Model added to IndexedDB with ID:', id);
 
       // Refresh the models list
       await get().loadModels(model.projectId);
@@ -140,7 +157,16 @@ export const createModelSlice: StateCreator<ModelState> = (set, get) => ({
         updatedAt: new Date()
       };
 
+      // --- DEBUG LOG ---
+      console.log('[ModelStore] Updating model:', JSON.parse(JSON.stringify(updatedModel)));
+      if (updatedModel.assumptions?.marketing?.channels) {
+        console.log('[ModelStore] Updating marketing channels:', updatedModel.assumptions.marketing.channels);
+      }
+      // Log the exact object to be saved
+      console.log('[ModelStore][RAW] Object to update in IndexedDB:', JSON.parse(JSON.stringify(updatedModel)));
+
       await db.financialModels.update(id, updatedModel);
+      console.log('[ModelStore][RAW] Model updated in IndexedDB with ID:', id);
 
       // Update current model if it's the one being updated
       const { currentModel } = get();
@@ -181,6 +207,7 @@ export const createModelSlice: StateCreator<ModelState> = (set, get) => ({
 
       // Delete the model
       await db.financialModels.delete(id);
+      console.log('[ModelStore][RAW] Model deleted from IndexedDB with ID:', id);
 
       // Clear current model if it's the one being deleted
       const { currentModel } = get();

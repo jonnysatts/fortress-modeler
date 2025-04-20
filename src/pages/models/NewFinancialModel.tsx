@@ -121,7 +121,7 @@ const NewFinancialModel = () => {
       // Create growth model based on type
       const growthModel = {
         type: data.growthModelType,
-        rate: data.growthRate,
+        rate: data.growthRate / 100, // FIX: Store as decimal
         seasonalFactors: seasonalFactorsArray,
       };
 

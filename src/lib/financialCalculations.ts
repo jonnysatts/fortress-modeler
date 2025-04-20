@@ -37,7 +37,7 @@ export const calculateTotalRevenue = (model: FinancialModel): number => {
       // Calculate attendance for this week
       const attendanceGrowthRate = metadata.growth.attendanceGrowthRate / 100;
       const currentAttendance = Math.round(
-        (initialAttendance ?? 0) * Math.pow(1 + attendanceGrowthRate, week - 1)
+        (initialAttendance ?? 0) * (attendanceGrowthRate === 0 ? 1 : Math.pow(1 + attendanceGrowthRate, week - 1))
       );
 
       // Calculate per-customer values with growth if enabled
@@ -99,7 +99,7 @@ export const calculateTotalCosts = (model: FinancialModel): number => {
       // Calculate attendance for this week
       const attendanceGrowthRate = metadata.growth.attendanceGrowthRate / 100;
       const currentAttendance = Math.round(
-        (initialAttendance ?? 0) * Math.pow(1 + attendanceGrowthRate, week - 1)
+        (initialAttendance ?? 0) * (attendanceGrowthRate === 0 ? 1 : Math.pow(1 + attendanceGrowthRate, week - 1))
       );
 
       // Calculate F&B revenue for this week to determine COGS
@@ -127,6 +127,17 @@ export const calculateTotalCosts = (model: FinancialModel): number => {
 
 // NEW: Function to generate the full forecast time series
 export const generateForecastTimeSeries = (model: FinancialModel): ForecastPeriodData[] => {
+  console.log("[DEBUG] Growth settings:", {
+    attendanceGrowthRate: model.assumptions.metadata?.growth?.attendanceGrowthRate,
+    ticketPriceGrowth: model.assumptions.metadata?.growth?.ticketPriceGrowth,
+    fbSpendGrowth: model.assumptions.metadata?.growth?.fbSpendGrowth,
+    merchandiseSpendGrowth: model.assumptions.metadata?.growth?.merchandiseSpendGrowth,
+    useCustomerSpendGrowth: model.assumptions.metadata?.growth?.useCustomerSpendGrowth,
+    growthModel: model.assumptions.growthModel,
+    modelName: model.name,
+    time: new Date().toISOString(),
+  });
+
   console.log("[generateForecastTimeSeries] Starting calculation for model:", model?.name);
   if (!model?.assumptions) {
     console.warn("[generateForecastTimeSeries] No assumptions found in model.");
@@ -154,6 +165,23 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
   let cumulativeProfit = 0;
 
   try {
+    // Use growthModel if present, otherwise use specific growth fields
+    const useOverallGrowth = !!assumptions.growthModel;
+    const overallGrowthType = assumptions.growthModel?.type || 'exponential';
+    // FIX: Growth rate must always be a decimal
+    const overallGrowthRate = (assumptions.growthModel?.rate ?? 0) / 100;
+
+    // Enhanced debug logging for growth settings
+    console.log('[DEBUG] GROWTH SETTINGS START');
+    console.log('Raw growth settings:', model.assumptions.metadata?.growth);
+    console.log('Stringified growth settings:', JSON.stringify(model.assumptions.metadata?.growth, null, 2));
+    console.log('Attendance growth rate (decimal):', model.assumptions.metadata?.growth?.attendanceGrowthRate ? model.assumptions.metadata?.growth?.attendanceGrowthRate / 100 : 0);
+    console.log('Use customer spend growth:', model.assumptions.metadata?.growth?.useCustomerSpendGrowth);
+    console.log('Use growth:', model.assumptions.metadata?.useGrowth);
+    console.log('Growth model (raw):', model.assumptions.growthModel);
+    console.log('Growth model (stringified):', JSON.stringify(model.assumptions.growthModel, null, 2));
+    console.log('[DEBUG] GROWTH SETTINGS END');
+
     for (let period = 1; period <= duration; period++) {
       const point = `${timeUnit} ${period}`;
       let periodRevenue = 0;
@@ -167,34 +195,20 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
           currentAttendance = initialAttendance;
           console.log(`[FinancialCalc Period ${period}] Initial attendance: ${currentAttendance}`);
         } else {
-          // Use the attendance growth rate from the model
-          let rate = (metadata.growth?.attendanceGrowthRate ?? 0) / 100;
-
-          // CRITICAL: Check for useGrowth flag at both levels
-          const useGrowth = metadata.useGrowth || metadata.growth?.useCustomerSpendGrowth;
-
-          // Log what growth settings we're using
-          console.log(`[FinancialCalc Period ${period}] Growth settings: attendanceGrowthRate=${metadata.growth?.attendanceGrowthRate ?? 0}%, useGrowth=${useGrowth}, useCustomerSpendGrowth=${metadata.growth?.useCustomerSpendGrowth}, growthModel.type=${growthModel?.type}, growthModel.rate=${growthModel?.rate ?? 0}`);
-
-          // If we're not using growth, force the rate to 0
-          if (!useGrowth) {
-            console.log(`[FinancialCalc] Growth disabled, setting rate to 0`);
-            rate = 0;
+          let rate = 0;
+          if (useOverallGrowth && overallGrowthRate > 0) {
+            rate = overallGrowthRate;
+          } else if (metadata.growth?.attendanceGrowthRate) {
+            rate = (metadata.growth.attendanceGrowthRate ?? 0) / 100;
           }
-          // If attendance growth rate is 0 but we have an overall growth model with exponential type,
-          // use that rate instead
-          else if (rate === 0 && growthModel?.type === 'exponential' && growthModel?.rate > 0) {
-            rate = growthModel.rate;
-            console.log(`[FinancialCalc] Using overall growth rate: ${rate * 100}% instead of attendance growth rate: 0%`);
-          }
-
-          // Calculate attendance with growth rate
-          currentAttendance = initialAttendance * Math.pow(1 + rate, period - 1);
-          console.log(`[FinancialCalc Period ${period}] Attendance calculation: ${initialAttendance} * (1 + ${rate})^(${period - 1}) = ${currentAttendance}`);
-
-          // Add debug logging
-          if (period <= 3) { // Log for first few periods to see progression
-            console.log(`[FinancialCalc] Attendance Growth: Initial=${initialAttendance}, Rate=${rate * 100}%, Period ${period}=${Math.round(currentAttendance)}`);
+          if (rate > 0) {
+            if (useOverallGrowth && overallGrowthType === 'linear') {
+              currentAttendance = initialAttendance + initialAttendance * rate * (period - 1);
+            } else {
+              currentAttendance = initialAttendance * Math.pow(1 + rate, period - 1);
+            }
+          } else {
+            currentAttendance = initialAttendance;
           }
         }
         currentAttendance = Math.round(currentAttendance);
@@ -208,48 +222,53 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
 
       // Calculate Per-Attendee based revenue FIRST (if WeeklyEvent)
       if (isWeekly && metadata?.perCustomer) {
-          // Get the base per-customer values
-          let currentTicketPrice = metadata.perCustomer.ticketPrice ?? 0;
-          let currentFbSpend = metadata.perCustomer.fbSpend ?? 0;
-          let currentMerchSpend = metadata.perCustomer.merchandiseSpend ?? 0;
+        // Get the base per-customer values
+        let currentTicketPrice = metadata.perCustomer.ticketPrice ?? 0;
+        let currentFbSpend = metadata.perCustomer.fbSpend ?? 0;
+        let currentMerchSpend = metadata.perCustomer.merchandiseSpend ?? 0;
 
-          // Log the base values for debugging
-          if (period === 1) {
-              console.log(`[FinancialCalc Period ${period}] Base per-customer values: Ticket=$${currentTicketPrice.toFixed(2)}, F&B=$${currentFbSpend.toFixed(2)}, Merch=$${currentMerchSpend.toFixed(2)}`);
-          }
+        // Apply growth if applicable
+        if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
+          let ticketGrowth = (metadata.growth.ticketPriceGrowth ?? 0) / 100;
+          let fbGrowth = (metadata.growth.fbSpendGrowth ?? 0) / 100;
+          let merchGrowth = (metadata.growth.merchandiseSpendGrowth ?? 0) / 100;
 
-          // Apply growth if applicable
-          // CRITICAL: Check for useGrowth flag at both levels
-          const useCustomerSpendGrowth = metadata.useGrowth || metadata.growth?.useCustomerSpendGrowth;
-          if (period > 1 && useCustomerSpendGrowth) {
-              const ticketGrowth = (metadata.growth.ticketPriceGrowth ?? 0) / 100;
-              const fbGrowth = (metadata.growth.fbSpendGrowth ?? 0) / 100;
-              const merchGrowth = (metadata.growth.merchandiseSpendGrowth ?? 0) / 100;
-
-              // Apply growth rates to each revenue stream
+          if (ticketGrowth > 0) {
+            if (useOverallGrowth && overallGrowthType === 'linear') {
+              const increment = (metadata.perCustomer.ticketPrice ?? 0) * ticketGrowth;
+              currentTicketPrice = (metadata.perCustomer.ticketPrice ?? 0) + increment * (period - 1);
+            } else {
               currentTicketPrice *= Math.pow(1 + ticketGrowth, period - 1);
+            }
+          }
+          if (fbGrowth > 0) {
+            if (useOverallGrowth && overallGrowthType === 'linear') {
+              const increment = (metadata.perCustomer.fbSpend ?? 0) * fbGrowth;
+              currentFbSpend = (metadata.perCustomer.fbSpend ?? 0) + increment * (period - 1);
+            } else {
               currentFbSpend *= Math.pow(1 + fbGrowth, period - 1);
+            }
+          }
+          if (merchGrowth > 0) {
+            if (useOverallGrowth && overallGrowthType === 'linear') {
+              const increment = (metadata.perCustomer.merchandiseSpend ?? 0) * merchGrowth;
+              currentMerchSpend = (metadata.perCustomer.merchandiseSpend ?? 0) + increment * (period - 1);
+            } else {
               currentMerchSpend *= Math.pow(1 + merchGrowth, period - 1);
-
-              // Log the growth-adjusted values for debugging
-              if (period <= 3) {
-                  console.log(`[FinancialCalc Period ${period}] After growth: Ticket=$${currentTicketPrice.toFixed(2)} (${ticketGrowth*100}%), F&B=$${currentFbSpend.toFixed(2)} (${fbGrowth*100}%), Merch=$${currentMerchSpend.toFixed(2)} (${merchGrowth*100}%)`);
-              }
+            }
           }
+        }
 
-          // Calculate revenue for each stream
-          const ticketRevenue = currentAttendance * currentTicketPrice;
-          periodFBCRevenue = currentAttendance * currentFbSpend; // Assign to specific var for COGS
-          periodMerchRevenue = currentAttendance * currentMerchSpend; // Assign to specific var for COGS
+        // Calculate revenue for each stream
+        const ticketRevenue = currentAttendance * currentTicketPrice;
+        periodFBCRevenue = currentAttendance * currentFbSpend; // Assign to specific var for COGS
+        periodMerchRevenue = currentAttendance * currentMerchSpend; // Assign to specific var for COGS
 
-          // Add all per-attendee revenues together
-          const totalPerAttendeeRevenue = ticketRevenue + periodFBCRevenue + periodMerchRevenue;
-          periodRevenue += totalPerAttendeeRevenue;
-
-          // Log attendance-based revenue calculation for first few periods
-          if (period <= 3) {
-            console.log(`[FinancialCalc Period ${period}] Attendance-based revenue: ${currentAttendance} attendees x (${currentTicketPrice.toFixed(2)} ticket + ${currentFbSpend.toFixed(2)} F&B + ${currentMerchSpend.toFixed(2)} merch) = $${totalPerAttendeeRevenue.toFixed(2)}`);
-          }
+        // Add all per-attendee revenues together
+        const totalPerAttendeeRevenue = ticketRevenue + periodFBCRevenue + periodMerchRevenue;
+        periodRevenue += totalPerAttendeeRevenue;
+        // DEBUG: Log period revenue and attendance math for each week
+        console.log(`[DEBUG][Period ${period}] Attendance: ${currentAttendance}, Ticket Price: ${currentTicketPrice}, Period Revenue: ${periodRevenue}`);
       }
 
       // Add revenue from the *other* streams in the array (non-per-attendee)
@@ -269,12 +288,13 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
 
         // Apply growth model (non-weekly or non-per-attendee streams)
         streamRevenue = baseValue;
-        if (period > 1 && growthModel) {
+        // Only apply growthModel if the user has explicitly set a non-zero rate for this stream
+        if (period > 1 && growthModel && growthModel.rate > 0) {
             const { type, rate } = growthModel;
             const originalStreamRevenue = streamRevenue;
 
             if (type === "linear") {
-                streamRevenue = baseValue * (1 + rate * (period - 1));
+                streamRevenue = baseValue + (baseValue * rate * (period - 1));
             } else if (type === "exponential") {
                 streamRevenue = baseValue * Math.pow(1 + rate, period - 1);
             }
@@ -289,7 +309,7 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
 
         // Log the contribution to period revenue
         if (period <= 3) {
-            console.log(`[FinancialCalc Period ${period}] Revenue stream ${stream.name} contributing $${streamRevenue.toFixed(2)} to period revenue`);
+            console.log(`[Period ${period}] Revenue stream ${stream.name} contributing $${streamRevenue.toFixed(2)} to period revenue`);
         }
       });
 
@@ -341,37 +361,33 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
 
       // 4. Marketing Costs
       let periodMarketingCost = 0;
-
-      // Ensure marketingSetup exists and has a valid allocationMode
       const marketingMode = marketingSetup?.allocationMode || 'none';
-
       console.log(`[ForecastCalc Period ${period}] Marketing Mode: ${marketingMode}`);
-
       if (marketingMode === 'channels') {
-        // Sum up all channel weekly budgets
+        // Calculate per-channel costs respecting distribution
         const channels = Array.isArray(marketingSetup.channels) ? marketingSetup.channels : [];
-
-        // Log each channel for debugging
-        if (channels.length > 0) {
-          console.log(`[ForecastCalc Period ${period}] Marketing Channels (${channels.length}):`);
-          channels.forEach((ch, idx) => {
-            console.log(`  Channel ${idx+1}: ${ch.name || 'Unnamed'} (${ch.channelType || 'Unknown'}) - Budget: ${ch.weeklyBudget || 0}`);
-          });
-        } else {
-          console.log(`[ForecastCalc Period ${period}] No marketing channels defined.`);
+        let totalChannelCost = 0;
+        channels.forEach((ch, idx) => {
+          const totalBudget = typeof ch.weeklyBudget === 'number' ? ch.weeklyBudget : 0;
+          const distribution = ch.distribution || 'spreadEvenly';
+          let channelCost = 0;
+          if (distribution === 'upfront') {
+            channelCost = period === 1 ? totalBudget : 0;
+          } else if (distribution === 'spreadEvenly') {
+            channelCost = duration > 0 ? totalBudget / duration : 0;
+          } else if (distribution === 'spreadCustom') {
+            const spreadDuration = typeof ch.spreadDuration === 'number' && ch.spreadDuration > 0 ? ch.spreadDuration : duration;
+            channelCost = period <= spreadDuration ? totalBudget / spreadDuration : 0;
+          }
+          totalChannelCost += channelCost;
+          if (period <= 3) {
+            console.log(`[ForecastCalc Period ${period}] Channel ${ch.name || 'Unnamed'} (${ch.channelType || 'Unknown'}) - Distribution: ${distribution}, Total: $${totalBudget}, Applied: $${channelCost}`);
+          }
+        });
+        periodMarketingCost = isWeekly ? totalChannelCost : totalChannelCost * (365.25 / 7 / 12); // Approx monthly
+        if (period <= 3) {
+          console.log(`[ForecastCalc Period ${period}] Total Channel Marketing Cost: ${periodMarketingCost}`);
         }
-
-        // Calculate total budget from all channels
-        const budget = channels.reduce((s, ch) => {
-          const weeklyBudget = typeof ch.weeklyBudget === 'number' ? ch.weeklyBudget : 0;
-          return s + weeklyBudget;
-        }, 0);
-
-        periodMarketingCost = isWeekly ? budget : budget * (365.25 / 7 / 12); // Approx monthly
-
-        // Log channel budgets for debugging
-        console.log(`[ForecastCalc Period ${period}] Total Channel Budget: ${budget} per ${isWeekly ? 'week' : 'month'}`);
-        console.log(`[ForecastCalc Period ${period}] Calculated Marketing Cost: ${periodMarketingCost}`);
       } else if (marketingMode === 'highLevel' && marketingSetup) {
         // Assert the type within this block
         const highLevelMarketing = marketingSetup as MarketingSetup;

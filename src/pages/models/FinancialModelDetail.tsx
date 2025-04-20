@@ -67,14 +67,28 @@ const FinancialModelDetail = () => {
           marketing: { channels: [] }
       };
 
-      const newAssumptions = { ...currentAssumptions, ...updatedFields };
+      let newAssumptions = { ...currentAssumptions, ...updatedFields };
 
-      if (updatedFields.marketing) {
-         newAssumptions.marketing = {
-            channels: [],
-            ...currentAssumptions.marketing,
-            ...updatedFields.marketing,
-         };
+      // --- Deep merge for marketing channels ---
+      if (updatedFields.marketing && Array.isArray(updatedFields.marketing.channels)) {
+        const prevChannels = currentAssumptions.marketing?.channels || [];
+        const updatedChannels = updatedFields.marketing.channels;
+        // Merge by channel id, preserving previous properties unless explicitly overwritten
+        const mergedChannels = updatedChannels.map(updatedCh => {
+          const prevCh = prevChannels.find(ch => ch.id === updatedCh.id);
+          return prevCh ? { ...prevCh, ...updatedCh } : updatedCh;
+        });
+        newAssumptions.marketing = {
+          ...currentAssumptions.marketing,
+          ...updatedFields.marketing,
+          channels: mergedChannels,
+        };
+      } else if (updatedFields.marketing) {
+        newAssumptions.marketing = {
+          channels: [],
+          ...currentAssumptions.marketing,
+          ...updatedFields.marketing,
+        };
       }
       
       if (!newAssumptions.revenue) newAssumptions.revenue = [];
@@ -83,9 +97,14 @@ const FinancialModelDetail = () => {
       if (!newAssumptions.marketing) newAssumptions.marketing = { channels: [] };
       if (!newAssumptions.marketing.channels) newAssumptions.marketing.channels = [];
 
-      // *** Add specific log for marketing object before save ***
+      // *** Add specific log for marketing object and channel distributions before save ***
       if (newAssumptions.marketing) {
           console.log("[FinancialModelDetail] Marketing object being saved:", JSON.stringify(newAssumptions.marketing));
+          if (Array.isArray(newAssumptions.marketing.channels)) {
+            newAssumptions.marketing.channels.forEach(ch => {
+              console.log(`[FinancialModelDetail] Channel ${ch.name || ch.id} distribution:`, ch.distribution);
+            });
+          }
       } else {
           console.log("[FinancialModelDetail] No marketing object to save.");
       }

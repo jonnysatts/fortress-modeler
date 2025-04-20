@@ -841,8 +841,12 @@ const ProductSummary: React.FC = () => {
                  <div>
                     <Label htmlFor="scenario-select" className="mb-1 block text-sm font-medium">Selected Scenario</Label>
                     <Select 
-                      value={currentScenario?.id?.toString() || ""} 
+                      value={currentScenario?.id !== undefined && currentScenario?.id !== null ? currentScenario.id.toString() : "baseline"}
                       onValueChange={(value) => {
+                        if (value === "baseline") {
+                          if (setCurrentScenario) setCurrentScenario(null);
+                          return;
+                        }
                         const selectedId = parseInt(value);
                         const scenarioToSet = scenarios.find(s => s.id === selectedId) || null;
                         if (setCurrentScenario) {
@@ -854,11 +858,8 @@ const ProductSummary: React.FC = () => {
                          <SelectValue placeholder="Select scenario..." />
                        </SelectTrigger>
                        <SelectContent>
-                         {/* <SelectItem value="">None (Baseline)</SelectItem> */}
-                         {/* Render memoized items - Still commented out */}
-                         {/* {scenarioSelectItems} */}
-                          {/* Hardcode a test item */}
-                          <SelectItem value="test-scenario-1">Test Scenario 1</SelectItem>
+                         <SelectItem value="baseline">None (Baseline)</SelectItem>
+                         {scenarioSelectItems}
                        </SelectContent>
                     </Select>
                  </div>
@@ -949,7 +950,31 @@ const ProductSummary: React.FC = () => {
                  className="mt-1"
                  rows={4}
                />
-               {/* TODO: Add save button, timestamp, author */}
+               <div className="flex items-center justify-between mt-2">
+                 <Button
+                   size="sm"
+                   variant="secondary"
+                   onClick={async () => {
+                     if (latestModel && latestModel.id) {
+                       // Save annotation to DB for this model
+                       const updated = { ...latestModel, assumptions: { ...latestModel.assumptions, metadata: { ...latestModel.assumptions.metadata, annotation } } };
+                       // Save to DB
+                       try {
+                         await import('@/lib/db').then(({ db }) => db.financialModels.update(latestModel.id, { assumptions: updated.assumptions, updatedAt: new Date() }));
+                         // Optionally show toast
+                         if (typeof window !== 'undefined') {
+                           import('@/components/ui/use-toast').then(({ toast }) => toast({ title: 'Notes Saved', description: `Saved at ${new Date().toLocaleTimeString()}` }));
+                         }
+                       } catch (err) {
+                         if (typeof window !== 'undefined') {
+                           import('@/components/ui/use-toast').then(({ toast }) => toast({ title: 'Save Failed', description: 'Could not save notes', variant: 'destructive' }));
+                         }
+                       }
+                     }
+                   }}
+                 >Save Notes</Button>
+                 <span className="text-xs text-muted-foreground">Last updated: {latestModel?.updatedAt ? formatDateTime(latestModel.updatedAt) : 'N/A'}</span>
+               </div>
             </CardContent>
           </Card>
       </div>

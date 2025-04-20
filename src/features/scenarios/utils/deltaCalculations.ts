@@ -59,16 +59,20 @@ function ensureModelStructure(model: FinancialModel): void {
   if (!model.assumptions.metadata.perCustomer) {
     console.log('Creating perCustomer structure');
     model.assumptions.metadata.perCustomer = {
-      ticketPrice: 10,
-      fbSpend: 5,
-      merchandiseSpend: 2
+      ticketPrice: 0,
+      fbSpend: 0,
+      merchandiseSpend: 0,
+      onlineSpend: 0,
+      miscSpend: 0
     };
   } else {
     // Ensure all perCustomer properties exist
     const perCustomer = model.assumptions.metadata.perCustomer;
-    if (perCustomer.ticketPrice === undefined) perCustomer.ticketPrice = 10;
-    if (perCustomer.fbSpend === undefined) perCustomer.fbSpend = 5;
-    if (perCustomer.merchandiseSpend === undefined) perCustomer.merchandiseSpend = 2;
+    if (perCustomer.ticketPrice === undefined) perCustomer.ticketPrice = 0;
+    if (perCustomer.fbSpend === undefined) perCustomer.fbSpend = 0;
+    if (perCustomer.merchandiseSpend === undefined) perCustomer.merchandiseSpend = 0;
+    if (perCustomer.onlineSpend === undefined) perCustomer.onlineSpend = 0;
+    if (perCustomer.miscSpend === undefined) perCustomer.miscSpend = 0;
   }
 
   // Ensure costs structure exists
@@ -381,12 +385,15 @@ function applyAttendanceDeltas(
   }
 
   // Log the final growth settings for debugging
-  console.log('Final growth settings:', JSON.stringify({
-    attendanceGrowthRate: growth.attendanceGrowthRate,
-    useCustomerSpendGrowth: growth.useCustomerSpendGrowth,
-    useGrowth: modifiedModel.assumptions.metadata.useGrowth,
-    growthModel: modifiedModel.assumptions.growthModel
-  }, null, 2));
+  console.log('[DEBUG] GROWTH SETTINGS START');
+  console.log('Raw growth settings:', growth);
+  console.log('Stringified growth settings:', JSON.stringify(growth, null, 2));
+  console.log('Attendance growth rate (decimal):', growth.attendanceGrowthRate ? growth.attendanceGrowthRate / 100 : 0);
+  console.log('Use customer spend growth:', growth.useCustomerSpendGrowth);
+  console.log('Use growth:', modifiedModel.assumptions.metadata.useGrowth);
+  console.log('Growth model (raw):', modifiedModel.assumptions.growthModel);
+  console.log('Growth model (stringified):', JSON.stringify(modifiedModel.assumptions.growthModel, null, 2));
+  console.log('[DEBUG] GROWTH SETTINGS END');
 }
 
 /**

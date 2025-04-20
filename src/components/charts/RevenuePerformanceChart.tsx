@@ -108,10 +108,11 @@ const RevenuePerformanceChart: React.FC<RevenuePerformanceChartProps> = ({
 }) => {
   const [animationProgress, setAnimationProgress] = useState(0);
   const chartRef = useRef<HTMLDivElement>(null);
+  const [mode, setMode] = useState<'period' | 'cumulative'>('period');
   
   // Find breakeven point (where profit becomes positive)
   const breakevenPoint = data.findIndex(point => 
-    (viewMode === 'cumulative' ? point.cumulativeProfitForecast : point.profitForecast) > 0
+    (mode === 'cumulative' ? point.cumulativeProfitForecast : point.profitForecast) > 0
   );
   
   // Animation effect
@@ -136,11 +137,11 @@ const RevenuePerformanceChart: React.FC<RevenuePerformanceChartProps> = ({
     } else {
       setAnimationProgress(1);
     }
-  }, [animate, data, viewMode]);
+  }, [animate, data, mode]);
   
-  // Determine which data keys to use based on view mode
-  const forecastKey = viewMode === 'cumulative' ? 'cumulativeRevenueForecast' : 'revenueForecast';
-  const actualKey = viewMode === 'cumulative' ? 'cumulativeRevenueActual' : 'revenueActual';
+  // Determine which data keys to use based on mode
+  const forecastKey = mode === 'cumulative' ? 'cumulativeRevenueForecast' : 'revenueForecast';
+  const actualKey = mode === 'cumulative' ? 'cumulativeRevenueActual' : 'revenueActual';
   
   // Filter data for animation
   const animatedData = animate 
@@ -169,17 +170,37 @@ const RevenuePerformanceChart: React.FC<RevenuePerformanceChartProps> = ({
         return {
           ...point,
           projectedRevenue: projectedValue,
-          cumulativeProjectedRevenue: viewMode === 'cumulative' ? projectedValue : undefined
+          cumulativeProjectedRevenue: mode === 'cumulative' ? projectedValue : undefined
         };
     })
     : data;
   
   // Determine if we should show the projection line
   const showProjection = viewMode === 'projected' && lastActualPeriod >= 0;
-  const projectionKey = viewMode === 'cumulative' ? 'cumulativeProjectedRevenue' : 'projectedRevenue';
+  const projectionKey = mode === 'cumulative' ? 'cumulativeProjectedRevenue' : 'projectedRevenue';
   
   return (
     <div ref={chartRef} className="w-full h-full">
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+        <label style={{ marginRight: 8 }}>
+          <input
+            type="radio"
+            checked={mode === 'period'}
+            onChange={() => setMode('period')}
+            style={{ marginRight: 4 }}
+          />
+          Weekly
+        </label>
+        <label>
+          <input
+            type="radio"
+            checked={mode === 'cumulative'}
+            onChange={() => setMode('cumulative')}
+            style={{ marginRight: 4 }}
+          />
+          Cumulative
+        </label>
+      </div>
       <ResponsiveContainer width="100%" height={height}>
         <ComposedChart 
           data={showProjection ? projectedData : animatedData}
@@ -207,7 +228,6 @@ const RevenuePerformanceChart: React.FC<RevenuePerformanceChartProps> = ({
             iconSize={10}
             wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
           />
-          
           {/* Breakeven reference line */}
           {breakevenPoint >= 0 && (
             <ReferenceLine 
@@ -224,7 +244,6 @@ const RevenuePerformanceChart: React.FC<RevenuePerformanceChartProps> = ({
               }
             />
           )}
-          
           {/* Forecast line */}
           <Line
             type="monotone"
@@ -237,7 +256,6 @@ const RevenuePerformanceChart: React.FC<RevenuePerformanceChartProps> = ({
             activeDot={{ r: 6, strokeWidth: 1 }}
             isAnimationActive={false}
           />
-          
           {/* Actual line with area fill */}
           <Area
             type="monotone"
@@ -252,7 +270,6 @@ const RevenuePerformanceChart: React.FC<RevenuePerformanceChartProps> = ({
             connectNulls
             isAnimationActive={false}
           />
-          
           {/* Projection line (only shown in projected mode) */}
           {showProjection && (
             <Line

@@ -56,8 +56,14 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
   const lastCalcParamsRef = useRef<{
     baseModel: FinancialModel | null;
     deltas: ScenarioParameterDeltas | null;
-  }>({ baseModel: null, deltas: null });
+    attendanceGrowthMode: 'replace' | 'add' | null;
+    cogsMode: 'multiply' | 'add' | null;
+  }>({ baseModel: null, deltas: null, attendanceGrowthMode: null, cogsMode: null });
   const originalDeltasRef = useRef<ScenarioParameterDeltas | null>(null);
+
+  // --- NEW: Calculation mode toggles for Attendance Growth and COGS ---
+  const [attendanceGrowthMode, setAttendanceGrowthMode] = useState<'replace' | 'add'>('replace');
+  const [cogsMode, setCogsMode] = useState<'multiply' | 'add'>('multiply');
 
   const {
     calculateScenarioForecast,
@@ -132,25 +138,30 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
     if (!scenario || !baseModel) return;
     if (
       lastCalcParamsRef.current.baseModel === baseModel &&
-      JSON.stringify(lastCalcParamsRef.current.deltas) === JSON.stringify(localDeltas)
+      JSON.stringify(lastCalcParamsRef.current.deltas) === JSON.stringify(localDeltas) &&
+      lastCalcParamsRef.current.attendanceGrowthMode === attendanceGrowthMode &&
+      lastCalcParamsRef.current.cogsMode === cogsMode
     ) return;
     setIsCalculating(true);
     if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
     debounceTimeoutRef.current = setTimeout(() => {
-      calculateScenarioForecast(localDeltas);
-      lastCalcParamsRef.current = { baseModel, deltas: localDeltas };
+      calculateScenarioForecast(localDeltas, {
+        attendanceGrowthMode,
+        cogsMode
+      });
+      lastCalcParamsRef.current = { baseModel, deltas: localDeltas, attendanceGrowthMode, cogsMode };
     }, 150);
     return () => {
       if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
     };
-  }, [localDeltas, scenario, baseModel, calculateScenarioForecast]);
+  }, [localDeltas, scenario, baseModel, calculateScenarioForecast, attendanceGrowthMode, cogsMode]);
 
   // Turn off loading once forecast updates
   useEffect(() => {
     if (isCalculating) setIsCalculating(false);
   }, [scenarioForecastData, lastUpdated]);
 
-  // Handle parameter changes
+  // Handle parameter changes (now also handle calculation mode)
   const handleParamChange = (param: keyof ScenarioParameterDeltas, value: number) => {
     setLocalDeltas(prev => ({
       ...prev,
@@ -158,6 +169,7 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
     }));
     setLastChangedParam(param);
     try {
+      // Remove extra arguments: calculateRelatedChanges expects 3 args
       const newSuggestions = calculateRelatedChanges(param, value, localDeltas);
       if (Object.keys(newSuggestions).length > 0) {
         setSuggestedChanges(newSuggestions);
@@ -313,41 +325,77 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
             </CardContent>
           </Card>
 
-          {/* Attendance Growth Slider */}
-          <Card className={parameterCardClass}>
-            <CardHeader>
-              <CardTitle>Attendance Growth</CardTitle>
-              <CardDescription>Adjust attendance growth (%)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Slider
-                min={-30}
-                max={50}
-                step={1}
-                value={[localDeltas.attendanceGrowthPercent]}
-                onValueChange={([v]) => handleParamChange('attendanceGrowthPercent', v)}
-              />
-              <div className="mt-2 text-right">{localDeltas.attendanceGrowthPercent}%</div>
-            </CardContent>
-          </Card>
+          {/* Attendance Growth Slider + Mode Toggle + Tooltip */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <label htmlFor="attendance-growth-slider">Attendance Growth (%)</label>
+              <select
+                value={attendanceGrowthMode}
+                onChange={e => setAttendanceGrowthMode(e.target.value as 'replace' | 'add')}
+                style={{ marginLeft: 8 }}
+                aria-label="Attendance Growth Calculation Mode"
+              >
+                <option value="replace">Replace Baseline</option>
+                <option value="add">Add to Baseline</option>
+              </select>
+              <span title={
+                attendanceGrowthMode === 'replace'
+                  ? 'Each week’s attendance will grow by this percentage, starting from the initial value. (Replaces baseline growth rate)'
+                  : 'This percentage will be added to the baseline attendance growth rate.'
+              }>
+                <Lightbulb size={16} style={{ marginLeft: 8, color: '#FFD600' }} />
+              </span>
+            </div>
+            <Slider
+              id="attendance-growth-slider"
+              min={-100}
+              max={200}
+              step={1}
+              value={[localDeltas.attendanceGrowthPercent]}
+              onValueChange={([value]) => handleParamChange('attendanceGrowthPercent', value)}
+            />
+            <TypographyMuted>
+              {attendanceGrowthMode === 'replace'
+                ? 'Attendance will compound at this rate each period, replacing the baseline.'
+                : 'This value will be added to the baseline attendance growth rate.'}
+            </TypographyMuted>
+          </div>
 
-          {/* COGS Slider */}
-          <Card className={parameterCardClass}>
-            <CardHeader>
-              <CardTitle>COGS</CardTitle>
-              <CardDescription>Adjust cost of goods sold (%)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Slider
-                min={-30}
-                max={50}
-                step={1}
-                value={[localDeltas.cogsMultiplier]}
-                onValueChange={([v]) => handleParamChange('cogsMultiplier', v)}
-              />
-              <div className="mt-2 text-right">{localDeltas.cogsMultiplier}%</div>
-            </CardContent>
-          </Card>
+          {/* COGS Slider + Mode Toggle + Tooltip */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <label htmlFor="cogs-multiplier-slider">COGS Change (%)</label>
+              <select
+                value={cogsMode}
+                onChange={e => setCogsMode(e.target.value as 'multiply' | 'add')}
+                style={{ marginLeft: 8 }}
+                aria-label="COGS Calculation Mode"
+              >
+                <option value="multiply">% Increase (multiply)</option>
+                <option value="add">Add to Baseline</option>
+              </select>
+              <span title={
+                cogsMode === 'multiply'
+                  ? 'COGS will be multiplied by (1 + this value/100). E.g., 30% + 5% = 31.5%.'
+                  : 'This value will be added to the baseline COGS percentage.'
+              }>
+                <Lightbulb size={16} style={{ marginLeft: 8, color: '#FFD600' }} />
+              </span>
+            </div>
+            <Slider
+              id="cogs-multiplier-slider"
+              min={-100}
+              max={100}
+              step={1}
+              value={[localDeltas.cogsMultiplier]}
+              onValueChange={([value]) => handleParamChange('cogsMultiplier', value)}
+            />
+            <TypographyMuted>
+              {cogsMode === 'multiply'
+                ? 'COGS will be multiplied by (1 + value/100).'
+                : 'This value will be added to the baseline COGS percentage.'}
+            </TypographyMuted>
+          </div>
         </div>
 
         {/* Section Divider */}

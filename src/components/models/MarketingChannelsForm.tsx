@@ -64,7 +64,16 @@ export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({
 
   useEffect(() => {
     setChannels(marketingSetup.channels || []);
-    setIsDirty(false); 
+    setIsDirty(false);
+    if (marketingSetup.channels) {
+      console.log('[MarketingChannelsForm] Loaded channels from marketingSetup:', marketingSetup.channels);
+      // Check for missing distribution property
+      marketingSetup.channels.forEach((ch, idx) => {
+        if (!ch.distribution) {
+          console.warn(`[MarketingChannelsForm] Channel at index ${idx} is missing distribution property.`, ch);
+        }
+      });
+    }
   }, [marketingSetup]);
 
   useEffect(() => {
@@ -86,6 +95,31 @@ export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({
     setIsDirty(internalSetupString !== propsSetupString);
   }, [allocationMode, channels, totalBudget, budgetApplication, spreadDuration, marketingSetup]);
 
+  useEffect(() => {
+    if (channels.length > 0) {
+      const updated = channels.map(ch => {
+        if (!ch.distribution) {
+          console.warn('[MarketingChannelsForm] Adding missing distribution property to channel:', ch);
+          return { ...ch, distribution: 'spreadEvenly' };
+        }
+        return ch;
+      });
+      if (JSON.stringify(updated) !== JSON.stringify(channels)) {
+        setChannels(updated);
+      }
+    }
+  }, [channels]);
+
+  const getChannelsWithDistribution = (channels: MarketingChannelItem[]): MarketingChannelItem[] => {
+    return channels.map(ch => {
+      if (!ch.distribution) {
+        console.warn('[MarketingChannelsForm] Adding missing distribution property before save:', ch);
+        return { ...ch, distribution: 'spreadEvenly' };
+      }
+      return ch;
+    });
+  };
+
   const handleAddChannel = () => {
     setEditingChannel({
       id: uuidv4(),
@@ -94,6 +128,7 @@ export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({
       weeklyBudget: 0,
       targetAudience: '',
       description: '',
+      distribution: 'spreadEvenly',
     });
     setIsAdding(true);
   };
@@ -105,11 +140,16 @@ export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({
 
   const handleSaveChannel = () => {
     if (!editingChannel) return;
+    let channelToSave = { ...editingChannel };
+    if (!channelToSave.distribution) {
+      channelToSave.distribution = 'spreadEvenly';
+      console.warn('[MarketingChannelsForm] Setting default distribution for channel on save:', channelToSave);
+    }
     let updatedChannels;
     if (isAdding) {
-      updatedChannels = [...channels, editingChannel];
+      updatedChannels = [...channels, channelToSave];
     } else {
-      updatedChannels = channels.map(ch => ch.id === editingChannel.id ? editingChannel : ch);
+      updatedChannels = channels.map(ch => ch.id === channelToSave.id ? channelToSave : ch);
     }
     setChannels(updatedChannels);
     setEditingChannel(null);
@@ -137,14 +177,30 @@ export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({
   };
 
   const handleSaveChanges = () => {
+     // Ensure all channels have distribution before saving
+     const safeChannels = allocationMode === 'channels' ? getChannelsWithDistribution(channels) : [];
+     console.log('[MarketingChannelsForm] Channels to be saved (with all properties):', JSON.stringify(safeChannels));
+     const fullySafeChannels = safeChannels.map(ch => ({
+       ...ch,
+       distribution: ch.distribution || 'spreadEvenly',
+     }));
      const currentInternalSetup: MarketingSetup = {
       allocationMode,
-      channels: allocationMode === 'channels' ? channels : [], 
+      channels: fullySafeChannels,
       totalBudget: allocationMode === 'highLevel' ? totalBudget : undefined,
       budgetApplication: allocationMode === 'highLevel' ? budgetApplication : undefined,
       spreadDuration: allocationMode === 'highLevel' && budgetApplication === 'spreadCustom' ? spreadDuration : undefined,
     };
-     console.log("Saving marketing setup:", currentInternalSetup);
+     console.log("[MarketingChannelsForm] Saving marketing setup:", currentInternalSetup);
+     if (currentInternalSetup.channels) {
+       currentInternalSetup.channels.forEach((ch, idx) => {
+         if (!ch.distribution) {
+           console.warn(`[MarketingChannelsForm] Channel at save time missing distribution property.`, ch);
+         } else {
+           console.log(`[MarketingChannelsForm] Channel ${ch.name || ch.id} distribution at save:`, ch.distribution);
+         }
+       });
+     }
      updateAssumptions({ marketing: currentInternalSetup });
   };
 
@@ -203,8 +259,20 @@ export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({
                    </div>
                  </div>
                  <div>
-                   <Label htmlFor="weeklyBudget">Weekly Budget</Label>
-                   <Input id="weeklyBudget" type="number" value={editingChannel.weeklyBudget} onChange={(e) => handleInputChange('weeklyBudget', parseFloat(e.target.value) || 0)} placeholder="0"/>
+                   <Label htmlFor="weeklyBudget">
+                     Total Channel Budget
+                     <span className="text-xs text-muted-foreground block">
+                       Enter the <strong>total</strong> amount you want to allocate for this channel. 
+                       <br/>
+                       <strong>How it works:</strong>
+                       <ul className="list-disc ml-4 mt-1">
+                         <li><strong>Upfront:</strong> The full amount is spent in the first period.</li>
+                         <li><strong>Spread Evenly:</strong> The total is divided equally across all periods (e.g., 12 weeks: $1200 → $100/week).</li>
+                         <li><strong>Custom Spread:</strong> The total is divided equally over a custom number of periods.</li>
+                       </ul>
+                     </span>
+                   </Label>
+                   <Input id="weeklyBudget" type="number" value={editingChannel.weeklyBudget} onChange={(e) => handleInputChange('weeklyBudget', parseFloat(e.target.value) || 0)} placeholder="e.g., 1200"/>
                  </div>
                  <div>
                    <Label htmlFor="targetAudience">Target Audience</Label>
@@ -214,6 +282,47 @@ export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({
                    <Label htmlFor="description">Description / Strategy Notes</Label>
                    <Textarea id="description" value={editingChannel.description} onChange={(e) => handleInputChange('description', e.target.value)} placeholder="Optional: Specific goals, tactics, KPIs..."/>
                  </div>
+                 <div>
+                   <Label htmlFor="distribution">
+                     Cost Distribution
+                     <span className="text-xs text-muted-foreground block">
+                       <strong>Upfront:</strong> Full amount applied in week 1.<br/>
+                       <strong>Spread Evenly:</strong> Amount divided equally across all weeks.<br/>
+                       <strong>Custom Spread:</strong> Amount divided equally over a custom number of weeks (set below).
+                     </span>
+                   </Label>
+                   <Select
+                     value={editingChannel.distribution || 'spreadEvenly'}
+                     onValueChange={(value: 'upfront' | 'spreadEvenly' | 'spreadCustom') => handleInputChange('distribution', value)}
+                   >
+                     <SelectTrigger id="distribution">
+                       <SelectValue placeholder="Select distribution..." />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="spreadEvenly">Spread Evenly</SelectItem>
+                       <SelectItem value="upfront">Upfront</SelectItem>
+                       <SelectItem value="spreadCustom">Custom Spread</SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
+                 {editingChannel.distribution === 'spreadCustom' && (
+                   <div>
+                     <Label htmlFor="spreadDuration">
+                       Custom Spread Duration (weeks)
+                       <span className="text-xs text-muted-foreground block">
+                         Number of weeks over which to spread the total amount.
+                       </span>
+                     </Label>
+                     <Input
+                       id="spreadDuration"
+                       type="number"
+                       value={editingChannel.spreadDuration || ''}
+                       min="1"
+                       placeholder="e.g., 4"
+                       onChange={(e) => handleInputChange('spreadDuration', parseInt(e.target.value) || 1)}
+                     />
+                   </div>
+                 )}
                  <div className="flex justify-end space-x-2 pt-4">
                    <Button variant="outline" onClick={handleCancelEdit}>Cancel</Button>
                    <Button onClick={handleSaveChannel}>Save Channel Changes</Button> 
@@ -229,7 +338,22 @@ export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({
                  <div key={channel.id} className="border p-3 rounded-md flex justify-between items-start hover:bg-muted/20">
                    <div>
                      <p className="font-semibold">{channel.name} <span className="text-sm font-normal text-muted-foreground">({channel.channelType})</span></p>
-                     <p className="text-sm text-muted-foreground">Budget: {formatCurrency(channel.weeklyBudget)} / week</p>
+                     <p className="text-sm text-muted-foreground">
+                       Budget: {formatCurrency(channel.weeklyBudget)} total
+                       <span className="ml-2 text-xs font-normal text-muted-foreground">
+                         [
+                         {channel.distribution === 'upfront' && 'Upfront'}
+                         {channel.distribution === 'spreadEvenly' && 'Spread Evenly'}
+                         {channel.distribution === 'spreadCustom' && `Custom Spread (${channel.spreadDuration || '?'} weeks)`}
+                         ]
+                       </span>
+                     </p>
+                     {channel.distribution === 'spreadEvenly' && (
+                       <p className="text-xs text-muted-foreground">This will be divided equally per period (e.g., $1200 over 12 weeks = $100/week).</p>
+                     )}
+                     {channel.distribution === 'spreadCustom' && channel.spreadDuration && (
+                       <p className="text-xs text-muted-foreground">This will be divided equally over {channel.spreadDuration} periods.</p>
+                     )}
                      {channel.targetAudience && <p className="text-xs mt-1">Target: {channel.targetAudience}</p>}
                      {channel.description && <p className="text-xs mt-1 text-gray-600">Notes: {channel.description}</p>}
                    </div>
@@ -301,7 +425,7 @@ export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({
 
         <div className="mt-6 pt-6 border-t flex justify-between items-center">
             <p className="text-lg font-semibold">
-                {allocationMode === 'channels' && channels.length > 0 ? `Total Weekly Budget: ${formatCurrency(totalWeeklyChannelBudget)}` : ""}
+                {allocationMode === 'channels' && channels.length > 0 ? `Total Budget: ${formatCurrency(totalWeeklyChannelBudget)}` : ""}
             </p>
             <Button onClick={handleSaveChanges} disabled={!isDirty}>
                 Save Marketing Setup

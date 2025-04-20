@@ -129,7 +129,7 @@ const MarketingAnalysis: React.FC = () => {
     // Process channel data
     const channels = marketingChannels.map(channel => {
       // Calculate total forecast for this channel (full duration)
-      const totalForecast = channel.weeklyBudget * duration;
+      const totalForecast = channel.weeklyBudget;
 
       // Get the latest period with actuals
       const latestPeriodWithActuals = actuals.length > 0 ?
@@ -191,11 +191,20 @@ const MarketingAnalysis: React.FC = () => {
 
       // Add forecast data for each channel
       marketingChannels.forEach(channel => {
-        // For now, we'll assume even distribution across periods
-        // This would be enhanced based on the distribution setting
-        const forecastAmount = channel.weeklyBudget;
-        periodObj.totalForecast += forecastAmount;
+        let forecastAmount = 0;
+        // --- CORRECTED LOGIC: treat weeklyBudget as total budget ---
+        if (channel.distribution === 'upfront') {
+          // All cost in period 1 only
+          forecastAmount = period === 1 ? channel.weeklyBudget : 0;
+        } else if (channel.distribution === 'spreadCustom' && channel.spreadDuration && period <= channel.spreadDuration) {
+          // Spread evenly over custom duration
+          forecastAmount = channel.spreadDuration > 0 ? channel.weeklyBudget / channel.spreadDuration : 0;
+        } else if (channel.distribution === 'spreadEvenly') {
+          // Spread evenly over the full duration
+          forecastAmount = duration > 0 ? channel.weeklyBudget / duration : 0;
+        }
         periodObj.channels[channel.id] = forecastAmount;
+        periodObj.totalForecast += forecastAmount;
       });
 
       // Add actual data if available
@@ -219,7 +228,15 @@ const MarketingAnalysis: React.FC = () => {
     setPeriodData(periods);
 
     // Calculate summary data
-    const totalForecast = marketingChannels.reduce((sum, channel) => sum + (channel.weeklyBudget * duration), 0);
+    const totalForecast = marketingChannels.reduce((sum, channel) => {
+      if (channel.distribution === 'upfront') {
+        return sum + channel.weeklyBudget;
+      } else if (channel.distribution === 'spreadCustom' && channel.spreadDuration) {
+        return sum + channel.weeklyBudget; // Adjust if needed
+      } else {
+        return sum + channel.weeklyBudget;
+      }
+    }, 0);
 
     let totalActual = 0;
     actuals.forEach(actual => {
@@ -252,7 +269,7 @@ const MarketingAnalysis: React.FC = () => {
   // Prepare data for pie chart
   const pieChartData = channelData.map((channel, index) => ({
     name: channel.name,
-    value: channel.weeklyBudget * duration,
+    value: channel.weeklyBudget,
     color: COLORS[index % COLORS.length]
   }));
 

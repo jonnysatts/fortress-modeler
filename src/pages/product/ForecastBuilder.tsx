@@ -344,24 +344,29 @@ const ForecastBuilder: React.FC = () => {
         }
       }
 
-      // For channels mode, ensure channels array exists and is properly formatted
-      if (dataToSave.marketing.allocationMode === 'channels') {
-        if (!Array.isArray(dataToSave.marketing.channels)) {
-          dataToSave.marketing.channels = [];
-        } else {
-          // Ensure each channel has the required properties
-          dataToSave.marketing.channels = dataToSave.marketing.channels.map((channel: z.infer<typeof marketingChannelSchema>) => ({
+      // --- FIX: Always use latest form values for marketing channels before saving ---
+      // Pull the freshest channels array from react-hook-form
+      const latestChannels = getValues('marketing.channels');
+      if (!latestChannels || latestChannels.length === 0) {
+        dataToSave.marketing.channels = [];
+      } else {
+        dataToSave.marketing.channels = latestChannels.map((channel: any) => {
+          const safeChannel = {
+            ...channel,
             id: channel.id || crypto.randomUUID(),
             channelType: channel.channelType || defaultChannelTypes[0],
             name: channel.name || '',
             weeklyBudget: typeof channel.weeklyBudget === 'number' ? channel.weeklyBudget : 0,
             targetAudience: channel.targetAudience || '',
-            description: channel.description || ''
-          }));
-        }
-
-        console.log('Processed marketing channels for saving:', dataToSave.marketing.channels);
+            description: channel.description || '',
+            distribution: channel.distribution || 'spreadEvenly',
+          };
+          console.log('[ForecastBuilder] Channel before save:', safeChannel);
+          return safeChannel;
+        });
       }
+
+      console.log('[ForecastBuilder] Channels to be saved (with all properties):', dataToSave.marketing.channels);
     }
 
     console.log("Saving assumptions:", dataToSave);
