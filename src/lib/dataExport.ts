@@ -5,6 +5,7 @@
 
 import { db } from '@/lib/db';
 import { ExportDataType } from '@/store/types';
+import { generateForecastTimeSeries, ForecastPeriodData } from '@/lib/financialCalculations';
 
 /**
  * Get real product data directly from the database
@@ -44,7 +45,17 @@ export async function getProductExportData(projectId: number): Promise<ExportDat
 
     // Process performance data using the fetched model
     const periodPerformance = await processPeriodPerformance(actuals, currentModel);
-    
+
+    // --- NEW: Generate forecastTableData using the same function as the UI ---
+    let forecastTableData: ForecastPeriodData[] = [];
+    try {
+      forecastTableData = generateForecastTimeSeries(currentModel);
+      console.log('[DataExport] Generated forecastTableData for export:', forecastTableData);
+    } catch (err) {
+      console.error('[DataExport] Error generating forecastTableData:', err);
+      forecastTableData = [];
+    }
+
     // Calculate Revenue from periods
     const totalForecastRevenue = periodPerformance.reduce((sum, period) => sum + (period.totalForecast || 0), 0);
     const totalActualRevenue = periodPerformance.reduce((sum, period) => sum + (period.totalActual || 0), 0);
@@ -222,7 +233,9 @@ export async function getProductExportData(projectId: number): Promise<ExportDat
           attendanceForecast: period.attendanceForecast || 0,
           attendanceActual: period.attendanceActual || 0
         }))
-      }
+      },
+      // --- NEW: Add forecastTableData for Excel export ---
+      forecastTableData
     };
 
     console.log('[DataExport] Returning real export data based on freshly fetched model');

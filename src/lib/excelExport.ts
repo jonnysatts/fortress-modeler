@@ -91,6 +91,7 @@ export async function generateExcelReport(data: ExportDataType, reportTitle: str
       addAssumptionsSheet(workbook, projectData);
       addScenarioParametersSheet(workbook, projectData); // Might need adjustment if scenarios are project-specific
       addForecastVsActualSheet(workbook, projectData);
+      addForecastTableSheet(workbook, projectData); // NEW: Add forecast table sheet (matches UI)
       addMarketingSpendSheet(workbook, projectData);
       addAttendanceSheet(workbook, projectData);
       addRawDataSheet(workbook, projectData); // Add raw data sheet for project
@@ -628,4 +629,104 @@ function addRawDataSheet(workbook: XLSX.WorkBook, productData: ExportDataType): 
 
   // Add the worksheet to the workbook
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Raw Data');
+}
+
+/**
+ * Add the Forecast Table sheet to the workbook
+ * Uses the new forecastTableData (same as UI) for detailed period-by-period export
+ */
+function addForecastTableSheet(workbook: XLSX.WorkBook, productData: ExportDataType): void {
+  console.log('[Excel] Adding Forecast Table sheet using forecastTableData');
+  const forecastTableData = productData.forecastTableData || [];
+  if (!forecastTableData.length) {
+    console.warn('[Excel] No forecastTableData found for export');
+    return;
+  }
+
+  // Dynamically determine columns to show, matching ForecastDataTable logic
+  const showTicket = forecastTableData.some((p: any) => typeof p.ticketRevenue === 'number');
+  const showFB = forecastTableData.some((p: any) => typeof p.fbRevenue === 'number');
+  const showMerch = forecastTableData.some((p: any) => typeof p.merchRevenue === 'number');
+  const revenueKeys: { key: keyof typeof forecastTableData[0]; label: string }[] = [
+    ...(showTicket ? [{ key: 'ticketRevenue', label: 'Ticket Sales' }] : []),
+    ...(showFB ? [{ key: 'fbRevenue', label: 'F&B Sales' }] : []),
+    ...(showMerch ? [{ key: 'merchRevenue', label: 'Merchandise Sales' }] : [])
+  ];
+
+  // Collect all unique cost keys with nonzero totals
+  const allCostKeysRaw = Array.from(
+    forecastTableData.reduce((acc: Set<string>, period: any) => {
+      Object.keys(period.costBreakdown || {}).forEach((k) => acc.add(k));
+      return acc;
+    }, new Set<string>())
+  );
+  const costKeyTotals = Object.fromEntries(
+    allCostKeysRaw.map(costKey => [costKey, forecastTableData.reduce((sum: number, period: any) => sum + (period.costBreakdown?.[costKey as keyof typeof period.costBreakdown] || 0), 0)])
+  );
+  const allCostKeys = allCostKeysRaw.filter(costKey => costKeyTotals[costKey] !== 0);
+
+  // Build header row
+  const header = [
+    'Period',
+    'Attendance',
+    ...revenueKeys.map(k => k.label),
+    'Revenue',
+    ...allCostKeys.map(k => k),
+    'Total Cost',
+    'Profit',
+    'Cumulative Revenue',
+    'Cumulative Cost',
+    'Cumulative Profit'
+  ];
+
+  // Build data rows
+  const rows = forecastTableData.map((period: any) => [
+    period.point || `Period ${period.period}`,
+    period.attendance ?? '',
+    ...revenueKeys.map(k => period[k.key] ?? 0),
+    period.revenue ?? 0,
+    ...allCostKeys.map(k => period.costBreakdown?.[k] ?? 0),
+    period.totalCost ?? period.cost ?? 0,
+    period.profit ?? 0,
+    period.cumulativeRevenue ?? 0,
+    period.cumulativeCost ?? 0,
+    period.cumulativeProfit ?? 0
+  ]);
+
+  // Add totals row
+  const totals = {
+    revenue: 0,
+    profit: 0,
+    totalCost: 0,
+    costBreakdown: {} as Record<string, number>,
+    revenueBreakdown: {} as Record<string, number>,
+  };
+  forecastTableData.forEach((period: any) => {
+    totals.revenue += period.revenue || 0;
+    totals.profit += period.profit || 0;
+    totals.totalCost += period.totalCost || period.cost || 0;
+    allCostKeys.forEach((costKey) => {
+      totals.costBreakdown[costKey] = (totals.costBreakdown[costKey] || 0) + (period.costBreakdown?.[costKey as keyof typeof period.costBreakdown] || 0);
+    });
+    revenueKeys.forEach(({ key }) => {
+      const val = period[key] ?? 0;
+      totals.revenueBreakdown[key as string] = (totals.revenueBreakdown[key as string] || 0) + (val || 0);
+    });
+  });
+  const totalsRow = [
+    'TOTAL',
+    '',
+    ...revenueKeys.map(k => totals.revenueBreakdown[k.key as string] || 0),
+    totals.revenue,
+    ...allCostKeys.map(k => totals.costBreakdown[k] || 0),
+    totals.totalCost,
+    totals.profit,
+    '', '', ''
+  ];
+
+  // Combine all rows
+  const sheetData = [header, ...rows, totalsRow];
+  const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+  worksheet['!cols'] = header.map(() => ({ wch: 16 }));
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Forecast Table');
 }
