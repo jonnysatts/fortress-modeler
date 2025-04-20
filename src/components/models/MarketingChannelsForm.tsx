@@ -140,7 +140,7 @@ export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({
 
   const handleSaveChannel = () => {
     if (!editingChannel) return;
-    let channelToSave = { ...editingChannel };
+    const channelToSave = { ...editingChannel };
     if (!channelToSave.distribution) {
       channelToSave.distribution = 'spreadEvenly';
       console.warn('[MarketingChannelsForm] Setting default distribution for channel on save:', channelToSave);

@@ -14,16 +14,22 @@ function loadScript(url: string): Promise<void> {
       return;
     }
 
-    // Create and load the script
-    const script = document.createElement('script');
-    script.src = url;
-    script.async = true;
-    script.onload = () => {
-      console.log(`Script loaded: ${url}`);
+    // Check for browser environment
+    if (typeof document === 'undefined' || typeof document.querySelector !== 'function') {
+      // In non-browser environment, simply resolve
       resolve();
-    };
-    script.onerror = () => reject(new Error(`Failed to load script: ${url}`));
-    document.head.appendChild(script);
+    } else {
+      // Create and load the script
+      const script = document.createElement('script');
+      script.src = url;
+      script.async = true;
+      script.onload = () => {
+        console.log(`Script loaded: ${url}`);
+        resolve();
+      };
+      script.onerror = () => reject(new Error(`Failed to load script: ${url}`));
+      document.head.appendChild(script);
+    }
   });
 }
 

@@ -274,7 +274,7 @@ function addAssumptionsSheet(workbook: XLSX.WorkBook, productData: ExportDataTyp
   const marketing = assumptions.marketing || {};
 
   // Default dynamic assumptions data build
-  let assumptionsData = [
+  const assumptionsData = [
     ['FORTRESS MODELER - MODEL ASSUMPTIONS', ''],
     [''],
     ['GROWTH ASSUMPTIONS', ''],
@@ -337,7 +337,7 @@ function addScenarioParametersSheet(workbook: XLSX.WorkBook, data: ExportDataTyp
   const scenarioData = data['Scenario Data'] || {};
   const isScenario = !!scenarioData.isScenario;
 
-  let scenarioParams: any[] = [];
+  const scenarioParams: any[] = [];
 
   if (isScenario && scenarioData.parameters) {
     // Create header row
@@ -416,8 +416,8 @@ function addForecastVsActualSheet(workbook: XLSX.WorkBook, productData: ExportDa
   const channelPerformance = (productData.performanceData?.channelPerformance as ChannelLikeType[]) || [];
   const marketingDataSource: ChannelLikeType[] = marketingChannels.length > 0 ? marketingChannels : channelPerformance;
 
-  let totalMarketingForecast = marketingDataSource.reduce((sum: number, channel: ChannelLikeType) => sum + (channel.forecast || channel.totalForecast || 0), 0);
-  let totalMarketingActual = marketingDataSource.reduce((sum: number, channel: ChannelLikeType) => sum + (channel.actual || channel.actualSpend || 0), 0);
+  const totalMarketingForecast = marketingDataSource.reduce((sum: number, channel: ChannelLikeType) => sum + (channel.forecast || channel.totalForecast || 0), 0);
+  const totalMarketingActual = marketingDataSource.reduce((sum: number, channel: ChannelLikeType) => sum + (channel.actual || channel.actualSpend || 0), 0);
 
   // Remove Trivia/Mead hardcoded overrides
   /*
@@ -444,8 +444,8 @@ function addForecastVsActualSheet(workbook: XLSX.WorkBook, productData: ExportDa
   }
 
   // Attendance
-  let totalAttendanceForecast = periodPerformance.reduce((sum: number, period: PerformancePeriodType) => sum + (period.attendanceForecast || 0), 0);
-  let totalAttendanceActual = periodPerformance.reduce((sum: number, period: PerformancePeriodType) => sum + (period.attendanceActual || 0), 0);
+  const totalAttendanceForecast = periodPerformance.reduce((sum: number, period: PerformancePeriodType) => sum + (period.attendanceForecast || 0), 0);
+  const totalAttendanceActual = periodPerformance.reduce((sum: number, period: PerformancePeriodType) => sum + (period.attendanceActual || 0), 0);
 
   // Remove Trivia/Mead hardcoded overrides
   /*

@@ -30,12 +30,12 @@ export async function getPortfolioExportData(): Promise<ExportDataType> {
       let totalRevenue = 0;
       let totalProfit = 0;
       let profitMargin = 0;
-      let revenueConcentration = 0;
+      const revenueConcentration = 0;
       let breakeven = false;
       let growthRate = 0;
-      let forecastAccuracy = 0;
-      let costEfficiency = 0;
-      let marketingROI = 0;
+      const forecastAccuracy = 0;
+      const costEfficiency = 0;
+      const marketingROI = 0;
       let healthScore = 0;
       let riskLevel: 'low' | 'medium' | 'high' = 'medium';
 

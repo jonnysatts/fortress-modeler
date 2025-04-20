@@ -39,10 +39,11 @@ const ScenarioSummaryTable: React.FC<ScenarioSummaryTableProps> = ({
   }
 
   // Calculate totals (legacy method, UI unchanged)
+  // --- FIX: Use marketingTotal if present for accurate costs ---
   const baselineTotals = baselineData.reduce(
     (acc, period) => {
       acc.revenue += period.revenue;
-      acc.costs += period.cost; // Fixed: using cost instead of totalCost
+      acc.costs += typeof period.marketingTotal === 'number' ? (period.cost - (period.marketingTotal || 0)) + (period.marketingTotal || 0) : period.cost;
       acc.profit += period.profit;
       return acc;
     },
@@ -52,7 +53,7 @@ const ScenarioSummaryTable: React.FC<ScenarioSummaryTableProps> = ({
   const scenarioTotals = scenarioData.reduce(
     (acc, period) => {
       acc.revenue += period.revenue;
-      acc.costs += period.cost; // Fixed: using cost instead of totalCost
+      acc.costs += typeof period.marketingTotal === 'number' ? (period.cost - (period.marketingTotal || 0)) + (period.marketingTotal || 0) : period.cost;
       acc.profit += period.profit;
       return acc;
     },

@@ -79,7 +79,7 @@ export function profitAdapter(model: FinancialModel): number {
 
 // Adapter for period data (returns array)
 export function periodDataAdapter(model: FinancialModel): ForecastPeriodData[] {
-  let legacy: ForecastPeriodData[] = [];
+  const legacy: ForecastPeriodData[] = [];
   let centralized: ForecastPeriodData[] = [];
   try {
     // If legacy period data function exists, call it here (else leave as empty array)
@@ -96,7 +96,7 @@ export function periodDataAdapter(model: FinancialModel): ForecastPeriodData[] {
 
 // Adapter for metrics summary
 export function metricsSummaryAdapter(model: FinancialModel, actuals: ActualsPeriodEntry[]): MetricsSummary {
-  let legacy: MetricsSummary = {
+  const legacy: MetricsSummary = {
     totalRevenue: 0,
     totalCosts: 0,
     totalProfit: 0,

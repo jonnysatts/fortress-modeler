@@ -9,7 +9,8 @@ import {
   Legend,
   ResponsiveContainer,
   LabelList,
-  Cell
+  Cell,
+  TooltipProps
 } from 'recharts';
 import { dataColors } from '@/lib/colors';
 import type { AnalysisPeriodData } from '@/hooks/useForecastAnalysis';
@@ -21,10 +22,17 @@ interface AttendanceTrackingChartProps {
   animate?: boolean;
 }
 
+interface AttendanceDataPoint {
+  week: number;
+  actual: number;
+  forecast: number;
+  [key: string]: number;
+}
+
 // Enhanced tooltip component
-const EnhancedTooltip = ({ active, payload, label }: any) => {
+const EnhancedTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
   if (active && payload && payload.length) {
-    const data = payload[0].payload as AnalysisPeriodData;
+    const data = payload[0].payload as AttendanceDataPoint;
     
     // Determine which data to show based on what's available in the payload
     const forecastValue = data.attendanceForecast || 0;
@@ -87,14 +95,24 @@ const EnhancedTooltip = ({ active, payload, label }: any) => {
 };
 
 // Custom label for variance percentage
-const VarianceLabel = (props: any) => {
+type VarianceLabelData = AttendanceDataPoint | AnalysisPeriodData;
+
+function isAttendanceDataPoint(obj: any): obj is AttendanceDataPoint {
+  return (
+    typeof obj.week === 'number' &&
+    typeof obj.actual === 'number' &&
+    typeof obj.forecast === 'number'
+  );
+}
+
+const VarianceLabel = (props: { x: number; y: number; width: number; height: number; value: number; index: number; data: VarianceLabelData[] }) => {
   const { x, y, width, height, value, index, data } = props;
   
   if (value === undefined || value === null) return null;
   
   const item = data[index];
-  const forecast = item.attendanceForecast || 0;
-  const actual = item.attendanceActual;
+  const forecast = isAttendanceDataPoint(item) ? item.forecast : item.attendanceForecast || 0;
+  const actual = isAttendanceDataPoint(item) ? item.actual : item.attendanceActual;
   
   if (actual === undefined || forecast === 0) return null;
   
@@ -122,6 +140,26 @@ const VarianceLabel = (props: any) => {
       </text>
     </g>
   );
+};
+
+// Fix: Ensure VarianceLabel is only called with all required props
+// If you are using <LabelList data={...} content={VarianceLabel} />, ensure you pass all required props or use a wrapper
+
+// Example wrapper for LabelList usage:
+const VarianceLabelWrapper = (props: any) => {
+  // Only render VarianceLabel if all required props are present
+  if (
+    props.x !== undefined &&
+    props.y !== undefined &&
+    props.width !== undefined &&
+    props.height !== undefined &&
+    props.value !== undefined &&
+    props.index !== undefined &&
+    props.data !== undefined
+  ) {
+    return <VarianceLabel {...props} />;
+  }
+  return null;
 };
 
 const AttendanceTrackingChart: React.FC<AttendanceTrackingChartProps> = ({
@@ -223,7 +261,7 @@ const AttendanceTrackingChart: React.FC<AttendanceTrackingChartProps> = ({
         >
           <LabelList 
             dataKey="attendanceActual" 
-            content={<VarianceLabel data={filteredData} />} 
+            content={<VarianceLabelWrapper data={filteredData} />} 
             position="top"
           />
           

@@ -7,6 +7,7 @@ import useStore from '@/store/useStore';
 import ScenariosList from '@/components/scenarios/ScenariosList';
 import ScenarioEditor from '@/components/scenarios/ScenarioEditor';
 import ScenarioComparison from '@/components/scenarios/ScenarioComparison';
+import ForecastDataTab from '@/components/scenarios/ForecastDataTab';
 import { AlertTriangle } from 'lucide-react';
 
 /**
@@ -129,6 +130,7 @@ const ScenariosView: React.FC = () => {
         <TabsList className="mb-4">
           <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
           <TabsTrigger value="editor" disabled={!currentScenario}>Scenario Editor</TabsTrigger>
+          <TabsTrigger value="forecastData" disabled={!currentScenario}>Forecast Data Table</TabsTrigger>
           <TabsTrigger value="comparison" disabled={!currentScenario}>Comparison</TabsTrigger>
         </TabsList>
 
@@ -185,6 +187,26 @@ const ScenariosView: React.FC = () => {
               <TypographyH4>No Scenario Selected</TypographyH4>
               <TypographyMuted className="mt-2">
                 Please select a scenario to edit or create a new one.
+              </TypographyMuted>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="forecastData" className="space-y-6">
+          {currentScenario ? (
+            <div className="p-2">
+              <TypographyH4>Forecast Data Table</TypographyH4>
+              <TypographyMuted>This tab gives a detailed week-by-week breakdown of all forecast line items for this scenario.</TypographyMuted>
+              <div className="mt-4">
+                <ForecastDataTab />
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center">
+              <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+              <TypographyH4>No Scenario Selected</TypographyH4>
+              <TypographyMuted className="mt-2">
+                Please select a scenario to view forecast data.
               </TypographyMuted>
             </div>
           )}

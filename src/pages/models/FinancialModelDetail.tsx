@@ -67,7 +67,7 @@ const FinancialModelDetail = () => {
           marketing: { channels: [] }
       };
 
-      let newAssumptions = { ...currentAssumptions, ...updatedFields };
+      const newAssumptions = { ...currentAssumptions, ...updatedFields };
 
       // --- Deep merge for marketing channels ---
       if (updatedFields.marketing && Array.isArray(updatedFields.marketing.channels)) {

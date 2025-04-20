@@ -533,7 +533,7 @@ function createSummaryTable(summary: any, formattedSummary?: any): any {
     const value = summary[key];
     const formattedValue = formattedSummary && formattedSummary[key] ? formattedSummary[key] : value;
     const displayKey = key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1');
-    let displayValue = formattedValue ? formattedValue.toString() : (value != null ? value.toString() : '');
+    const displayValue = formattedValue ? formattedValue.toString() : (value != null ? value.toString() : '');
     return [{ text: displayKey, bold: true }, { text: displayValue, alignment: 'right' }];
   });
   return {

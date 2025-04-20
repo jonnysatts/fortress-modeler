@@ -24,28 +24,35 @@ interface ProfitPerformanceChartProps {
   animate?: boolean;
 }
 
+interface ProfitChartDataPoint {
+  [key: string]: string | number;
+}
+
 // Enhanced tooltip component
-const EnhancedTooltip = ({ active, payload, label }: any) => {
+const EnhancedTooltip = ({ active, payload, label }: { active: boolean, payload: { payload: AnalysisPeriodData; value?: number; dataKey?: string }[], label: string }) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload as AnalysisPeriodData;
     
     // Determine which data to show based on what's available in the payload
-    const showForecast = payload.some((p: any) => 
+    const showForecast = payload.some((p) =>
       p.dataKey === 'profitForecast' || p.dataKey === 'cumulativeProfitForecast');
-    const showActual = payload.some((p: any) => 
+    const showActual = payload.some((p) =>
       p.dataKey === 'profitActual' || p.dataKey === 'cumulativeProfitActual');
     
     // Get the appropriate values based on the data keys
-    const forecastValue = showForecast 
-      ? (payload.find((p: any) => p.dataKey === 'profitForecast' || p.dataKey === 'cumulativeProfitForecast')?.value || 0) 
+    const forecastValue = showForecast
+      ? Number(payload.find((p) => p.dataKey === 'profitForecast' || p.dataKey === 'cumulativeProfitForecast')?.value) || 0
       : 0;
     
-    const actualValue = showActual 
-      ? (payload.find((p: any) => p.dataKey === 'profitActual' || p.dataKey === 'cumulativeProfitActual')?.value || null) 
+    const actualValue = showActual
+      ? Number(payload.find((p) => p.dataKey === 'profitActual' || p.dataKey === 'cumulativeProfitActual')?.value) || null
       : null;
     
     // Calculate variance if both values are available
-    const variance = actualValue !== null ? actualValue - forecastValue : null;
+    const variance =
+      forecastValue !== null && actualValue !== null && typeof actualValue === 'number'
+        ? actualValue - forecastValue
+        : null;
     const variancePercent = variance !== null && forecastValue !== 0 
       ? (variance / forecastValue) * 100 
       : null;
@@ -96,6 +103,18 @@ const EnhancedTooltip = ({ active, payload, label }: any) => {
         </div>
       </div>
     );
+  }
+  return null;
+};
+
+// Fix: Ensure EnhancedTooltip always receives required props when used as a content prop
+const EnhancedTooltipWrapper = (props: any) => {
+  if (
+    props.active !== undefined &&
+    props.payload !== undefined &&
+    props.label !== undefined
+  ) {
+    return <EnhancedTooltip {...props} />;
   }
   return null;
 };
@@ -202,7 +221,7 @@ const ProfitPerformanceChart: React.FC<ProfitPerformanceChartProps> = ({
             axisLine={{ stroke: dataColors.grid }}
             width={60}
           />
-          <Tooltip content={<EnhancedTooltip />} />
+          <Tooltip content={<EnhancedTooltipWrapper />} />
           <Legend 
             verticalAlign="top" 
             height={36}

@@ -23,11 +23,7 @@ import { Separator } from "@/components/ui/separator";
 import { db } from '@/lib/db';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-// Placeholder types - Define these properly in @/types/models or similar
-// REMOVE Placeholder types
-// type ScenarioParameterAdjustment = { parameter: string; adjustment: number; /* originalValue?: any; scenarioValue?: any */ };
-// type Scenario = { id?: number; projectId: number; name: string; description?: string; parameters: ScenarioParameterAdjustment[]; createdAt?: Date; updatedAt?: Date; };
+import ForecastDataTab from '@/components/product/ForecastDataTab';
 
 // --- Helper: Calculate Revenue Breakdown from Time Series ---
 interface RevenueBreakdownItem {
@@ -55,7 +51,7 @@ const calculateRevenueBreakdown = (timeSeries: ForecastPeriodData[], model: Fina
 
     // Sum revenue per stream across all periods
     timeSeries.forEach(periodData => {
-        let currentAttendance = periodData.attendance ?? 0;
+        const currentAttendance = periodData.attendance ?? 0;
         const period = periodData.period;
 
         // Re-calculate per-period stream revenue based on drivers/assumptions
@@ -126,7 +122,7 @@ const calculateCostBreakdown = (timeSeries: ForecastPeriodData[], model: Financi
         const period = periodData.period;
         let periodFBCRevenue = 0; // Need to recalculate revenue for COGS base
         let periodMerchRevenue = 0;
-        let currentAttendance = periodData.attendance ?? 0;
+        const currentAttendance = periodData.attendance ?? 0;
 
         // Simplified revenue recalc for COGS (assumes relevant data is available)
         if (isWeekly && metadata?.perCustomer) {
@@ -276,13 +272,12 @@ const ProductSummary: React.FC = () => {
     if (timeSeriesData.length === 0) {
         return { totalRevenue: 0, totalCosts: 0, totalProfit: 0, profitMargin: 0, breakeven: false };
     }
-    const finalPeriod = timeSeriesData[timeSeriesData.length - 1];
-    const totalRevenue = finalPeriod.cumulativeRevenue;
-    const totalCosts = finalPeriod.cumulativeCost;
-    const totalProfit = finalPeriod.cumulativeProfit;
+    // Option A: Use sum of per-period values for totals
+    const totalRevenue = timeSeriesData.reduce((sum, p) => sum + (p.revenue || 0), 0);
+    const totalCosts = timeSeriesData.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+    const totalProfit = timeSeriesData.reduce((sum, p) => sum + (p.profit || 0), 0);
     const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
     const breakeven = totalProfit >= 0;
-
 
     return { totalRevenue, totalCosts, totalProfit, profitMargin, breakeven };
   }, [timeSeriesData]);
@@ -508,225 +503,276 @@ const ProductSummary: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8">
-      {/* === Header Section === */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <TypographyH2 className="text-lg font-semibold tracking-tight flex-grow">{forecastHeadline}</TypographyH2>
-        <Badge variant={confidenceVariant} className="flex-shrink-0">
-            {forecastConfidence} Confidence
-        </Badge>
-      </div>
+    <>
+      {/* === All your summary UI goes here, UNCHANGED === */}
+      <div className="space-y-8">
+        {/* === Header Section === */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <TypographyH2 className="text-lg font-semibold tracking-tight flex-grow">{forecastHeadline}</TypographyH2>
+          <Badge variant={confidenceVariant} className="flex-shrink-0">
+              {forecastConfidence} Confidence
+          </Badge>
+        </div>
 
-      {/* === Section 1: Summary Cards Row === */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Card 1: Revenue */}
-        <Card>
-          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            {/* Optional: Add hover tooltip icon here */}
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
-            {revenueDelta !== undefined && (
-              <p className={cn("text-xs", revenueDelta >= 0 ? "text-green-600" : "text-red-600")}>
-                  {revenueDelta >= 0 ? '+' : ''}{revenueDelta.toFixed(1)}% vs last period
-              </p>
-            )}
-            <div className="h-[40px] mt-2">
-              <Sparkline data={revenueSparkline} width={100} height={30} color={dataColors.revenue} />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Card 2: Costs */}
-        <Card>
-          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium">Total Costs</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalCosts)}</div>
-            {costDelta !== undefined && (
-              <p className={cn("text-xs", costDelta <= 0 ? "text-green-600" : "text-red-600")}>
-                  {costDelta >= 0 ? '+' : ''}{costDelta.toFixed(1)}% vs last period
-              </p>
-            )}
-            <div className="h-[40px] mt-2">
-              <Sparkline data={costSparkline} width={100} height={30} color={dataColors.cost} />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Card 3: Profit */}
-        <Card>
-          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalProfit)}</div>
-            {profitDelta !== undefined && (
-              <p className={cn("text-xs", profitDelta >= 0 ? "text-green-600" : "text-red-600")}>
-                  {profitDelta >= 0 ? '+' : ''}{profitDelta.toFixed(1)}% vs last period
-              </p>
-            )}
-            <div className="h-[40px] mt-2">
-              <Sparkline data={profitSparkline} width={100} height={30} color={dataColors.profit} />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Card 4: Profit Margin */}
-        <Card>
-          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium">Profit Margin</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatPercent(profitMargin)}</div>
-            {marginDelta !== undefined && (
-              <p className={cn("text-xs", marginDelta >= 0 ? "text-green-600" : "text-red-600")}>
-                  {marginDelta >= 0 ? '+' : ''}{marginDelta.toFixed(1)}% vs last period
-              </p>
-            )}
-            <div className="h-[40px] mt-2">
-              <Sparkline data={marginSparkline} width={100} height={30} color={dataColors.profit} />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Card 5: Breakeven Point (Consider making larger via grid spans if needed) */}
-        <Card>
-          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium">Breakeven Point</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold mb-2">{breakEvenPeriod.label}</div>
-            {breakEvenPeriod.achieved ? (
-                <span className="text-sm text-green-600 font-medium flex items-center">
-                    <CheckCircle className="h-4 w-4 mr-1" /> Achieved
-                </span>
-            ) : (
-                <span className="text-sm text-amber-600 font-medium flex items-center">
-                    <AlertTriangle className="h-4 w-4 mr-1" /> Projected
-                </span>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* === Section 2: Forecast Averages Panel === */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Forecast Averages (Per Week)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                  <TypographyMuted className="text-sm">Avg. Revenue</TypographyMuted>
-                  <div className="text-2xl font-semibold">{formatCurrency(averageMetrics.avgRevenue)}</div>
+        {/* === Section 1: Summary Cards Row === */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Card 1: Revenue */}
+          <Card>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              {/* Optional: Add hover tooltip icon here */}
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
+              {revenueDelta !== undefined && (
+                <p className={cn("text-xs", revenueDelta >= 0 ? "text-green-600" : "text-red-600")}>
+                    {revenueDelta >= 0 ? '+' : ''}{revenueDelta.toFixed(1)}% vs last period
+                </p>
+              )}
+              <div className="h-[40px] mt-2">
+                <Sparkline data={revenueSparkline} width={100} height={30} color={dataColors.revenue} />
               </div>
-               <div>
-                  <TypographyMuted className="text-sm">Avg. Costs</TypographyMuted>
-                  <div className="text-2xl font-semibold">{formatCurrency(averageMetrics.avgCost)}</div>
-              </div>
-               <div>
-                  <TypographyMuted className="text-sm">Avg. Profit</TypographyMuted>
-                  <div className="text-2xl font-semibold">{formatCurrency(averageMetrics.avgProfit)}</div>
-              </div>
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
 
-      {/* === Section 3: Assumptions & Model Settings (Side-by-Side) === */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Card 1: Model Settings */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Forecast Model Settings</CardTitle>
-            {/* Removed Edit button from here, maybe add to overall section? */}
-          </CardHeader>
-          <CardContent>
-            <dl className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Growth Model</dt>
-                <dd className="font-medium capitalize">{latestModel?.assumptions.growthModel?.type || 'N/A'}</dd>
+          {/* Card 2: Costs */}
+          <Card>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-sm font-medium">Total Costs</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(totalCosts)}</div>
+              {costDelta !== undefined && (
+                <p className={cn("text-xs", costDelta <= 0 ? "text-green-600" : "text-red-600")}>
+                    {costDelta >= 0 ? '+' : ''}{costDelta.toFixed(1)}% vs last period
+                </p>
+              )}
+              <div className="h-[40px] mt-2">
+                <Sparkline data={costSparkline} width={100} height={30} color={dataColors.cost} />
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Growth Rate</dt>
-                <dd className="font-medium">{formatPercent(latestModel?.assumptions.growthModel?.rate || 0)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Model Created</dt>
-                <dd className="font-medium">{formatDateTime(latestModel?.createdAt)}</dd>
-              </div>
-               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Last Updated</dt>
-                <dd className="font-medium">{formatDateTime(latestModel?.updatedAt)}</dd>
-              </div>
-            </dl>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Card 2: Core Assumptions */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Core Assumptions</CardTitle>
-             <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/projects/${projectId}/forecast-builder`)}
-             >
-               Edit Assumptions
-            </Button>
-          </CardHeader>
-          <CardContent>
-             <dl className="space-y-2 text-sm">
-               <div className="flex justify-between">
-                 <dt className="text-muted-foreground">Avg Attendance (Initial)</dt>
-                 <dd className="font-medium">{latestModel?.assumptions.metadata?.initialWeeklyAttendance?.toLocaleString() ?? 'N/A'}</dd>
-               </div>
-               <div className="flex justify-between">
-                 <dt className="text-muted-foreground">Avg Spend / Attendee</dt>
-                 <dd className="font-medium">{
-                   latestModel?.assumptions.metadata?.perCustomer ?
-                   formatCurrency(
-                     (latestModel.assumptions.metadata.perCustomer.ticketPrice ?? 0) +
-                     (latestModel.assumptions.metadata.perCustomer.fbSpend ?? 0) +
-                     (latestModel.assumptions.metadata.perCustomer.merchandiseSpend ?? 0)
-                   ) : 'N/A'
-                 }</dd>
-               </div>
-                <div className="flex justify-between">
-                 <dt className="text-muted-foreground">Marketing Spend</dt>
-                 <dd className="font-medium">{marketingSpendSummary}</dd>
-               </div>
-               <div className="flex justify-between">
-                 <dt className="text-muted-foreground">Fixed Costs</dt>
-                 <dd className="font-medium">{fixedCostSummary}</dd>
-               </div>
-               <div className="flex justify-between">
-                 <dt className="text-muted-foreground">Variable Costs (COGS)</dt>
-                 <dd className="font-medium">{variableCostSummary}</dd>
-               </div>
-             </dl>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Card 3: Profit */}
+          <Card>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(totalProfit)}</div>
+              {profitDelta !== undefined && (
+                <p className={cn("text-xs", profitDelta >= 0 ? "text-green-600" : "text-red-600")}>
+                    {profitDelta >= 0 ? '+' : ''}{profitDelta.toFixed(1)}% vs last period
+                </p>
+              )}
+              <div className="h-[40px] mt-2">
+                <Sparkline data={profitSparkline} width={100} height={30} color={dataColors.profit} />
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* === Section 4: Forecast Visualisation Charts === */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Chart 1: Weekly Revenue vs. Costs */}
+          {/* Card 4: Profit Margin */}
+          <Card>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-sm font-medium">Profit Margin</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatPercent(profitMargin)}</div>
+              {marginDelta !== undefined && (
+                <p className={cn("text-xs", marginDelta >= 0 ? "text-green-600" : "text-red-600")}>
+                    {marginDelta >= 0 ? '+' : ''}{marginDelta.toFixed(1)}% vs last period
+                </p>
+              )}
+              <div className="h-[40px] mt-2">
+                <Sparkline data={marginSparkline} width={100} height={30} color={dataColors.profit} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card 5: Breakeven Point (Consider making larger via grid spans if needed) */}
+          <Card>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-sm font-medium">Breakeven Point</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold mb-2">{breakEvenPeriod.label}</div>
+              {breakEvenPeriod.achieved ? (
+                  <span className="text-sm text-green-600 font-medium flex items-center">
+                      <CheckCircle className="h-4 w-4 mr-1" /> Achieved
+                  </span>
+              ) : (
+                  <span className="text-sm text-amber-600 font-medium flex items-center">
+                      <AlertTriangle className="h-4 w-4 mr-1" /> Projected
+                  </span>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* === Section 2: Forecast Averages Panel === */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Weekly Revenue vs. Costs</CardTitle>
+            <CardTitle className="text-lg">Forecast Averages (Per Week)</CardTitle>
           </CardHeader>
           <CardContent>
-             <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={timeSeriesData}
-                  margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
-                  barCategoryGap="25%"
-                  barGap={2}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <TypographyMuted className="text-sm">Avg. Revenue</TypographyMuted>
+                    <div className="text-2xl font-semibold">{formatCurrency(averageMetrics.avgRevenue)}</div>
+                </div>
+                 <div>
+                    <TypographyMuted className="text-sm">Avg. Costs</TypographyMuted>
+                    <div className="text-2xl font-semibold">{formatCurrency(averageMetrics.avgCost)}</div>
+                </div>
+                 <div>
+                    <TypographyMuted className="text-sm">Avg. Profit</TypographyMuted>
+                    <div className="text-2xl font-semibold">{formatCurrency(averageMetrics.avgProfit)}</div>
+                </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* === Section 3: Assumptions & Model Settings (Side-by-Side) === */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Card 1: Model Settings */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg">Forecast Model Settings</CardTitle>
+              {/* Removed Edit button from here, maybe add to overall section? */}
+            </CardHeader>
+            <CardContent>
+              <dl className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Growth Model</dt>
+                  <dd className="font-medium capitalize">{latestModel?.assumptions.growthModel?.type || 'N/A'}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Growth Rate</dt>
+                  <dd className="font-medium">{formatPercent(latestModel?.assumptions.growthModel?.rate || 0)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Model Created</dt>
+                  <dd className="font-medium">{formatDateTime(latestModel?.createdAt)}</dd>
+                </div>
+                 <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Last Updated</dt>
+                  <dd className="font-medium">{formatDateTime(latestModel?.updatedAt)}</dd>
+                </div>
+              </dl>
+            </CardContent>
+          </Card>
+
+          {/* Card 2: Core Assumptions */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg">Core Assumptions</CardTitle>
+               <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/projects/${projectId}/forecast-builder`)}
+               >
+                Edit Assumptions
+              </Button>
+            </CardHeader>
+            <CardContent>
+               <dl className="space-y-2 text-sm">
+                 <div className="flex justify-between">
+                   <dt className="text-muted-foreground">Avg Attendance (Initial)</dt>
+                   <dd className="font-medium">{latestModel?.assumptions.metadata?.initialWeeklyAttendance?.toLocaleString() ?? 'N/A'}</dd>
+                 </div>
+                 <div className="flex justify-between">
+                   <dt className="text-muted-foreground">Avg Spend / Attendee</dt>
+                   <dd className="font-medium">{
+                     latestModel?.assumptions.metadata?.perCustomer ?
+                     formatCurrency(
+                       (latestModel.assumptions.metadata.perCustomer.ticketPrice ?? 0) +
+                       (latestModel.assumptions.metadata.perCustomer.fbSpend ?? 0) +
+                       (latestModel.assumptions.metadata.perCustomer.merchandiseSpend ?? 0)
+                     ) : 'N/A'
+                   }</dd>
+                 </div>
+                  <div className="flex justify-between">
+                   <dt className="text-muted-foreground">Marketing Spend</dt>
+                   <dd className="font-medium">{marketingSpendSummary}</dd>
+                 </div>
+                 <div className="flex justify-between">
+                   <dt className="text-muted-foreground">Fixed Costs</dt>
+                   <dd className="font-medium">{fixedCostSummary}</dd>
+                 </div>
+                 <div className="flex justify-between">
+                   <dt className="text-muted-foreground">Variable Costs (COGS)</dt>
+                   <dd className="font-medium">{variableCostSummary}</dd>
+                 </div>
+               </dl>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* === Section 4: Forecast Visualisation Charts === */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Chart 1: Weekly Revenue vs. Costs */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Weekly Revenue vs. Costs</CardTitle>
+            </CardHeader>
+            <CardContent>
+               <ResponsiveContainer width="100%" height={300}>
+                  <BarChart
+                    data={timeSeriesData}
+                    margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                    barCategoryGap="25%"
+                    barGap={2}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                    <XAxis
+                      dataKey="point"
+                      tick={{ fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tickFormatter={formatCurrency}
+                      tick={{ fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={60}
+                    />
+                    <Tooltip
+                      content={<CustomTooltip />}
+                      cursor={{ fill: 'transparent' }}
+                    />
+                    <Legend
+                      wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
+                      verticalAlign="bottom"
+                      iconSize={10}
+                    />
+                    <Bar name="Weekly Revenue" dataKey="revenue" fill={dataColors.revenue} radius={[3, 3, 0, 0]} barSize={15} />
+                    <Bar name="Weekly Costs" dataKey="cost" fill={dataColors.cost} radius={[3, 3, 0, 0]} barSize={15} />
+                  </BarChart>
+               </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Chart 2: Financial Forecast */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Financial Forecast</CardTitle>
+            </CardHeader>
+            <CardContent>
+               <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={timeSeriesData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                  <defs>
+                      {/* Adjusted gradient opacity */}
+                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={dataColors.revenue} stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor={dataColors.revenue} stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={dataColors.cost} stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor={dataColors.cost} stopOpacity={0}/>
+                      </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
                     dataKey="point"
                     tick={{ fontSize: 11 }}
@@ -742,243 +788,200 @@ const ProductSummary: React.FC = () => {
                   />
                   <Tooltip
                     content={<CustomTooltip />}
-                    cursor={{ fill: 'transparent' }}
+                    cursor={{ stroke: dataColors.neutral[400], strokeWidth: 1, strokeDasharray: "3 3" }}
                   />
                   <Legend
                     wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
                     verticalAlign="bottom"
-                    iconSize={10}
+                    payload={[
+                      { value: 'Revenue', type: 'square', id: 'revenue', color: dataColors.revenue },
+                      { value: 'Costs', type: 'square', id: 'cost', color: dataColors.cost },
+                      { value: 'Profit', type: 'line', id: 'profit', color: dataColors.forecast }
+                    ]}
                   />
-                  <Bar name="Weekly Revenue" dataKey="revenue" fill={dataColors.revenue} radius={[3, 3, 0, 0]} barSize={15} />
-                  <Bar name="Weekly Costs" dataKey="cost" fill={dataColors.cost} radius={[3, 3, 0, 0]} barSize={15} />
-                </BarChart>
-             </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Chart 2: Financial Forecast */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Financial Forecast</CardTitle>
-          </CardHeader>
-          <CardContent>
-             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={timeSeriesData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                <defs>
-                    {/* Adjusted gradient opacity */}
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={dataColors.revenue} stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor={dataColors.revenue} stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={dataColors.cost} stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor={dataColors.cost} stopOpacity={0}/>
-                    </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="point"
-                  tick={{ fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tickFormatter={formatCurrency}
-                  tick={{ fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={60}
-                />
-                <Tooltip
-                  content={<CustomTooltip />}
-                  cursor={{ stroke: dataColors.neutral[400], strokeWidth: 1, strokeDasharray: "3 3" }}
-                />
-                <Legend
-                  wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
-                  verticalAlign="bottom"
-                  payload={[
-                    { value: 'Revenue', type: 'square', id: 'revenue', color: dataColors.revenue },
-                    { value: 'Costs', type: 'square', id: 'cost', color: dataColors.cost },
-                    { value: 'Profit', type: 'line', id: 'profit', color: dataColors.forecast }
-                  ]}
-                />
-                {breakEvenPeriod.index !== null && (
-                    <ReferenceLine
-                      x={timeSeriesData[breakEvenPeriod.index]?.point}
-                      stroke={dataColors.status.warning}
-                      strokeDasharray="4 4"
-                      strokeWidth={1.5}
-                    >
-                        <RechartsLabel
-                          value="Breakeven"
-                          position="insideTopLeft"
-                          fill={dataColors.status.warning}
-                          fontSize={10}
-                          offset={8}
-                          className="font-semibold"
-                        />
-                    </ReferenceLine>
-                 )}
-                <Area type="monotone" dataKey="revenue" name="Revenue" stroke={dataColors.revenue} strokeWidth={1.5} fillOpacity={1} fill="url(#colorRevenue)" dot={false} />
-                <Area type="monotone" dataKey="cost" name="Costs" stroke={dataColors.cost} strokeWidth={1.5} fillOpacity={1} fill="url(#colorCost)" dot={false}/>
-                 <Line type="monotone" dataKey="profit" name="Profit" stroke={dataColors.forecast} strokeWidth={2} dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* === Section 5: Scenario Analysis, Risk Flags, Notes === */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Scenario Analysis Card - Display Comparison */}
-          <Card className="lg:col-span-1">
-              <CardHeader>
-                  <CardTitle className="text-lg">Scenario Impact Overview</CardTitle>
-                  <CardDescription>Select a scenario to see its impact vs. baseline.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                 {/* Scenario Selector Dropdown */}
-                 <div>
-                    <Label htmlFor="scenario-select" className="mb-1 block text-sm font-medium">Selected Scenario</Label>
-                    <Select 
-                      value={currentScenario?.id !== undefined && currentScenario?.id !== null ? currentScenario.id.toString() : "baseline"}
-                      onValueChange={(value) => {
-                        if (value === "baseline") {
-                          if (setCurrentScenario) setCurrentScenario(null);
-                          return;
-                        }
-                        const selectedId = parseInt(value);
-                        const scenarioToSet = scenarios.find(s => s.id === selectedId) || null;
-                        if (setCurrentScenario) {
-                           setCurrentScenario(scenarioToSet);
-                        }
-                      }}
-                    >
-                       <SelectTrigger id="scenario-select">
-                         <SelectValue placeholder="Select scenario..." />
-                       </SelectTrigger>
-                       <SelectContent>
-                         <SelectItem value="baseline">None (Baseline)</SelectItem>
-                         {scenarioSelectItems}
-                       </SelectContent>
-                    </Select>
-                 </div>
-
-                 {/* Display Scenario Comparison */}
-                 <Separator />
-                 <div>
-                    <TypographyMuted className="text-sm">Impact vs. Baseline:</TypographyMuted>
-                    <div className="mt-2 p-3 bg-muted/50 rounded-md border min-h-[80px]">
-                       {currentScenario && scenarioComparisonData ? (
-                         <Table>
-                           {/* Optional Header <TableHeader><TableRow><TableHead>Metric</TableHead><TableHead className="text-right">Impact</TableHead></TableRow></TableHeader> */}
-                           <TableBody>
-                              <TableRow>
-                                <TableCell>Revenue</TableCell>
-                                <TableCell className={cn("text-right", scenarioComparisonData.revenueDelta >= 0 ? 'text-green-600' : 'text-red-600')}>{formatCurrency(scenarioComparisonData.revenueDelta)}</TableCell>
-                              </TableRow>
-                              <TableRow>
-                                <TableCell>Cost</TableCell>
-                                <TableCell className={cn("text-right", scenarioComparisonData.costDelta <= 0 ? 'text-green-600' : 'text-red-600')}>{formatCurrency(scenarioComparisonData.costDelta)}</TableCell>
-                              </TableRow>
-                              <TableRow>
-                                <TableCell>Profit</TableCell>
-                                <TableCell className={cn("text-right", scenarioComparisonData.profitDelta >= 0 ? 'text-green-600' : 'text-red-600')}>{formatCurrency(scenarioComparisonData.profitDelta)}</TableCell>
-                              </TableRow>
-                           </TableBody>
-                         </Table>
-                       ) : (
-                         <p className="text-sm text-center py-4 text-muted-foreground">{scenarios.length > 0 ? "Select a scenario above to see its impact." : "No scenarios defined for this project."}</p>
-                       )}
-                    </div>
-                 </div>
-              </CardContent>
-          </Card>
-
-          {/* Risk Flags & Alerts / Notes & Commentary Cards */}
-          <Card className="lg:col-span-1">
-            <CardHeader>
-               <CardTitle className="text-lg">Risk Flags & Alerts</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {warnings.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {warnings.map((warning, index) => {
-                        // Using smaller cards/badges for alerts might be better here
-                        let alertClasses = "p-3 border rounded-lg flex items-start gap-3 text-xs ";
-                        let iconColor = "text-blue-500";
-                        let titleColor = "font-semibold";
-                        if (warning.severity === 'error') {
-                            alertClasses += "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700/50";
-                            iconColor = "text-red-500";
-                        } else if (warning.severity === 'warning') {
-                            alertClasses += "bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700/50";
-                            iconColor = "text-amber-500";
-                        } else { // Info
-                            alertClasses += "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700/50";
-                        }
-                        return (
-                            <div key={index} className={alertClasses}>
-                                <AlertTriangle className={`h-4 w-4 ${iconColor} flex-shrink-0 mt-0.5`} />
-                                <div>
-                                    <h4 className={titleColor}>{warning.type}</h4>
-                                    <p>{warning.message}</p>
-                                    {/* TODO: Link to relevant assumption/input */}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-              ) : (
-                 <TypographyP className="text-muted-foreground">No specific risks flagged based on current forecast.</TypographyP>
-              )}
+                  {breakEvenPeriod.index !== null && (
+                      <ReferenceLine
+                        x={timeSeriesData[breakEvenPeriod.index]?.point}
+                        stroke={dataColors.status.warning}
+                        strokeDasharray="4 4"
+                        strokeWidth={1.5}
+                      >
+                          <RechartsLabel
+                            value="Breakeven"
+                            position="insideTopLeft"
+                            fill={dataColors.status.warning}
+                            fontSize={10}
+                            offset={8}
+                            className="font-semibold"
+                          />
+                      </ReferenceLine>
+                   )}
+                  <Area type="monotone" dataKey="revenue" name="Revenue" stroke={dataColors.revenue} strokeWidth={1.5} fillOpacity={1} fill="url(#colorRevenue)" dot={false} />
+                  <Area type="monotone" dataKey="cost" name="Costs" stroke={dataColors.cost} strokeWidth={1.5} fillOpacity={1} fill="url(#colorCost)" dot={false}/>
+                   <Line type="monotone" dataKey="profit" name="Profit" stroke={dataColors.forecast} strokeWidth={2} dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
+        </div>
 
-          {/* Notes & Commentary Card */}
-          <Card className="lg:col-span-1">
-            <CardHeader>
-               <CardTitle className="text-lg">Notes & Commentary</CardTitle>
-            </CardHeader>
-            <CardContent>
-               <Label htmlFor="pm-notes" className="sr-only">PM Commentary</Label> {/* Screen reader label */}
-               <Textarea
-                 id="pm-notes"
-                 placeholder="Add notes or observations about this forecast..."
-                 value={annotation}
-                 onChange={(e) => setAnnotation(e.target.value)}
-                 className="mt-1"
-                 rows={4}
-               />
-               <div className="flex items-center justify-between mt-2">
-                 <Button
-                   size="sm"
-                   variant="secondary"
-                   onClick={async () => {
-                     if (latestModel && latestModel.id) {
-                       // Save annotation to DB for this model
-                       const updated = { ...latestModel, assumptions: { ...latestModel.assumptions, metadata: { ...latestModel.assumptions.metadata, annotation } } };
-                       // Save to DB
-                       try {
-                         await import('@/lib/db').then(({ db }) => db.financialModels.update(latestModel.id, { assumptions: updated.assumptions, updatedAt: new Date() }));
-                         // Optionally show toast
-                         if (typeof window !== 'undefined') {
-                           import('@/components/ui/use-toast').then(({ toast }) => toast({ title: 'Notes Saved', description: `Saved at ${new Date().toLocaleTimeString()}` }));
-                         }
-                       } catch (err) {
-                         if (typeof window !== 'undefined') {
-                           import('@/components/ui/use-toast').then(({ toast }) => toast({ title: 'Save Failed', description: 'Could not save notes', variant: 'destructive' }));
+        {/* === Section 5: Scenario Analysis, Risk Flags, Notes === */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Scenario Analysis Card - Display Comparison */}
+            <Card className="lg:col-span-1">
+                <CardHeader>
+                    <CardTitle className="text-lg">Scenario Impact Overview</CardTitle>
+                    <CardDescription>Select a scenario to see its impact vs. baseline.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                   {/* Scenario Selector Dropdown */}
+                   <div>
+                      <Label htmlFor="scenario-select" className="mb-1 block text-sm font-medium">Selected Scenario</Label>
+                      <Select 
+                        value={currentScenario?.id !== undefined && currentScenario?.id !== null ? currentScenario.id.toString() : "baseline"}
+                        onValueChange={(value) => {
+                          if (value === "baseline") {
+                            if (setCurrentScenario) setCurrentScenario(null);
+                            return;
+                          }
+                          const selectedId = parseInt(value);
+                          const scenarioToSet = scenarios.find(s => s.id === selectedId) || null;
+                          if (setCurrentScenario) {
+                             setCurrentScenario(scenarioToSet);
+                          }
+                        }}
+                      >
+                         <SelectTrigger id="scenario-select">
+                           <SelectValue placeholder="Select scenario..." />
+                         </SelectTrigger>
+                         <SelectContent>
+                           <SelectItem value="baseline">None (Baseline)</SelectItem>
+                           {scenarioSelectItems}
+                         </SelectContent>
+                      </Select>
+                   </div>
+
+                   {/* Display Scenario Comparison */}
+                   <Separator />
+                   <div>
+                      <TypographyMuted className="text-sm">Impact vs. Baseline:</TypographyMuted>
+                      <div className="mt-2 p-3 bg-muted/50 rounded-md border min-h-[80px]">
+                         {currentScenario && scenarioComparisonData ? (
+                           <Table>
+                             {/* Optional Header <TableHeader><TableRow><TableHead>Metric</TableHead><TableHead className="text-right">Impact</TableHead></TableRow></TableHeader> */}
+                             <TableBody>
+                                <TableRow>
+                                  <TableCell>Revenue</TableCell>
+                                  <TableCell className={cn("text-right", scenarioComparisonData.revenueDelta >= 0 ? 'text-green-600' : 'text-red-600')}>{formatCurrency(scenarioComparisonData.revenueDelta)}</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell>Cost</TableCell>
+                                  <TableCell className={cn("text-right", scenarioComparisonData.costDelta <= 0 ? 'text-green-600' : 'text-red-600')}>{formatCurrency(scenarioComparisonData.costDelta)}</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell>Profit</TableCell>
+                                  <TableCell className={cn("text-right", scenarioComparisonData.profitDelta >= 0 ? 'text-green-600' : 'text-red-600')}>{formatCurrency(scenarioComparisonData.profitDelta)}</TableCell>
+                                </TableRow>
+                             </TableBody>
+                           </Table>
+                         ) : (
+                           <p className="text-sm text-center py-4 text-muted-foreground">{scenarios.length > 0 ? "Select a scenario above to see its impact." : "No scenarios defined for this project."}</p>
+                         )}
+                      </div>
+                   </div>
+                </CardContent>
+            </Card>
+
+            {/* Risk Flags & Alerts / Notes & Commentary Cards */}
+            <Card className="lg:col-span-1">
+              <CardHeader>
+                 <CardTitle className="text-lg">Risk Flags & Alerts</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {warnings.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {warnings.map((warning, index) => {
+                          // Using smaller cards/badges for alerts might be better here
+                          let alertClasses = "p-3 border rounded-lg flex items-start gap-3 text-xs ";
+                          let iconColor = "text-blue-500";
+                          const titleColor = "font-semibold";
+                          if (warning.severity === 'error') {
+                              alertClasses += "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700/50";
+                              iconColor = "text-red-500";
+                          } else if (warning.severity === 'warning') {
+                              alertClasses += "bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700/50";
+                              iconColor = "text-amber-500";
+                          } else { // Info
+                              alertClasses += "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700/50";
+                          }
+                          return (
+                              <div key={index} className={alertClasses}>
+                                  <AlertTriangle className={`h-4 w-4 ${iconColor} flex-shrink-0 mt-0.5`} />
+                                  <div>
+                                      <h4 className={titleColor}>{warning.type}</h4>
+                                      <p>{warning.message}</p>
+                                      {/* TODO: Link to relevant assumption/input */}
+                                  </div>
+                              </div>
+                          );
+                      })}
+                  </div>
+                ) : (
+                   <TypographyP className="text-muted-foreground">No specific risks flagged based on current forecast.</TypographyP>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Notes & Commentary Card */}
+            <Card className="lg:col-span-1">
+              <CardHeader>
+                 <CardTitle className="text-lg">Notes & Commentary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                 <Label htmlFor="pm-notes" className="sr-only">PM Commentary</Label> {/* Screen reader label */}
+                 <Textarea
+                   id="pm-notes"
+                   placeholder="Add notes or observations about this forecast..."
+                   value={annotation}
+                   onChange={(e) => setAnnotation(e.target.value)}
+                   className="mt-1"
+                   rows={4}
+                 />
+                 <div className="flex items-center justify-between mt-2">
+                   <Button
+                     size="sm"
+                     variant="secondary"
+                     onClick={async () => {
+                       if (latestModel && latestModel.id) {
+                         // Save annotation to DB for this model
+                         const updated = { ...latestModel, assumptions: { ...latestModel.assumptions, metadata: { ...latestModel.assumptions.metadata, annotation } } };
+                         // Save to DB
+                         try {
+                           await import('@/lib/db').then(({ db }) => db.financialModels.update(latestModel.id, { assumptions: updated.assumptions, updatedAt: new Date() }));
+                           // Optionally show toast
+                           if (typeof window !== 'undefined') {
+                             import('@/components/ui/use-toast').then(({ toast }) => toast({ title: 'Notes Saved', description: `Saved at ${new Date().toLocaleTimeString()}` }));
+                           }
+                         } catch (err) {
+                           if (typeof window !== 'undefined') {
+                             import('@/components/ui/use-toast').then(({ toast }) => toast({ title: 'Save Failed', description: 'Could not save notes', variant: 'destructive' }));
+                           }
                          }
                        }
-                     }
-                   }}
-                 >Save Notes</Button>
-                 <span className="text-xs text-muted-foreground">Last updated: {latestModel?.updatedAt ? formatDateTime(latestModel.updatedAt) : 'N/A'}</span>
-               </div>
-            </CardContent>
-          </Card>
+                     }}
+                   >Save Notes</Button>
+                   <span className="text-xs text-muted-foreground">Last updated: {latestModel?.updatedAt ? formatDateTime(latestModel.updatedAt) : 'N/A'}</span>
+                 </div>
+              </CardContent>
+            </Card>
+        </div>
+
+        {/* === Section 6: Forecast Data Table === */}
+        <div className="mt-12">
+          <ForecastDataTab />
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

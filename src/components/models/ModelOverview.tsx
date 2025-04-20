@@ -623,6 +623,61 @@ export const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverv
                  </p>
                </div>
              </div>
+             <div>
+                <h3 className="font-medium mb-2">Marketing Budget</h3>
+                <div className="space-y-1">
+                  {/* Show campaign total and average per week if channel-based */}
+                  {model.assumptions.marketing?.allocationMode === 'highLevel' && model.assumptions.marketing?.totalBudget ? (
+                    <>
+                      <p className="text-sm">
+                        <span className="text-muted-foreground">Total Campaign Budget: </span>
+                        {formatCurrency(model.assumptions.marketing.totalBudget)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Avg per week: {formatCurrency(model.assumptions.marketing.totalBudget / (model.assumptions.metadata?.weeks || 12))}
+                      </p>
+                    </>
+                  ) : model.assumptions.marketing?.allocationMode === 'channels' && Array.isArray(model.assumptions.marketing.channels) ? (
+                    (() => {
+                      const weeks = model.assumptions.metadata?.weeks || 12;
+                      let total = 0;
+                      let perWeek: number[] = Array(weeks).fill(0);
+                      model.assumptions.marketing.channels.forEach(ch => {
+                        if (ch.distribution === 'upfront') {
+                          perWeek[0] += ch.weeklyBudget || 0;
+                        } else if (ch.distribution === 'spreadCustom' && ch.spreadDuration) {
+                          for (let i = 0; i < ch.spreadDuration && i < weeks; i++) {
+                            perWeek[i] += ch.weeklyBudget || 0;
+                          }
+                        } else {
+                          // spreadEvenly or default
+                          for (let i = 0; i < weeks; i++) {
+                            perWeek[i] += ch.weeklyBudget || 0;
+                          }
+                        }
+                      });
+                      total = perWeek.reduce((a, b) => a + b, 0);
+                      const avg = total / weeks;
+                      return (
+                        <>
+                          <p className="text-sm">
+                            <span className="text-muted-foreground">Total Marketing Channel Spend: </span>
+                            {formatCurrency(total)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Avg per week: {formatCurrency(avg)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            (Week 1: {formatCurrency(perWeek[0])}, Week 2: {formatCurrency(perWeek[1])}, Week 3: {formatCurrency(perWeek[2])}...)
+                          </p>
+                        </>
+                      );
+                    })()
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No marketing budget defined.</p>
+                  )}
+                </div>
+              </div>
            </div>
          </CardContent>
       </Card>

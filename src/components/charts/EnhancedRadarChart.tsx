@@ -21,18 +21,22 @@ interface RadarDataPoint {
   [key: string]: string | number;
 }
 
+interface RadarChartDataPoint {
+  [key: string]: string | number;
+}
+
 interface EnhancedRadarChartProps {
   data: RadarDataPoint[];
   height?: number;
 }
 
 // Custom tooltip for the radar chart
-const CustomTooltip = ({ active, payload }: any) => {
+const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: { payload?: RadarDataPoint; value?: number; dataKey?: string | number }[] }) => {
   if (active && payload && payload.length) {
-    const dataPoint = payload[0];
-    const metric = dataPoint.payload.subject;
-    const actual = payload.find((p: any) => p.dataKey === 'Actual')?.value || 0;
-    const target = payload.find((p: any) => p.dataKey === 'Target')?.value || 0;
+    const dataPoint = payload[0].payload;
+    const metric = (dataPoint as RadarDataPoint).subject;
+    const actual = Number(payload.find((p) => p.dataKey === 'Actual')?.value) || 0;
+    const target = Number(payload.find((p) => p.dataKey === 'Target')?.value) || 0;
     
     // Calculate performance as a percentage of target
     const performance = target !== 0 ? (actual / target) * 100 : 0;
@@ -69,11 +73,22 @@ const CustomTooltip = ({ active, payload }: any) => {
 };
 
 // Custom label component to show values at axis tips
-const AxisLabel = (props: any) => {
+const AxisLabel = (props: { 
+  x: number; 
+  y: number; 
+  textAnchor: string; 
+  stroke: string; 
+  payload: RadarDataPoint; 
+  value: string; 
+  index: number; 
+  cx: number; 
+  cy: number; 
+  data: RadarDataPoint[] 
+}) => {
   const { x, y, textAnchor, stroke, payload, value, index, cx, cy, data } = props;
   
   // Find the data point for this axis
-  const dataPoint = data.find((d: RadarDataPoint) => d.subject === payload.value);
+  const dataPoint = data.find((d: RadarDataPoint) => d.subject === payload.subject);
   if (!dataPoint) return null;
   
   // Calculate the position for the label (a bit further out from the axis end)
@@ -118,7 +133,7 @@ const EnhancedRadarChart: React.FC<EnhancedRadarChartProps> = ({
         <PolarRadiusAxis 
           angle={90} 
           domain={[0, 100]} 
-          tickFormatter={(value) => `${value}%`}
+          tickFormatter={(value: number) => `${value}%`}
           tick={{ fontSize: 10 }}
           stroke={dataColors.grid}
         />
@@ -147,7 +162,7 @@ const EnhancedRadarChart: React.FC<EnhancedRadarChartProps> = ({
           activeDot={{ r: 6, strokeWidth: 2 }}
         />
         
-        <Tooltip content={<CustomTooltip />} />
+        <Tooltip content={CustomTooltip} />
         
         <Legend 
           verticalAlign="bottom" 

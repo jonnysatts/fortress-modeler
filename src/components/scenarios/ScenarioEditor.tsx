@@ -17,6 +17,7 @@ import { toast } from '@/components/ui/use-toast';
 import { useConfirm } from '@/hooks/useConfirm';
 import ScenarioChart from './ScenarioChart';
 import ScenarioSummaryTable from './ScenarioSummaryTable';
+import ForecastDataTab from './ForecastDataTab';
 import { calculateRelatedChanges } from '@/lib/scenarioRelationships';
 
 interface ScenarioEditorProps {
@@ -270,6 +271,8 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
     </div>
   ) : null;
 
+  const [activeTab, setActiveTab] = useState<'main' | 'forecastData'>('main');
+
   return (
     <>
       <div className="space-y-6">
@@ -287,185 +290,205 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
           </div>
         </div>
 
-        {/* --- Scenario Parameter Controls --- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Marketing Spend Slider */}
-          <Card className={parameterCardClass}>
-            <CardHeader>
-              <CardTitle>Marketing Spend</CardTitle>
-              <CardDescription>Adjust overall marketing budget (%)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Slider
-                min={-50}
-                max={100}
-                step={1}
-                value={[localDeltas.marketingSpendPercent]}
-                onValueChange={([v]) => handleParamChange('marketingSpendPercent', v)}
-              />
-              <div className="mt-2 text-right">{localDeltas.marketingSpendPercent}%</div>
-            </CardContent>
-          </Card>
-
-          {/* Pricing Slider */}
-          <Card className={parameterCardClass}>
-            <CardHeader>
-              <CardTitle>Pricing</CardTitle>
-              <CardDescription>Adjust all pricing (%)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Slider
-                min={-30}
-                max={50}
-                step={1}
-                value={[localDeltas.pricingPercent]}
-                onValueChange={([v]) => handleParamChange('pricingPercent', v)}
-              />
-              <div className="mt-2 text-right">{localDeltas.pricingPercent}%</div>
-            </CardContent>
-          </Card>
-
-          {/* Attendance Growth Slider + Mode Toggle + Tooltip */}
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <label htmlFor="attendance-growth-slider">Attendance Growth (%)</label>
-              <select
-                value={attendanceGrowthMode}
-                onChange={e => setAttendanceGrowthMode(e.target.value as 'replace' | 'add')}
-                style={{ marginLeft: 8 }}
-                aria-label="Attendance Growth Calculation Mode"
-              >
-                <option value="replace">Replace Baseline</option>
-                <option value="add">Add to Baseline</option>
-              </select>
-              <span title={
-                attendanceGrowthMode === 'replace'
-                  ? 'Each week’s attendance will grow by this percentage, starting from the initial value. (Replaces baseline growth rate)'
-                  : 'This percentage will be added to the baseline attendance growth rate.'
-              }>
-                <Lightbulb size={16} style={{ marginLeft: 8, color: '#FFD600' }} />
-              </span>
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle>Scenario Editor</CardTitle>
+            <CardDescription>
+              Adjust scenario parameters and see real-time forecast updates.
+            </CardDescription>
+            <div className="flex gap-2 mt-2">
+              <Button variant={activeTab === 'main' ? 'default' : 'outline'} onClick={() => setActiveTab('main')}>Summary & Charts</Button>
+              <Button variant={activeTab === 'forecastData' ? 'default' : 'outline'} onClick={() => setActiveTab('forecastData')}>Forecast Data Table</Button>
             </div>
-            <Slider
-              id="attendance-growth-slider"
-              min={-100}
-              max={200}
-              step={1}
-              value={[localDeltas.attendanceGrowthPercent]}
-              onValueChange={([value]) => handleParamChange('attendanceGrowthPercent', value)}
-            />
-            <TypographyMuted>
-              {attendanceGrowthMode === 'replace'
-                ? 'Attendance will compound at this rate each period, replacing the baseline.'
-                : 'This value will be added to the baseline attendance growth rate.'}
-            </TypographyMuted>
-          </div>
+          </CardHeader>
+          <CardContent>
+            {activeTab === 'main' ? (
+              <>
+                {/* --- Scenario Parameter Controls --- */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                  {/* Marketing Spend Slider */}
+                  <Card className={parameterCardClass}>
+                    <CardHeader>
+                      <CardTitle>Marketing Spend</CardTitle>
+                      <CardDescription>Adjust overall marketing budget (%)</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Slider
+                        min={-50}
+                        max={100}
+                        step={1}
+                        value={[localDeltas.marketingSpendPercent]}
+                        onValueChange={([v]) => handleParamChange('marketingSpendPercent', v)}
+                      />
+                      <div className="mt-2 text-right">{localDeltas.marketingSpendPercent}%</div>
+                    </CardContent>
+                  </Card>
 
-          {/* COGS Slider + Mode Toggle + Tooltip */}
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <label htmlFor="cogs-multiplier-slider">COGS Change (%)</label>
-              <select
-                value={cogsMode}
-                onChange={e => setCogsMode(e.target.value as 'multiply' | 'add')}
-                style={{ marginLeft: 8 }}
-                aria-label="COGS Calculation Mode"
-              >
-                <option value="multiply">% Increase (multiply)</option>
-                <option value="add">Add to Baseline</option>
-              </select>
-              <span title={
-                cogsMode === 'multiply'
-                  ? 'COGS will be multiplied by (1 + this value/100). E.g., 30% + 5% = 31.5%.'
-                  : 'This value will be added to the baseline COGS percentage.'
-              }>
-                <Lightbulb size={16} style={{ marginLeft: 8, color: '#FFD600' }} />
-              </span>
-            </div>
-            <Slider
-              id="cogs-multiplier-slider"
-              min={-100}
-              max={100}
-              step={1}
-              value={[localDeltas.cogsMultiplier]}
-              onValueChange={([value]) => handleParamChange('cogsMultiplier', value)}
-            />
-            <TypographyMuted>
-              {cogsMode === 'multiply'
-                ? 'COGS will be multiplied by (1 + value/100).'
-                : 'This value will be added to the baseline COGS percentage.'}
-            </TypographyMuted>
-          </div>
-        </div>
+                  {/* Pricing Slider */}
+                  <Card className={parameterCardClass}>
+                    <CardHeader>
+                      <CardTitle>Pricing</CardTitle>
+                      <CardDescription>Adjust all pricing (%)</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Slider
+                        min={-30}
+                        max={50}
+                        step={1}
+                        value={[localDeltas.pricingPercent]}
+                        onValueChange={([v]) => handleParamChange('pricingPercent', v)}
+                      />
+                      <div className="mt-2 text-right">{localDeltas.pricingPercent}%</div>
+                    </CardContent>
+                  </Card>
 
-        {/* Section Divider */}
-        {sectionDivider}
+                  {/* Attendance Growth Slider + Mode Toggle + Tooltip */}
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <label htmlFor="attendance-growth-slider">Attendance Growth (%)</label>
+                      <select
+                        value={attendanceGrowthMode}
+                        onChange={e => setAttendanceGrowthMode(e.target.value as 'replace' | 'add')}
+                        style={{ marginLeft: 8 }}
+                        aria-label="Attendance Growth Calculation Mode"
+                      >
+                        <option value="replace">Replace Baseline</option>
+                        <option value="add">Add to Baseline</option>
+                      </select>
+                      <span title={
+                        attendanceGrowthMode === 'replace'
+                          ? 'Each week’s attendance will grow by this percentage, starting from the initial value. (Replaces baseline growth rate)'
+                          : 'This percentage will be added to the baseline attendance growth rate.'
+                      }>
+                        <Lightbulb size={16} style={{ marginLeft: 8, color: '#FFD600' }} />
+                      </span>
+                    </div>
+                    <Slider
+                      id="attendance-growth-slider"
+                      min={-100}
+                      max={200}
+                      step={1}
+                      value={[localDeltas.attendanceGrowthPercent]}
+                      onValueChange={([value]) => handleParamChange('attendanceGrowthPercent', value)}
+                    />
+                    <TypographyMuted>
+                      {attendanceGrowthMode === 'replace'
+                        ? 'Attendance will compound at this rate each period, replacing the baseline.'
+                        : 'This value will be added to the baseline attendance growth rate.'}
+                    </TypographyMuted>
+                  </div>
 
-        {/* --- Suggestions Section --- */}
-        {showSuggestions && (
-          <div className="my-4 p-4 bg-blue-50 border border-blue-200 rounded">
-            <div className="mb-2 font-semibold flex items-center">
-              <Lightbulb className="h-4 w-4 mr-2 text-blue-500" />
-              <span className="ml-1">Advice: Consider these related changes</span>
-            </div>
-            <ul className="mb-2">
-              {Object.entries(suggestedChanges).map(([key, val]) => (
-                <li key={key} className="flex items-center justify-between py-1">
-                  <span>
-                    <strong>{key}:</strong> {String(val)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <div className="flex gap-2">
-              <Button size="sm" onClick={() => handleAcceptSuggestions(suggestedChanges)}>
-                Accept All Advice
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleDismissSuggestions}>
-                Ignore
-              </Button>
-            </div>
-          </div>
-        )}
+                  {/* COGS Slider + Mode Toggle + Tooltip */}
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <label htmlFor="cogs-multiplier-slider">COGS Change (%)</label>
+                      <select
+                        value={cogsMode}
+                        onChange={e => setCogsMode(e.target.value as 'multiply' | 'add')}
+                        style={{ marginLeft: 8 }}
+                        aria-label="COGS Calculation Mode"
+                      >
+                        <option value="multiply">% Increase (multiply)</option>
+                        <option value="add">Add to Baseline</option>
+                      </select>
+                      <span title={
+                        cogsMode === 'multiply'
+                          ? 'COGS will be multiplied by (1 + this value/100). E.g., 30% + 5% = 31.5%.'
+                          : 'This value will be added to the baseline COGS percentage.'
+                      }>
+                        <Lightbulb size={16} style={{ marginLeft: 8, color: '#FFD600' }} />
+                      </span>
+                    </div>
+                    <Slider
+                      id="cogs-multiplier-slider"
+                      min={-100}
+                      max={100}
+                      step={1}
+                      value={[localDeltas.cogsMultiplier]}
+                      onValueChange={([value]) => handleParamChange('cogsMultiplier', value)}
+                    />
+                    <TypographyMuted>
+                      {cogsMode === 'multiply'
+                        ? 'COGS will be multiplied by (1 + value/100).'
+                        : 'This value will be added to the baseline COGS percentage.'}
+                    </TypographyMuted>
+                  </div>
+                </div>
 
-        {/* Chart Area with Overlay */}
-        <div className="relative">
-          {chartOverlay}
-          <ScenarioChart
-            baselineData={baselineForecastData}
-            scenarioData={scenarioForecastData}
-            isCalculating={isCalculating}
-          />
-        </div>
+                {/* Section Divider */}
+                {sectionDivider}
 
-        {/* Section Divider */}
-        {sectionDivider}
+                {/* --- Suggestions Section --- */}
+                {showSuggestions && (
+                  <div className="my-4 p-4 bg-blue-50 border border-blue-200 rounded">
+                    <div className="mb-2 font-semibold flex items-center">
+                      <Lightbulb className="h-4 w-4 mr-2 text-blue-500" />
+                      <span className="ml-1">Advice: Consider these related changes</span>
+                    </div>
+                    <ul className="mb-2">
+                      {Object.entries(suggestedChanges).map(([key, val]) => (
+                        <li key={key} className="flex items-center justify-between py-1">
+                          <span>
+                            <strong>{key}:</strong> {String(val)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => handleAcceptSuggestions(suggestedChanges)}>
+                        Accept All Advice
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={handleDismissSuggestions}>
+                        Ignore
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
-        <ScenarioSummaryTable
-          baselineData={baselineForecastData}
-          scenarioData={scenarioForecastData}
-          isCalculating={isCalculating}
-        />
+                {/* Chart Area with Overlay */}
+                <div className="relative">
+                  {chartOverlay}
+                  <ScenarioChart
+                    baselineData={baselineForecastData}
+                    scenarioData={scenarioForecastData}
+                    isCalculating={isCalculating}
+                  />
+                </div>
 
-        <div className="flex gap-3 justify-end mt-6">
-          <Button
-            variant="default"
-            className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2 rounded shadow"
-            loading={isSaving}
-            onClick={handleSave}
-            disabled={!hasUnsavedChanges || isSaving}
-          >
-            Save Scenario
-          </Button>
-          <Button
-            variant="outline"
-            className="border-amber-300 text-amber-600 hover:bg-amber-50 px-6 py-2 rounded"
-            onClick={handleCancel}
-            disabled={isSaving}
-          >
-            Cancel
-          </Button>
-        </div>
+                {/* Section Divider */}
+                {sectionDivider}
+
+                <ScenarioSummaryTable
+                  baselineData={baselineForecastData}
+                  scenarioData={scenarioForecastData}
+                  isCalculating={isCalculating}
+                />
+
+                <div className="flex gap-3 justify-end mt-6">
+                  <Button
+                    variant="default"
+                    className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2 rounded shadow"
+                    loading={isSaving}
+                    onClick={handleSave}
+                    disabled={!hasUnsavedChanges || isSaving}
+                  >
+                    Save Scenario
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="border-amber-300 text-amber-600 hover:bg-amber-50 px-6 py-2 rounded"
+                    onClick={handleCancel}
+                    disabled={isSaving}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <ForecastDataTab />
+            )}
+          </CardContent>
+        </Card>
       </div>
     </>
   );

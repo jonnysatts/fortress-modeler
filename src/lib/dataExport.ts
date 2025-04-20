@@ -76,7 +76,7 @@ export async function getProductExportData(projectId: number): Promise<ExportDat
 
     // --- Calculate Costs using fetched model data --- 
     let totalForecastCost = 0;
-    let totalActualCost = totalMarketingActual;
+    const totalActualCost = totalMarketingActual;
 
     if (metadata) {
       const costAssumptions = metadata.costs || {};
@@ -303,7 +303,23 @@ function createFallbackData(projectName: string): ExportDataType {
 
 // Helper function to process marketing channels
 function processMarketingChannels(channels: any[], actuals: any[]) {
+  // Ensure each channel has a forecast value
+  channels = channels.map(channel => {
+    if (channel.forecast === undefined) {
+      if (channel.weeklyBudget !== undefined) {
+        channel.forecast = channel.weeklyBudget;
+      } else {
+        console.warn('[DataExport Warning] Channel forecast is undefined for channel', channel.id, '- defaulting to 0');
+        channel.forecast = 0;
+      }
+    }
+    return channel;
+  });
+  
   console.log('[DataExport] Processing marketing channels:', channels);
+  channels.forEach(channel => {
+    console.log('[DataExport Debug] Channel details:', { id: channel.id, forecast: channel.forecast, distribution: channel.distribution, spreadDuration: channel.spreadDuration });
+  });
 
   // If no channels, return an empty array
   if (!channels || channels.length === 0) {

@@ -3,6 +3,7 @@ import useStore from '@/store/useStore';
 import { ExportDataType } from '@/store/types';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import { MarketingChannelItem } from '@/types/models';
+import { generateForecastTimeSeries } from '@/lib/financialCalculations';
 
 interface MarketingAnalysisExportProps {
   projectId: number;
@@ -43,55 +44,40 @@ const MarketingAnalysisExport: React.FC<MarketingAnalysisExportProps> = ({ proje
         return { error: 'Detailed Channels mode is not enabled for this project' };
       }
 
-      // Get the marketing channels
+      // Generate forecast time series using the shared calculation logic
+      const forecastPeriods = generateForecastTimeSeries(latestModel);
+
+      // Compute summary metrics
+      const totalForecast = forecastPeriods.reduce((sum, period) => sum + (period.marketingTotal || 0), 0);
+      const totalActual = forecastPeriods.reduce((sum, period) => sum + (period.marketingActual || 0), 0);
+      const profit = forecastPeriods.reduce((sum, period) => sum + (period.profit || 0), 0);
+      const totalRevenue = forecastPeriods.reduce((sum, period) => sum + (period.revenue || 0), 0);
+      const totalCost = forecastPeriods.reduce((sum, period) => sum + (period.cost || 0), 0);
+      const profitMargin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
+
+      // For channels, aggregate per channel over all periods
       const marketingChannels = latestModel.assumptions?.marketing?.channels || [];
-
-      // Get the time unit (Week or Month)
-      const isWeeklyEvent = latestModel.assumptions?.metadata?.type === "WeeklyEvent";
-      const timeUnit = isWeeklyEvent ? "Week" : "Month";
-
-      // Get the duration
-      const duration = isWeeklyEvent
-        ? latestModel.assumptions?.metadata?.weeks || 12
-        : 12;
-
-      // Process channel data
       const channelData = marketingChannels.map(channel => {
-        // Calculate total forecast for this channel
-        const totalForecast = channel.weeklyBudget * duration;
-
-        // Calculate total actual spend for this channel
-        let totalActual = 0;
-        actuals.forEach(actual => {
-          if (actual.marketingActuals && actual.marketingActuals[channel.id]) {
-            totalActual += actual.marketingActuals[channel.id].actualSpend;
-          }
-        });
-
-        // Calculate variance
-        const variance = totalActual - totalForecast;
-        const variancePercent = totalForecast > 0 ? (variance / totalForecast) * 100 : 0;
-
-        // Calculate cost per result if conversions are available
+        // Sum forecast and actuals for this channel across all periods
+        let forecast = 0;
+        let actual = 0;
         let conversions = 0;
-        let costPerResult = 0;
-
-        actuals.forEach(actual => {
-          if (actual.marketingActuals && actual.marketingActuals[channel.id] && actual.marketingActuals[channel.id].conversions) {
-            conversions += actual.marketingActuals[channel.id].conversions || 0;
+        forecastPeriods.forEach(period => {
+          if (period.marketingChannels && period.marketingChannels[channel.id]) {
+            forecast += period.marketingChannels[channel.id].forecast || 0;
+            actual += period.marketingChannels[channel.id].actual || 0;
+            conversions += period.marketingChannels[channel.id].conversions || 0;
           }
         });
-
-        if (conversions > 0) {
-          costPerResult = totalActual / conversions;
-        }
-
+        const variance = actual - forecast;
+        const variancePercent = forecast > 0 ? (variance / forecast) * 100 : 0;
+        const costPerResult = conversions > 0 ? actual / conversions : 0;
         return {
           id: channel.id,
           name: channel.name,
           type: channel.channelType,
-          forecast: totalForecast,
-          actual: totalActual,
+          forecast,
+          actual,
           variance,
           variancePercent,
           conversions,
@@ -101,59 +87,28 @@ const MarketingAnalysisExport: React.FC<MarketingAnalysisExportProps> = ({ proje
         };
       });
 
-      // Calculate summary data
-      const totalForecast = marketingChannels.reduce((sum, channel) => sum + (channel.weeklyBudget * duration), 0);
+      // Prepare period data for export (align with forecastPeriods)
+      const periodData = forecastPeriods.map((period, idx) => ({
+        period: idx + 1,
+        name: period.name || `Week ${idx + 1}`,
+        totalForecast: period.marketingTotal || 0,
+        totalActual: period.marketingActual || 0,
+        channels: period.marketingChannels
+          ? Object.fromEntries(Object.entries(period.marketingChannels).map(([id, d]) => [id, d.forecast || 0]))
+          : {},
+        actualChannels: period.marketingChannels
+          ? Object.fromEntries(Object.entries(period.marketingChannels).map(([id, d]) => [id, d.actual || 0]))
+          : {},
+        revenue: period.revenue || 0,
+        cost: period.cost || 0,
+        profit: period.profit || 0
+      }));
 
-      let totalActual = 0;
-      actuals.forEach(actual => {
-        if (actual.marketingActuals) {
-          Object.values(actual.marketingActuals).forEach(channelActual => {
-            totalActual += channelActual.actualSpend;
-          });
-        }
-      });
-
-      // Calculate forecast to date (for periods where we have actuals)
-      const periodsWithActuals = actuals.map(a => a.period);
-      const forecastToDate = marketingChannels.reduce((sum, channel) => {
-        return sum + (channel.weeklyBudget * periodsWithActuals.length);
-      }, 0);
-
-      // Process period data
-      const periodData = [];
-
-      for (let period = 1; period <= duration; period++) {
-        const periodObj: any = {
-          period,
-          name: `${timeUnit} ${period}`,
-          totalForecast: 0,
-          channels: {}
-        };
-
-        // Add forecast data for each channel
-        marketingChannels.forEach(channel => {
-          // For now, we'll assume even distribution across periods
-          // This would be enhanced based on the distribution setting
-          const forecastAmount = channel.weeklyBudget;
-          periodObj.totalForecast += forecastAmount;
-          periodObj.channels[channel.id] = forecastAmount;
-        });
-
-        // Add actual data if available
-        const actualForPeriod = actuals.find(a => a.period === period);
-        if (actualForPeriod && actualForPeriod.marketingActuals) {
-          periodObj.totalActual = 0;
-          periodObj.actualChannels = {};
-
-          // Sum up actual spend for each channel
-          Object.entries(actualForPeriod.marketingActuals).forEach(([channelId, channelActual]) => {
-            periodObj.actualChannels[channelId] = channelActual.actualSpend;
-            periodObj.totalActual = (periodObj.totalActual || 0) + channelActual.actualSpend;
-          });
-        }
-
-        periodData.push(periodObj);
-      }
+      // Compute forecast to date (for periods where we have actuals)
+      const periodsWithActuals = periodData.filter(p => p.totalActual > 0).map(p => p.period);
+      const forecastToDate = periodData
+        .filter(p => periodsWithActuals.includes(p.period))
+        .reduce((sum, p) => sum + (p.totalForecast || 0), 0);
 
       // Prepare the export data
       const exportData: ExportDataType = {
@@ -165,12 +120,13 @@ const MarketingAnalysisExport: React.FC<MarketingAnalysisExportProps> = ({ proje
           totalActual,
           percentUtilized: totalForecast > 0 ? (totalActual / totalForecast) * 100 : 0,
           forecastToDate,
+          profit,
+          profitMargin,
           actualToDate: totalActual
         },
         marketingChannels: channelData,
         periods: periodData,
         performanceData: {
-          // Add performance metrics for charts
           channelPerformance: channelData.map(channel => ({
             name: channel.name,
             forecast: channel.forecast,
@@ -183,12 +139,13 @@ const MarketingAnalysisExport: React.FC<MarketingAnalysisExportProps> = ({ proje
             actual: period.totalActual || 0
           }))
         },
-        // Format the data for display
         formattedSummary: {
           totalForecast: formatCurrency(totalForecast),
           totalActual: formatCurrency(totalActual),
           percentUtilized: formatPercent(totalForecast > 0 ? (totalActual / totalForecast) * 100 : 0),
           forecastToDate: formatCurrency(forecastToDate),
+          profit: formatCurrency(profit),
+          profitMargin: formatPercent(profitMargin),
           actualToDate: formatCurrency(totalActual)
         },
         formattedChannels: channelData.map(channel => ({

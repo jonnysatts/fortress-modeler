@@ -20,6 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import { db } from '@/lib/db';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import ForecastDataTab from '@/components/product/ForecastDataTab';
 
 // Placeholder types - Define these properly in @/types/models or similar
 // REMOVE Placeholder types
@@ -52,7 +53,7 @@ const calculateRevenueBreakdown = (timeSeries: ForecastPeriodData[], model: Fina
 
     // Sum revenue per stream across all periods
     timeSeries.forEach(periodData => {
-        let currentAttendance = periodData.attendance ?? 0;
+        const currentAttendance = periodData.attendance ?? 0;
         const period = periodData.period;
 
         // Re-calculate per-period stream revenue based on drivers/assumptions
@@ -156,5 +157,18 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 function ProductSummary() {
     // ... (rest of the component code, 700+ lines)
 }
+
+// TODO: Insert this into your main tab navigation, between Forecast Builder and Actuals Tracker.
+// Example if using Tabs from your UI library:
+// <TabsList>
+//   <TabsTrigger value="summary">Forecast Summary</TabsTrigger>
+//   <TabsTrigger value="builder">Forecast Builder</TabsTrigger>
+//   <TabsTrigger value="forecastData">Forecast Data Table</TabsTrigger>
+//   <TabsTrigger value="actuals">Actuals Tracker</TabsTrigger>
+//   ...
+// </TabsList>
+// <TabsContent value="forecastData">
+//   <ForecastDataTab />
+// </TabsContent>
 
 export default ProductSummary;
