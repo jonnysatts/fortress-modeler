@@ -138,7 +138,7 @@ export const createExportSlice: StateCreator<ExportState> = (set, get) => ({
 });
 
 // Helper functions for export handling
-async function handlePdfExport(data: ExportDataType, reportKey: string) {
+export async function handlePdfExport(data: ExportDataType, reportKey: string) {
   try {
     console.log(`[Store] PDF Export for ${reportKey} started with data:`, data);
 
@@ -154,26 +154,15 @@ async function handlePdfExport(data: ExportDataType, reportKey: string) {
             alignment: 'right'
           },
           {
-            text: reportKey,
-            fontSize: 24,
-            bold: true,
-            color: '#1A2942',
-            margin: [0, 10, 0, 20]
-          },
-          {
-            text: `Generated: ${new Date().toLocaleString()}`,
-            fontSize: 12,
-            margin: [0, 0, 0, 20]
-          },
-          {
-            text: 'No Data Available',
+            text: `No data available for ${reportKey}`,
             fontSize: 16,
-            bold: true,
             color: '#EF4444',
-            margin: [0, 0, 0, 10]
+            bold: true,
+            margin: [0, 40, 0, 0],
+            alignment: 'center'
           },
           {
-            text: 'There is no data available for this report. Please make sure you have created and configured your products correctly.',
+            text: 'Please check your project data and try again.',
             fontSize: 12,
             margin: [0, 0, 0, 20]
           }
@@ -230,11 +219,88 @@ function handleJsonExport(data: ExportDataType, reportKey: string) {
   }
 }
 
-// Helper function to create PDF document definition
-function createDocDefinition(data: ExportDataType, reportKey: string): any { // Return type any for flexibility with pdfmake
-  console.log("Creating pdfmake doc definition for:", reportKey, data);
+// Helper function to create a PDF table from forecastTableData
+function createForecastTable(forecastTableData: any[]): any {
+  if (!forecastTableData || forecastTableData.length === 0) {
+    return { text: 'No forecast data available', italics: true, margin: [0, 5, 0, 15] };
+  }
+  const body = [
+    [
+      { text: 'Period', style: 'tableHeader' },
+      { text: 'Revenue', style: 'tableHeader' },
+      { text: 'Cost', style: 'tableHeader' },
+      { text: 'Profit', style: 'tableHeader' },
+      { text: 'Attendance', style: 'tableHeader' }
+    ]
+  ];
+  forecastTableData.forEach(row => {
+    body.push([
+      { text: row.point || row.period, alignment: 'left' },
+      { text: `$${(row.revenue || 0).toLocaleString()}`, alignment: 'right' },
+      { text: `$${(row.cost || 0).toLocaleString()}`, alignment: 'right' },
+      { text: `$${(row.proft || 0).toLocaleString()}`, alignment: 'right', color: (row.proft || 0) >= 0 ? '#10B981' : '#EF4444' },
+      { text: row.attendance != null ? row.attendance.toLocaleString() : '', alignment: 'right' }
+    ]);
+  });
+  return {
+    table: {
+      headerRows: 1,
+      widths: ['*', 'auto', 'auto', 'auto', 'auto'],
+      body: body
+    },
+    layout: 'lightHorizontalLines',
+    margin: [0, 5, 0, 15]
+  };
+}
 
-  // Base structure
+function createMarketingChannelsTable(marketingChannels: any[]): any {
+  if (!marketingChannels || marketingChannels.length === 0) {
+    return { text: 'No marketing channel data available', italics: true, margin: [0, 5, 0, 15] };
+  }
+  const body = [
+    [
+      { text: 'Channel', style: 'tableHeader' },
+      { text: 'Type', style: 'tableHeader' },
+      { text: 'Forecast', style: 'tableHeader' },
+      { text: 'Actual', style: 'tableHeader' },
+      { text: 'Variance', style: 'tableHeader' },
+      { text: 'Variance %', style: 'tableHeader' }
+    ]
+  ];
+  marketingChannels.forEach(row => {
+    body.push([
+      { text: row.name, alignment: 'left' },
+      { text: row.type, alignment: 'left' },
+      { text: `$${(row.forecast || 0).toLocaleString()}`, alignment: 'right' },
+      { text: `$${(row.actual || 0).toLocaleString()}`, alignment: 'right' },
+      { text: `$${(row.variance || 0).toLocaleString()}`, alignment: 'right', color: (row.variance || 0) >= 0 ? '#10B981' : '#EF4444' },
+      { text: `${row.variancePercent != null ? row.variancePercent.toFixed(1) : '0'}%`, alignment: 'right', color: (row.variancePercent || 0) >= 0 ? '#10B981' : '#EF4444' }
+    ]);
+  });
+  return {
+    table: {
+      headerRows: 1,
+      widths: ['*', '*', 'auto', 'auto', 'auto', 'auto'],
+      body: body
+    },
+    layout: 'lightHorizontalLines',
+    margin: [0, 5, 0, 15]
+  };
+}
+
+function createDocDefinition(data: any, reportKey: string): any {
+  // DEBUG: Log the summary values being rendered in the PDF
+  console.log('[PDF DocDefinition] Summary values:', {
+    totalRevenue: data.totalRevenue,
+    totalCosts: data.totalCosts,
+    totalProfit: data.totalProfit,
+    profitMargin: data.profitMargin,
+    breakEvenLabel: data.breakEvenLabel,
+    breakEvenAchieved: data.breakEvenAchieved,
+    averageMetrics: data.averageMetrics
+  });
+
+  // Professional header and summary
   const docDefinition: any = {
     content: [
       {
@@ -252,10 +318,74 @@ function createDocDefinition(data: ExportDataType, reportKey: string): any { // 
         ]
       },
       {
-        text: reportKey,
+        text: data.title || reportKey,
         style: 'title',
-        margin: [0, 20, 0, 20]
-      }
+        margin: [0, 20, 0, 10]
+      },
+      {
+        columns: [
+          { text: `Project: ${data.projectName || ''}`, width: '50%' },
+          { text: `Exported: ${(data.exportDate ? new Date(data.exportDate) : new Date()).toLocaleString()}`, alignment: 'right', width: '50%' }
+        ],
+        margin: [0, 0, 0, 10]
+      },
+      { text: 'Executive Summary', style: 'subheader', margin: [0, 10, 0, 5] },
+      {
+        columns: [
+          {
+            width: '33%',
+            text: [
+              { text: 'Total Revenue: ', bold: true },
+              { text: (typeof data.totalRevenue === 'number') ? `$${data.totalRevenue.toLocaleString()}` : (data.totalRevenue || '$0') }
+            ]
+          },
+          {
+            width: '33%',
+            text: [
+              { text: 'Total Costs: ', bold: true },
+              { text: (typeof data.totalCosts === 'number') ? `$${data.totalCosts.toLocaleString()}` : (data.totalCosts || '$0') }
+            ]
+          },
+          {
+            width: '33%',
+            text: [
+              { text: 'Total Profit: ', bold: true },
+              { text: (typeof data.totalProfit === 'number') ? `$${data.totalProfit.toLocaleString()}` : (data.totalProfit || '$0'), color: (data.totalProfit || 0) >= 0 ? '#10B981' : '#EF4444' }
+            ]
+          }
+        ],
+        margin: [0, 0, 0, 10]
+      },
+      {
+        columns: [
+          {
+            width: '33%',
+            text: [
+              { text: 'Profit Margin: ', bold: true },
+              { text: (typeof data.profitMargin === 'number') ? `${data.profitMargin.toFixed(1)}%` : (data.profitMargin || '0%') }
+            ]
+          },
+          {
+            width: '33%',
+            text: [
+              { text: 'Breakeven Point: ', bold: true },
+              { text: data.breakEvenLabel || 'N/A', color: data.breakEvenAchieved ? '#10B981' : '#EF4444' }
+            ]
+          },
+          {
+            width: '33%',
+            text: [
+              { text: 'Avg. Revenue: ', bold: true },
+              { text: (data.averageMetrics && typeof data.averageMetrics.avgRevenue === 'number') ? `$${data.averageMetrics.avgRevenue.toLocaleString()}` : '$0' }
+            ]
+          }
+        ],
+        margin: [0, 0, 0, 10]
+      },
+      { text: 'Forecast by Period', style: 'subheader', margin: [0, 15, 0, 5] },
+      createForecastTable(data.forecastTableData),
+      { text: 'Marketing Channels', style: 'subheader', margin: [0, 15, 0, 5] },
+      createMarketingChannelsTable(data.marketingChannels)
     ],
     styles: {
       header: {
@@ -297,183 +427,11 @@ function createDocDefinition(data: ExportDataType, reportKey: string): any { // 
       fontSize: 10
     }
   };
-
-  // Add data content based on report type
-  if (reportKey === 'Marketing Analysis') {
-    if (data.summary) {
-      docDefinition.content.push(
-        { text: 'Executive Summary', style: 'subheader' },
-        { // Corrected structure for columns
-          columns: [
-            {
-              width: '33%',
-              text: [
-                { text: 'Total Forecast: ', bold: true },
-                { text: data.formattedSummary?.totalForecast || '$0' }
-              ]
-            },
-            {
-              width: '33%',
-              text: [
-                { text: 'Total Actual: ', bold: true },
-                { text: data.formattedSummary?.totalActual || '$0' }
-              ]
-            },
-            {
-              width: '33%',
-              text: [
-                { text: 'Utilization: ', bold: true },
-                { text: data.formattedSummary?.percentUtilized || '0%' }
-              ]
-            }
-          ],
-          margin: [0, 10, 0, 20]
-        }
-      );
-    }
-
-    if (data.marketingChannels && Array.isArray(data.marketingChannels)) {
-      docDefinition.content.push(
-        { text: 'Marketing Channels', style: 'subheader', margin: [0, 10, 0, 10] },
-        createMarketingChannelsTable(data.marketingChannels) // Assuming this returns valid pdfmake content
-      );
-    }
-
-    if (data.performanceData && data.performanceData.channelPerformance) {
-      docDefinition.content.push(
-        // Use empty text element for pageBreak
-        { text: '', pageBreak: 'before' },
-        { text: 'Channel Performance', style: 'subheader', margin: [0, 20, 0, 10] },
-        createPerformanceTable(data.performanceData.channelPerformance) // Assuming this returns valid pdfmake content
-      );
-    }
-
-    if (data.performanceData && data.performanceData.periodPerformance) {
-      docDefinition.content.push(
-        { text: 'Period Performance', style: 'subheader', margin: [0, 20, 0, 10] },
-        createPerformanceTable(data.performanceData.periodPerformance) // Assuming this returns valid pdfmake content
-      );
-    }
-  } else if (reportKey === 'Full Export' || reportKey.endsWith('Export')) { // Handle Portfolio or Project Exports
-    const reportData = (reportKey === 'Portfolio Export') ? data : { 'Project Data': data };
-
-    let isFirstSection = true;
-    for (const [sectionKey, sectionData] of Object.entries(reportData)) {
-      if (sectionData && typeof sectionData === 'object' && Object.keys(sectionData).length > 0) {
-
-        // Add page break before sections (except the first)
-        if (!isFirstSection) {
-           docDefinition.content.push({ text: '', pageBreak: 'before' });
-        }
-
-        docDefinition.content.push(
-          {
-            text: sectionKey, // Like 'Project Data' or 'Portfolio Overview'
-            style: 'subheader', // Keep main sections as subheader
-            margin: [0, 20, 0, 15]
-          }
-        );
-        isFirstSection = false; // Subsequent sections will get a page break
-
-        if (sectionData.projectName) {
-          docDefinition.content.push({
-            text: `Project: ${sectionData.projectName}`,
-            margin: [0, 0, 0, 10]
-          });
-        }
-
-        if (sectionData.summary) {
-          docDefinition.content.push(
-            { text: 'Executive Summary', style: 'subsubheader', margin: [0, 15, 0, 10] }
-          );
-          docDefinition.content.push({
-            columns: [
-              {
-                width: '33%',
-                text: [
-                  { text: 'Total Forecast: ', bold: true },
-                  { text: sectionData.formattedSummary?.totalForecast || `$${sectionData.summary.totalForecast?.toLocaleString() || '0'}` }
-                ]
-              },
-              {
-                width: '33%',
-                text: [
-                  { text: 'Total Actual: ', bold: true },
-                  { text: sectionData.formattedSummary?.totalActual || `$${sectionData.summary.totalActual?.toLocaleString() || '0'}` }
-                ]
-              },
-              {
-                width: '33%',
-                text: [
-                  { text: 'Utilization: ', bold: true },
-                  {
-                    text: sectionData.formattedSummary?.percentUtilized || `${sectionData.summary.percentUtilized || '0'}%`,
-                    color: sectionData.summary.percentUtilized >= 90 ? '#10B981' :
-                           sectionData.summary.percentUtilized >= 75 ? '#FBBF24' : '#EF4444'
-                  }
-                ]
-              }
-            ],
-            margin: [0, 5, 0, 15]
-          });
-        }
-
-        // Check for projects array (Portfolio)
-        if (sectionData.projects && Array.isArray(sectionData.projects)) {
-           docDefinition.content.push(
-             { text: 'Product Performance', style: 'subsubheader', margin: [0, 15, 0, 10] },
-             createProjectsTable(sectionData.projects)
-           );
-           docDefinition.content.push(
-             { text: 'Risk Distribution', style: 'subsubheader', margin: [0, 15, 0, 10] },
-             createRiskDistributionTable(sectionData.riskDistribution)
-           );
-        }
-
-        // Marketing Channels (Project)
-        if (sectionData.marketingChannels && Array.isArray(sectionData.marketingChannels)) {
-          docDefinition.content.push(
-            { text: 'Marketing Channels', style: 'subsubheader', margin: [0, 15, 0, 10] },
-            createMarketingChannelsTable(sectionData.marketingChannels)
-          );
-        }
-
-        // Performance Data (Project)
-        if (sectionData.performanceData) {
-          if (sectionData.performanceData.channelPerformance && sectionData.performanceData.channelPerformance.length > 0) {
-            docDefinition.content.push(
-              { text: 'Channel Performance', style: 'subsubheader', margin: [0, 15, 0, 10] },
-              createPerformanceTable(sectionData.performanceData.channelPerformance)
-            );
-          }
-          if (sectionData.performanceData.periodPerformance && sectionData.performanceData.periodPerformance.length > 0) {
-            docDefinition.content.push(
-              { text: 'Period Performance', style: 'subsubheader', margin: [0, 15, 0, 10] },
-              createPerformanceTable(sectionData.performanceData.periodPerformance)
-            );
-          }
-        }
-      }
-    }
-  } else {
-    // Generic fallback
-    docDefinition.content.push(
-      { text: 'Report Data', style: 'subheader', margin: [0, 10, 0, 10] },
-      { text: JSON.stringify(data, null, 2) }
-    );
-  }
-
-  // Add footer
-  docDefinition.content.push(
-    { text: 'Generated by Fortress Modeler', style: 'footer', margin: [0, 30, 0, 0] }
-  );
-
   return docDefinition;
 }
 
 // --- PDF Table Helper Functions ---
 
-// Corrected return type for table helpers to 'any' for pdfmake compatibility
 function createProjectsTable(projects: any[]): any {
   if (!projects || projects.length === 0) {
     return { text: 'No project data available', italics: true, margin: [0, 5, 0, 15] };
@@ -542,44 +500,6 @@ function createSummaryTable(summary: any, formattedSummary?: any): any {
       body: body
     },
     layout: 'noBorders',
-    margin: [0, 5, 0, 15]
-  };
-}
-
-function createMarketingChannelsTable(channels: any[]): any {
-  if (!channels || channels.length === 0) {
-    return { text: 'No marketing channel data available', italics: true, margin: [0, 5, 0, 15] };
-  }
-  const body = [
-    ['Channel', 'Type', 'Forecast', 'Actual', 'Variance', 'Var %'].map(h => ({ text: h, style: 'tableHeader' }))
-  ];
-  channels.forEach(channel => {
-    const variance = (channel.actual || 0) - (channel.forecast || 0);
-    const variancePercent = (channel.forecast || 0) !== 0 ? (variance / channel.forecast) * 100 : 0;
-    body.push([
-      { text: channel.name, bold: true },
-      { text: channel.type || '' },
-      { text: `$${(channel.forecast || 0).toLocaleString()}`, alignment: 'right' },
-      { text: `$${(channel.actual || 0).toLocaleString()}`, alignment: 'right' },
-      {
-        text: `$${variance.toLocaleString()}`,
-        alignment: 'right',
-        color: variance >= 0 ? '#10B981' : '#EF4444'
-      },
-      {
-        text: `${variancePercent.toFixed(1)}%`,
-        alignment: 'right',
-        color: variancePercent >= 0 ? '#10B981' : '#EF4444'
-      }
-    ]);
-  });
-  return {
-    table: {
-      headerRows: 1,
-      widths: ['*', '*', 'auto', 'auto', 'auto', 'auto'],
-      body: body
-    },
-    layout: 'lightHorizontalLines',
     margin: [0, 5, 0, 15]
   };
 }

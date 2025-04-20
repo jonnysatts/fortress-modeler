@@ -306,15 +306,19 @@ export const createScenarioSlice: StateCreator<ScenarioState> = (set, get) => ({
   setBaselineModel: (model: FinancialModel | null) => {
     set({ baselineModel: model });
 
-    // Calculate baseline forecast
+    // Always recalculate baseline forecast with the latest calculation engine
     if (model) {
+      // Use the robust generateForecastTimeSeries from financialCalculations.ts
       const baselineForecastData = generateForecastTimeSeries(model);
       set({ baselineForecastData });
 
-      // Calculate scenario forecast if we have a current scenario
+      // Also recalculate scenario forecast if a scenario is selected
       if (get().currentScenario) {
         get().calculateScenarioForecast();
       }
+    } else {
+      // If model is null, clear the forecast data
+      set({ baselineForecastData: [], scenarioForecastData: [] });
     }
   },
 
@@ -368,10 +372,11 @@ export const createScenarioSlice: StateCreator<ScenarioState> = (set, get) => ({
     const paramDeltas = deltas || get().currentScenario?.parameterDeltas;
     const { currentScenario } = get();
 
-    console.log('Calculating forecast with:', {
+    // Debug log to confirm calculation source
+    console.log('[ScenarioStore] Calculating scenario forecast with:', {
       baseModel: !!baseModel,
-      deltas: paramDeltas,
-      currentScenario: currentScenario ? currentScenario.name : null
+      paramDeltas,
+      scenario: currentScenario ? currentScenario.name : null
     });
 
     if (!baseModel || !paramDeltas) {
@@ -384,45 +389,21 @@ export const createScenarioSlice: StateCreator<ScenarioState> = (set, get) => ({
     }
 
     try {
-      // First, update the lastUpdated timestamp to trigger a re-render
-      // This helps components know that a recalculation is in progress
       set({ lastUpdated: new Date().getTime() });
-
-      console.log('Starting forecast recalculation...');
-
-      // Create a modified model by applying deltas
+      // Apply deltas to base model
       const modifiedModel = applyScenarioDeltas(baseModel, paramDeltas, options);
-      console.log('Modified model created');
-
-      // Generate forecast data using the modified model
+      // Use robust calculation engine for both scenario and baseline
       const scenarioForecastData = generateForecastTimeSeries(modifiedModel);
-      console.log('Scenario forecast calculated:', scenarioForecastData.length);
-
-      // Always recalculate baseline forecast data to ensure consistency
-      console.log('Recalculating baseline forecast');
       const baselineForecastData = generateForecastTimeSeries(baseModel);
 
-      // Log the first few periods of each dataset to help diagnose issues
-      console.log('First 3 baseline periods:', baselineForecastData.slice(0, 3));
-      console.log('First 3 scenario periods:', scenarioForecastData.slice(0, 3));
+      // Log output for debugging
+      console.log('[ScenarioStore] Baseline forecast (first 3):', baselineForecastData.slice(0, 3));
+      console.log('[ScenarioStore] Scenario forecast (first 3):', scenarioForecastData.slice(0, 3));
 
-      // Set the baseline data first to ensure components update
       set({ baselineForecastData });
-
-      // Immediately set the scenario data in a separate update
-      // This helps React detect that changes have occurred
       set({ scenarioForecastData });
-
-      console.log('Forecast recalculated:', {
-        scenarioForecastData: scenarioForecastData.length,
-        baselineForecastData: baselineForecastData.length
-      });
-
-      // Force another re-render by updating the timestamp again
-      // This ensures components know the calculation is complete
       set({ lastUpdated: new Date().getTime() });
-
-      console.log('Forecast calculation complete, state updated with timestamp:', new Date().getTime());
+      console.log('[ScenarioStore] Forecast calculation complete.');
     } catch (error) {
       console.error('Error calculating scenario forecast:', error);
       toast({

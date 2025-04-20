@@ -24,171 +24,31 @@ import { db } from '@/lib/db';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ForecastDataTab from '@/components/product/ForecastDataTab';
+import { getProductExportData } from '@/lib/dataExport';
+import { generateExcelReport } from '@/lib/excelExport';
 
-// --- Helper: Calculate Revenue Breakdown from Time Series ---
-interface RevenueBreakdownItem {
-    name: string;
-    totalValue: number;
-    percentage: number;
-}
-const calculateRevenueBreakdown = (timeSeries: ForecastPeriodData[], model: FinancialModel | null): RevenueBreakdownItem[] => {
-    if (!model?.assumptions || timeSeries.length === 0) return [];
-
-    const breakdown: Record<string, number> = {};
-    const revenueStreams = model.assumptions.revenue || [];
-    const metadata = model.assumptions.metadata;
-    const growthModel = model.assumptions.growthModel;
-    const isWeekly = metadata?.type === "WeeklyEvent";
-
-    // Initialize breakdown with all known stream names
-    revenueStreams.forEach(s => breakdown[s.name] = 0);
-    // Ensure standard streams exist if it's a weekly model
-    if (isWeekly) {
-        if (!breakdown["Ticket Sales"]) breakdown["Ticket Sales"] = 0;
-        if (!breakdown["F&B Sales"]) breakdown["F&B Sales"] = 0;
-        if (!breakdown["Merchandise Sales"]) breakdown["Merchandise Sales"] = 0;
+// --- Helper: Calculate Deltas ---
+const calculateDeltas = (timeSeriesData: ForecastPeriodData[]) => {
+    if (timeSeriesData.length < 2) {
+      return { revenueDelta: undefined, costDelta: undefined, profitDelta: undefined, marginDelta: undefined };
     }
+    const last = timeSeriesData[timeSeriesData.length - 1];
+    const prev = timeSeriesData[timeSeriesData.length - 2];
 
-    // Sum revenue per stream across all periods
-    timeSeries.forEach(periodData => {
-        const currentAttendance = periodData.attendance ?? 0;
-        const period = periodData.period;
+    const calcDelta = (current: number, previous: number): number | undefined => {
+        if (previous === 0) return undefined; // Avoid division by zero
+        return ((current - previous) / previous) * 100;
+    };
 
-        // Re-calculate per-period stream revenue based on drivers/assumptions
-        // (This mirrors logic in generateForecastTimeSeries but sums into breakdown)
-         if (isWeekly && metadata?.perCustomer) {
-            let currentTicketPrice = metadata.perCustomer.ticketPrice ?? 0;
-            let currentFbSpend = metadata.perCustomer.fbSpend ?? 0;
-            let currentMerchSpend = metadata.perCustomer.merchandiseSpend ?? 0;
-            // Apply growth...
-            if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
-                currentTicketPrice *= Math.pow(1 + (metadata.growth.ticketPriceGrowth ?? 0) / 100, period - 1);
-                currentFbSpend *= Math.pow(1 + (metadata.growth.fbSpendGrowth ?? 0) / 100, period - 1);
-                currentMerchSpend *= Math.pow(1 + (metadata.growth.merchandiseSpendGrowth ?? 0) / 100, period - 1);
-            }
-            breakdown["Ticket Sales"] += currentAttendance * currentTicketPrice;
-            breakdown["F&B Sales"] += currentAttendance * currentFbSpend;
-            breakdown["Merchandise Sales"] += currentAttendance * currentMerchSpend;
-         }
+    const lastMargin = last.revenue > 0 ? (last.profit / last.revenue) * 100 : 0;
+    const prevMargin = prev.revenue > 0 ? (prev.profit / prev.revenue) * 100 : 0;
 
-         revenueStreams.forEach(stream => {
-            if (isWeekly && ["Ticket Sales", "F&B Sales", "Merchandise Sales"].includes(stream.name)) return; // Skip already calculated
-
-            let streamRevenue = stream.value ?? 0;
-            if (period > 1 && growthModel) { // Apply general growth to others
-                if (growthModel.type === "linear") streamRevenue = (stream.value??0) * (1 + growthModel.rate * (period - 1));
-                else if (growthModel.type === "exponential") streamRevenue = (stream.value??0) * Math.pow(1 + growthModel.rate, period - 1);
-            }
-            breakdown[stream.name] = (breakdown[stream.name] || 0) + streamRevenue;
-         });
-    });
-
-    const totalRevenue = Object.values(breakdown).reduce((sum, val) => sum + val, 0);
-
-    return Object.entries(breakdown)
-        .map(([name, totalValue]) => ({
-            name,
-            totalValue: Math.round(totalValue),
-            percentage: totalRevenue > 0 ? Math.round((totalValue / totalRevenue) * 100) : 0,
-        }))
-        .filter(item => item.totalValue > 0) // Filter out zero-value streams
-        .sort((a, b) => b.totalValue - a.totalValue);
-};
-
-// --- Helper: Calculate Cost Breakdown from Time Series ---
-interface CostBreakdownItem {
-    category: string;
-    totalValue: number;
-    percentage: number;
-}
-const calculateCostBreakdown = (timeSeries: ForecastPeriodData[], model: FinancialModel | null): CostBreakdownItem[] => {
-     if (!model?.assumptions || timeSeries.length === 0) return [];
-
-     const breakdown: Record<string, number> = {
-         "COGS": 0,
-         "Marketing": 0,
-         "Fixed/Setup": 0,
-         "Other Recurring": 0,
-         "Staffing": 0
-     };
-     const { assumptions } = model;
-     const metadata = assumptions.metadata;
-     const costs = assumptions.costs || [];
-     const marketingSetup = assumptions.marketing || { allocationMode: 'none', channels: [] };
-     const isWeekly = metadata?.type === "WeeklyEvent";
-     const duration = timeSeries.length;
-
-     timeSeries.forEach(periodData => {
-        const period = periodData.period;
-        let periodFBCRevenue = 0; // Need to recalculate revenue for COGS base
-        let periodMerchRevenue = 0;
-        const currentAttendance = periodData.attendance ?? 0;
-
-        // Simplified revenue recalc for COGS (assumes relevant data is available)
-        if (isWeekly && metadata?.perCustomer) {
-             let currentFbSpend = metadata.perCustomer.fbSpend ?? 0;
-             let currentMerchSpend = metadata.perCustomer.merchandiseSpend ?? 0;
-             if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
-                currentFbSpend *= Math.pow(1 + (metadata.growth.fbSpendGrowth ?? 0) / 100, period - 1);
-                currentMerchSpend *= Math.pow(1 + (metadata.growth.merchandiseSpendGrowth ?? 0) / 100, period - 1);
-             }
-             periodFBCRevenue = currentAttendance * currentFbSpend;
-             periodMerchRevenue = currentAttendance * currentMerchSpend;
-        }
-
-        // 1. COGS
-        const fbCogsPercent = metadata?.costs?.fbCOGSPercent ?? 0;
-        const merchCogsPercent = metadata?.costs?.merchandiseCogsPercent ?? 0;
-        breakdown["COGS"] += (periodFBCRevenue * fbCogsPercent) / 100;
-        breakdown["COGS"] += (periodMerchRevenue * merchCogsPercent) / 100;
-
-        // 2. Staff Costs
-        if (isWeekly && metadata?.costs?.staffCount && metadata?.costs?.staffCostPerPerson) {
-            const periodStaffCost = (metadata.costs.staffCount || 0) * (metadata.costs.staffCostPerPerson || 0);
-            breakdown["Staffing"] = (breakdown["Staffing"] || 0) + periodStaffCost;
-        }
-
-        // 3. Fixed/Recurring
-        costs.forEach(cost => {
-            const costType = cost.type?.toLowerCase();
-            const baseValue = cost.value ?? 0;
-            if (costType === "fixed") {
-                if (period === 1) breakdown["Fixed/Setup"] += baseValue;
-            } else if (costType === "recurring") {
-                 if (cost.name === "Setup Costs" && isWeekly && duration > 0) {
-                    breakdown["Fixed/Setup"] += baseValue / duration; // Spread setup if recurring
-                 } else {
-                    breakdown["Other Recurring"] += baseValue;
-                 }
-            }
-        });
-
-        // 4. Marketing
-        let periodMarketingCost = 0;
-        if (marketingSetup.allocationMode === 'channels') {
-            const budget = marketingSetup.channels.reduce((s, ch) => s + (ch.weeklyBudget ?? 0), 0);
-            periodMarketingCost = isWeekly ? budget : budget * (365.25 / 7 / 12);
-        } else if (marketingSetup.allocationMode === 'highLevel' && marketingSetup.totalBudget) {
-            const totalBudget = marketingSetup.totalBudget ?? 0;
-            const application = marketingSetup.budgetApplication || 'spreadEvenly';
-            const spreadDuration = marketingSetup.spreadDuration ?? duration;
-            if (application === 'upfront' && period === 1) periodMarketingCost = totalBudget;
-            else if (application === 'spreadEvenly' && duration > 0) periodMarketingCost = totalBudget / duration;
-            else if (application === 'spreadCustom' && spreadDuration > 0 && period <= spreadDuration) periodMarketingCost = totalBudget / spreadDuration;
-        }
-        breakdown["Marketing"] += periodMarketingCost;
-     });
-
-     const totalCosts = Object.values(breakdown).reduce((sum, val) => sum + val, 0);
-
-     return Object.entries(breakdown)
-        .map(([category, totalValue]) => ({
-            category,
-            totalValue: Math.round(totalValue),
-            percentage: totalCosts > 0 ? Math.round((totalValue / totalCosts) * 100) : 0,
-        }))
-        .filter(item => item.totalValue > 0)
-        .sort((a, b) => b.totalValue - a.totalValue);
+    return {
+        revenueDelta: calcDelta(last.revenue, prev.revenue),
+        costDelta: calcDelta(last.cost, prev.cost),
+        profitDelta: calcDelta(last.profit, prev.profit),
+        marginDelta: prevMargin === 0 ? undefined : lastMargin - prevMargin // Margin delta is absolute change
+    };
 };
 
 // --- Custom Tooltip for Charts ---
@@ -260,14 +120,14 @@ const ProductSummary: React.FC = () => {
   console.log('[ProductSummary] actuals:', actuals);
   console.log('[ProductSummary] latestModel:', latestModel);
   console.log('[ProductSummary] timeSeriesData:', timeSeriesData);
+  if (timeSeriesData && timeSeriesData.length > 0) {
+    console.log('[ProductSummary] baselineForecastData (full):', JSON.stringify(timeSeriesData, null, 2));
+    const last = timeSeriesData[timeSeriesData.length - 1];
+    console.log('[ProductSummary] Final period:', last);
+    console.log('[ProductSummary] cumulativeRevenue:', last.cumulativeRevenue, 'cumulativeCost:', last.cumulativeCost, 'cumulativeProfit:', last.cumulativeProfit);
+  }
 
-  // Restore Sparkline calculations (using baselineForecastData)
-  const sparklineLength = 8;
-  const revenueSparkline = useMemo(() => timeSeriesData.map(d => d.revenue).slice(-sparklineLength), [timeSeriesData]);
-  const costSparkline = useMemo(() => timeSeriesData.map(d => d.cost).slice(-sparklineLength), [timeSeriesData]);
-  const profitSparkline = useMemo(() => timeSeriesData.map(d => d.profit).slice(-sparklineLength), [timeSeriesData]);
-  const marginSparkline = useMemo(() => timeSeriesData.map(d => d.revenue > 0 ? (d.profit / d.revenue) * 100 : 0).slice(-sparklineLength), [timeSeriesData]);
-
+  // Log the computed summary metrics
   const summaryMetrics = useMemo(() => {
     if (timeSeriesData.length === 0) {
         return { totalRevenue: 0, totalCosts: 0, totalProfit: 0, profitMargin: 0, breakeven: false };
@@ -281,9 +141,7 @@ const ProductSummary: React.FC = () => {
 
     return { totalRevenue, totalCosts, totalProfit, profitMargin, breakeven };
   }, [timeSeriesData]);
-
-  const revenueBreakdownData = useMemo(() => calculateRevenueBreakdown(timeSeriesData, latestModel), [timeSeriesData, latestModel]);
-  const costBreakdownData = useMemo(() => calculateCostBreakdown(timeSeriesData, latestModel), [timeSeriesData, latestModel]);
+  console.log('[ProductSummary] summaryMetrics:', summaryMetrics);
 
   const breakEvenPeriod = useMemo(() => {
       const breakEvenIndex = timeSeriesData.findIndex(p => p.cumulativeProfit >= 0);
@@ -327,29 +185,7 @@ const ProductSummary: React.FC = () => {
     return { warnings: warningsList };
   }, [summaryMetrics, actuals, latestModel]);
 
-  // --- Calculate Deltas ---
-  const { revenueDelta, costDelta, profitDelta, marginDelta } = useMemo(() => {
-    if (timeSeriesData.length < 2) {
-      return { revenueDelta: undefined, costDelta: undefined, profitDelta: undefined, marginDelta: undefined };
-    }
-    const last = timeSeriesData[timeSeriesData.length - 1];
-    const prev = timeSeriesData[timeSeriesData.length - 2];
-
-    const calcDelta = (current: number, previous: number): number | undefined => {
-        if (previous === 0) return undefined; // Avoid division by zero
-        return ((current - previous) / previous) * 100;
-    };
-
-    const lastMargin = last.revenue > 0 ? (last.profit / last.revenue) * 100 : 0;
-    const prevMargin = prev.revenue > 0 ? (prev.profit / prev.revenue) * 100 : 0;
-
-    return {
-        revenueDelta: calcDelta(last.revenue, prev.revenue),
-        costDelta: calcDelta(last.cost, prev.cost),
-        profitDelta: calcDelta(last.profit, prev.profit),
-        marginDelta: prevMargin === 0 ? undefined : lastMargin - prevMargin // Margin delta is absolute change
-    };
-  }, [timeSeriesData]);
+  const deltas = useMemo(() => calculateDeltas(timeSeriesData), [timeSeriesData]);
 
   // --- Calculate Core Assumption Summaries ---
   const { marketingSpendSummary, fixedCostSummary, variableCostSummary } = useMemo(() => {
@@ -444,6 +280,82 @@ const ProductSummary: React.FC = () => {
     }
   }, [latestModel]);
 
+  // --- Helper Function to Format Date/Time ---
+  const formatDateTime = (date: Date | string | undefined): string => {
+    if (!date) return 'N/A';
+    try {
+      return new Date(date).toLocaleString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+      });
+    } catch { return 'Invalid Date'; }
+  };
+
+  const handleExportData = async () => {
+    if (!projectId) return;
+    // Always use the live UI data for export
+    const exportData = await getProductExportData(Number(projectId));
+    exportData.forecastTableData = baselineForecastData || [];
+    await generateExcelReport(exportData, 'Forecast_Report', Number(projectId));
+  };
+
+  // --- PDF Export Handler ---
+  const handleExportPdf = async () => {
+    if (!projectId) return;
+    try {
+      // Use the same data as the UI
+      const exportData = await getProductExportData(Number(projectId));
+      exportData.forecastTableData = baselineForecastData || [];
+      // Use the *actual UI summary card values* for the PDF export
+      exportData.totalRevenue = summaryMetrics.totalRevenue;
+      exportData.totalCosts = summaryMetrics.totalCosts;
+      exportData.totalProfit = summaryMetrics.totalProfit;
+      exportData.profitMargin = summaryMetrics.profitMargin;
+      exportData.breakEvenLabel = breakEvenPeriod.label;
+      exportData.breakEvenAchieved = breakEvenPeriod.achieved;
+      exportData.averageMetrics = averageMetrics;
+
+      // --- Build marketing channels table for export using UI's calculation engine output ---
+      const marketingChannelsConfig = latestModel?.assumptions?.marketing?.channels || [];
+      // Build a map of channelId to total forecast, using the same data as the UI table 'Total' row
+      const channelTotals: Record<string, number> = {};
+      (baselineForecastData || []).forEach(period => {
+        if (period.marketingChannels) {
+          Object.entries(period.marketingChannels).forEach(([channelId, data]) => {
+            channelTotals[channelId] = (channelTotals[channelId] || 0) + (data.forecast || 0);
+          });
+        }
+      });
+      exportData.marketingChannels = marketingChannelsConfig.map(channel => ({
+        id: channel.id,
+        name: channel.name,
+        type: channel.type,
+        forecast: channelTotals[channel.id] || 0,
+        actual: 0,
+        variance: 0,
+        variancePercent: 0,
+      }));
+
+      // DEBUG: Log the export data sent to PDF
+      console.log('[PDF Export] Data sent to PDF:', exportData);
+
+      // Call the PDF export logic in the store
+      if (typeof window !== 'undefined') {
+        // Dynamically import the store and PDF logic to avoid circular deps
+        const { useStore } = await import('@/store/useStore');
+        const { handlePdfExport } = await import('@/store/modules/exportStore');
+        // Use a descriptive report key
+        await handlePdfExport(exportData, `Forecast_Report_${projectId}`);
+        // Show toast on success
+        import('@/components/ui/use-toast').then(({ toast }) => toast({ title: 'PDF Exported', description: 'Your PDF report was generated successfully.' }));
+      }
+    } catch (error) {
+      console.error('[ProductSummary] PDF export failed:', error);
+      if (typeof window !== 'undefined') {
+        import('@/components/ui/use-toast').then(({ toast }) => toast({ title: 'Export Failed', description: 'There was a problem exporting the PDF.', variant: 'destructive' }));
+      }
+    }
+  };
+
   // --- Calculate Scenario Comparison Deltas ---
   const scenarioComparisonData = useMemo(() => {
     if (!currentScenario || baselineForecastData.length === 0 || scenarioForecastData.length === 0) {
@@ -492,16 +404,6 @@ const ProductSummary: React.FC = () => {
                           : (forecastConfidence as string) === 'Medium' ? 'warning'
                           : 'destructive';
 
-  // --- Helper Function to Format Date/Time ---
-  const formatDateTime = (date: Date | string | undefined): string => {
-    if (!date) return 'N/A';
-    try {
-      return new Date(date).toLocaleString('en-US', {
-        year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
-      });
-    } catch { return 'Invalid Date'; }
-  };
-
   return (
     <>
       {/* === All your summary UI goes here, UNCHANGED === */}
@@ -524,13 +426,13 @@ const ProductSummary: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
-              {revenueDelta !== undefined && (
-                <p className={cn("text-xs", revenueDelta >= 0 ? "text-green-600" : "text-red-600")}>
-                    {revenueDelta >= 0 ? '+' : ''}{revenueDelta.toFixed(1)}% vs last period
+              {deltas.revenueDelta !== undefined && (
+                <p className={cn("text-xs", deltas.revenueDelta >= 0 ? "text-green-600" : "text-red-600")}>
+                    {deltas.revenueDelta >= 0 ? '+' : ''}{deltas.revenueDelta.toFixed(1)}% vs last period
                 </p>
               )}
               <div className="h-[40px] mt-2">
-                <Sparkline data={revenueSparkline} width={100} height={30} color={dataColors.revenue} />
+                <Sparkline data={timeSeriesData.map(d => d.revenue).slice(-8)} width={100} height={30} color={dataColors.revenue} />
               </div>
             </CardContent>
           </Card>
@@ -542,13 +444,13 @@ const ProductSummary: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatCurrency(totalCosts)}</div>
-              {costDelta !== undefined && (
-                <p className={cn("text-xs", costDelta <= 0 ? "text-green-600" : "text-red-600")}>
-                    {costDelta >= 0 ? '+' : ''}{costDelta.toFixed(1)}% vs last period
+              {deltas.costDelta !== undefined && (
+                <p className={cn("text-xs", deltas.costDelta <= 0 ? "text-green-600" : "text-red-600")}>
+                    {deltas.costDelta >= 0 ? '+' : ''}{deltas.costDelta.toFixed(1)}% vs last period
                 </p>
               )}
               <div className="h-[40px] mt-2">
-                <Sparkline data={costSparkline} width={100} height={30} color={dataColors.cost} />
+                <Sparkline data={timeSeriesData.map(d => d.cost).slice(-8)} width={100} height={30} color={dataColors.cost} />
               </div>
             </CardContent>
           </Card>
@@ -560,13 +462,13 @@ const ProductSummary: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatCurrency(totalProfit)}</div>
-              {profitDelta !== undefined && (
-                <p className={cn("text-xs", profitDelta >= 0 ? "text-green-600" : "text-red-600")}>
-                    {profitDelta >= 0 ? '+' : ''}{profitDelta.toFixed(1)}% vs last period
+              {deltas.profitDelta !== undefined && (
+                <p className={cn("text-xs", deltas.profitDelta >= 0 ? "text-green-600" : "text-red-600")}>
+                    {deltas.profitDelta >= 0 ? '+' : ''}{deltas.profitDelta.toFixed(1)}% vs last period
                 </p>
               )}
               <div className="h-[40px] mt-2">
-                <Sparkline data={profitSparkline} width={100} height={30} color={dataColors.profit} />
+                <Sparkline data={timeSeriesData.map(d => d.profit).slice(-8)} width={100} height={30} color={dataColors.profit} />
               </div>
             </CardContent>
           </Card>
@@ -578,13 +480,13 @@ const ProductSummary: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatPercent(profitMargin)}</div>
-              {marginDelta !== undefined && (
-                <p className={cn("text-xs", marginDelta >= 0 ? "text-green-600" : "text-red-600")}>
-                    {marginDelta >= 0 ? '+' : ''}{marginDelta.toFixed(1)}% vs last period
+              {deltas.marginDelta !== undefined && (
+                <p className={cn("text-xs", deltas.marginDelta >= 0 ? "text-green-600" : "text-red-600")}>
+                    {deltas.marginDelta >= 0 ? '+' : ''}{deltas.marginDelta.toFixed(1)}% vs last period
                 </p>
               )}
               <div className="h-[40px] mt-2">
-                <Sparkline data={marginSparkline} width={100} height={30} color={dataColors.profit} />
+                <Sparkline data={timeSeriesData.map(d => d.revenue > 0 ? (d.profit / d.revenue) * 100 : 0).slice(-8)} width={100} height={30} color={dataColors.profit} />
               </div>
             </CardContent>
           </Card>
@@ -980,6 +882,12 @@ const ProductSummary: React.FC = () => {
         <div className="mt-12">
           <ForecastDataTab />
         </div>
+        <Button onClick={handleExportData} variant="outline" className="ml-2">
+          Export Data
+        </Button>
+        <Button onClick={handleExportPdf} variant="outline" className="ml-2">
+          Export PDF
+        </Button>
       </div>
     </>
   );

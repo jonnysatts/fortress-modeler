@@ -185,76 +185,52 @@ function addPortfolioOverviewSheet(workbook: XLSX.WorkBook, portfolioData: Expor
  * (Now relies purely on input data, no hardcoding)
  */
 function addSummarySheet(workbook: XLSX.WorkBook, productData: ExportDataType): void {
-  console.log('[Excel] Adding Summary sheet using dynamic data:', productData);
-
-  const projectName = productData.projectName || 'Unknown Project';
-  const productType = productData.productType || 'Unknown Type';
-  const productTitle = productData.title || ''; // Might be report title
-  const exportDate = new Date();
-
+  console.log('[Excel] Adding Summary sheet using forecastTableData if available');
+  // Use forecastTableData for all totals if present, else fallback to summary
+  const forecastTableData = productData.forecastTableData || [];
   const summary = productData.summary || {};
-  const profitMetrics = productData.profitMetrics || {}; // Use profitMetrics if available
-  const formattedSummary = productData.formattedSummary || {}; // Use formatted if available
 
-  const totalForecastRevenue = summary.totalForecast || 0;
-  const totalActualRevenue = summary.totalActual || 0;
+  let totalForecastRevenue = summary.totalForecast || 0;
+  let totalForecastProfit = summary.totalForecastProfit || 0;
+  let totalForecastCost = summary.totalForecastCost || 0;
+  let profitMargin = 0;
 
-  // Calculate profit dynamically
-  const totalForecastProfit = profitMetrics.forecastProfit ?? (summary.totalForecastProfit || 0); // Prefer profitMetrics
-  const totalActualProfit = profitMetrics.actualProfit ?? (summary.totalActualProfit || 0);
-  const forecastProfitMargin = totalForecastRevenue > 0
-    ? (totalForecastProfit / totalForecastRevenue) * 100
-    : 0;
-
-  const revenueVariance = totalActualRevenue - totalForecastRevenue;
-  const revenueVariancePercent = totalForecastRevenue > 0
-    ? (revenueVariance / totalForecastRevenue) * 100
-    : 0;
-
-  // Get breakeven point from data, fallback to 'N/A'
-  const breakevenPoint = productData.breakevenPoint || 'N/A'; // Remove hardcoding
-
-  // Get performance indicators from data, fallback to 'N/A'
-  const growthRate = productData.growthRate != null ? `${productData.growthRate}%` : 'N/A';
-  const healthScore = productData.healthScore ?? 'N/A';
-  const riskLevel = productData.riskLevel || 'N/A';
+  if (forecastTableData.length > 0) {
+    totalForecastRevenue = forecastTableData.reduce((sum: number, period: any) => sum + (period.revenue || 0), 0);
+    totalForecastCost = forecastTableData.reduce((sum: number, period: any) => sum + (period.totalCost ?? period.cost ?? 0), 0);
+    totalForecastProfit = forecastTableData.reduce((sum: number, period: any) => sum + (period.profit || 0), 0);
+    profitMargin = totalForecastRevenue !== 0 ? (totalForecastProfit / totalForecastRevenue) * 100 : 0;
+  } else if (totalForecastRevenue !== 0) {
+    profitMargin = (totalForecastProfit / totalForecastRevenue) * 100;
+  }
 
   const summaryData = [
-    ['FORTRESS MODELER - PROJECT SUMMARY', ''],
+    ['FORTRESS MODELER - PROJECT SUMMARY'],
     [''],
-    ['PROJECT INFORMATION', ''],
-    ['Product Name', productTitle || projectName], // Use title if available, else project name
-    ['Project Name', projectName],
-    ['Export Date', exportDate.toLocaleDateString()],
-    ['Product Type', productType],
+    ['PROJECT INFORMATION'],
+    ['Product Name', productData.title || ''],
+    ['Project Name', productData.projectName || ''],
+    ['Export Date', productData.exportDate ? new Date(productData.exportDate).toLocaleDateString() : ''],
+    ['Product Type', productData.productType || ''],
     [''],
-    ['FINANCIAL SUMMARY', ''],
-    ['Total Forecast Revenue', formattedSummary.totalForecast || formatCurrency(totalForecastRevenue)],
-    ['Total Forecast Profit', formattedSummary.totalForecastProfit || formatCurrency(totalForecastProfit)],
-    ['Forecast Profit Margin', formattedSummary.forecastProfitMargin || `${forecastProfitMargin.toFixed(1)}%`],
-    ['Actual Revenue (if available)', formattedSummary.totalActual || formatCurrency(totalActualRevenue)],
-    ['Actual Profit (if available)', formattedSummary.totalActualProfit || formatCurrency(totalActualProfit)],
-    ['Variance ($)', formattedSummary.revenueVariance || formatCurrency(revenueVariance)],
-    ['Variance (%)', formattedSummary.revenueVariancePercent || `${revenueVariancePercent.toFixed(1)}%`],
-    ['Breakeven Point', breakevenPoint],
+    ['FINANCIAL SUMMARY'],
+    ['Total Forecast Revenue', formatCurrency(totalForecastRevenue)],
+    ['Total Forecast Profit', formatCurrency(totalForecastProfit)],
+    ['Forecast Profit Margin', `${profitMargin.toFixed(1)}%`],
+    ['Actual Revenue (if available)', formatCurrency(summary.totalActual || 0)],
+    ['Actual Profit (if available)', formatCurrency(summary.totalActualProfit || 0)],
+    ['Variance ($)', formatCurrency((summary.totalActual || 0) - totalForecastRevenue)],
+    ['Variance (%)', totalForecastRevenue !== 0 ? `${(((summary.totalActual || 0) - totalForecastRevenue) / totalForecastRevenue * 100).toFixed(1)}%` : 'N/A'],
+    ['Breakeven Point', 'N/A'],
     [''],
-    ['PERFORMANCE INDICATORS', ''],
-    ['Growth Rate', growthRate],
-    ['Health Score', healthScore],
-    ['Risk Level', riskLevel]
+    ['PERFORMANCE INDICATORS'],
+    ['Growth Rate', 'N/A'],
+    ['Health Score', 'N/A'],
+    ['Risk Level', 'N/A'],
   ];
 
-  // Create the worksheet
   const worksheet = XLSX.utils.aoa_to_sheet(summaryData);
-
-  // Set column widths
-  const columnWidths = [
-    { wch: 25 },  // A
-    { wch: 25 }   // B
-  ];
-  worksheet['!cols'] = columnWidths;
-
-  // Add the worksheet to the workbook
+  worksheet['!cols'] = [{ wch: 30 }, { wch: 24 }];
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Summary');
 }
 
@@ -491,20 +467,32 @@ function addForecastVsActualSheet(workbook: XLSX.WorkBook, productData: ExportDa
 
 /**
  * Add the Marketing Spend sheet to the workbook
+ * This version uses forecastTableData (from the UI) as the source of truth for channel spend.
  */
 function addMarketingSpendSheet(workbook: XLSX.WorkBook, productData: ExportDataType): void {
-  console.log('[Excel] Adding Marketing Spend sheet using dynamic data');
+  console.log('[Excel] Adding Marketing Spend sheet using forecastTableData');
+  const forecastTableData = productData.forecastTableData || [];
   const marketingChannels = (productData.marketingChannels as ChannelLikeType[]) || [];
-  const channelPerformance = (productData.performanceData?.channelPerformance as ChannelLikeType[]) || [];
-  const combinedChannels: ChannelLikeType[] = marketingChannels.length > 0 ? marketingChannels : channelPerformance;
 
+  // Build a map of channelId/name to total forecasted spend from forecastTableData
+  // Assume each period in forecastTableData has marketingSpendByChannel: { [channelId]: number }
+  const channelSpendMap: Record<string, number> = {};
+  forecastTableData.forEach(period => {
+    if (period.marketingSpendByChannel) {
+      Object.entries(period.marketingSpendByChannel).forEach(([channelId, spend]) => {
+        channelSpendMap[channelId] = (channelSpendMap[channelId] || 0) + (spend || 0);
+      });
+    }
+  });
+
+  // Build the rows for the sheet
   const marketingSpendData = [
     ['Channel Name', 'Forecast Spend', 'Actual Spend', 'Variance ($)', 'Variance (%)']
   ];
 
-  // Add explicit type for channel parameter in forEach
-  combinedChannels.forEach((channel: ChannelLikeType) => {
-    const forecast = channel.forecast || channel.totalForecast || 0;
+  marketingChannels.forEach((channel: ChannelLikeType) => {
+    const channelId = channel.id || channel.name;
+    const forecast = channelSpendMap[channelId] || 0;
     const actual = channel.actual || channel.actualSpend || 0;
     const variance = actual - forecast;
     const variancePercent = forecast !== 0 ? (variance / forecast) * 100 : 0;

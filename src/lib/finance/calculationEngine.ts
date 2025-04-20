@@ -3,14 +3,15 @@
 
 import type { FinancialModel } from '../db';
 import type { ForecastPeriodData, ActualsPeriodEntry, MetricsSummary, RiskScore } from './types';
+import { generateForecastTimeSeries as generateForecastTimeSeriesV2 } from '../financialCalculations';
 
 /**
  * Generate the full forecast time series for a model
+ * DEPRECATED: Use the implementation in financialCalculations.ts
  */
 export function generateForecastTimeSeries(model: FinancialModel): ForecastPeriodData[] {
-  // TODO: Implement core forecast logic
-  // Placeholder: returns empty array
-  return [];
+  // Delegate to the robust implementation in financialCalculations.ts
+  return generateForecastTimeSeriesV2(model);
 }
 
 /**
