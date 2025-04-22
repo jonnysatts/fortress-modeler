@@ -142,6 +142,8 @@ export const calculateTotalCosts = (model: FinancialModel): number => {
 export const generateForecastTimeSeries = (model: FinancialModel): ForecastPeriodData[] => {
   try {
     console.log("[generateForecastTimeSeries] Incoming model:", model);
+    // DEBUG: Log the unique marker to trace model pipeline
+    console.log('[DEBUG] Model marker:', (model as any).__debugScenarioPatch);
     // --- PATCH: Only log missing fields, never return early ---
     if (!model?.assumptions) {
       console.error("[generateForecastTimeSeries] No assumptions found in model. Model:", model);
@@ -161,6 +163,29 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
     })();
 
     console.log(`[generateForecastTimeSeries] Type: ${isWeekly ? "Weekly" : "Monthly"}, Duration: ${duration}`);
+
+    // Defensive: Zero all customer spend growth if not explicitly enabled
+    const growth = model.assumptions.metadata?.growth;
+    if (!model.assumptions.metadata?.useCustomerSpendGrowth) {
+      if (growth) {
+        growth.ticketPriceGrowth = 0;
+        growth.fbSpendGrowth = 0;
+        growth.merchandiseSpendGrowth = 0;
+        growth.onlineSpendGrowth = 0;
+        growth.miscSpendGrowth = 0;
+        console.log('[DEFENSIVE PATCH] Zeroed all customer spend growth rates because useCustomerSpendGrowth is false');
+      }
+    }
+
+    // --- DEFENSIVE PATCH: If useCustomerSpendGrowth is false, forcibly zero all growth rates ---
+    if (metadata.growth && !metadata.growth.useCustomerSpendGrowth) {
+      metadata.growth.ticketPriceGrowth = 0;
+      metadata.growth.fbSpendGrowth = 0;
+      metadata.growth.merchandiseSpendGrowth = 0;
+      metadata.growth.onlineSpendGrowth = 0;
+      metadata.growth.miscSpendGrowth = 0;
+      console.log('[DEFENSIVE PATCH] All customer spend growth rates forcibly set to 0 because useCustomerSpendGrowth is false.');
+    }
 
     const periodicData: ForecastPeriodData[] = [];
     let cumulativeRevenue = 0;
@@ -236,19 +261,47 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
 
       // Defensive: Always calculate per-attendee revenue, even if some fields are missing
       if (isWeekly && metadata.perCustomer) {
+        // --- DEBUG: Log all per-customer values and growth rates for this period ---
+        console.log(`[DEBUG][Period ${period}] useCustomerSpendGrowth:`, metadata.growth?.useCustomerSpendGrowth,
+          '| ticketPriceGrowth:', metadata.growth?.ticketPriceGrowth,
+          '| fbSpendGrowth:', metadata.growth?.fbSpendGrowth,
+          '| merchandiseSpendGrowth:', metadata.growth?.merchandiseSpendGrowth,
+          '| ticketPrice:', metadata.perCustomer.ticketPrice,
+          '| fbSpend:', metadata.perCustomer.fbSpend,
+          '| merchandiseSpend:', metadata.perCustomer.merchandiseSpend);
+
+        // --- PATCH: Prevent ticket price from changing when only FB/Merch changes ---
+        let ticketGrowth = 0;
+        let fbGrowth = 0;
+        let merchGrowth = 0;
         if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
-          const ticketGrowth = (metadata.growth.ticketPriceGrowth ?? 0) / 100;
-          const fbGrowth = (metadata.growth.fbSpendGrowth ?? 0) / 100;
-          const merchGrowth = (metadata.growth.merchandiseSpendGrowth ?? 0) / 100;
+          ticketGrowth = typeof metadata.growth.ticketPriceGrowth === 'number' ? metadata.growth.ticketPriceGrowth / 100 : 0;
+          fbGrowth = typeof metadata.growth.fbSpendGrowth === 'number' ? metadata.growth.fbSpendGrowth / 100 : 0;
+          merchGrowth = typeof metadata.growth.merchandiseSpendGrowth === 'number' ? metadata.growth.merchandiseSpendGrowth / 100 : 0;
           // LOGGING: Show per-customer growth rates
           console.log(`[PerCustomerGrowth] Period ${period} | Ticket: ${ticketGrowth}, FB: ${fbGrowth}, Merch: ${merchGrowth}`);
+          // --- CRITICAL PATCH: Only apply growth to each field if its growth rate is nonzero ---
           if (ticketGrowth !== 0) {
+            // --- DEBUG LOGGING: Ticket Price Growth Diagnostics ---
+            console.log('[DEBUG][TicketPriceGrowth]', {
+              period,
+              useCustomerSpendGrowth: metadata.growth?.useCustomerSpendGrowth,
+              ticketPriceGrowth: metadata.growth?.ticketPriceGrowth,
+              ticketGrowth,
+              ticketPriceSliderDelta: metadata.ticketPriceDelta,
+              ticketPriceDeltaType: metadata.ticketPriceDeltaType,
+              perCustomerTicketPrice: perCustomer.ticketPrice,
+              currentPerCustomerTicketPrice: currentPerCustomer.ticketPrice,
+              assumptionsGrowthModel: assumptions.growthModel,
+            });
             if (useOverallGrowth && overallGrowthType === 'linear') {
               const increment = (metadata.perCustomer.ticketPrice ?? 0) * ticketGrowth;
               currentPerCustomer.ticketPrice = (metadata.perCustomer.ticketPrice ?? 0) + increment * (period - 1);
             } else {
               currentPerCustomer.ticketPrice *= Math.pow(1 + ticketGrowth, period - 1);
             }
+          } else {
+            currentPerCustomer.ticketPrice = metadata.perCustomer.ticketPrice ?? 0;
           }
           if (fbGrowth !== 0) {
             if (useOverallGrowth && overallGrowthType === 'linear') {
@@ -257,6 +310,8 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
             } else {
               currentPerCustomer.fbSpend *= Math.pow(1 + fbGrowth, period - 1);
             }
+          } else {
+            currentPerCustomer.fbSpend = metadata.perCustomer.fbSpend ?? 0;
           }
           if (merchGrowth !== 0) {
             if (useOverallGrowth && overallGrowthType === 'linear') {
@@ -265,7 +320,14 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
             } else {
               currentPerCustomer.merchandiseSpend *= Math.pow(1 + merchGrowth, period - 1);
             }
+          } else {
+            currentPerCustomer.merchandiseSpend = metadata.perCustomer.merchandiseSpend ?? 0;
           }
+        }
+        // --- PATCH: Forcibly reset ticket price to baseline if growth is zero ---
+        if ((!(metadata.growth?.ticketPriceGrowth) || metadata.growth.ticketPriceGrowth === 0)
+          && (!assumptions.growthModel || assumptions.growthModel.rate === 0)) {
+          currentPerCustomer.ticketPrice = perCustomer.ticketPrice ?? 0;
         }
         // LOGGING: Show per-customer values
         console.log(`[PerCustomerGrowth] Period ${period} | PerCustomer:`, currentPerCustomer);

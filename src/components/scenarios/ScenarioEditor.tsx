@@ -44,7 +44,13 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
     marketingSpendByChannel: {},
     pricingPercent: 0,
     attendanceGrowthPercent: 0,
-    cogsMultiplier: 0
+    cogsMultiplier: 0,
+    ticketPriceDelta: 0,
+    ticketPriceDeltaType: 'percent',
+    fbSpendDelta: 0,
+    fbSpendDeltaType: 'percent',
+    merchSpendDelta: 0,
+    merchSpendDeltaType: 'percent'
   });
   const [isDirty, setIsDirty] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -87,7 +93,13 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
           marketingSpendByChannel: {},
           pricingPercent: 0,
           attendanceGrowthPercent: 0,
-          cogsMultiplier: 0
+          cogsMultiplier: 0,
+          ticketPriceDelta: 0,
+          ticketPriceDeltaType: 'percent',
+          fbSpendDelta: 0,
+          fbSpendDeltaType: 'percent',
+          merchSpendDelta: 0,
+          merchSpendDeltaType: 'percent'
         };
         const deltaCopy = {
           ...defaultDeltas,
@@ -181,22 +193,23 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localDeltas.pricingPercent]);
 
-  // Handle parameter changes (now also handle calculation mode)
-  const handleParamChange = (param: keyof ScenarioParameterDeltas, value: number) => {
+  // --- Enhanced: Handle parameter changes for both number and string values ---
+  const handleParamChange = (param: keyof ScenarioParameterDeltas, value: number | string) => {
     setLocalDeltas(prev => ({
       ...prev,
       [param]: value
     }));
     setLastChangedParam(param);
     try {
-      // Remove extra arguments: calculateRelatedChanges expects 3 args
-      const newSuggestions = calculateRelatedChanges(param, value, localDeltas);
-      if (Object.keys(newSuggestions).length > 0) {
-        setSuggestedChanges(newSuggestions);
-        setShowSuggestions(true);
-      } else {
-        setSuggestedChanges({});
-        setShowSuggestions(false);
+      if (typeof value === 'number') {
+        const newSuggestions = calculateRelatedChanges(param, value, localDeltas);
+        if (Object.keys(newSuggestions).length > 0) {
+          setSuggestedChanges(newSuggestions);
+          setShowSuggestions(true);
+        } else {
+          setSuggestedChanges({});
+          setShowSuggestions(false);
+        }
       }
     } catch {
       setSuggestedChanges({});
@@ -211,7 +224,13 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
       marketingSpendByChannel: {},
       pricingPercent: 0,
       attendanceGrowthPercent: 0,
-      cogsMultiplier: 0
+      cogsMultiplier: 0,
+      ticketPriceDelta: 0,
+      ticketPriceDeltaType: 'percent',
+      fbSpendDelta: 0,
+      fbSpendDeltaType: 'percent',
+      merchSpendDelta: 0,
+      merchSpendDeltaType: 'percent'
     });
     setSuggestedChanges({});
     setShowSuggestions(false);
@@ -290,6 +309,13 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
       </div>
     );
   }
+
+  // --- NEW: Trigger forecast calculation on localDeltas change ---
+  useEffect(() => {
+    console.log('localDeltas changed:', localDeltas);
+    calculateScenarioForecast(localDeltas);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localDeltas]);
 
   const parameterCardClass =
     "shadow-md rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 flex flex-col gap-2 transition-shadow hover:shadow-lg";
@@ -468,6 +494,100 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
                       </TypographyMuted>
                     </CardContent>
                   </Card>
+
+                  {/* --- Per-Attendee Revenue Group --- */}
+                  <div className="col-span-full">
+                    <Card className="shadow-md rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 flex flex-col gap-2">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Per-Attendee Revenue</CardTitle>
+                        <CardDescription className="text-xs">Model increases in average spend per attendee for ticket price, F&B, and merchandise. Choose % or $ increase.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex flex-col md:flex-row gap-2">
+                        {/* Ticket Price Delta */}
+                        <div className="flex-1 flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-xs">Ticket Price</span>
+                            <select
+                              value={localDeltas.ticketPriceDeltaType || 'percent'}
+                              onChange={e => handleParamChange('ticketPriceDeltaType', e.target.value as any)}
+                              className="border rounded px-1 py-0.5 text-xs"
+                            >
+                              <option value="percent">% Increase</option>
+                              <option value="absolute">$ Increase</option>
+                            </select>
+                          </div>
+                          <Slider
+                            min={localDeltas.ticketPriceDeltaType === 'absolute' ? -10 : -50}
+                            max={localDeltas.ticketPriceDeltaType === 'absolute' ? 50 : 100}
+                            step={localDeltas.ticketPriceDeltaType === 'absolute' ? 1 : 1}
+                            value={[localDeltas.ticketPriceDelta || 0]}
+                            onValueChange={([v]) => handleParamChange('ticketPriceDelta', v)}
+                            aria-label="Ticket Price Delta"
+                          />
+                          <div className="mt-1 text-right font-semibold text-xs">
+                            {localDeltas.ticketPriceDeltaType === 'absolute'
+                              ? `$${localDeltas.ticketPriceDelta || 0}`
+                              : `${localDeltas.ticketPriceDelta || 0}%`}
+                          </div>
+                        </div>
+                        {/* F&B Spend Delta */}
+                        <div className="flex-1 flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-xs">F&B Spend</span>
+                            <select
+                              value={localDeltas.fbSpendDeltaType || 'percent'}
+                              onChange={e => handleParamChange('fbSpendDeltaType', e.target.value as any)}
+                              className="border rounded px-1 py-0.5 text-xs"
+                            >
+                              <option value="percent">% Increase</option>
+                              <option value="absolute">$ Increase</option>
+                            </select>
+                          </div>
+                          <Slider
+                            min={localDeltas.fbSpendDeltaType === 'absolute' ? -10 : -50}
+                            max={localDeltas.fbSpendDeltaType === 'absolute' ? 50 : 100}
+                            step={localDeltas.fbSpendDeltaType === 'absolute' ? 1 : 1}
+                            value={[localDeltas.fbSpendDelta || 0]}
+                            onValueChange={([v]) => handleParamChange('fbSpendDelta', v)}
+                            aria-label="F&B Spend Delta"
+                          />
+                          <div className="mt-1 text-right font-semibold text-xs">
+                            {localDeltas.fbSpendDeltaType === 'absolute'
+                              ? `$${localDeltas.fbSpendDelta || 0}`
+                              : `${localDeltas.fbSpendDelta || 0}%`}
+                          </div>
+                        </div>
+                        {/* Merchandise Spend Delta */}
+                        <div className="flex-1 flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-xs">Merch Spend</span>
+                            <select
+                              value={localDeltas.merchSpendDeltaType || 'percent'}
+                              onChange={e => handleParamChange('merchSpendDeltaType', e.target.value as any)}
+                              className="border rounded px-1 py-0.5 text-xs"
+                            >
+                              <option value="percent">% Increase</option>
+                              <option value="absolute">$ Increase</option>
+                            </select>
+                          </div>
+                          <Slider
+                            min={localDeltas.merchSpendDeltaType === 'absolute' ? -10 : -50}
+                            max={localDeltas.merchSpendDeltaType === 'absolute' ? 50 : 100}
+                            step={localDeltas.merchSpendDeltaType === 'absolute' ? 1 : 1}
+                            value={[localDeltas.merchSpendDelta || 0]}
+                            onValueChange={([v]) => handleParamChange('merchSpendDelta', v)}
+                            aria-label="Merch Spend Delta"
+                          />
+                          <div className="mt-1 text-right font-semibold text-xs">
+                            {localDeltas.merchSpendDeltaType === 'absolute'
+                              ? `$${localDeltas.merchSpendDelta || 0}`
+                              : `${localDeltas.merchSpendDelta || 0}%`}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
                 </div>
 
                 {/* Section Divider */}

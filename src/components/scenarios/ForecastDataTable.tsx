@@ -65,6 +65,8 @@ const ForecastDataTable: React.FC<ForecastDataTableProps> = ({ data }) => {
         <thead>
           <tr>
             <th className="border px-2 py-1 bg-muted">Period</th>
+            <th className="border px-2 py-1 bg-muted">Attendance</th>
+            <th className="border px-2 py-1 bg-muted">Ticket Price</th>
             {revenueKeys.map(({ key, label }) => (
               <th key={key} className="border px-2 py-1">{label}</th>
             ))}
@@ -82,6 +84,8 @@ const ForecastDataTable: React.FC<ForecastDataTableProps> = ({ data }) => {
           {data.map((period) => (
             <tr key={period.period}>
               <td className="border px-2 py-1 font-bold">{period.period}</td>
+              <td className="border px-2 py-1">{period.attendance !== undefined ? period.attendance.toLocaleString() : '-'}</td>
+              <td className="border px-2 py-1">{typeof period.ticketRevenue === 'number' && period.attendance ? `$${(period.ticketRevenue / period.attendance).toFixed(2)}` : '-'}</td>
               {revenueKeys.map(({ key }) => (
                 <td key={key} className="border px-2 py-1">${Math.round((period as any)[key] ?? 0).toLocaleString()}</td>
               ))}
@@ -99,6 +103,8 @@ const ForecastDataTable: React.FC<ForecastDataTableProps> = ({ data }) => {
           ))}
           <tr className="bg-muted font-bold">
             <td className="border px-2 py-1">Total</td>
+            <td className="border px-2 py-1">-</td>
+            <td className="border px-2 py-1">-</td>
             {revenueKeys.map(({ key }) => (
               <td key={key} className="border px-2 py-1">${Math.round(totals.revenueBreakdown[key] || 0).toLocaleString()}</td>
             ))}

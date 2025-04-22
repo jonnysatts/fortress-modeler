@@ -14,12 +14,20 @@ export interface ScenarioParameterDeltas {
 
   // Pricing adjustments
   pricingPercent: number; // Average ticket price adjustment
+  ticketPriceDeltaType?: 'percent' | 'absolute'; // How to interpret the delta
+  ticketPriceDelta?: number; // Value (percent or dollars)
 
   // Attendance adjustments
   attendanceGrowthPercent: number; // Attendance growth rate adjustment
 
   // Cost adjustments
   cogsMultiplier: number; // Cost of goods sold adjustment
+
+  // Per-attendee revenue deltas for scenario modeling
+  fbSpendDeltaType?: 'percent' | 'absolute';
+  fbSpendDelta?: number;
+  merchSpendDeltaType?: 'percent' | 'absolute';
+  merchSpendDelta?: number;
 }
 
 /**

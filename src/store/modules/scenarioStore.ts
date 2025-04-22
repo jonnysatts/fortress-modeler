@@ -509,7 +509,10 @@ function applyScenarioDeltas(
     (deltas.pricingPercent === 0 || deltas.pricingPercent === undefined) &&
     (deltas.attendanceGrowthPercent === 0 || deltas.attendanceGrowthPercent === undefined) &&
     (deltas.cogsMultiplier === 0 || deltas.cogsMultiplier === undefined) &&
-    (!deltas.marketingSpendByChannel || Object.values(deltas.marketingSpendByChannel).every(v => v === 0));
+    (!deltas.marketingSpendByChannel || Object.values(deltas.marketingSpendByChannel).every(v => v === 0)) &&
+    (deltas.ticketPriceDelta === 0 || deltas.ticketPriceDelta === undefined) &&
+    (deltas.fbSpendDelta === 0 || deltas.fbSpendDelta === undefined) &&
+    (deltas.merchSpendDelta === 0 || deltas.merchSpendDelta === undefined);
   if (allDeltasZero) {
     console.log('[PATCH] All scenario deltas are zero. Returning baseline model copy.');
     return JSON.parse(JSON.stringify(baselineModel));
@@ -517,17 +520,26 @@ function applyScenarioDeltas(
 
   // Create a deep copy of the baseline model
   const modifiedModel: FinancialModel = JSON.parse(JSON.stringify(baselineModel));
+  // DEBUG: Add a unique marker to trace patched models
+  (modifiedModel as any).__debugScenarioPatch = 'patched';
 
-  // --- PATCH: Always enable customer spend growth and set growth rates if any delta is applied ---
+  // --- PATCH: Only enable customer spend growth and set growth rates if a delta that should cause growth is present ---
   const growth = modifiedModel.assumptions.metadata?.growth;
   if (growth) {
     let growthChanged = false;
-    if (deltas.attendanceGrowthPercent !== 0) growthChanged = true;
-    if (deltas.pricingPercent !== 0) growthChanged = true;
-    if (deltas.cogsMultiplier !== 0) growthChanged = true;
-    if (deltas.marketingSpendPercent !== 0) growthChanged = true;
-    if (growthChanged) {
-      growth.useCustomerSpendGrowth = true;
+    // Only consider growthChanged for pricingPercent or attendanceGrowthPercent
+    if (deltas.pricingPercent !== 0 && deltas.pricingPercent !== undefined) growthChanged = true;
+    if (deltas.attendanceGrowthPercent !== 0 && deltas.attendanceGrowthPercent !== undefined) growthChanged = true;
+    // PATCH: Only enable useCustomerSpendGrowth when pricing or attendance growth is present
+    growth.useCustomerSpendGrowth = growthChanged;
+    if (!growthChanged) {
+      growth.ticketPriceGrowth = 0;
+      growth.fbSpendGrowth = 0;
+      growth.merchandiseSpendGrowth = 0;
+      growth.onlineSpendGrowth = 0;
+      growth.miscSpendGrowth = 0;
+      console.log('[PATCH] All customer spend growth rates forcibly set to 0 and useCustomerSpendGrowth disabled.');
+    } else {
       if (growth.ticketPriceGrowth === undefined) growth.ticketPriceGrowth = 0;
       if (growth.fbSpendGrowth === undefined) growth.fbSpendGrowth = 0;
       if (growth.merchandiseSpendGrowth === undefined) growth.merchandiseSpendGrowth = 0;
@@ -565,6 +577,51 @@ function applyScenarioDeltas(
         const baseInitial = baselineModel.assumptions.metadata?.initialWeeklyAttendance || 0;
         modifiedModel.assumptions.metadata.initialWeeklyAttendance = Math.round(baseInitial * (1 + deltas.attendanceGrowthPercent / 100));
         console.log('[Attendance Growth][PATCH] Adjusted initialWeeklyAttendance:', baseInitial, '->', modifiedModel.assumptions.metadata.initialWeeklyAttendance);
+      }
+    }
+  }
+
+  // --- PATCH: Apply per-attendee revenue deltas (ticket, F&B, merch) ---
+  if (modifiedModel.assumptions.metadata?.perCustomer) {
+    // --- Ticket Price ---
+    if (deltas.ticketPriceDelta !== undefined && deltas.ticketPriceDeltaType) {
+      const orig = modifiedModel.assumptions.metadata.perCustomer.ticketPrice;
+      if (orig !== undefined) {
+        if (deltas.ticketPriceDeltaType === 'percent') {
+          modifiedModel.assumptions.metadata.perCustomer.ticketPrice = orig * (1 + (deltas.ticketPriceDelta || 0) / 100);
+        } else if (deltas.ticketPriceDeltaType === 'absolute') {
+          modifiedModel.assumptions.metadata.perCustomer.ticketPrice = orig + (deltas.ticketPriceDelta || 0);
+        }
+        console.log(`[Per-Attendee] Ticket price: $${orig} -> $${modifiedModel.assumptions.metadata.perCustomer.ticketPrice} (${deltas.ticketPriceDeltaType}, ${deltas.ticketPriceDelta})`);
+      }
+    }
+    // --- PATCH: Ensure ticketPriceGrowth is zeroed if no ticket delta is present ---
+    if (growth && (deltas.ticketPriceDelta === undefined || deltas.ticketPriceDelta === 0)) {
+      growth.ticketPriceGrowth = 0;
+      console.log('[PATCH] ticketPriceGrowth forcibly set to 0 because no ticket price delta was applied.');
+    }
+    // --- F&B Spend ---
+    if (deltas.fbSpendDelta !== undefined && deltas.fbSpendDeltaType) {
+      const orig = modifiedModel.assumptions.metadata.perCustomer.fbSpend;
+      if (orig !== undefined) {
+        if (deltas.fbSpendDeltaType === 'percent') {
+          modifiedModel.assumptions.metadata.perCustomer.fbSpend = orig * (1 + (deltas.fbSpendDelta || 0) / 100);
+        } else if (deltas.fbSpendDeltaType === 'absolute') {
+          modifiedModel.assumptions.metadata.perCustomer.fbSpend = orig + (deltas.fbSpendDelta || 0);
+        }
+        console.log(`[Per-Attendee] F&B spend: $${orig} -> $${modifiedModel.assumptions.metadata.perCustomer.fbSpend} (${deltas.fbSpendDeltaType}, ${deltas.fbSpendDelta})`);
+      }
+    }
+    // --- Merchandise Spend ---
+    if (deltas.merchSpendDelta !== undefined && deltas.merchSpendDeltaType) {
+      const orig = modifiedModel.assumptions.metadata.perCustomer.merchandiseSpend;
+      if (orig !== undefined) {
+        if (deltas.merchSpendDeltaType === 'percent') {
+          modifiedModel.assumptions.metadata.perCustomer.merchandiseSpend = orig * (1 + (deltas.merchSpendDelta || 0) / 100);
+        } else if (deltas.merchSpendDeltaType === 'absolute') {
+          modifiedModel.assumptions.metadata.perCustomer.merchandiseSpend = orig + (deltas.merchSpendDelta || 0);
+        }
+        console.log(`[Per-Attendee] Merch spend: $${orig} -> $${modifiedModel.assumptions.metadata.perCustomer.merchandiseSpend} (${deltas.merchSpendDeltaType}, ${deltas.merchSpendDelta})`);
       }
     }
   }
