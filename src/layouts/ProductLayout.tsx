@@ -118,20 +118,16 @@ const ProductLayout: React.FC = () => {
                         Edit Inputs
                       </Button>
 
+                      {/* PDF Export: Forward event to summary page */}
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          triggerFullExport('pdf');
-                          toast({
-                            title: "PDF Export",
-                            description: "Exporting data as PDF...",
-                            variant: "default"
-                          });
+                          window.dispatchEvent(new CustomEvent('fortress:exportPdf'));
                         }}
                         className="flex items-center gap-1"
                       >
-                        <FileText className="mr-2 h-4 w-4" />
+                        <Download className="mr-2 h-4 w-4" />
                         Export PDF
                       </Button>
 

@@ -142,70 +142,23 @@ export const calculateTotalCosts = (model: FinancialModel): number => {
 export const generateForecastTimeSeries = (model: FinancialModel): ForecastPeriodData[] => {
   try {
     console.log("[generateForecastTimeSeries] Incoming model:", model);
+    // --- PATCH: Only log missing fields, never return early ---
     if (!model?.assumptions) {
-      console.warn("[generateForecastTimeSeries] No assumptions found in model.");
-      return [{
-        period: 1,
-        point: "Week 1",
-        revenue: 0,
-        cost: 0,
-        profit: 0,
-        cumulativeRevenue: 0,
-        cumulativeCost: 0,
-        cumulativeProfit: 0,
-        attendance: 0,
-        totalCost: 0,
-        marketingTotal: 0,
-        marketingChannels: {},
-        costBreakdown: {},
-      }];
+      console.error("[generateForecastTimeSeries] No assumptions found in model. Model:", model);
     }
-    const { assumptions } = model;
-    const metadata = assumptions.metadata;
-    const revenueStreams = assumptions.revenue || [];
-    const costs = assumptions.costs || [];
-    const marketingSetup = assumptions.marketing || { allocationMode: 'none', channels: [] };
-    const growthModel = assumptions.growthModel;
+    const { assumptions } = model || {};
+    const metadata = assumptions?.metadata || {};
+    const revenueStreams = assumptions?.revenue || [];
+    const costs = assumptions?.costs || [];
+    const marketingSetup = assumptions?.marketing || { allocationMode: 'none', channels: [] };
+    const growthModel = assumptions?.growthModel;
     const isWeekly = metadata?.type === "WeeklyEvent";
     const duration = metadata?.weeks || 12;
-    const perCustomer = metadata?.perCustomer || { ticketPrice: 0, fbSpend: 0, merchandiseSpend: 0, onlineSpend: 0, miscSpend: 0 };
-
-    if (!metadata) {
-      console.warn("[generateForecastTimeSeries] No metadata found in model.");
-      return [{
-        period: 1,
-        point: "Week 1",
-        revenue: 0,
-        cost: 0,
-        profit: 0,
-        cumulativeRevenue: 0,
-        cumulativeCost: 0,
-        cumulativeProfit: 0,
-        attendance: 0,
-        totalCost: 0,
-        marketingTotal: 0,
-        marketingChannels: {},
-        costBreakdown: {},
-      }];
-    }
-    if (!metadata.perCustomer) {
-      console.warn("[generateForecastTimeSeries] No perCustomer found in metadata.");
-      return [{
-        period: 1,
-        point: "Week 1",
-        revenue: 0,
-        cost: 0,
-        profit: 0,
-        cumulativeRevenue: 0,
-        cumulativeCost: 0,
-        cumulativeProfit: 0,
-        attendance: 0,
-        totalCost: 0,
-        marketingTotal: 0,
-        marketingChannels: {},
-        costBreakdown: {},
-      }];
-    }
+    // PATCH: Default perCustomer to all zeros, but warn if missing
+    const perCustomer = metadata?.perCustomer || (() => {
+      console.warn('[generateForecastTimeSeries] metadata.perCustomer missing, using all zeros. Metadata:', metadata);
+      return { ticketPrice: 0, fbSpend: 0, merchandiseSpend: 0, onlineSpend: 0, miscSpend: 0 };
+    })();
 
     console.log(`[generateForecastTimeSeries] Type: ${isWeekly ? "Weekly" : "Monthly"}, Duration: ${duration}`);
 
@@ -230,6 +183,11 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
     console.log('Growth model (stringified):', JSON.stringify(model.assumptions.growthModel, null, 2));
     console.log('[DEBUG] GROWTH SETTINGS END');
 
+    // PATCH: Log growth and attendance info for scenario debugging
+    console.log('[DEBUG][generateForecastTimeSeries] attendanceGrowthRate:', metadata?.growth?.attendanceGrowthRate);
+    console.log('[DEBUG][generateForecastTimeSeries] useCustomerSpendGrowth:', metadata?.growth?.useCustomerSpendGrowth);
+    console.log('[DEBUG][generateForecastTimeSeries] perCustomer:', JSON.stringify(perCustomer));
+
     for (let period = 1; period <= duration; period++) {
       const point = `${isWeekly ? "Week" : "Month"} ${period}`;
       let periodRevenue = 0;
@@ -242,28 +200,31 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
       let fbRevenue = 0;
       let merchRevenue = 0;
 
+      // Always define currentPerCustomer at the start of each period
+      let currentPerCustomer = { ...perCustomer };
+
       // --- Calculate Attendance (if applicable) ---
       if (isWeekly && metadata.initialWeeklyAttendance !== undefined) {
         const initialAttendance = metadata.initialWeeklyAttendance;
-        if (period === 1) {
-          currentAttendance = initialAttendance;
-        } else {
-          let rate = 0;
-          if (useOverallGrowth && overallGrowthRate > 0) {
-            rate = overallGrowthRate;
-          } else if (metadata.growth?.attendanceGrowthRate) {
-            rate = (metadata.growth.attendanceGrowthRate ?? 0) / 100;
-          }
-          if (rate > 0) {
-            if (useOverallGrowth && overallGrowthType === 'linear') {
-              currentAttendance = initialAttendance + initialAttendance * rate * (period - 1);
-            } else {
-              currentAttendance = initialAttendance * Math.pow(1 + rate, period - 1);
-            }
-          } else {
-            currentAttendance = initialAttendance;
-          }
+        let rate = 0;
+        if (useOverallGrowth && overallGrowthRate !== 0) {
+          rate = overallGrowthRate;
+        } else if (metadata.growth?.attendanceGrowthRate !== undefined) {
+          rate = (metadata.growth.attendanceGrowthRate ?? 0) / 100;
         }
+        // LOGGING: Show attendance growth rate and calculation
+        console.log(`[AttendanceCalc] Period ${period} | Initial: ${initialAttendance}, Rate: ${rate}`);
+        if (rate !== 0) {
+          if (useOverallGrowth && overallGrowthType === 'linear') {
+            currentAttendance = initialAttendance + initialAttendance * rate * (period - 1);
+          } else {
+            currentAttendance = initialAttendance * Math.pow(1 + rate, period - 1);
+          }
+        } else {
+          currentAttendance = initialAttendance;
+        }
+        // LOGGING: Show compounded attendance
+        console.log(`[AttendanceCalc] Compounded Attendance for Period ${period}:`, currentAttendance);
         currentAttendance = Math.round(currentAttendance);
       }
 
@@ -275,12 +236,13 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
 
       // Defensive: Always calculate per-attendee revenue, even if some fields are missing
       if (isWeekly && metadata.perCustomer) {
-        let currentPerCustomer = { ...perCustomer };
         if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
           const ticketGrowth = (metadata.growth.ticketPriceGrowth ?? 0) / 100;
           const fbGrowth = (metadata.growth.fbSpendGrowth ?? 0) / 100;
-          const merchGrowth = (metadata.growth.merchandiseGrowth ?? 0) / 100;
-          if (ticketGrowth > 0) {
+          const merchGrowth = (metadata.growth.merchandiseSpendGrowth ?? 0) / 100;
+          // LOGGING: Show per-customer growth rates
+          console.log(`[PerCustomerGrowth] Period ${period} | Ticket: ${ticketGrowth}, FB: ${fbGrowth}, Merch: ${merchGrowth}`);
+          if (ticketGrowth !== 0) {
             if (useOverallGrowth && overallGrowthType === 'linear') {
               const increment = (metadata.perCustomer.ticketPrice ?? 0) * ticketGrowth;
               currentPerCustomer.ticketPrice = (metadata.perCustomer.ticketPrice ?? 0) + increment * (period - 1);
@@ -288,7 +250,7 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
               currentPerCustomer.ticketPrice *= Math.pow(1 + ticketGrowth, period - 1);
             }
           }
-          if (fbGrowth > 0) {
+          if (fbGrowth !== 0) {
             if (useOverallGrowth && overallGrowthType === 'linear') {
               const increment = (metadata.perCustomer.fbSpend ?? 0) * fbGrowth;
               currentPerCustomer.fbSpend = (metadata.perCustomer.fbSpend ?? 0) + increment * (period - 1);
@@ -296,7 +258,7 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
               currentPerCustomer.fbSpend *= Math.pow(1 + fbGrowth, period - 1);
             }
           }
-          if (merchGrowth > 0) {
+          if (merchGrowth !== 0) {
             if (useOverallGrowth && overallGrowthType === 'linear') {
               const increment = (metadata.perCustomer.merchandiseSpend ?? 0) * merchGrowth;
               currentPerCustomer.merchandiseSpend = (metadata.perCustomer.merchandiseSpend ?? 0) + increment * (period - 1);
@@ -305,6 +267,8 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
             }
           }
         }
+        // LOGGING: Show per-customer values
+        console.log(`[PerCustomerGrowth] Period ${period} | PerCustomer:`, currentPerCustomer);
         ticketRevenue = currentAttendance * (currentPerCustomer.ticketPrice ?? 0);
         fbRevenue = currentAttendance * (currentPerCustomer.fbSpend ?? 0);
         merchRevenue = currentAttendance * (currentPerCustomer.merchandiseSpend ?? 0);
@@ -375,8 +339,9 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
       // --- Calculate COGS ---
       const fbCogsPercent = metadata?.costs?.fbCOGSPercent ?? 0;
       const merchCogsPercent = metadata?.costs?.merchandiseCogsPercent ?? 0;
-      const currentFBSpend = (metadata.perCustomer.fbSpend ?? 0) * currentAttendance;
-      const currentMerchSpend = (metadata.perCustomer.merchandiseSpend ?? 0) * currentAttendance;
+      // Use actual per-customer values for this period
+      const currentFBSpend = (currentPerCustomer.fbSpend ?? 0) * currentAttendance;
+      const currentMerchSpend = (currentPerCustomer.merchandiseSpend ?? 0) * currentAttendance;
       const fbCogs = currentFBSpend * (fbCogsPercent / 100);
       const merchCogs = currentMerchSpend * (merchCogsPercent / 100);
       periodCost += fbCogs + merchCogs;
@@ -466,6 +431,10 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
       });
     }
     console.log(`[generateForecastTimeSeries] Returning ${periodicData.length} periods`);
+    const result = periodicData;
+    if (result.length > 0) {
+      console.log('[DEBUG][generateForecastTimeSeries] First period:', JSON.stringify(result[0]));
+    }
     if (periodicData.length === 0) {
       // Fallback: always return at least one period with zeros
       return [{
@@ -484,7 +453,7 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
         costBreakdown: {},
       }];
     }
-    return periodicData;
+    return result;
   } catch (error) {
     console.error("[generateForecastTimeSeries] Error during calculation:", error);
     // Fallback: always return at least one period with zeros

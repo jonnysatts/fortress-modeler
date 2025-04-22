@@ -48,7 +48,7 @@ export const parameterRelationships: Record<keyof ScenarioParameterDeltas, Param
       targetParam: 'attendanceGrowthPercent',
       description: 'Price increases typically reduce attendance (price elasticity)',
       calculateSuggestion: (priceChange, currentAttendance) => {
-        // Simple elasticity model: 10% price increase leads to ~5% decrease in attendance
+        // Updated elasticity model: 10% price increase leads to ~5% decrease in attendance
         // Elasticity of -0.5
         const attendanceImpact = priceChange * -0.5;
         return Math.round(attendanceImpact * 10) / 10; // Round to 1 decimal place
@@ -96,11 +96,14 @@ export function calculateRelatedChanges(
     }
   }
   if (param === 'pricingPercent') {
-    // If pricing goes up, attendance growth might go down
+    // If pricing goes up, attendance growth might go down (auto-apply elasticity)
+    // Use elasticity of -0.5
+    const elasticity = -0.5;
+    const attendanceImpact = value * elasticity;
     if (options?.attendanceGrowthMode === 'replace') {
-      suggestions.attendanceGrowthPercent = Math.max(0, localDeltas.attendanceGrowthPercent - value * 0.1);
+      suggestions.attendanceGrowthPercent = attendanceImpact;
     } else {
-      suggestions.attendanceGrowthPercent = (localDeltas.attendanceGrowthPercent || 0) - value * 0.1;
+      suggestions.attendanceGrowthPercent = (localDeltas.attendanceGrowthPercent || 0) + attendanceImpact;
     }
   }
   if (param === 'cogsMultiplier') {

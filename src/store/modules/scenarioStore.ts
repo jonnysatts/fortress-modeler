@@ -503,8 +503,71 @@ function applyScenarioDeltas(
   const attendanceGrowthMode = options?.attendanceGrowthMode || 'replace';
   const cogsMode = options?.cogsMode || 'multiply';
 
+  // --- PATCH: If all deltas are zero, return a deep copy of baseline ---
+  const allDeltasZero =
+    (deltas.marketingSpendPercent === 0 || deltas.marketingSpendPercent === undefined) &&
+    (deltas.pricingPercent === 0 || deltas.pricingPercent === undefined) &&
+    (deltas.attendanceGrowthPercent === 0 || deltas.attendanceGrowthPercent === undefined) &&
+    (deltas.cogsMultiplier === 0 || deltas.cogsMultiplier === undefined) &&
+    (!deltas.marketingSpendByChannel || Object.values(deltas.marketingSpendByChannel).every(v => v === 0));
+  if (allDeltasZero) {
+    console.log('[PATCH] All scenario deltas are zero. Returning baseline model copy.');
+    return JSON.parse(JSON.stringify(baselineModel));
+  }
+
   // Create a deep copy of the baseline model
   const modifiedModel: FinancialModel = JSON.parse(JSON.stringify(baselineModel));
+
+  // --- PATCH: Always enable customer spend growth and set growth rates if any delta is applied ---
+  const growth = modifiedModel.assumptions.metadata?.growth;
+  if (growth) {
+    let growthChanged = false;
+    if (deltas.attendanceGrowthPercent !== 0) growthChanged = true;
+    if (deltas.pricingPercent !== 0) growthChanged = true;
+    if (deltas.cogsMultiplier !== 0) growthChanged = true;
+    if (deltas.marketingSpendPercent !== 0) growthChanged = true;
+    if (growthChanged) {
+      growth.useCustomerSpendGrowth = true;
+      if (growth.ticketPriceGrowth === undefined) growth.ticketPriceGrowth = 0;
+      if (growth.fbSpendGrowth === undefined) growth.fbSpendGrowth = 0;
+      if (growth.merchandiseSpendGrowth === undefined) growth.merchandiseSpendGrowth = 0;
+      if (growth.onlineSpendGrowth === undefined) growth.onlineSpendGrowth = 0;
+      if (growth.miscSpendGrowth === undefined) growth.miscSpendGrowth = 0;
+      console.log('[PATCH] useCustomerSpendGrowth forcibly enabled and all growth rates set for scenario deltas');
+    }
+    console.log('[DEBUG] Incoming scenario deltas:', JSON.stringify(deltas));
+    console.log('[DEBUG] AttendanceGrowthPercent:', deltas.attendanceGrowthPercent);
+    console.log('[DEBUG] Final attendanceGrowthRate in model:', growth.attendanceGrowthRate);
+    console.log('[DEBUG] useCustomerSpendGrowth in model:', growth.useCustomerSpendGrowth);
+  }
+
+  // --- PATCH: Apply attendance growth percent delta globally ---
+  if (growth) {
+    // Always treat slider as percent (e.g., 28 means 28%)
+    if (deltas.attendanceGrowthPercent !== undefined && deltas.attendanceGrowthPercent !== null) {
+      const originalRate = growth.attendanceGrowthRate || 0;
+      let newGrowthRate = originalRate;
+      if (attendanceGrowthMode === 'replace') {
+        newGrowthRate = deltas.attendanceGrowthPercent;
+        console.log('[Attendance Growth][PATCH] Mode: REPLACE. Setting new growth rate to:', newGrowthRate, '%');
+      } else if (attendanceGrowthMode === 'add') {
+        newGrowthRate = originalRate + deltas.attendanceGrowthPercent;
+        console.log('[Attendance Growth][PATCH] Mode: ADD. Adding delta to original:', originalRate, '+', deltas.attendanceGrowthPercent, '=', newGrowthRate, '%');
+      }
+      if (newGrowthRate < -100) {
+        console.warn('[Attendance Growth][PATCH] Clamping growth rate to -100% to avoid negative compounding.');
+        newGrowthRate = -100;
+      }
+      growth.attendanceGrowthRate = newGrowthRate;
+      console.log('[Attendance Growth][PATCH] Final growth rate set in model:', newGrowthRate, '%');
+      // PATCH: Also adjust initialWeeklyAttendance for scenario
+      if (deltas.attendanceGrowthPercent !== 0 && modifiedModel.assumptions.metadata?.initialWeeklyAttendance !== undefined) {
+        const baseInitial = baselineModel.assumptions.metadata?.initialWeeklyAttendance || 0;
+        modifiedModel.assumptions.metadata.initialWeeklyAttendance = Math.round(baseInitial * (1 + deltas.attendanceGrowthPercent / 100));
+        console.log('[Attendance Growth][PATCH] Adjusted initialWeeklyAttendance:', baseInitial, '->', modifiedModel.assumptions.metadata.initialWeeklyAttendance);
+      }
+    }
+  }
 
   // Apply marketing spend percent delta
   // Always apply marketing spend adjustments to ensure proper configuration
@@ -621,21 +684,31 @@ function applyScenarioDeltas(
   if (modifiedModel.assumptions.metadata?.growth) {
     const originalRate = modifiedModel.assumptions.metadata.growth.attendanceGrowthRate || 0;
     let newGrowthRate = originalRate;
+    // Always treat slider as percent (e.g., 28 means 28%)
+    // Log the incoming delta for clarity
+    console.log('[Attendance Growth] Incoming delta (slider value):', deltas.attendanceGrowthPercent);
     if (attendanceGrowthMode === 'replace') {
       newGrowthRate = deltas.attendanceGrowthPercent;
+      console.log('[Attendance Growth] Mode: REPLACE. Setting new growth rate to:', newGrowthRate, '%');
     } else if (attendanceGrowthMode === 'add') {
       newGrowthRate = originalRate + deltas.attendanceGrowthPercent;
+      console.log('[Attendance Growth] Mode: ADD. Adding delta to original:', originalRate, '+', deltas.attendanceGrowthPercent, '=', newGrowthRate, '%');
+    }
+    // Defensive: Clamp to -100% minimum to avoid negative compounding
+    if (newGrowthRate < -100) {
+      console.warn('[Attendance Growth] Clamping growth rate to -100% to avoid negative compounding.');
+      newGrowthRate = -100;
     }
     modifiedModel.assumptions.metadata.growth.attendanceGrowthRate = newGrowthRate;
-    console.log(`Attendance growth rate: Original: ${originalRate}% -> Modified: ${newGrowthRate}%, Mode: ${attendanceGrowthMode}`);
+    console.log('[Attendance Growth] Final growth rate set in model:', newGrowthRate, '%');
     // Force enable customer spend growth to ensure growth calculations are used
     modifiedModel.assumptions.metadata.growth.useCustomerSpendGrowth = true;
-    console.log(`Enabled useCustomerSpendGrowth: ${modifiedModel.assumptions.metadata.growth.useCustomerSpendGrowth}`);
+    console.log('[Attendance Growth] useCustomerSpendGrowth set to TRUE');
 
     // If this is a weekly event model, ensure the attendance growth is properly configured
     if (modifiedModel.assumptions.metadata.type === "WeeklyEvent" ||
         modifiedModel.assumptions.metadata.type === "Weekly") {
-      console.log('Configuring weekly event model for attendance growth');
+      console.log('[Attendance Growth] Configuring weekly event model for attendance growth');
 
       // Ensure the growth model is properly set to use exponential growth
       if (modifiedModel.assumptions.growthModel) {
@@ -647,7 +720,7 @@ function applyScenarioDeltas(
         const growthRate = modifiedModel.assumptions.metadata.growth.attendanceGrowthRate / 100; // Convert to decimal
         modifiedModel.assumptions.growthModel.rate = Math.max(0.01, growthRate);
 
-        console.log('Growth model FORCED to type: exponential, rate:', modifiedModel.assumptions.growthModel.rate);
+        console.log('[Attendance Growth] Growth model FORCED to type: exponential, rate:', modifiedModel.assumptions.growthModel.rate);
       }
 
       // Ensure ticket price growth is enabled and set to a reasonable value if not already set

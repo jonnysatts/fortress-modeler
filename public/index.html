@@ -1,0 +1,16 @@
+<body>
+  <div id="debug-marker" style="background:red;color:white;z-index:9999;position:fixed;top:0;left:0;width:100%;text-align:center;">DEBUG MARKER</div>
+  <!-- Add pdfMake and vfs_fonts from CDN for robust PDF generation (must be before closing body tag) -->
+  <div id="pdfmake-status" style="position:fixed;top:0;left:0;z-index:9999;background:#fff;color:#000;padding:4px;font-size:14px;">Loading pdfMake...</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+  <script>
+    if (window.pdfMake) {
+      document.getElementById('pdfmake-status').innerText = 'pdfMake loaded!';
+      console.log('[pdfMake] window.pdfMake at load:', window.pdfMake);
+    } else {
+      document.getElementById('pdfmake-status').innerText = 'pdfMake NOT loaded!';
+      console.error('[pdfMake] window.pdfMake is NOT available at load');
+    }
+  </script>
+</body>

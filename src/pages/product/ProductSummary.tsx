@@ -171,4 +171,6 @@ function ProductSummary() {
 //   <ForecastDataTab />
 // </TabsContent>
 
+export { calculateRevenueBreakdown, calculateCostBreakdown };
+
 export default ProductSummary;

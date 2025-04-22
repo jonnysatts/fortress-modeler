@@ -39,6 +39,8 @@ export const dataColors = {
   cost: '#EF4444',         // Red
   profit: '#3B82F6',       // Blue
   attendance: '#8B5CF6',   // Purple
+  scenario: '#f472b6',      // Pink (for scenario comparison)
+  marketing: '#fbbf24',     // Amber (for marketing breakdown)
 
   // Forecast vs Actual
   forecast: '#1A2942',     // Dark blue

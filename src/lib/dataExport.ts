@@ -62,32 +62,9 @@ export async function getProductExportData(projectId: number): Promise<ExportDat
     const finalForecastRevenue = totalForecastRevenue;
     console.log(`[DataExport] Revenue Summary: Forecast=${finalForecastRevenue}, Actual=${totalActualRevenue}`);
 
-    // --- Process Marketing --- 
-    const marketingSetup = assumptions?.marketing || { allocationMode: 'none' };
-    const weeksForMarketing = metadata?.weeks || 12; // Use model duration for total calc
-    let totalMarketingForecast = 0;
-
-    if (marketingSetup.allocationMode === 'channels') {
-      const channels = Array.isArray(marketingSetup.channels) ? marketingSetup.channels : [];
-      const weeklyBudget = channels.reduce((sum, ch) => sum + (ch.weeklyBudget || 0), 0);
-      totalMarketingForecast = weeklyBudget * weeksForMarketing;
-    } else if (marketingSetup.allocationMode === 'highLevel') {
-      totalMarketingForecast = marketingSetup.totalBudget || 0;
-    }
-    // If allocationMode is 'none', totalMarketingForecast remains 0
-
-    // Process actuals (remains the same) - Pass channels only if mode is 'channels'
-    const channelsToProcess = marketingSetup.allocationMode === 'channels' && Array.isArray(marketingSetup.channels) 
-                             ? marketingSetup.channels 
-                             : [];
-    const processedChannels = processMarketingChannels(channelsToProcess, actuals);
-    const totalMarketingActual = processedChannels.reduce((sum, channel) => sum + (channel.actualSpend || 0), 0);
-    const percentUtilized = totalMarketingForecast > 0 ? Math.round((totalMarketingActual / totalMarketingForecast) * 100) : 0;
-    console.log(`[DataExport] Marketing Summary: Forecast=${totalMarketingForecast}, Actual=${totalMarketingActual}, Utilization=${percentUtilized}%`);
-
     // --- Calculate Costs using fetched model data --- 
     let totalForecastCost = 0;
-    const totalActualCost = totalMarketingActual;
+    const totalActualCost = 0; // Initialize totalActualCost to 0
 
     if (metadata) {
       const costAssumptions = metadata.costs || {};
@@ -160,14 +137,10 @@ export async function getProductExportData(projectId: number): Promise<ExportDat
       }
 
       // Add Marketing Costs
-      totalForecastCost += totalMarketingForecast;
-      console.log(`[DataExport] Marketing Cost Contribution: ${totalMarketingForecast}`);
-
-      // TODO: Calculate Actual Costs more accurately here
-      console.warn(`[DataExport] Actual Cost calculation is simplified, using only Marketing Actual: ${totalActualCost}`);
+      // Removed marketing cost calculation
     } else {
       console.warn("[DataExport] Metadata not found in fetched model, cost calculation might be incomplete.");
-      totalForecastCost = totalMarketingForecast;
+      totalForecastCost = 0;
     }
     console.log(`[DataExport] Total Forecast Cost Calculated: ${totalForecastCost}`);
 
@@ -190,11 +163,11 @@ export async function getProductExportData(projectId: number): Promise<ExportDat
         totalActualCost: totalActualCost,
         totalForecastProfit: totalForecastProfit,
         totalActualProfit: totalActualProfit,
-        percentUtilized,
+        percentUtilized: 0, // Removed marketing utilization calculation
         forecastToDate: finalForecastRevenue,
         actualToDate: totalActualRevenue,
-        marketingForecast: totalMarketingForecast,
-        marketingActual: totalMarketingActual
+        marketingForecast: 0, // Removed marketing forecast
+        marketingActual: 0 // Removed marketing actual
       },
       formattedSummary: {
         totalForecast: formatCurrency(finalForecastRevenue),
@@ -203,28 +176,15 @@ export async function getProductExportData(projectId: number): Promise<ExportDat
         totalActualCost: formatCurrency(totalActualCost),
         totalForecastProfit: formatCurrency(totalForecastProfit),
         totalActualProfit: formatCurrency(totalActualProfit),
-        percentUtilized: `${percentUtilized}%`,
+        percentUtilized: "0%",
         forecastToDate: formatCurrency(finalForecastRevenue),
         actualToDate: formatCurrency(totalActualRevenue),
-        marketingForecast: formatCurrency(totalMarketingForecast),
-        marketingActual: formatCurrency(totalMarketingActual)
+        marketingForecast: formatCurrency(0), // Removed marketing forecast
+        marketingActual: formatCurrency(0) // Removed marketing actual
       },
-      marketingChannels: processedChannels.map(channel => ({
-        name: channel.name,
-        type: channel.channelType,
-        forecast: channel.totalForecast || 0,
-        actual: channel.actualSpend || 0,
-        variance: (channel.actualSpend || 0) - (channel.totalForecast || 0),
-        variancePercent: channel.variancePercent || 0,
-        costPerResult: channel.costPerResult || 0
-      })),
+      marketingChannels: [], // Removed marketing channels
       performanceData: {
-        channelPerformance: processedChannels.map(channel => ({
-          name: channel.name,
-          forecast: channel.totalForecast || 0,
-          actual: channel.actualSpend || 0,
-          variance: (channel.actualSpend || 0) - (channel.totalForecast || 0)
-        })),
+        channelPerformance: [], // Removed channel performance
         periodPerformance: periodPerformance.map(period => ({
           name: period.name,
           forecast: period.totalForecast,
@@ -269,41 +229,9 @@ function createFallbackData(projectName: string): ExportDataType {
       forecastToDate: "$9,000.00",
       actualToDate: "$8,500.00"
     },
-    marketingChannels: [
-      {
-        name: "Facebook",
-        type: "Social Media",
-        forecast: 3000,
-        actual: 2800,
-        variance: -200,
-        variancePercent: -6.67,
-        costPerResult: 1.25
-      },
-      {
-        name: "Google",
-        type: "Search",
-        forecast: 4000,
-        actual: 3500,
-        variance: -500,
-        variancePercent: -12.5,
-        costPerResult: 2.10
-      },
-      {
-        name: "Email",
-        type: "Direct",
-        forecast: 3000,
-        actual: 2200,
-        variance: -800,
-        variancePercent: -26.67,
-        costPerResult: 0.75
-      }
-    ],
+    marketingChannels: [],
     performanceData: {
-      channelPerformance: [
-        { name: "Facebook", forecast: 3000, actual: 2800, variance: -200 },
-        { name: "Google", forecast: 4000, actual: 3500, variance: -500 },
-        { name: "Email", forecast: 3000, actual: 2200, variance: -800 }
-      ],
+      channelPerformance: [],
       periodPerformance: [
         { name: "Week 1", forecast: 2500, actual: 2200, variance: -300 },
         { name: "Week 2", forecast: 2500, actual: 2100, variance: -400 },
@@ -312,66 +240,6 @@ function createFallbackData(projectName: string): ExportDataType {
       ]
     }
   };
-}
-
-// Helper function to process marketing channels
-function processMarketingChannels(channels: any[], actuals: any[]) {
-  // Ensure each channel has a forecast value
-  channels = channels.map(channel => {
-    if (channel.forecast === undefined) {
-      if (channel.weeklyBudget !== undefined) {
-        channel.forecast = channel.weeklyBudget;
-      } else {
-        console.warn('[DataExport Warning] Channel forecast is undefined for channel', channel.id, '- defaulting to 0');
-        channel.forecast = 0;
-      }
-    }
-    return channel;
-  });
-  
-  console.log('[DataExport] Processing marketing channels:', channels);
-  channels.forEach(channel => {
-    console.log('[DataExport Debug] Channel details:', { id: channel.id, forecast: channel.forecast, distribution: channel.distribution, spreadDuration: channel.spreadDuration });
-  });
-
-  // If no channels, return an empty array
-  if (!channels || channels.length === 0) {
-    console.log('[DataExport] No marketing channels found, returning empty array');
-    return [];
-  }
-
-  return channels.map(channel => {
-    // Calculate total forecast
-    const totalForecast = channel.weeklyBudget * 12; // Assuming 12 weeks for simplicity
-
-    // Calculate actual spend
-    let actualSpend = 0;
-    let conversions = 0;
-
-    actuals.forEach(actual => {
-      if (actual.marketingActuals && actual.marketingActuals[channel.id]) {
-        actualSpend += actual.marketingActuals[channel.id].actualSpend || 0;
-        conversions += actual.marketingActuals[channel.id].conversions || 0;
-      }
-    });
-
-    // Calculate variance
-    const variance = actualSpend - totalForecast;
-    const variancePercent = totalForecast > 0 ? (variance / totalForecast) * 100 : 0;
-
-    // Calculate cost per result
-    const costPerResult = conversions > 0 ? actualSpend / conversions : 0;
-
-    return {
-      ...channel,
-      totalForecast,
-      actualSpend,
-      variance,
-      variancePercent,
-      conversions,
-      costPerResult
-    };
-  });
 }
 
 // Helper function to process period performance

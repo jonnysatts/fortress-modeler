@@ -147,6 +147,13 @@ const ScenarioSummaryTable: React.FC<ScenarioSummaryTableProps> = ({
             </TableCell>
             <TableCell className="text-right">-</TableCell>
           </TableRow>
+          <TableRow>
+            <TableCell className="font-medium">Total Attendance</TableCell>
+            <TableCell className="text-right">{baselineData.reduce((sum, p) => sum + (p.attendance ?? 0), 0)}</TableCell>
+            <TableCell className="text-right">{scenarioData.reduce((sum, p) => sum + (p.attendance ?? 0), 0)}</TableCell>
+            <TableCell className="text-right">{scenarioData.reduce((sum, p) => sum + (p.attendance ?? 0), 0) - baselineData.reduce((sum, p) => sum + (p.attendance ?? 0), 0)}</TableCell>
+            <TableCell className="text-right">-</TableCell>
+          </TableRow>
         </TableBody>
       </Table>
     </div>

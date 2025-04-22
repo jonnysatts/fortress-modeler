@@ -1,40 +1,23 @@
-// PDF Configuration for pdfmake
-// Import as a namespace to avoid issues with the module structure
-import * as pdfMakeModule from 'pdfmake/build/pdfmake';
-import * as pdfFontsModule from 'pdfmake/build/vfs_fonts';
+// pdfConfig now uses the global pdfMake provided by the CDN
+// No npm imports of pdfmake or vfs_fonts!
 
-// Get the actual pdfMake instance
-const pdfMake = pdfMakeModule.default || pdfMakeModule;
+const pdfMake = (window as any).pdfMake;
 
-// Configure pdfMake with the virtual file system for fonts
-// Handle different module structures
-try {
-  if (pdfFontsModule.pdfMake && pdfFontsModule.pdfMake.vfs) {
-    pdfMake.vfs = pdfFontsModule.pdfMake.vfs;
-    console.log('VFS loaded from pdfFontsModule.pdfMake.vfs');
-  } else if (pdfFontsModule.default && pdfFontsModule.default.pdfMake && pdfFontsModule.default.pdfMake.vfs) {
-    pdfMake.vfs = pdfFontsModule.default.pdfMake.vfs;
-    console.log('VFS loaded from pdfFontsModule.default.pdfMake.vfs');
-  } else {
-    // Fallback to an empty VFS if none is available
-    console.warn('No VFS found in pdfFontsModule, using fallback');
-    pdfMake.vfs = pdfMake.vfs || {};
-
-    // Set up default fonts
-    pdfMake.fonts = {
-      Roboto: {
-        normal: 'Roboto-Regular.ttf',
-        bold: 'Roboto-Medium.ttf',
-        italics: 'Roboto-Italic.ttf',
-        bolditalics: 'Roboto-MediumItalic.ttf'
-      }
-    };
-  }
-} catch (error) {
-  console.error('Error configuring pdfMake fonts:', error);
-  // Ensure pdfMake has at least an empty VFS to prevent errors
-  pdfMake.vfs = pdfMake.vfs || {};
+if (!pdfMake) {
+  console.error('[pdfMake] window.pdfMake is not available! Check CDN script in public/index.html');
+} else {
+  console.log('[pdfMake] window.pdfMake is available:', pdfMake);
 }
+
+// Optionally set up default fonts
+pdfMake.fonts = {
+  Roboto: {
+    normal: 'Roboto-Regular.ttf',
+    bold: 'Roboto-Medium.ttf',
+    italics: 'Roboto-Italic.ttf',
+    bolditalics: 'Roboto-MediumItalic.ttf',
+  },
+};
 
 // Define default font styles
 const defaultStyles = {
@@ -75,3 +58,4 @@ const defaultDocDefinition = {
 };
 
 export { pdfMake, defaultDocDefinition, defaultStyles };
+export default pdfMake;

@@ -1,7 +1,7 @@
 // Add a log to confirm summary mount
 console.log('ProductSummary mounted');
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FinancialModel, ActualsPeriodEntry, Scenario } from '@/lib/db';
 import useStore from '@/store/useStore';
@@ -24,8 +24,10 @@ import { db } from '@/lib/db';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ForecastDataTab from '@/components/product/ForecastDataTab';
-import { getProductExportData } from '@/lib/dataExport';
-import { generateExcelReport } from '@/lib/excelExport';
+import { generateBoardroomPdf } from '@/lib/boardroomPdfExport';
+import { exportChartAsImage } from '@/lib/chartExport';
+import { calculateRevenueBreakdown, calculateCostBreakdown } from './ProductSummary';
+import { calculateScenarioComparison } from '@/lib/finance/calculationEngine';
 
 // --- Helper: Calculate Deltas ---
 const calculateDeltas = (timeSeriesData: ForecastPeriodData[]) => {
@@ -72,6 +74,10 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   }
   return null;
 };
+
+// TEMP STUBS for PDF export to work
+const calculateMarketingAnalysis = () => [];
+const calculateActualsVsForecast = () => [];
 
 const ProductSummary: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -130,18 +136,50 @@ const ProductSummary: React.FC = () => {
   // Log the computed summary metrics
   const summaryMetrics = useMemo(() => {
     if (timeSeriesData.length === 0) {
-        return { totalRevenue: 0, totalCosts: 0, totalProfit: 0, profitMargin: 0, breakeven: false };
+      return {
+        totalRevenue: 0,
+        totalCosts: 0,
+        totalProfit: 0,
+        profitMargin: 0,
+        breakEvenPeriod: { index: null, label: "Not Reached" },
+        averageWeeklyRevenue: 0,
+        averageWeeklyCosts: 0,
+        averageWeeklyProfit: 0
+      };
     }
     // Option A: Use sum of per-period values for totals
     const totalRevenue = timeSeriesData.reduce((sum, p) => sum + (p.revenue || 0), 0);
     const totalCosts = timeSeriesData.reduce((sum, p) => sum + (p.totalCost || 0), 0);
     const totalProfit = timeSeriesData.reduce((sum, p) => sum + (p.profit || 0), 0);
     const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-    const breakeven = totalProfit >= 0;
 
-    return { totalRevenue, totalCosts, totalProfit, profitMargin, breakeven };
+    // Calculate breakEvenPeriod
+    const breakEvenIndex = timeSeriesData.findIndex(p => p.cumulativeProfit >= 0);
+    let breakEvenPeriod = { index: null as number | null, label: "Not Reached" };
+    if (breakEvenIndex !== -1) {
+      breakEvenPeriod = {
+        index: breakEvenIndex,
+        label: timeSeriesData[breakEvenIndex].point || `Period ${breakEvenIndex + 1}`
+      };
+    }
+
+    // Calculate averages
+    const numPeriods = timeSeriesData.length;
+    const averageWeeklyRevenue = totalRevenue / numPeriods;
+    const averageWeeklyCosts = totalCosts / numPeriods;
+    const averageWeeklyProfit = totalProfit / numPeriods;
+
+    return {
+      totalRevenue,
+      totalCosts,
+      totalProfit,
+      profitMargin,
+      breakEvenPeriod,
+      averageWeeklyRevenue,
+      averageWeeklyCosts,
+      averageWeeklyProfit
+    };
   }, [timeSeriesData]);
-  console.log('[ProductSummary] summaryMetrics:', summaryMetrics);
 
   const breakEvenPeriod = useMemo(() => {
       const breakEvenIndex = timeSeriesData.findIndex(p => p.cumulativeProfit >= 0);
@@ -168,7 +206,7 @@ const ProductSummary: React.FC = () => {
   }, [timeSeriesData, summaryMetrics]);
 
   const { warnings } = useMemo(() => {
-    const { totalRevenue, profitMargin, breakeven } = summaryMetrics;
+    const { totalRevenue, profitMargin } = summaryMetrics;
     const revenueStreams = latestModel?.assumptions.revenue || [];
     let revenueConcentrationCalc = 0;
     if (latestModel && totalRevenue > 0 && revenueStreams.length > 0) {
@@ -179,7 +217,7 @@ const ProductSummary: React.FC = () => {
     const warningsList = [];
     if (revenueConcentrationCalc > 80) warningsList.push({ type: 'Revenue Concentration', message: 'Over 80% of revenue comes from a single source', severity: 'warning' });
     if (profitMargin < 20) warningsList.push({ type: 'Low Profit Margin', message: 'Profit margin is below 20%', severity: 'warning' });
-    if (!breakeven) warningsList.push({ type: 'No Breakeven', message: 'Product does not reach breakeven point', severity: 'error' });
+    if (summaryMetrics.breakEvenPeriod.index === null) warningsList.push({ type: 'No Breakeven', message: 'Product does not reach breakeven point', severity: 'error' });
     if (actuals.length === 0) warningsList.push({ type: 'No Actuals', message: 'No actual performance data has been recorded', severity: 'info' });
 
     return { warnings: warningsList };
@@ -280,6 +318,17 @@ const ProductSummary: React.FC = () => {
     }
   }, [latestModel]);
 
+  // Listen for PDF export event from ProductLayout
+  useEffect(() => {
+    const listener = () => {
+      handleExportPdf();
+    };
+    window.addEventListener('fortress:exportPdf', listener);
+    return () => {
+      window.removeEventListener('fortress:exportPdf', listener);
+    };
+  }, []);
+
   // --- Helper Function to Format Date/Time ---
   const formatDateTime = (date: Date | string | undefined): string => {
     if (!date) return 'N/A';
@@ -290,70 +339,83 @@ const ProductSummary: React.FC = () => {
     } catch { return 'Invalid Date'; }
   };
 
-  const handleExportData = async () => {
-    if (!projectId) return;
-    // Always use the live UI data for export
-    const exportData = await getProductExportData(Number(projectId));
-    exportData.forecastTableData = baselineForecastData || [];
-    await generateExcelReport(exportData, 'Forecast_Report', Number(projectId));
-  };
+  // --- Chart Refs for PDF Export ---
+  const revenueChartRef = useRef<HTMLDivElement>(null);
+  const costChartRef = useRef<HTMLDivElement>(null);
+  const marketingChartRef = useRef<HTMLDivElement>(null);
+  const scenarioChartRef = useRef<HTMLDivElement>(null);
 
-  // --- PDF Export Handler ---
+  // --- New PDF Export Handler ---
   const handleExportPdf = async () => {
-    if (!projectId) return;
-    try {
-      // Use the same data as the UI
-      const exportData = await getProductExportData(Number(projectId));
-      exportData.forecastTableData = baselineForecastData || [];
-      // Use the *actual UI summary card values* for the PDF export
-      exportData.totalRevenue = summaryMetrics.totalRevenue;
-      exportData.totalCosts = summaryMetrics.totalCosts;
-      exportData.totalProfit = summaryMetrics.totalProfit;
-      exportData.profitMargin = summaryMetrics.profitMargin;
-      exportData.breakEvenLabel = breakEvenPeriod.label;
-      exportData.breakEvenAchieved = breakEvenPeriod.achieved;
-      exportData.averageMetrics = averageMetrics;
-
-      // --- Build marketing channels table for export using UI's calculation engine output ---
-      const marketingChannelsConfig = latestModel?.assumptions?.marketing?.channels || [];
-      // Build a map of channelId to total forecast, using the same data as the UI table 'Total' row
-      const channelTotals: Record<string, number> = {};
-      (baselineForecastData || []).forEach(period => {
-        if (period.marketingChannels) {
-          Object.entries(period.marketingChannels).forEach(([channelId, data]) => {
-            channelTotals[channelId] = (channelTotals[channelId] || 0) + (data.forecast || 0);
-          });
-        }
-      });
-      exportData.marketingChannels = marketingChannelsConfig.map(channel => ({
-        id: channel.id,
-        name: channel.name,
-        type: channel.type,
-        forecast: channelTotals[channel.id] || 0,
-        actual: 0,
-        variance: 0,
-        variancePercent: 0,
-      }));
-
-      // DEBUG: Log the export data sent to PDF
-      console.log('[PDF Export] Data sent to PDF:', exportData);
-
-      // Call the PDF export logic in the store
-      if (typeof window !== 'undefined') {
-        // Dynamically import the store and PDF logic to avoid circular deps
-        const { useStore } = await import('@/store/useStore');
-        const { handlePdfExport } = await import('@/store/modules/exportStore');
-        // Use a descriptive report key
-        await handlePdfExport(exportData, `Forecast_Report_${projectId}`);
-        // Show toast on success
-        import('@/components/ui/use-toast').then(({ toast }) => toast({ title: 'PDF Exported', description: 'Your PDF report was generated successfully.' }));
-      }
-    } catch (error) {
-      console.error('[ProductSummary] PDF export failed:', error);
-      if (typeof window !== 'undefined') {
-        import('@/components/ui/use-toast').then(({ toast }) => toast({ title: 'Export Failed', description: 'There was a problem exporting the PDF.', variant: 'destructive' }));
-      }
+    console.log('[PDF Export] Export button clicked');
+    console.log('[PDF Export] revenueChartRef.current:', revenueChartRef.current);
+    console.log('[PDF Export] costChartRef.current:', costChartRef.current);
+    console.log('[PDF Export] marketingChartRef.current:', marketingChartRef.current);
+    console.log('[PDF Export] scenarioChartRef.current:', scenarioChartRef.current);
+    if (!revenueChartRef.current) throw new Error('Revenue chart ref not set');
+    if (!costChartRef.current) throw new Error('Cost chart ref not set');
+    // Optionally skip marketing/scenario if not present
+    // Gather chart images
+    const revenueChartImg = await exportChartAsImage(revenueChartRef);
+    const costChartImg = await exportChartAsImage(costChartRef);
+    let marketingChartImg = undefined;
+    let scenarioChartImg = undefined;
+    if (marketingChartRef.current) {
+      marketingChartImg = await exportChartAsImage(marketingChartRef);
     }
+    if (scenarioChartRef.current) {
+      scenarioChartImg = await exportChartAsImage(scenarioChartRef);
+    }
+    // --- Wire up real data for each section ---
+    // Project info
+    const projectInfo = {
+      name: currentProject?.name || 'Project',
+      client: (currentProject && 'client' in currentProject ? (currentProject as any).client : ''),
+      date: new Date().toLocaleDateString()
+    };
+    // Summary metrics (already calculated in UI)
+    const summaryMetricsCopy = summaryMetrics;
+    // Forecast table (already calculated in UI)
+    const forecastTable = baselineForecastData;
+    // Chart images
+    const chartImages = [
+      { title: 'Revenue Trend', dataUrl: revenueChartImg },
+      { title: 'Cost Trend', dataUrl: costChartImg },
+      ...(marketingChartImg ? [{ title: 'Marketing Breakdown', dataUrl: marketingChartImg }] : []),
+      ...(scenarioChartImg ? [{ title: 'Scenario Comparison', dataUrl: scenarioChartImg }] : [])
+    ];
+    // Revenue breakdown (calculate or select from UI data)
+    const revenueBreakdown = calculateRevenueBreakdown(baselineForecastData, latestModel);
+    // Cost breakdown (calculate or select from UI data)
+    const costBreakdown = calculateCostBreakdown(baselineForecastData, latestModel);
+    // Marketing analysis (calculate or select from UI data)
+    const marketingAnalysis = calculateMarketingAnalysis(); // TEMP: stub
+    // Scenario analysis (compare baseline and scenario metrics)
+    const scenarioAnalysis = calculateScenarioComparison(summaryMetrics, summaryMetrics); // TODO: Replace with real scenario metrics if available
+    // Actuals vs. forecast (if actuals exist)
+    const actualsVsForecast = calculateActualsVsForecast(); // TEMP: stub
+    // Risks (select from UI or database)
+    const risks = warnings;
+    // Assumptions (select from UI or database)
+    const assumptions = latestModel?.assumptions;
+    // Optional: logo as dataUrl
+    const logoDataUrl = undefined; // Optionally export your logo as a dataUrl
+
+    await generateBoardroomPdf({
+      projectInfo,
+      summaryMetrics: summaryMetricsCopy,
+      forecastTable,
+      chartImages,
+      revenueBreakdown,
+      costBreakdown,
+      marketingAnalysis,
+      scenarioAnalysis,
+      actualsVsForecast,
+      risks,
+      assumptions,
+      exportTimestamp: new Date().toISOString(),
+      logoDataUrl
+    });
   };
 
   // --- Calculate Scenario Comparison Deltas ---
@@ -414,6 +476,19 @@ const ProductSummary: React.FC = () => {
           <Badge variant={confidenceVariant} className="flex-shrink-0">
               {forecastConfidence} Confidence
           </Badge>
+        </div>
+
+        {/* === Export PDF Button (moved from ProductLayout) === */}
+        <div className="flex items-center gap-2 mb-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPdf}
+            className="flex items-center gap-1"
+          >
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-4 w-4" viewBox="0 0 24 24"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><polyline points="7 11 12 16 17 11"/><line x1="12" y1="4" x2="12" y2="16"/></svg>
+            Export PDF
+          </Button>
         </div>
 
         {/* === Section 1: Summary Cards Row === */}
@@ -618,40 +693,42 @@ const ProductSummary: React.FC = () => {
               <CardTitle className="text-lg">Weekly Revenue vs. Costs</CardTitle>
             </CardHeader>
             <CardContent>
-               <ResponsiveContainer width="100%" height={300}>
-                  <BarChart
-                    data={timeSeriesData}
-                    margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
-                    barCategoryGap="25%"
-                    barGap={2}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false}/>
-                    <XAxis
-                      dataKey="point"
-                      tick={{ fontSize: 11 }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tickFormatter={formatCurrency}
-                      tick={{ fontSize: 11 }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={60}
-                    />
-                    <Tooltip
-                      content={<CustomTooltip />}
-                      cursor={{ fill: 'transparent' }}
-                    />
-                    <Legend
-                      wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
-                      verticalAlign="bottom"
-                      iconSize={10}
-                    />
-                    <Bar name="Weekly Revenue" dataKey="revenue" fill={dataColors.revenue} radius={[3, 3, 0, 0]} barSize={15} />
-                    <Bar name="Weekly Costs" dataKey="cost" fill={dataColors.cost} radius={[3, 3, 0, 0]} barSize={15} />
-                  </BarChart>
-               </ResponsiveContainer>
+               <div ref={revenueChartRef} id="revenue-chart-ref">
+                 <ResponsiveContainer width="100%" height={300}>
+                   <BarChart
+                     data={timeSeriesData}
+                     margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                     barCategoryGap="25%"
+                     barGap={2}
+                   >
+                     <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                     <XAxis
+                       dataKey="point"
+                       tick={{ fontSize: 11 }}
+                       axisLine={false}
+                       tickLine={false}
+                     />
+                     <YAxis
+                       tickFormatter={formatCurrency}
+                       tick={{ fontSize: 11 }}
+                       axisLine={false}
+                       tickLine={false}
+                       width={60}
+                     />
+                     <Tooltip
+                       content={<CustomTooltip />}
+                       cursor={{ fill: 'transparent' }}
+                     />
+                     <Legend
+                       wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
+                       verticalAlign="bottom"
+                       iconSize={10}
+                     />
+                     <Bar name="Weekly Revenue" dataKey="revenue" fill={dataColors.revenue} radius={[3, 3, 0, 0]} barSize={15} />
+                     <Bar name="Weekly Costs" dataKey="cost" fill={dataColors.cost} radius={[3, 3, 0, 0]} barSize={15} />
+                   </BarChart>
+                 </ResponsiveContainer>
+               </div>
             </CardContent>
           </Card>
 
@@ -661,68 +738,122 @@ const ProductSummary: React.FC = () => {
               <CardTitle className="text-lg">Financial Forecast</CardTitle>
             </CardHeader>
             <CardContent>
-               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={timeSeriesData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                  <defs>
-                      {/* Adjusted gradient opacity */}
-                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={dataColors.revenue} stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor={dataColors.revenue} stopOpacity={0}/>
-                      </linearGradient>
-                      <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={dataColors.cost} stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor={dataColors.cost} stopOpacity={0}/>
-                      </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="point"
-                    tick={{ fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tickFormatter={formatCurrency}
-                    tick={{ fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={60}
-                  />
-                  <Tooltip
-                    content={<CustomTooltip />}
-                    cursor={{ stroke: dataColors.neutral[400], strokeWidth: 1, strokeDasharray: "3 3" }}
-                  />
-                  <Legend
-                    wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
-                    verticalAlign="bottom"
-                    payload={[
-                      { value: 'Revenue', type: 'square', id: 'revenue', color: dataColors.revenue },
-                      { value: 'Costs', type: 'square', id: 'cost', color: dataColors.cost },
-                      { value: 'Profit', type: 'line', id: 'profit', color: dataColors.forecast }
-                    ]}
-                  />
-                  {breakEvenPeriod.index !== null && (
-                      <ReferenceLine
-                        x={timeSeriesData[breakEvenPeriod.index]?.point}
-                        stroke={dataColors.status.warning}
-                        strokeDasharray="4 4"
-                        strokeWidth={1.5}
-                      >
-                          <RechartsLabel
-                            value="Breakeven"
-                            position="insideTopLeft"
-                            fill={dataColors.status.warning}
-                            fontSize={10}
-                            offset={8}
-                            className="font-semibold"
-                          />
-                      </ReferenceLine>
-                   )}
-                  <Area type="monotone" dataKey="revenue" name="Revenue" stroke={dataColors.revenue} strokeWidth={1.5} fillOpacity={1} fill="url(#colorRevenue)" dot={false} />
-                  <Area type="monotone" dataKey="cost" name="Costs" stroke={dataColors.cost} strokeWidth={1.5} fillOpacity={1} fill="url(#colorCost)" dot={false}/>
-                   <Line type="monotone" dataKey="profit" name="Profit" stroke={dataColors.forecast} strokeWidth={2} dot={false} />
-                </AreaChart>
-              </ResponsiveContainer>
+               <div ref={costChartRef} id="cost-chart-ref">
+                 <ResponsiveContainer width="100%" height={300}>
+                   <AreaChart data={timeSeriesData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                     <defs>
+                       {/* Adjusted gradient opacity */}
+                       <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                         <stop offset="5%" stopColor={dataColors.revenue} stopOpacity={0.3}/>
+                         <stop offset="95%" stopColor={dataColors.revenue} stopOpacity={0}/>
+                       </linearGradient>
+                       <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
+                         <stop offset="5%" stopColor={dataColors.cost} stopOpacity={0.3}/>
+                         <stop offset="95%" stopColor={dataColors.cost} stopOpacity={0}/>
+                       </linearGradient>
+                     </defs>
+                     <CartesianGrid strokeDasharray="3 3" />
+                     <XAxis
+                       dataKey="point"
+                       tick={{ fontSize: 11 }}
+                       axisLine={false}
+                       tickLine={false}
+                     />
+                     <YAxis
+                       tickFormatter={formatCurrency}
+                       tick={{ fontSize: 11 }}
+                       axisLine={false}
+                       tickLine={false}
+                       width={60}
+                     />
+                     <Tooltip
+                       content={<CustomTooltip />}
+                       cursor={{ stroke: dataColors.neutral[400], strokeWidth: 1, strokeDasharray: "3 3" }}
+                     />
+                     <Legend
+                       wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
+                       verticalAlign="bottom"
+                       payload={[
+                         { value: 'Revenue', type: 'square', id: 'revenue', color: dataColors.revenue },
+                         { value: 'Costs', type: 'square', id: 'cost', color: dataColors.cost },
+                         { value: 'Profit', type: 'line', id: 'profit', color: dataColors.forecast }
+                       ]}
+                     />
+                     {breakEvenPeriod.index !== null && (
+                       <ReferenceLine
+                         x={timeSeriesData[breakEvenPeriod.index]?.point}
+                         stroke={dataColors.status.warning}
+                         strokeDasharray="4 4"
+                         strokeWidth={1.5}
+                       >
+                         <RechartsLabel
+                           value="Breakeven"
+                           position="insideTopLeft"
+                           fill={dataColors.status.warning}
+                           fontSize={10}
+                           offset={8}
+                           className="font-semibold"
+                         />
+                       </ReferenceLine>
+                     )}
+                     <Area type="monotone" dataKey="revenue" name="Revenue" stroke={dataColors.revenue} strokeWidth={1.5} fillOpacity={1} fill="url(#colorRevenue)" dot={false} />
+                     <Area type="monotone" dataKey="cost" name="Costs" stroke={dataColors.cost} strokeWidth={1.5} fillOpacity={1} fill="url(#colorCost)" dot={false}/>
+                     <Line type="monotone" dataKey="profit" name="Profit" stroke={dataColors.forecast} strokeWidth={2} dot={false} />
+                   </AreaChart>
+                 </ResponsiveContainer>
+               </div>
+            </CardContent>
+          </Card>
+
+          {/* Chart 3: Marketing Breakdown */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Marketing Breakdown</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div ref={marketingChartRef} id="marketing-chart-ref">
+                {/* TODO: Replace with your actual marketing chart component */}
+                <ResponsiveContainer width="100%" height={250}>
+                  {/* Example PieChart for marketing breakdown */}
+                  <PieChart>
+                    <Pie
+                      data={[]}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      fill={dataColors.marketing}
+                      label
+                    />
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Chart 4: Scenario Comparison */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Scenario Comparison</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div ref={scenarioChartRef} id="scenario-chart-ref">
+                {/* TODO: Replace with your actual scenario chart component */}
+                <ResponsiveContainer width="100%" height={250}>
+                  {/* Example BarChart for scenario comparison */}
+                  <BarChart data={[]}> {/* Replace [] with your scenario comparison data */}
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="value" fill={dataColors.scenario || '#8884d8'} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -882,12 +1013,6 @@ const ProductSummary: React.FC = () => {
         <div className="mt-12">
           <ForecastDataTab />
         </div>
-        <Button onClick={handleExportData} variant="outline" className="ml-2">
-          Export Data
-        </Button>
-        <Button onClick={handleExportPdf} variant="outline" className="ml-2">
-          Export PDF
-        </Button>
       </div>
     </>
   );
