@@ -195,8 +195,8 @@ export const generateForecastTimeSeries = (model: FinancialModel): ForecastPerio
     // Use growthModel if present, otherwise use specific growth fields
     const useOverallGrowth = !!assumptions.growthModel;
     const overallGrowthType = assumptions.growthModel?.type || 'exponential';
-    // FIX: Growth rate must always be a decimal
-    const overallGrowthRate = (assumptions.growthModel?.rate ?? 0) / 100;
+    // growthModel.rate is already stored as a decimal (eg 0.05 for 5%) – do not divide by 100 again
+    const overallGrowthRate = assumptions.growthModel?.rate ?? 0;
 
     // Enhanced debug logging for growth settings
     console.log('[DEBUG] GROWTH SETTINGS START');

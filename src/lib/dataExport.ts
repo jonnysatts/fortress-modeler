@@ -58,7 +58,9 @@ export async function getProductExportData(projectId: number): Promise<ExportDat
     }
 
     // Calculate Revenue from periods
-    const totalForecastRevenue = periodPerformance.reduce((sum, period) => sum + (period.totalForecast || 0), 0);
+    const totalForecastRevenue = forecastTableData.length > 0
+      ? forecastTableData.reduce((sum, p) => sum + (p.revenue || 0), 0)
+      : periodPerformance.reduce((sum, period) => sum + (period.totalForecast || 0), 0);
     const totalActualRevenue = periodPerformance.reduce((sum, period) => sum + (period.totalActual || 0), 0);
     const finalForecastRevenue = totalForecastRevenue;
     console.log(`[DataExport] Revenue Summary: Forecast=${finalForecastRevenue}, Actual=${totalActualRevenue}`);
@@ -356,15 +358,17 @@ async function processPeriodPerformance(actuals: any[], model: any) {
     console.log("[DataExport] Calculating forecast data from assumptions");
     const weeks = metadata.weeks || 12;
     const initialAttendance = metadata.initialWeeklyAttendance || 0;
-    const growthRate = (metadata.growth?.rate || 0); // Keep as decimal for calculation
+    const growthRate = (metadata.growth?.rate || 0) / 100; // convert to decimal
     const perCustomer = metadata.perCustomer || {};
     const ticketPrice = perCustomer.ticketPrice || 0;
     const fbSpend = perCustomer.fbSpend || 0;
     const merchSpend = perCustomer.merchandiseSpend || 0;
+    const onlineSpend = perCustomer.onlineSpend || 0;
+    const miscSpend = perCustomer.miscSpend || 0;
 
     // Ensure ALL relevant spend types are included here
-    const revenuePerAttendee = ticketPrice + fbSpend + merchSpend;
-    console.log(`[DataExport] Calculated Revenue Per Attendee: ${revenuePerAttendee} (Ticket: ${ticketPrice}, F&B: ${fbSpend}, Merch: ${merchSpend})`);
+    const revenuePerAttendee = ticketPrice + fbSpend + merchSpend + onlineSpend + miscSpend;
+    console.log(`[DataExport] Calculated Revenue Per Attendee: ${revenuePerAttendee} (Ticket: ${ticketPrice}, F&B: ${fbSpend}, Merch: ${merchSpend}, Online: ${onlineSpend}, Misc: ${miscSpend})`);
 
     // Generate forecast data for each week - Always run this loop
     for (let week = 1; week <= weeks; week++) {
