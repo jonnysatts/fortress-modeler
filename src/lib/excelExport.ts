@@ -54,10 +54,30 @@ type ChannelLikeType = {
  */
 export async function generateExcelReport(data: ExportDataType, reportTitle: string, projectId?: number | null): Promise<void> {
   try {
+    console.log('[ExcelExport][DEBUG] Called generateExcelReport with data:', data);
+    // --- BEGIN DEEP DATA LOGGING ---
+    try {
+      console.log('[ExcelExport][DATA] Full export data:', JSON.stringify(data, null, 2));
+      if (Array.isArray(data.scenarios)) {
+        data.scenarios.forEach((scenario, idx) => {
+          console.log(`[ExcelExport][DATA] Scenario ${idx} name:`, scenario.name);
+          console.log(`[ExcelExport][DATA] Scenario ${idx} parameters:`, JSON.stringify(scenario.parameters, null, 2));
+          console.log(`[ExcelExport][DATA] Scenario ${idx} assumptions:`, JSON.stringify(scenario.assumptions, null, 2));
+          console.log(`[ExcelExport][DATA] Scenario ${idx} model:`, JSON.stringify(scenario.model, null, 2));
+        });
+      }
+      console.log('[ExcelExport][DATA] Baseline model:', JSON.stringify(data.model, null, 2));
+      console.log('[ExcelExport][DATA] Baseline assumptions:', JSON.stringify(data.assumptions, null, 2));
+      console.log('[ExcelExport][DATA] Baseline parameters:', JSON.stringify(data.parameters, null, 2));
+    } catch (logErr) {
+      console.error('[ExcelExport][DATA] Logging error:', logErr);
+    }
+    // --- END DEEP DATA LOGGING ---
     console.log(`[Excel] Generating Excel report: ${reportTitle} (Project ID: ${projectId ?? 'N/A'})`);
     console.log('[Excel] Data:', data);
 
     const workbook = XLSX.utils.book_new();
+    console.log('[ExcelExport][DEBUG] Step: Created new workbook');
 
     // Determine project name for file naming (from project data or portfolio data)
     let projectNameForFile = 'Fortress_Report';
@@ -68,39 +88,142 @@ export async function generateExcelReport(data: ExportDataType, reportTitle: str
     } else if (data.projectName) { // Fallback
       projectNameForFile = data.projectName;
     }
+    console.log('[ExcelExport][DEBUG] Step: Determined projectNameForFile', projectNameForFile);
 
     const exportDate = new Date();
     const formattedDate = exportDate.toISOString().split('T')[0];
     const fileName = `${projectNameForFile.replace(/\s+/g, '')}_${reportTitle.replace(/\s+/g, '')}_${formattedDate}.xlsx`;
+    console.log('[ExcelExport][DEBUG] Step: Built fileName', fileName);
 
-    // --- Conditionally add sheets based on export type ---
-
-    if (!projectId) {
-      // Portfolio Export: Add Portfolio Overview first
-      console.log('[Excel] Adding Portfolio Overview sheet (Portfolio Export)');
-      addPortfolioOverviewSheet(workbook, data); // Portfolio data is passed directly
+    // --- Enhanced Scenario Export ---
+    if (Array.isArray(data.scenarios) && data.scenarios.length > 0) {
+      const scenarios = data.scenarios;
+      console.log('[ExcelExport][DEBUG] Step: Found scenarios', scenarios.map(s => s.name));
+      scenarios.forEach((scenario, idx) => {
+        const scenarioName = scenario.name || `Scenario ${idx + 1}`;
+        const safeSheetName = `Scenario - ${scenarioName}`.substring(0, 31);
+        const scenarioData = scenario;
+        try {
+          addSummarySheet(workbook, scenarioData, safeSheetName + ' Summary');
+          console.log('[ExcelExport][DEBUG] Step: Added summary sheet for', scenarioName);
+        } catch (e) {
+          console.error('[ExcelExport][ERROR] Failed to add summary sheet for', scenarioName, e);
+        }
+        try {
+          addAssumptionsSheet(workbook, data, scenario);
+          console.log('[ExcelExport][DEBUG] Step: Added assumptions sheet for', scenarioName);
+        } catch (e) {
+          console.error('[ExcelExport][ERROR] Failed to add assumptions sheet for', scenarioName, e);
+        }
+        try {
+          addScenarioParametersSheet(workbook, data, scenario);
+          console.log('[ExcelExport][DEBUG] Step: Added scenario parameters sheet for', scenarioName);
+        } catch (e) {
+          console.error('[ExcelExport][ERROR] Failed to add scenario parameters sheet for', scenarioName, e);
+        }
+        try {
+          addForecastVsActualSheet(workbook, scenarioData);
+          console.log('[ExcelExport][DEBUG] Step: Added forecast vs actual sheet for', scenarioName);
+        } catch (e) {
+          console.error('[ExcelExport][ERROR] Failed to add forecast vs actual sheet for', scenarioName, e);
+        }
+        try {
+          addForecastTableSheet(workbook, scenarioData, safeSheetName + ' Forecast');
+          console.log('[ExcelExport][DEBUG] Step: Added forecast table sheet for', scenarioName);
+        } catch (e) {
+          console.error('[ExcelExport][ERROR] Failed to add forecast table sheet for', scenarioName, e);
+        }
+        try {
+          addMarketingSpendSheet(workbook, scenarioData);
+          console.log('[ExcelExport][DEBUG] Step: Added marketing spend sheet for', scenarioName);
+        } catch (e) {
+          console.error('[ExcelExport][ERROR] Failed to add marketing spend sheet for', scenarioName, e);
+        }
+        try {
+          addAttendanceSheet(workbook, scenarioData);
+          console.log('[ExcelExport][DEBUG] Step: Added attendance sheet for', scenarioName);
+        } catch (e) {
+          console.error('[ExcelExport][ERROR] Failed to add attendance sheet for', scenarioName, e);
+        }
+        try {
+          addRawDataSheet(workbook, scenarioData);
+          console.log('[ExcelExport][DEBUG] Step: Added raw data sheet for', scenarioName);
+        } catch (e) {
+          console.error('[ExcelExport][ERROR] Failed to add raw data sheet for', scenarioName, e);
+        }
+      });
+      try {
+        addScenarioComparisonSheet(workbook, scenarios);
+        console.log('[ExcelExport][DEBUG] Step: Added Scenario Comparison sheet');
+      } catch (e) {
+        console.error('[ExcelExport][ERROR] Failed to add Scenario Comparison sheet', e);
+      }
     } else {
-      // Project Export: Add project-specific sheets
-      console.log(`[Excel] Adding sheets for project ID: ${projectId}`);
-
-      // Ensure we have project data (it might be nested under 'Product Data')
-      const projectData = data['Product Data'] || data;
-
-      // Add project-specific sheets using the fetched projectData
-      addSummarySheet(workbook, projectData);
-      addAssumptionsSheet(workbook, projectData);
-      addScenarioParametersSheet(workbook, projectData); // Might need adjustment if scenarios are project-specific
-      addForecastVsActualSheet(workbook, projectData);
-      addForecastTableSheet(workbook, projectData); // NEW: Add forecast table sheet (matches UI)
-      addMarketingSpendSheet(workbook, projectData);
-      addAttendanceSheet(workbook, projectData);
-      addRawDataSheet(workbook, projectData); // Add raw data sheet for project
+      console.log('[ExcelExport][DEBUG] Step: No scenarios found, using baseline export');
+      if (!projectId) {
+        try {
+          addPortfolioOverviewSheet(workbook, data);
+          console.log('[ExcelExport][DEBUG] Step: Added portfolio summary sheet');
+        } catch (e) {
+          console.error('[ExcelExport][ERROR] Failed to add portfolio summary sheet', e);
+        }
+      } else {
+        try {
+          addSummarySheet(workbook, data);
+          console.log('[ExcelExport][DEBUG] Step: Added baseline summary sheet');
+        } catch (e) {
+          console.error('[ExcelExport][ERROR] Failed to add baseline summary sheet', e);
+        }
+        try {
+          addAssumptionsSheet(workbook, data);
+          console.log('[ExcelExport][DEBUG] Step: Added assumptions sheet');
+        } catch (e) {
+          console.error('[ExcelExport][ERROR] Failed to add assumptions sheet', e);
+        }
+        try {
+          addScenarioParametersSheet(workbook, data);
+          console.log('[ExcelExport][DEBUG] Step: Added scenario parameters sheet');
+        } catch (e) {
+          console.error('[ExcelExport][ERROR] Failed to add scenario parameters sheet', e);
+        }
+        try {
+          addForecastVsActualSheet(workbook, data);
+          console.log('[ExcelExport][DEBUG] Step: Added forecast vs actual sheet');
+        } catch (e) {
+          console.error('[ExcelExport][ERROR] Failed to add forecast vs actual sheet', e);
+        }
+        try {
+          addForecastTableSheet(workbook, data);
+          console.log('[ExcelExport][DEBUG] Step: Added baseline forecast table sheet');
+        } catch (e) {
+          console.error('[ExcelExport][ERROR] Failed to add baseline forecast table sheet', e);
+        }
+        try {
+          addMarketingSpendSheet(workbook, data);
+          console.log('[ExcelExport][DEBUG] Step: Added marketing spend sheet');
+        } catch (e) {
+          console.error('[ExcelExport][ERROR] Failed to add marketing spend sheet', e);
+        }
+        try {
+          addAttendanceSheet(workbook, data);
+          console.log('[ExcelExport][DEBUG] Step: Added attendance sheet');
+        } catch (e) {
+          console.error('[ExcelExport][ERROR] Failed to add attendance sheet', e);
+        }
+        try {
+          addRawDataSheet(workbook, data);
+          console.log('[ExcelExport][DEBUG] Step: Added raw data sheet');
+        } catch (e) {
+          console.error('[ExcelExport][ERROR] Failed to add raw data sheet', e);
+        }
+      }
     }
-
+    console.log('[ExcelExport][DEBUG] Finished building workbook, about to trigger download:', fileName);
     XLSX.writeFile(workbook, fileName);
-    console.log('[Excel] Excel report generated:', fileName);
+    console.log('[ExcelExport][DEBUG] Excel file download triggered:', fileName);
+    console.log('[ExcelExport][DEBUG] Excel report generated:', fileName);
   } catch (error) {
-    console.error('[Excel] Error generating Excel report:', error);
+    console.error('[ExcelExport][ERROR] Failed to generate Excel report:', error);
     throw error;
   }
 }
@@ -184,12 +307,12 @@ function addPortfolioOverviewSheet(workbook: XLSX.WorkBook, portfolioData: Expor
  * Add the Summary sheet to the workbook
  * (Now relies purely on input data, no hardcoding)
  */
-function addSummarySheet(workbook: XLSX.WorkBook, productData: ExportDataType): void {
-  console.log('[Excel] Adding Summary sheet using forecastTableData if available');
-  // Use forecastTableData for all totals if present, else fallback to summary
+function addSummarySheet(workbook: XLSX.WorkBook, productData: ExportDataType, sheetName?: string): void {
+  console.log('[Excel] Adding Summary sheet using dynamic data');
+
+  // --- PATCH: If this is a scenario, check for scenario-specific fields ---
   const forecastTableData = productData.forecastTableData || [];
   const summary = productData.summary || {};
-
   let totalForecastRevenue = summary.totalForecast || 0;
   let totalForecastProfit = summary.totalForecastProfit || 0;
   let totalForecastCost = summary.totalForecastCost || 0;
@@ -204,14 +327,19 @@ function addSummarySheet(workbook: XLSX.WorkBook, productData: ExportDataType): 
     profitMargin = (totalForecastProfit / totalForecastRevenue) * 100;
   }
 
+  // --- PATCH: Prefer scenario/projectName if present, fallback to parent data ---
+  const productName = productData.projectName || productData.productName || productData.title || '';
+  const productType = productData.productType || (productData.model?.assumptions?.metadata?.type ?? '');
+  const exportDate = productData.exportDate ? new Date(productData.exportDate).toLocaleDateString() : '';
+
   const summaryData = [
     ['FORTRESS MODELER - PROJECT SUMMARY'],
     [''],
     ['PROJECT INFORMATION'],
-    ['Product Name', productData.title || ''],
-    ['Project Name', productData.projectName || ''],
-    ['Export Date', productData.exportDate ? new Date(productData.exportDate).toLocaleDateString() : ''],
-    ['Product Type', productData.productType || ''],
+    ['Product Name', productName],
+    ['Project Name', productName],
+    ['Export Date', exportDate],
+    ['Product Type', productType],
     [''],
     ['FINANCIAL SUMMARY'],
     ['Total Forecast Revenue', formatCurrency(totalForecastRevenue)],
@@ -231,119 +359,111 @@ function addSummarySheet(workbook: XLSX.WorkBook, productData: ExportDataType): 
 
   const worksheet = XLSX.utils.aoa_to_sheet(summaryData);
   worksheet['!cols'] = [{ wch: 30 }, { wch: 24 }];
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Summary');
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName || 'Summary');
 }
 
 /**
  * Add the Assumptions sheet to the workbook
  * (Now relies purely on input data, no hardcoding)
  */
-function addAssumptionsSheet(workbook: XLSX.WorkBook, productData: ExportDataType): void {
+function addAssumptionsSheet(workbook: XLSX.WorkBook, productData: ExportDataType, scenario?: any): void {
   console.log('[Excel] Adding Assumptions sheet using dynamic data');
+  // Always use scenario-specific assumptions if present, otherwise fallback to baseline assumptions
+  let assumptions = scenario?.assumptions;
+  if (!assumptions || Object.keys(assumptions).length === 0) {
+    assumptions = productData.model?.assumptions || {};
+  }
+  let model = productData.model || productData;
+  let metadata = assumptions.metadata || productData.metadata || {};
+  let growth = metadata.growth || productData.growth || {};
+  let perCustomer = metadata.perCustomer || productData.perCustomer || {};
+  let costs = metadata.costs || productData.costs || {};
+  let marketing = assumptions.marketing || productData.marketing || {};
 
-  // Extract data for the assumptions sheet (should be project data)
-  const model = productData.model || {};
-  const assumptions = model.assumptions || {};
-  const metadata = assumptions.metadata || {};
-  const growth = metadata.growth || {};
-  const perCustomer = metadata.perCustomer || {}; // Corrected: Was 'revenue'
-  const costs = metadata.costs || {};
-  const marketing = assumptions.marketing || {};
-
-  // Default dynamic assumptions data build
+  // Dynamic assumptions data build
   const assumptionsData = [
     ['FORTRESS MODELER - MODEL ASSUMPTIONS', ''],
     [''],
     ['GROWTH ASSUMPTIONS', ''],
-    ['Growth Model', metadata.growthModelType || growth.type || 'N/A'], // Use metadata or growth obj
-    ['Weekly Growth Rate', growth.rate != null ? formatPercent(growth.rate) : 'N/A'], // Use growth obj
+    ['Growth Model', metadata.growthModelType || growth.type || 'N/A'],
+    ['Weekly Growth Rate', growth.rate != null ? formatPercent(growth.rate) : 'N/A'],
     ['Initial Weekly Attendance', metadata.initialWeeklyAttendance?.toString() || 'N/A'],
     ['Weeks in Model', metadata.weeks?.toString() || 'N/A'],
     [''],
     ['REVENUE ASSUMPTIONS', ''],
     ['Ticket Price per Attendee', perCustomer.ticketPrice != null ? formatCurrency(perCustomer.ticketPrice) : 'N/A'],
     ['F&B Spend per Attendee', perCustomer.fbSpend != null ? formatCurrency(perCustomer.fbSpend) : 'N/A'],
-    ['Merchandise Spend per Attendee', perCustomer.merchandiseSpend != null ? formatCurrency(perCustomer.merchandiseSpend) : 'N/A'], // Corrected name
-    // Calculate total per attendee dynamically if possible
-    // ['Total Revenue per Attendee', formatCurrency(...) ],
+    ['Merchandise Spend per Attendee', perCustomer.merchandiseSpend != null ? formatCurrency(perCustomer.merchandiseSpend) : 'N/A'],
     [''],
     ['COST ASSUMPTIONS', ''],
-    ['F&B COGS', costs.fbCOGSPercent != null ? formatPercent(costs.fbCOGSPercent) : 'N/A'], // Corrected name
-    ['Merchandise COGS', costs.merchandiseCogsPercent != null ? formatPercent(costs.merchandiseCogsPercent) : 'N/A'], // Was already correct
+    ['F&B COGS', costs.fbCOGSPercent != null ? formatPercent(costs.fbCOGSPercent) : 'N/A'],
+    ['Merchandise COGS', costs.merchandiseCogsPercent != null ? formatPercent(costs.merchandiseCogsPercent) : 'N/A'],
     ['Staff Count', costs.staffCount?.toString() || 'N/A'],
     ['Staff Cost per Person', costs.staffCostPerPerson != null ? formatCurrency(costs.staffCostPerPerson) : 'N/A'],
     ['Management Fee', costs.managementFee != null ? formatCurrency(costs.managementFee) : 'N/A'],
-    // Add other fixed costs if available in data model
     [''],
     ['MARKETING ASSUMPTIONS', ''],
-    ['Weekly Marketing Budget', 
-      marketing?.allocationMode === 'channels' 
+    ['Weekly Marketing Budget',
+      marketing?.allocationMode === 'channels'
         ? formatCurrency((marketing.channels || []).reduce((sum: number, ch: any) => sum + (ch.weeklyBudget || 0), 0))
-        : 'N/A' // Weekly budget only relevant for channels mode in this context
+        : 'N/A'
     ],
-    ['Total Marketing Budget', 
-      marketing?.allocationMode === 'highLevel' 
-        ? formatCurrency(marketing.totalBudget || 0) 
+    ['Total Marketing Budget',
+      marketing?.allocationMode === 'highLevel'
+        ? formatCurrency(marketing.totalBudget || 0)
         : marketing?.allocationMode === 'channels'
         ? formatCurrency((marketing.channels || []).reduce((sum: number, ch: any) => sum + (ch.weeklyBudget || 0), 0) * (metadata?.weeks || 12))
-        : '$0' // Default to $0 if mode is 'none' or unrecognized
+        : '$0'
     ]
   ];
 
-  // Create the worksheet
   const worksheet = XLSX.utils.aoa_to_sheet(assumptionsData);
-
-  // Set column widths
-  const columnWidths = [
-    { wch: 30 },  // A
-    { wch: 20 }   // B
-  ];
-  worksheet['!cols'] = columnWidths;
-
-  // Add the worksheet to the workbook
+  worksheet['!cols'] = [ { wch: 30 }, { wch: 20 } ];
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Assumptions');
 }
 
 /**
  * Add the Scenario Parameters sheet to the workbook
  */
-function addScenarioParametersSheet(workbook: XLSX.WorkBook, data: ExportDataType): void {
+function addScenarioParametersSheet(workbook: XLSX.WorkBook, data: ExportDataType, scenario?: any): void {
   console.log('[Excel] Adding Scenario Parameters sheet');
-
-  // Extract scenario data if available
-  const scenarioData = data['Scenario Data'] || {};
-  const isScenario = !!scenarioData.isScenario;
+  // Use scenario parameters if present, else fallback to empty
+  const parameters = scenario?.parameters || {};
+  // Use baseline parameters for comparison if needed
+  const baselineParameters = data.model?.parameters || {};
 
   const scenarioParams: any[] = [];
 
-  if (isScenario && scenarioData.parameters) {
-    // Create header row
+  if (Object.keys(parameters).length > 0) {
     scenarioParams.push(['Parameter Name', 'Original Value', 'Scenario Value', 'Delta %']);
-
-    // Add each parameter
-    Object.entries(scenarioData.parameters).forEach(([name, values]: [string, any]) => {
-      const originalValue = values.original;
-      const scenarioValue = values.scenario;
-      const deltaPercent = originalValue !== 0
-        ? ((scenarioValue - originalValue) / originalValue) * 100
-        : 0;
-
+    Object.entries(parameters).forEach(([name, values]: [string, any]) => {
+      const originalValue = values.original ?? '';
+      const scenarioValue = values.scenario ?? '';
+      let deltaPercent = '';
+      if (typeof originalValue === 'number' && typeof scenarioValue === 'number' && originalValue !== 0) {
+        deltaPercent = (((scenarioValue - originalValue) / originalValue) * 100).toFixed(2) + '%';
+      } else if (originalValue !== '' && scenarioValue !== '' && originalValue !== scenarioValue) {
+        deltaPercent = 'Changed';
+      } else {
+        deltaPercent = '0%';
+      }
       scenarioParams.push([
         name,
         originalValue,
         scenarioValue,
-        `${deltaPercent.toFixed(2)}%`
+        deltaPercent
       ]);
     });
   } else {
-    // If not a scenario, just mark as baseline
-    scenarioParams.push(['This is the Baseline Forecast']);
+    // If baseline has parameters, show them simply
+    scenarioParams.push(['Parameter Name', 'Value']);
+    Object.entries(baselineParameters).forEach(([name, values]: [string, any]) => {
+      const value = values.original ?? values.value ?? '';
+      scenarioParams.push([name, value]);
+    });
   }
 
-  // Create the worksheet
   const worksheet = XLSX.utils.aoa_to_sheet(scenarioParams);
-
-  // Add the worksheet to the workbook
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Scenario Parameters');
 }
 
@@ -477,7 +597,7 @@ function addMarketingSpendSheet(workbook: XLSX.WorkBook, productData: ExportData
   // Build a map of channelId/name to total forecasted spend from forecastTableData
   // Assume each period in forecastTableData has marketingSpendByChannel: { [channelId]: number }
   const channelSpendMap: Record<string, number> = {};
-  forecastTableData.forEach(period => {
+  forecastTableData.forEach((period: any) => {
     if (period.marketingSpendByChannel) {
       Object.entries(period.marketingSpendByChannel).forEach(([channelId, spend]) => {
         channelSpendMap[channelId] = (channelSpendMap[channelId] || 0) + (spend || 0);
@@ -490,7 +610,7 @@ function addMarketingSpendSheet(workbook: XLSX.WorkBook, productData: ExportData
     ['Channel Name', 'Forecast Spend', 'Actual Spend', 'Variance ($)', 'Variance (%)']
   ];
 
-  marketingChannels.forEach((channel: ChannelLikeType) => {
+  marketingChannels.forEach((channel: ChannelLikeType & { id?: string }) => {
     const channelId = channel.id || channel.name;
     const forecast = channelSpendMap[channelId] || 0;
     const actual = channel.actual || channel.actualSpend || 0;
@@ -623,7 +743,7 @@ function addRawDataSheet(workbook: XLSX.WorkBook, productData: ExportDataType): 
  * Add the Forecast Table sheet to the workbook
  * Uses the new forecastTableData (same as UI) for detailed period-by-period export
  */
-function addForecastTableSheet(workbook: XLSX.WorkBook, productData: ExportDataType): void {
+function addForecastTableSheet(workbook: XLSX.WorkBook, productData: ExportDataType, sheetName?: string): void {
   console.log('[Excel] Adding Forecast Table sheet using forecastTableData');
   const forecastTableData = productData.forecastTableData || [];
   if (!forecastTableData.length) {
@@ -649,7 +769,7 @@ function addForecastTableSheet(workbook: XLSX.WorkBook, productData: ExportDataT
     }, new Set<string>())
   );
   const costKeyTotals = Object.fromEntries(
-    allCostKeysRaw.map(costKey => [costKey, forecastTableData.reduce((sum: number, period: any) => sum + (period.costBreakdown?.[costKey as keyof typeof period.costBreakdown] || 0), 0)])
+    allCostKeysRaw.map(costKey => [costKey, forecastTableData.reduce((sum: number, period: any) => sum + (period.costBreakdown && typeof period.costBreakdown[costKey] === 'number' ? period.costBreakdown[costKey] : 0), 0)])
   );
   const allCostKeys = allCostKeysRaw.filter(costKey => costKeyTotals[costKey] !== 0);
 
@@ -668,18 +788,21 @@ function addForecastTableSheet(workbook: XLSX.WorkBook, productData: ExportDataT
   ];
 
   // Build data rows
-  const rows = forecastTableData.map((period: any) => [
-    period.point || `Period ${period.period}`,
-    period.attendance ?? '',
-    ...revenueKeys.map(k => period[k.key] ?? 0),
-    period.revenue ?? 0,
-    ...allCostKeys.map(k => period.costBreakdown?.[k] ?? 0),
-    period.totalCost ?? period.cost ?? 0,
-    period.profit ?? 0,
-    period.cumulativeRevenue ?? 0,
-    period.cumulativeCost ?? 0,
-    period.cumulativeProfit ?? 0
-  ]);
+  const rows = forecastTableData.map((period: any) => {
+    const costBreakdown: Record<string, number> = period.costBreakdown && typeof period.costBreakdown === 'object' ? period.costBreakdown : {};
+    return [
+      period.point || `Period ${period.period}`,
+      period.attendance ?? '',
+      ...revenueKeys.map(k => period[k.key] ?? 0),
+      period.revenue ?? 0,
+      ...allCostKeys.map(k => costBreakdown[k] ?? 0),
+      period.totalCost ?? period.cost ?? 0,
+      period.profit ?? 0,
+      period.cumulativeRevenue ?? 0,
+      period.cumulativeCost ?? 0,
+      period.cumulativeProfit ?? 0
+    ];
+  });
 
   // Add totals row
   const totals = {
@@ -690,15 +813,16 @@ function addForecastTableSheet(workbook: XLSX.WorkBook, productData: ExportDataT
     revenueBreakdown: {} as Record<string, number>,
   };
   forecastTableData.forEach((period: any) => {
+    const costBreakdown: Record<string, number> = period.costBreakdown && typeof period.costBreakdown === 'object' ? period.costBreakdown : {};
     totals.revenue += period.revenue || 0;
     totals.profit += period.profit || 0;
     totals.totalCost += period.totalCost || period.cost || 0;
     allCostKeys.forEach((costKey) => {
-      totals.costBreakdown[costKey] = (totals.costBreakdown[costKey] || 0) + (period.costBreakdown?.[costKey as keyof typeof period.costBreakdown] || 0);
+      totals.costBreakdown[costKey] = (totals.costBreakdown[costKey] || 0) + (costBreakdown[costKey] ?? 0);
     });
     revenueKeys.forEach(({ key }) => {
       const val = period[key] ?? 0;
-      totals.revenueBreakdown[key as string] = (totals.revenueBreakdown[key as string] || 0) + (val || 0);
+      totals.revenueBreakdown[key as string] = (totals.revenueBreakdown[key as string] || 0) + (typeof val === 'number' ? val : 0);
     });
   });
   const totalsRow = [
@@ -716,5 +840,47 @@ function addForecastTableSheet(workbook: XLSX.WorkBook, productData: ExportDataT
   const sheetData = [header, ...rows, totalsRow];
   const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
   worksheet['!cols'] = header.map(() => ({ wch: 16 }));
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Forecast Table');
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName || 'Forecast Table');
+}
+
+/**
+ * Add the Scenario Comparison sheet to the workbook
+ */
+function addScenarioComparisonSheet(workbook: XLSX.WorkBook, scenarios: any[]): void {
+  // Build the header row
+  const header = [
+    'Scenario Name',
+    'Total Forecast Revenue',
+    'Total Forecast Cost',
+    'Total Forecast Profit',
+    'Profit Margin',
+    'Key Parameters'
+  ];
+  // Build rows for each scenario
+  const rows = scenarios.map((scenario: any) => {
+    const s = scenario.summary || {};
+    // Serialize key parameters for readability
+    let params = '';
+    if (scenario.parameters) {
+      try {
+        params = Object.entries(scenario.parameters)
+          .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+          .join('; ');
+      } catch (e) {
+        params = JSON.stringify(scenario.parameters);
+      }
+    }
+    return [
+      scenario.name || '',
+      s.totalForecast || '',
+      s.totalForecastCost || '',
+      s.totalForecastProfit || '',
+      s.profitMargin !== undefined ? `${s.profitMargin.toFixed(1)}%` : '',
+      params
+    ];
+  });
+  const sheetData = [header, ...rows];
+  const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+  worksheet['!cols'] = header.map(() => ({ wch: 22 }));
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Scenario Comparison');
 }

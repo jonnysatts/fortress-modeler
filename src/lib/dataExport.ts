@@ -6,6 +6,7 @@
 import { db } from '@/lib/db';
 import { ExportDataType } from '@/store/types';
 import { generateForecastTimeSeries, ForecastPeriodData } from '@/lib/financialCalculations';
+import { applyScenarioDeltas } from '@/store/modules/scenarioStore';
 
 /**
  * Get real product data directly from the database
@@ -195,9 +196,100 @@ export async function getProductExportData(projectId: number): Promise<ExportDat
         }))
       },
       // --- NEW: Add forecastTableData for Excel export ---
-      forecastTableData
+      forecastTableData: forecastTableData,
+
+      // --- NEW: Export all scenarios for this project ---
+      scenarios: [],
     };
 
+    // --- NEW: Export all scenarios for this project ---
+    // --- DEBUG LOGGING: Baseline and Scenarios ---
+    console.log('[DataExport][DEBUG] Baseline model:', currentModel);
+    console.log('[DataExport][DEBUG] ExportData baseline summary:', exportData.summary);
+    // 1. Fetch all scenarios for this project
+    const scenarioRecords = await db.scenarios.where({ projectId }).toArray();
+    console.log('[DataExport][DEBUG] Scenario records fetched:', scenarioRecords);
+    // 2. Prepare baseline scenario entry (do not mutate baseline summary)
+    const baselineScenario = {
+      name: 'Baseline',
+      summary: { ...exportData.summary },
+      forecastTableData: exportData.forecastTableData,
+      parameters: {},
+    };
+    // 3. Prepare scenario entries
+    const scenarioEntries = await Promise.all(
+      scenarioRecords.map(async (scenario) => {
+        try {
+          // Fetch the base model for this scenario (should be currentModel or baselineModel)
+          const baseModel = currentModel;
+          // Apply deltas to base model
+          const scenarioModel = applyScenarioDeltas(baseModel, scenario.parameterDeltas);
+          console.log('[DataExport][DEBUG] Scenario:', scenario.name, 'Deltas:', scenario.parameterDeltas, 'ScenarioModel:', scenarioModel);
+          // Generate forecast table for this scenario
+          let scenarioForecastTable = [];
+          try {
+            scenarioForecastTable = generateForecastTimeSeries(scenarioModel);
+            console.log('[DataExport][DEBUG] Scenario:', scenario.name, 'ForecastTable:', scenarioForecastTable);
+          } catch (err) {
+            console.error('[DataExport][DEBUG] Error generating forecastTableData for scenario', scenario.name, err);
+          }
+          // Calculate summary metrics for this scenario
+          const totalRevenue = scenarioForecastTable.reduce((sum, period) => sum + (period.revenue || 0), 0);
+          const totalCost = scenarioForecastTable.reduce((sum, period) => sum + (period.totalCost ?? period.cost ?? 0), 0);
+          const totalProfit = scenarioForecastTable.reduce((sum, period) => sum + (period.profit || 0), 0);
+          const profitMargin = totalRevenue !== 0 ? (totalProfit / totalRevenue) * 100 : 0;
+          console.log('[DataExport][DEBUG] Scenario:', scenario.name, 'Summary:', { totalRevenue, totalCost, totalProfit, profitMargin });
+          return {
+            name: scenario.name,
+            summary: {
+              totalForecast: totalRevenue,
+              totalForecastCost: totalCost,
+              totalForecastProfit: totalProfit,
+              profitMargin,
+            },
+            forecastTableData: scenarioForecastTable,
+            parameters: scenario.parameterDeltas,
+          };
+        } catch (err) {
+          console.error('[DataExport][DEBUG] Error processing scenario', scenario.name, err);
+          return null;
+        }
+      })
+    );
+    // 4. Add scenarios array to exportData (filter out nulls)
+    exportData.scenarios = [baselineScenario, ...scenarioEntries.filter(Boolean)];
+    console.log('[DataExport][DEBUG] Final exportData.scenarios:', exportData.scenarios);
+
+    // --- PATCH: Attach scenario model and assumptions for Excel export ---
+    exportData.scenarios = exportData.scenarios.map((scenario, idx) => {
+      if (idx === 0) {
+        // Baseline: attach model and assumptions from the baseline
+        return {
+          ...scenario,
+          model: currentModel,
+          assumptions: currentModel.assumptions,
+          parameters: {}, // Explicitly add parameters for baseline
+        };
+      } else {
+        // Scenario: find scenario entry in scenarioRecords
+        const scenarioRecord = scenarioRecords.find(r => r.name === scenario.name);
+        if (!scenarioRecord) return scenario;
+        // Apply deltas to get scenario model
+        const scenarioModel = applyScenarioDeltas(currentModel, scenarioRecord.parameterDeltas);
+        return {
+          ...scenario,
+          model: scenarioModel,
+          assumptions: scenarioModel.assumptions,
+          parameters: scenarioRecord.parameterDeltas || {},
+        };
+      }
+    });
+    // --- PATCH: Attach baseline assumptions and parameters at top level for ExcelExport ---
+    exportData.assumptions = currentModel.assumptions;
+    exportData.parameters = {};
+    // --- PATCH: Attach top-level productName for ExcelExport ---
+    exportData.productName = project.name;
+    exportData.productType = project.productType || currentModel.assumptions?.metadata?.type || '';
     console.log('[DataExport] Returning real export data based on freshly fetched model');
     return exportData;
 

@@ -877,3 +877,6 @@ function applyScenarioDeltas(
 
   return modifiedModel;
 }
+
+// Export applyScenarioDeltas for use in other modules
+export { applyScenarioDeltas };
