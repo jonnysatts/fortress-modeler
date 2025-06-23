@@ -55,7 +55,6 @@ export const prepareRevenueDataForWeek = (weekDataPoint: any | null): RevenueDat
 // Prepare Cost Breakdown Data for a SPECIFIC week's data point
 export const prepareCostDataForWeek = (weekDataPoint: any | null, model: FinancialModel): CostData[] => {
   if (!weekDataPoint) return [];
-  console.log("[BreakdownCalc] Input weekDataPoint:", weekDataPoint); // Log the input
 
   const costItems: CostData[] = [];
   // Get total cost for this week BEFORE potentially adding marketing
@@ -80,9 +79,7 @@ export const prepareCostDataForWeek = (weekDataPoint: any | null, model: Financi
 
   // Add Marketing Budget if it exists and is > 0
   const marketingBudgetCost = weekDataPoint.MarketingBudget || 0;
-  console.log(`[BreakdownCalc] Found MarketingBudget value: ${marketingBudgetCost}`); // Log detected value
   if (marketingBudgetCost > 0) {
-      console.log("[BreakdownCalc] Adding Marketing Budget to costItems"); // Log if added
       costItems.push({
           name: "Marketing Budget",
           value: marketingBudgetCost,
@@ -100,7 +97,6 @@ export const prepareCostDataForWeek = (weekDataPoint: any | null, model: Financi
     item.nameAndPercentage = `${item.name} (${percentage}%)`; 
   });
 
-  console.log("[BreakdownCalc] Final costItems before return:", costItems); // Log final array
   return costItems.sort((a, b) => b.value - a.value);
 };
 
