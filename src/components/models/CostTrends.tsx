@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import FinancialMatrix from "./FinancialMatrix";
 import { MarketingSetup, ModelMetadata, GrowthModel } from "@/types/models";
+import { TrendDataPoint } from "@/types/trends";
 
 interface CostTrendsProps {
   costs: CostAssumption[];
@@ -19,7 +20,7 @@ interface CostTrendsProps {
   metadata?: ModelMetadata;
   growthModel?: GrowthModel;
   model: FinancialModel;
-  onUpdateCostData: (data: any[]) => void;
+  onUpdateCostData: (data: TrendDataPoint[]) => void;
 }
 
 const CostTrends = ({ 
@@ -35,10 +36,10 @@ const CostTrends = ({
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
   
   // Memoize the cost data calculation
-  const costData = useMemo(() => {
+  const costData: TrendDataPoint[] = useMemo(() => {
     console.log("[CostTrends] Recalculating costData...");
     try {
-      const data = [];
+      const data: TrendDataPoint[] = [];
       // Use passed props directly
       if (!costs || !metadata) return []; 
       
@@ -50,7 +51,7 @@ const CostTrends = ({
         const weeks = Math.min(metadata.weeks || 12, timePoints);
         
         for (let week = 1; week <= weeks; week++) {
-          const point: any = { point: `Week ${week}` };
+          const point: TrendDataPoint = { point: `Week ${week}` };
           let weeklyTotal = 0;
           
           // Get week 1 attendance and current attendance
@@ -159,8 +160,8 @@ const CostTrends = ({
          const months = timePoints;
          const modelDuration = duration; // Use calculated model duration (likely 12 months)
 
-         for (let month = 1; month <= months; month++) {
-           const point: any = { point: `Month ${month}` };
+           for (let month = 1; month <= months; month++) {
+           const point: TrendDataPoint = { point: `Month ${month}` };
            let monthlyTotal = 0;
            // Add regular costs
            costs.forEach(cost => {

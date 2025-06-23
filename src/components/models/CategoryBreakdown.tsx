@@ -21,11 +21,12 @@ import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
+import { TrendDataPoint } from "@/types/trends";
 
 interface CategoryBreakdownProps {
   model: FinancialModel;
-  revenueTrendData: any[]; // Add prop for full revenue trend data
-  costTrendData: any[]; // Add prop for full cost trend data
+  revenueTrendData: TrendDataPoint[]; // Add prop for full revenue trend data
+  costTrendData: TrendDataPoint[]; // Add prop for full cost trend data
 }
 
 // Define consistent colors, adding Marketing Budget
