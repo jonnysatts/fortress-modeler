@@ -1,10 +1,11 @@
 import { useState, useMemo } from "react";
 import { FinancialModel } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
+import { TrendDataPoint } from "@/types/trends";
 
 interface FinancialMatrixProps {
   model: FinancialModel;
-  trendData: any[];
+  trendData: TrendDataPoint[];
   revenueData?: boolean;
   costData?: boolean;
   combinedView?: boolean;

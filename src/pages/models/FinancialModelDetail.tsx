@@ -28,6 +28,7 @@ import { calculateTotalRevenue, calculateTotalCosts } from "@/lib/financialCalcu
 import { ModelOverview } from "@/components/models/ModelOverview";
 import { MarketingChannelsForm } from "@/components/models/MarketingChannelsForm";
 import { ModelAssumptions, MarketingSetup, RevenueStream, CostCategory } from "@/types/models";
+import { TrendDataPoint } from "@/types/trends";
 
 const FinancialModelDetail = () => {
   const { projectId, modelId } = useParams<{ projectId: string; modelId: string }>();
@@ -37,9 +38,9 @@ const FinancialModelDetail = () => {
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState<FinancialModel | null>(null);
   const { loadProjectById, currentProject, setCurrentProject } = useStore();
-  const [revenueData, setRevenueData] = useState<any[]>([]);
-  const [costData, setCostData] = useState<any[]>([]);
-  const [combinedFinancialData, setCombinedFinancialData] = useState<any[]>([]);
+  const [revenueData, setRevenueData] = useState<TrendDataPoint[]>([]);
+  const [costData, setCostData] = useState<TrendDataPoint[]>([]);
+  const [combinedFinancialData, setCombinedFinancialData] = useState<TrendDataPoint[]>([]);
   const [isFinancialDataReady, setIsFinancialDataReady] = useState<boolean>(false);
   
   // Memoize assumption props (call unconditionally)
@@ -114,7 +115,7 @@ const FinancialModelDetail = () => {
     }
     
     try {
-      const periodMap = new Map<string, any>();
+      const periodMap = new Map<string, TrendDataPoint>();
       
       // Process revenue first
       revenueData.forEach(revPeriod => {
@@ -144,8 +145,8 @@ const FinancialModelDetail = () => {
       // --- Recalculate Profit and Cumulative Profit --- 
       let cumulativeProfit = 0;
       combined = combined.map(period => {
-          const revenue = period.revenue || period.total || 0; // Handle different keys if necessary
-          const costs = period.costs || period.total || 0; // Handle different keys
+          const revenue = period.revenue || 0;
+          const costs = period.costs || 0;
           const profit = revenue - costs;
           cumulativeProfit += profit;
           

@@ -11,11 +11,12 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import FinancialMatrix from "./FinancialMatrix";
+import { TrendDataPoint } from "@/types/trends";
 
 interface RevenueTrendsProps {
   model: FinancialModel;
-  combinedData?: any[];
-  setCombinedData: (data: any[]) => void;
+  combinedData?: TrendDataPoint[];
+  setCombinedData: (data: TrendDataPoint[]) => void;
 }
 
 const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsProps) => {
@@ -23,9 +24,9 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
 
-  const trendData = useMemo(() => {
+  const trendData: TrendDataPoint[] = useMemo(() => {
     try {
-      const data = [];
+      const data: TrendDataPoint[] = [];
       if (!model?.assumptions?.revenue || !model?.assumptions?.metadata) return [];
       
       const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
@@ -46,7 +47,7 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
         let cumulativeTotal = 0;
         
         for (let week = 1; week <= weeks; week++) {
-          const point: any = { point: `Week ${week}` };
+          const point: TrendDataPoint = { point: `Week ${week}` };
           
           let currentAttendance = metadata.initialWeeklyAttendance || 0;
           if (week > 1 && metadata.growth) { 
@@ -107,7 +108,7 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
         let cumulativeTotal = 0;
         
         for (let month = 1; month <= months; month++) {
-          const point: any = { point: `Month ${month}` };
+          const point: TrendDataPoint = { point: `Month ${month}` };
           let totalRevenue = 0;
           revenueStreams.forEach(stream => {
             let streamRevenue = stream.value;
@@ -124,9 +125,9 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
             totalRevenue += streamRevenue;
           });
           
-          point.total = Math.ceil(totalRevenue);
+          point.revenue = Math.ceil(totalRevenue);
           cumulativeTotal += totalRevenue;
-          point.cumulativeTotal = Math.ceil(cumulativeTotal);
+          point.cumulativeRevenue = Math.ceil(cumulativeTotal);
           data.push(point);
         }
       }
