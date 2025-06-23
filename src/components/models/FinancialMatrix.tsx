@@ -302,7 +302,7 @@ const FinancialMatrix = ({
                 const safeName = stream.name.replace(/[^a-zA-Z0-9]/g, "");
                 return (
                   <td key={streamIdx} className="text-right py-2 px-3">
-                    ${Math.ceil(period[safeName] || 0).toLocaleString()}
+                    {Math.ceil(period[safeName] || 0).toLocaleString()}
                   </td>
                 );
               })}
@@ -310,15 +310,15 @@ const FinancialMatrix = ({
                 const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
                 return (
                   <td key={costIdx} className="text-right py-2 px-3">
-                    ${Math.ceil(period[safeName] || 0).toLocaleString()}
+                    {Math.ceil(period[safeName] || 0).toLocaleString()}
                   </td>
                 );
               })}
               <td className="text-right py-2 px-3 font-bold">
-                ${Math.ceil(period.total || period.revenue || period.costs || 0).toLocaleString()}
+                {Math.ceil(period.total || period.revenue || period.costs || 0).toLocaleString()}
               </td>
               <td className="text-right py-2 px-3 font-bold text-green-700">
-                ${Math.ceil(period.cumulativeTotal || period.cumulativeRevenue || period.cumulativeCosts || 0).toLocaleString()}
+                {Math.ceil(period.cumulativeTotal || period.cumulativeRevenue || period.cumulativeCosts || 0).toLocaleString()}
               </td>
             </tr>
           ))}
