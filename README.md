@@ -36,6 +36,21 @@ npm i
 npm run dev
 ```
 
+
+## Setup
+
+Install project dependencies, including dev dependencies, before running lint or build commands. Use the provided script:
+
+```sh
+./setup.sh
+```
+
+Alternatively, run `npm install` manually. Once dependencies are installed, you can execute:
+
+```sh
+npm run lint
+npm run build
+```
 **Edit a file directly in GitHub**
 
 - Navigate to the desired file(s).
