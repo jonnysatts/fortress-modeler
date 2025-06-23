@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { db, getProject, RevenueAssumption, CostAssumption } from "@/lib/db";
 import useStore from "@/store/useStore";
 import { toast } from "@/hooks/use-toast";
+import logger from "@/utils/logger";
 import EventModelForm from "./components/EventModelForm";
 
 // Schema for form validation
@@ -107,7 +108,7 @@ const NewFinancialModel = () => {
             .map((factor) => parseFloat(factor.trim()))
             .filter((factor) => !isNaN(factor));
         } catch (error) {
-          console.error("Error parsing seasonal factors:", error);
+          logger.error("Error parsing seasonal factors:", error);
           toast({
             variant: "destructive",
             title: "Invalid seasonal factors",
@@ -145,7 +146,7 @@ const NewFinancialModel = () => {
 
       navigate(`/projects/${projectId}`);
     } catch (error) {
-      console.error("Error creating financial model:", error);
+      logger.error("Error creating financial model:", error);
       toast({
         variant: "destructive",
         title: "Failed to create model",

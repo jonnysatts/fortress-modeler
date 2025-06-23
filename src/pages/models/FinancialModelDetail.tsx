@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { FinancialModel, db } from "@/lib/db";
 import useStore from "@/store/useStore";
+import logger from "@/utils/logger";
 import { toast } from "@/hooks/use-toast";
 import ModelProjections from "@/components/models/ModelProjections";
 import RevenueTrends from "@/components/models/RevenueTrends";
@@ -52,10 +53,10 @@ const FinancialModelDetail = () => {
 
   // Callbacks (call unconditionally)
   const updateModelAssumptions = useCallback(async (updatedFields: Partial<ModelAssumptions>) => {
-    console.log("[FinancialModelDetail] updateModelAssumptions called with:", JSON.stringify(updatedFields));
+    logger.log("[FinancialModelDetail] updateModelAssumptions called with:", JSON.stringify(updatedFields));
     
     if (!model || !model.id) {
-        console.log("[FinancialModelDetail] updateModelAssumptions skipped: no model or model.id");
+        logger.log("[FinancialModelDetail] updateModelAssumptions skipped: no model or model.id");
         return;
     }
     
@@ -85,21 +86,21 @@ const FinancialModelDetail = () => {
 
       // *** Add specific log for marketing object before save ***
       if (newAssumptions.marketing) {
-          console.log("[FinancialModelDetail] Marketing object being saved:", JSON.stringify(newAssumptions.marketing));
+          logger.log("[FinancialModelDetail] Marketing object being saved:", JSON.stringify(newAssumptions.marketing));
       } else {
-          console.log("[FinancialModelDetail] No marketing object to save.");
+          logger.log("[FinancialModelDetail] No marketing object to save.");
       }
       
       const assumptionsToSave = newAssumptions as FinancialModel['assumptions'];
 
-      console.log("[FinancialModelDetail] Attempting to save assumptions:", JSON.stringify(assumptionsToSave));
+      logger.log("[FinancialModelDetail] Attempting to save assumptions:", JSON.stringify(assumptionsToSave));
 
       await db.financialModels.update(model.id, { 
           assumptions: assumptionsToSave, 
           updatedAt: new Date() 
       });
       
-      console.log("[FinancialModelDetail] db.financialModels.update successful for ID:", model.id);
+      logger.log("[FinancialModelDetail] db.financialModels.update successful for ID:", model.id);
 
       setModel(prevModel => prevModel ? { 
           ...prevModel, 
@@ -110,7 +111,7 @@ const FinancialModelDetail = () => {
       toast({ title: "Assumptions Updated", description: "Marketing changes saved." });
       
     } catch (error) {
-      console.error("[FinancialModelDetail] Error saving assumptions:", error);
+      logger.error("[FinancialModelDetail] Error saving assumptions:", error);
       toast({ variant: "destructive", title: "Error Saving", description: "Could not save marketing changes." });
     }
   }, [model]); // Dependency might need refinement if model reference changes too often
@@ -170,7 +171,7 @@ const FinancialModelDetail = () => {
       setCombinedFinancialData(combined);
       setIsFinancialDataReady(true);
     } catch (error) {
-      console.error("Error combining financial data:", error);
+      logger.error("Error combining financial data:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -190,7 +191,7 @@ const FinancialModelDetail = () => {
       toast({ title: "Model deleted", description: "The financial model has been successfully deleted." });
       navigate(`/projects/${projectId}`);
     } catch (error) {
-      console.error("Error deleting model:", error);
+      logger.error("Error deleting model:", error);
       toast({ variant: "destructive", title: "Error deleting model", description: "There was an error deleting the financial model." });
     }
   }, [modelId, projectId, navigate]);
@@ -239,7 +240,7 @@ const FinancialModelDetail = () => {
           }
         }
       } catch (error) {
-        console.error("Error loading financial model:", error);
+        logger.error("Error loading financial model:", error);
         toast({
           variant: "destructive",
           title: "Error loading model",
@@ -272,7 +273,7 @@ const FinancialModelDetail = () => {
             year: "numeric", month: "short", day: "numeric",
         });
     } catch (error) {
-        console.error("Error formatting date:", dateString, error);
+        logger.error("Error formatting date:", dateString, error);
         return "Error Date";
     }
   };
@@ -307,7 +308,7 @@ const FinancialModelDetail = () => {
   // --- End Conditional Returns ---
 
   // Now it's safe to use the data and memoized props
-  console.log("[FinancialModelDetail Render] Passing marketingSetup:", memoizedMarketingSetup);
+  logger.log("[FinancialModelDetail Render] Passing marketingSetup:", memoizedMarketingSetup);
 
   return (
     <div className="space-y-6">

@@ -31,6 +31,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
 import { db, FinancialModel } from '@/lib/db';
+import logger from '@/utils/logger';
 
 interface PerCustomerRevenue {
   ticketPrice: number;
@@ -244,8 +245,8 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
         updatedAt: new Date(),
       };
 
-      console.log("Saving model with setup costs spread:", data.costs.spreadSetupCosts);
-      console.log("Setup cost type:", setupCostType);
+      logger.log("Saving model with setup costs spread:", data.costs.spreadSetupCosts);
+      logger.log("Setup cost type:", setupCostType);
 
       if (existingModel) {
         await db.financialModels.update(existingModel.id, modelData);
@@ -268,7 +269,7 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
 
       onCancel();
     } catch (error) {
-      console.error("Error saving event model:", error);
+      logger.error("Error saving event model:", error);
       toast({
         variant: "destructive",
         title: existingModel ? "Failed to update model" : "Failed to create model",

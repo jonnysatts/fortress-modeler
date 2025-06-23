@@ -71,3 +71,7 @@ Yes it is!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Debug Logging
+
+Set the environment variable `VITE_ENABLE_LOGGING` to `true` to enable runtime logs during development.

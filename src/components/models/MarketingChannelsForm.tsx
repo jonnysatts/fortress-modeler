@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import logger from "@/utils/logger";
 import { Trash2, PlusCircle, Edit2 } from 'lucide-react';
 import { formatCurrency } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -144,7 +145,7 @@ export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({
       budgetApplication: allocationMode === 'highLevel' ? budgetApplication : undefined,
       spreadDuration: allocationMode === 'highLevel' && budgetApplication === 'spreadCustom' ? spreadDuration : undefined,
     };
-     console.log("Saving marketing setup:", currentInternalSetup);
+    logger.log("Saving marketing setup:", currentInternalSetup);
      updateAssumptions({ marketing: currentInternalSetup });
   };
 

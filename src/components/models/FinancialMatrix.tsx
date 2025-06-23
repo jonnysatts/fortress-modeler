@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { FinancialModel } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
+import logger from "@/utils/logger";
 
 interface FinancialMatrixProps {
   model: FinancialModel;
@@ -106,7 +107,7 @@ const FinancialMatrix = ({
         }
       };
     } catch (error) {
-      console.error("Error calculating period data:", error);
+      logger.error("Error calculating period data:", error);
       return null;
     }
   };

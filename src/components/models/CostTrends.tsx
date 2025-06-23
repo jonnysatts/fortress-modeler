@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import FinancialMatrix from "./FinancialMatrix";
 import { MarketingSetup, ModelMetadata, GrowthModel } from "@/types/models";
+import logger from "@/utils/logger";
 
 interface CostTrendsProps {
   costs: CostAssumption[];
@@ -36,7 +37,7 @@ const CostTrends = ({
   
   // Memoize the cost data calculation
   const costData = useMemo(() => {
-    console.log("[CostTrends] Recalculating costData...");
+    logger.log("[CostTrends] Recalculating costData...");
     try {
       const data = [];
       // Use passed props directly
@@ -117,9 +118,9 @@ const CostTrends = ({
           // --- Calculate Marketing Cost based on mode ---
           let periodMarketingCost = 0;
           if (currentMarketingSetup.allocationMode === 'channels') {
-             console.log("[CostTrends Week Calc] Mode: Channels, Setup:", JSON.stringify(currentMarketingSetup)); // Log setup
+             logger.log("[CostTrends Week Calc] Mode: Channels, Setup:", JSON.stringify(currentMarketingSetup));
              periodMarketingCost = currentMarketingSetup.channels.reduce((sum, ch) => sum + (ch.weeklyBudget || 0), 0);
-             console.log("[CostTrends Week Calc] Calculated Channel Cost:", periodMarketingCost); // Log result
+             logger.log("[CostTrends Week Calc] Calculated Channel Cost:", periodMarketingCost);
           } else if (currentMarketingSetup.allocationMode === 'highLevel' && currentMarketingSetup.totalBudget) {
              const totalBudget = currentMarketingSetup.totalBudget;
              const application = currentMarketingSetup.budgetApplication || 'spreadEvenly';
@@ -224,7 +225,7 @@ const CostTrends = ({
       }
       return data;
     } catch (error) {
-      console.error("Error calculating cost trends:", error);
+      logger.error("Error calculating cost trends:", error);
       return [];
     }
   }, [
@@ -244,12 +245,12 @@ const CostTrends = ({
       const currentCostDataString = JSON.stringify(costData);
       // Only call update if the stringified data has actually changed
       if (currentCostDataString !== prevCostDataStringRef.current) {
-          console.log("[CostTrends] Data changed, calling onUpdateCostData");
+          logger.log("[CostTrends] Data changed, calling onUpdateCostData");
           onUpdateCostData(costData);
           // Update the ref to the current stringified data
           prevCostDataStringRef.current = currentCostDataString;
       } else {
-          // console.log("[CostTrends] Data reference changed but content is the same, skipping update.");
+
       }
     }
     // Dependencies remain costData (the result of useMemo) and the callback
@@ -293,7 +294,7 @@ const CostTrends = ({
     });
     
     // Log the final sorted order
-    console.log("[CostTrends] Sorted Keys for Rendering:", sortedKeys);
+    logger.log("[CostTrends] Sorted Keys for Rendering:", sortedKeys);
 
     return sortedKeys; 
 
@@ -311,7 +312,7 @@ const CostTrends = ({
      const fallbackColor = '#9ca3af'; // Gray fallback
      const color = colorMap[key] || fallbackColor;
      // Log color assignment
-     // console.log(`[CostTrends] getColor for key: ${key}, assigned: ${color}`);
+
      return color;
   };
 
@@ -372,7 +373,7 @@ const CostTrends = ({
             {/* Map over the SORTED costKeys */}
             {costKeys.map((key) => { 
                 const color = getColor(key);
-                console.log(`[CostTrends] Rendering Area - Key: ${key}, Color: ${color}`);
+                logger.log(`[CostTrends] Rendering Area - Key: ${key}, Color: ${color}`);
                 
                 return (
                   <Area

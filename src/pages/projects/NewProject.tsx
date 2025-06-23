@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "@/hooks/use-toast";
 import useStore from "@/store/useStore";
 import { Label } from "@/components/ui/label";
+import logger from "@/utils/logger";
 
 const formSchema = z.object({
   name: z.string().min(3, "Project name must be at least 3 characters"),
@@ -104,7 +105,7 @@ const NewProject = () => {
       
       navigate(`/projects/${projectId}`);
     } catch (error) {
-      console.error("Error creating project:", error);
+      logger.error("Error creating project:", error);
       toast({
         variant: "destructive",
         title: "Failed to create project",

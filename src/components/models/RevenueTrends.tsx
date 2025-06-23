@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import FinancialMatrix from "./FinancialMatrix";
+import logger from "@/utils/logger";
 
 interface RevenueTrendsProps {
   model: FinancialModel;
@@ -24,7 +25,7 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
 
   const trendData = useMemo(() => {
-    console.log("[RevenueTrends] Recalculating trendData...");
+    logger.log("[RevenueTrends] Recalculating trendData...");
     try {
       const data = [];
       if (!model?.assumptions?.revenue || !model?.assumptions?.metadata) return [];
@@ -133,14 +134,14 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
       }
       return data;
     } catch (error) {
-      console.error("Error calculating revenue trends:", error);
+      logger.error("Error calculating revenue trends:", error);
       return [];
     }
   }, [model, timePoints]);
 
   useEffect(() => {
     if (setCombinedData && trendData) {
-      console.log("[RevenueTrends] Calling setCombinedData");
+      logger.log("[RevenueTrends] Calling setCombinedData");
       setCombinedData(trendData);
     }
   }, [trendData, setCombinedData]);

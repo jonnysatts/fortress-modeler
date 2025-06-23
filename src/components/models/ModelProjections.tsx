@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { formatCurrency } from "@/lib/utils";
+import logger from "@/utils/logger";
 
 interface ModelProjectionsProps {
   model: FinancialModel;
@@ -186,7 +187,7 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
 
       return data;
     } catch (error) {
-      console.error("Error calculating projections:", error);
+      logger.error("Error calculating projections:", error);
       return [];
     }
   };

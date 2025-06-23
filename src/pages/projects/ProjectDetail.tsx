@@ -28,6 +28,7 @@ import {
 } from "@/lib/db";
 import { ActualsPeriodEntry } from "@/types/models";
 import { toast } from "@/hooks/use-toast";
+import logger from "@/utils/logger";
 import {
   Table,
   TableBody,
@@ -53,12 +54,12 @@ const ProjectDetail = () => {
   const fetchActualsData = useCallback(async () => {
     if (!projectId) return;
     try {
-      console.log(`Fetching actuals for project ID: ${projectId}`);
+      logger.log(`Fetching actuals for project ID: ${projectId}`);
       const data = await getActualsForProject(parseInt(projectId));
-      console.log("Fetched actuals data:", data);
+      logger.log("Fetched actuals data:", data);
       setActualsData(data);
     } catch (error) {
-      console.error("Error fetching actuals data:", error);
+      logger.error("Error fetching actuals data:", error);
       toast({ variant: "destructive", title: "Error Loading Actuals", description: "Could not load performance data." });
       setActualsData([]);
     }
@@ -84,7 +85,7 @@ const ProjectDetail = () => {
           navigate("/projects");
         }
       } catch (error) {
-        console.error("Error fetching project:", error);
+        logger.error("Error fetching project:", error);
         toast({
           variant: "destructive",
           title: "Error loading project",
@@ -112,7 +113,7 @@ const ProjectDetail = () => {
       });
       navigate("/projects");
     } catch (error) {
-      console.error("Error deleting project:", error);
+      logger.error("Error deleting project:", error);
       toast({
         variant: "destructive",
         title: "Failed to delete project",

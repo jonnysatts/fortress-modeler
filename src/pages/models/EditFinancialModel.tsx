@@ -7,6 +7,7 @@ import { toast } from "@/hooks/use-toast";
 import { FinancialModel, db } from "@/lib/db";
 import useStore from "@/store/useStore";
 import EventModelForm from "./components/EventModelForm";
+import logger from "@/utils/logger";
 
 const EditFinancialModel = () => {
   const { projectId, modelId } = useParams<{ projectId: string; modelId: string }>();
@@ -75,7 +76,7 @@ const EditFinancialModel = () => {
           navigate(`/projects/${projectId}`);
         }
       } catch (error) {
-        console.error("Error loading financial model:", error);
+        logger.error("Error loading financial model:", error);
         toast({
           variant: "destructive",
           title: "Error loading model",

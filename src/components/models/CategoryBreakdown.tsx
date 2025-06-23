@@ -18,6 +18,7 @@ import CostBreakdownView from "./CostBreakdownView";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Add Select imports
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from 'recharts';
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import logger from "@/utils/logger";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
@@ -66,9 +67,9 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
   const totalWeeks = model.assumptions.metadata?.weeks || 0;
 
   // Log the received cost data prop
-  console.log(`[CategoryBreakdown Render] Received costTrendData:`, costTrendData);
+  logger.log(`[CategoryBreakdown Render] Received costTrendData:`, costTrendData);
 
-  console.log(`[CategoryBreakdown] View: ${breakdownView}, Selected Week: ${selectedWeek}`);
+  logger.log(`[CategoryBreakdown] View: ${breakdownView}, Selected Week: ${selectedWeek}`);
 
   // Find the data point for the selected week
   // Note: Assumes trendData arrays start from Week 1 at index 0
@@ -76,7 +77,7 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
   const selectedCostPoint = costTrendData?.[selectedWeek - 1] || null;
   
   // Log the selected data point
-  console.log(`[CategoryBreakdown Render] Selected cost point for ${timeUnit} ${selectedWeek}:`, selectedCostPoint);
+  logger.log(`[CategoryBreakdown Render] Selected cost point for ${timeUnit} ${selectedWeek}:`, selectedCostPoint);
   
   // Calculate breakdown data for the selected week
   const revenueData = useMemo(() => 
@@ -93,7 +94,7 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
   );
 
   // Log the costData just before rendering
-  console.log("[CategoryBreakdown Render] costData state before JSX:", costData);
+  logger.log("[CategoryBreakdown Render] costData state before JSX:", costData);
   
   const weeklyTotals = useMemo(() => {
     if (!isWeeklyEvent) return null;

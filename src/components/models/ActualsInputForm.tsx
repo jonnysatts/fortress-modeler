@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { upsertActualsPeriod } from "@/lib/db";
+import logger from "@/utils/logger";
 
 interface ActualsInputFormProps {
   model: FinancialModel;
@@ -100,11 +101,11 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
   };
 
   const handleSaveActuals = async () => {
-    console.log("[ActualsInputForm] handleSaveActuals triggered."); 
+    logger.log("[ActualsInputForm] handleSaveActuals triggered.");
     // Ensure projectId from the model exists and is a number before parsing
     const projectIdNum = model?.projectId;
     if (!model?.id || typeof projectIdNum !== 'number') { 
-        console.error("[ActualsInputForm] Save failed: Model ID or valid Project ID missing.");
+        logger.error("[ActualsInputForm] Save failed: Model ID or valid Project ID missing.");
         toast({ variant: "destructive", title: "Error", description: "Model or Project ID is invalid." });
         return;
     }
@@ -119,19 +120,19 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
         notes: periodData.notes
     };
 
-    console.log("[ActualsInputForm] Data prepared for upsert:", JSON.stringify(actualEntry));
+    logger.log("[ActualsInputForm] Data prepared for upsert:", JSON.stringify(actualEntry));
 
     try {
         // Use the upsertActualsPeriod helper function correctly
         const savedId = await upsertActualsPeriod(actualEntry);
-        console.log(`[ActualsInputForm] Upsert successful, ID: ${savedId}`);
+        logger.log(`[ActualsInputForm] Upsert successful, ID: ${savedId}`);
         
         toast({ title: "Success", description: `Actuals for ${timeUnit} ${selectedPeriod} saved.` });
         setInitialDataString(JSON.stringify(periodData)); 
         setIsDirty(false);
         onActualsSaved(); 
     } catch (error) {
-        console.error("[ActualsInputForm] Error saving actuals via upsertActualsPeriod:", error);
+        logger.error("[ActualsInputForm] Error saving actuals via upsertActualsPeriod:", error);
         toast({ variant: "destructive", title: "Save Error", description: "Could not save actuals data." });
     }
   };

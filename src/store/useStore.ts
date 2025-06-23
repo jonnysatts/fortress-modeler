@@ -1,6 +1,7 @@
 
 import { create } from 'zustand';
 import { Project, FinancialModel, db } from '@/lib/db';
+import logger from '@/utils/logger';
 
 interface AppState {
   projects: Project[];
@@ -38,7 +39,7 @@ const useStore = create<AppState>((set, get) => ({
       const projects = await db.projects.toArray();
       set({ projects, isLoading: false });
     } catch (error) {
-      console.error('Error loading projects:', error);
+      logger.error('Error loading projects:', error);
       set({ error: 'Failed to load projects', isLoading: false });
     }
   },
@@ -55,7 +56,7 @@ const useStore = create<AppState>((set, get) => ({
         return null;
       }
     } catch (error) {
-      console.error('Error loading project:', error);
+      logger.error('Error loading project:', error);
       set({ error: 'Failed to load project', isLoading: false });
       return null;
     }
@@ -77,7 +78,7 @@ const useStore = create<AppState>((set, get) => ({
       set({ isLoading: false });
       return id;
     } catch (error) {
-      console.error('Error adding project:', error);
+      logger.error('Error adding project:', error);
       set({ error: 'Failed to add project', isLoading: false });
       return -1;
     }
@@ -100,7 +101,7 @@ const useStore = create<AppState>((set, get) => ({
       
       set({ isLoading: false });
     } catch (error) {
-      console.error('Error updating project:', error);
+      logger.error('Error updating project:', error);
       set({ error: 'Failed to update project', isLoading: false });
     }
   },
@@ -119,7 +120,7 @@ const useStore = create<AppState>((set, get) => ({
       await get().loadProjects();
       set({ isLoading: false });
     } catch (error) {
-      console.error('Error deleting project:', error);
+      logger.error('Error deleting project:', error);
       set({ error: 'Failed to delete project', isLoading: false });
     }
   },
@@ -135,7 +136,7 @@ const useStore = create<AppState>((set, get) => ({
       }
       return model || null;
     } catch (error) {
-      console.error('Error loading financial model:', error);
+      logger.error('Error loading financial model:', error);
       set({ error: 'Failed to load financial model', isLoading: false });
       return null;
     }
@@ -151,7 +152,7 @@ const useStore = create<AppState>((set, get) => ({
       set({ isLoading: false });
       return models;
     } catch (error) {
-      console.error('Error loading financial models:', error);
+      logger.error('Error loading financial models:', error);
       set({ error: 'Failed to load financial models', isLoading: false });
       return [];
     }
@@ -168,7 +169,7 @@ const useStore = create<AppState>((set, get) => ({
       set({ isLoading: false });
       return id;
     } catch (error) {
-      console.error('Error adding financial model:', error);
+      logger.error('Error adding financial model:', error);
       set({ error: 'Failed to add financial model', isLoading: false });
       return -1;
     }
@@ -190,7 +191,7 @@ const useStore = create<AppState>((set, get) => ({
       
       set({ isLoading: false });
     } catch (error) {
-      console.error('Error updating financial model:', error);
+      logger.error('Error updating financial model:', error);
       set({ error: 'Failed to update financial model', isLoading: false });
     }
   },
@@ -208,7 +209,7 @@ const useStore = create<AppState>((set, get) => ({
       
       set({ isLoading: false });
     } catch (error) {
-      console.error('Error deleting financial model:', error);
+      logger.error('Error deleting financial model:', error);
       set({ error: 'Failed to delete financial model', isLoading: false });
     }
   },

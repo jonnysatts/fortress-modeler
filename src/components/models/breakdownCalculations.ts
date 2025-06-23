@@ -1,4 +1,5 @@
 import { FinancialModel } from "@/lib/db";
+import logger from "@/utils/logger";
 
 // Define interfaces for our data objects
 export interface RevenueData {
@@ -55,7 +56,7 @@ export const prepareRevenueDataForWeek = (weekDataPoint: any | null): RevenueDat
 // Prepare Cost Breakdown Data for a SPECIFIC week's data point
 export const prepareCostDataForWeek = (weekDataPoint: any | null, model: FinancialModel): CostData[] => {
   if (!weekDataPoint) return [];
-  console.log("[BreakdownCalc] Input weekDataPoint:", weekDataPoint); // Log the input
+  logger.log("[BreakdownCalc] Input weekDataPoint:", weekDataPoint);
 
   const costItems: CostData[] = [];
   // Get total cost for this week BEFORE potentially adding marketing
@@ -80,9 +81,9 @@ export const prepareCostDataForWeek = (weekDataPoint: any | null, model: Financi
 
   // Add Marketing Budget if it exists and is > 0
   const marketingBudgetCost = weekDataPoint.MarketingBudget || 0;
-  console.log(`[BreakdownCalc] Found MarketingBudget value: ${marketingBudgetCost}`); // Log detected value
+  logger.log(`[BreakdownCalc] Found MarketingBudget value: ${marketingBudgetCost}`);
   if (marketingBudgetCost > 0) {
-      console.log("[BreakdownCalc] Adding Marketing Budget to costItems"); // Log if added
+      logger.log("[BreakdownCalc] Adding Marketing Budget to costItems");
       costItems.push({
           name: "Marketing Budget",
           value: marketingBudgetCost,
@@ -100,7 +101,7 @@ export const prepareCostDataForWeek = (weekDataPoint: any | null, model: Financi
     item.nameAndPercentage = `${item.name} (${percentage}%)`; 
   });
 
-  console.log("[BreakdownCalc] Final costItems before return:", costItems); // Log final array
+  logger.log("[BreakdownCalc] Final costItems before return:", costItems);
   return costItems.sort((a, b) => b.value - a.value);
 };
 

@@ -1,5 +1,6 @@
 import Dexie, { Table } from 'dexie';
 import { MarketingSetup, ActualsPeriodEntry } from '@/types/models';
+import logger from '@/utils/logger';
 
 // Define interfaces for our database tables
 export interface Project {
@@ -109,8 +110,8 @@ export class FortressDB extends Dexie {
       risks: '++id, projectId, type, likelihood, impact, status',
       scenarios: '++id, projectId, modelId, name, createdAt',
       actuals: '++id, &[projectId+period], projectId, period'
-    }).upgrade(tx => {
-      console.log("Upgrading DB schema to version 3, changing index for 'actuals' table.");
+    }).upgrade(() => {
+      logger.log("Upgrading DB schema to version 3, changing index for 'actuals' table.");
     });
     
     this.version(2).stores({

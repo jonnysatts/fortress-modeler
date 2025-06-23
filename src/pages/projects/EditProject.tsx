@@ -18,6 +18,7 @@ import { toast } from "@/hooks/use-toast";
 import useStore from "@/store/useStore";
 import { Label } from "@/components/ui/label";
 import { getProject, updateProject } from "@/lib/db"; // Import get/update project functions
+import logger from "@/utils/logger";
 
 // Schema likely same as NewProject
 const formSchema = z.object({
@@ -143,7 +144,7 @@ const EditProject = () => {
       });
       navigate(`/projects/${projectId}`); // Navigate back to project detail
     } catch (error) {
-      console.error("Error updating project:", error);
+      logger.error("Error updating project:", error);
       toast({
         variant: "destructive",
         title: "Failed to update project",

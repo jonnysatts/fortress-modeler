@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { formatCurrency, formatPercent } from "@/lib/utils";
 import { VarianceCard } from '@/components/ui/VarianceCard';
+import logger from "@/utils/logger";
 
 interface PerformanceAnalysisProps {
   financialModels: FinancialModel[];
@@ -80,7 +81,7 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
   const analysisData = useMemo(() => {
     if (!selectedModel?.assumptions) return null;
     
-    console.log(`[PerformanceAnalysis] Calculating for Model ID: ${selectedModelId}`);
+    logger.log(`[PerformanceAnalysis] Calculating for Model ID: ${selectedModelId}`);
     
     const { assumptions } = selectedModel;
     const metadata = assumptions.metadata;

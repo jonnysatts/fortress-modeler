@@ -4,6 +4,7 @@ import Sidebar from "./Sidebar";
 import { Toaster } from "@/components/ui/toaster";
 import { db, addDemoData } from "@/lib/db";
 import useStore from "@/store/useStore";
+import logger from "@/utils/logger";
 
 const AppLayout = () => {
   const [initializing, setInitializing] = useState(true);
@@ -17,7 +18,7 @@ const AppLayout = () => {
         await addDemoData(); // Add demo data if the database is empty
         await loadProjects();
       } catch (error) {
-        console.error("Error initializing app:", error);
+        logger.error("Error initializing app:", error);
       } finally {
         setInitializing(false);
       }

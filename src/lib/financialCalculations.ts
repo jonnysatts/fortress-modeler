@@ -1,4 +1,5 @@
 import { FinancialModel } from './db'; // Adjust import path if necessary
+import logger from '@/utils/logger';
 
 // Calculate total revenue for a weekly event model over its duration, including growth
 export const calculateTotalRevenue = (model: FinancialModel): number => {
@@ -51,7 +52,7 @@ export const calculateTotalRevenue = (model: FinancialModel): number => {
 
     return Math.round(totalRevenue);
   } catch (error) {
-    console.error("Error calculating total revenue:", error);
+    logger.error("Error calculating total revenue:", error);
     return 0;
   }
 };
@@ -99,7 +100,7 @@ export const calculateTotalCosts = (model: FinancialModel): number => {
 
     return Math.round(totalCosts);
   } catch (error) {
-    console.error("Error calculating total costs:", error);
+    logger.error("Error calculating total costs:", error);
     return 0;
   }
-}; 
+};
