@@ -12,7 +12,9 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
   const navItems = [
-    { name: "Dashboard", path: "/dashboard", icon: Home },
+    // The Dashboard route is the index route at "/" so the sidebar link should
+    // navigate to the root path
+    { name: "Dashboard", path: "/", icon: Home },
     { name: "Projects", path: "/projects", icon: FolderKanban },
     // Add other top-level sections if needed
     // { name: "Performance", path: "/performance", icon: LineChart },
