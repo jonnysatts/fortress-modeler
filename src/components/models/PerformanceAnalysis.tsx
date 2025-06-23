@@ -80,7 +80,6 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
   const analysisData = useMemo(() => {
     if (!selectedModel?.assumptions) return null;
     
-    console.log(`[PerformanceAnalysis] Calculating for Model ID: ${selectedModelId}`);
     
     const { assumptions } = selectedModel;
     const metadata = assumptions.metadata;

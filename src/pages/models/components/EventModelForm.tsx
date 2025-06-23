@@ -244,8 +244,6 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
         updatedAt: new Date(),
       };
 
-      console.log("Saving model with setup costs spread:", data.costs.spreadSetupCosts);
-      console.log("Setup cost type:", setupCostType);
 
       if (existingModel) {
         await db.financialModels.update(existingModel.id, modelData);
