@@ -355,10 +355,11 @@ const FinancialModelDetail = () => {
          </TabsContent>
 
          <TabsContent value="marketing">
-           <MarketingChannelsForm 
-             marketingSetup={memoizedMarketingSetup} 
-             updateAssumptions={updateModelAssumptions} 
-             modelTimeUnit={isWeeklyEvent ? 'Week' : 'Month'} 
+           <MarketingChannelsForm
+             marketingSetup={memoizedMarketingSetup}
+             updateAssumptions={updateModelAssumptions}
+             modelTimeUnit={isWeeklyEvent ? 'Week' : 'Month'}
+             metadata={memoizedMetadata}
            />
          </TabsContent>
 

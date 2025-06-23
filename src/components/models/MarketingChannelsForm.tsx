@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { MarketingSetup, MarketingChannelItem, ModelAssumptions } from '@/types/models';
+import { MarketingSetup, MarketingChannelItem, ModelAssumptions, ModelMetadata } from '@/types/models';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,7 @@ interface MarketingChannelsFormProps {
   marketingSetup: MarketingSetup;
   updateAssumptions: (updatedFields: Partial<ModelAssumptions>) => void;
   modelTimeUnit: 'Week' | 'Month';
+  metadata?: ModelMetadata;
 }
 
 const defaultChannelTypes = [
@@ -37,10 +38,11 @@ const defaultChannelTypes = [
   "Custom",
 ];
 
-export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({ 
-  marketingSetup, 
+export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({
+  marketingSetup,
   updateAssumptions,
-  modelTimeUnit
+  modelTimeUnit,
+  metadata
 }) => {
   const [allocationMode, setAllocationMode] = useState<'channels' | 'highLevel'>(
       marketingSetup.allocationMode || 'channels'
@@ -150,7 +152,21 @@ export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({
 
   const totalWeeklyChannelBudget = channels.reduce((sum, ch) => sum + (ch.weeklyBudget || 0), 0);
 
-  const getModelDuration = () => modelTimeUnit === 'Week' ? (marketingSetup.channels?.length > 0 ? 12 : 12) : 12;
+  const getModelDuration = () => {
+    if (metadata) {
+      if (modelTimeUnit === 'Week') {
+        return metadata.weeks ?? 12;
+      }
+      // @ts-ignore - allow optional months in metadata
+      if ((metadata as any).months !== undefined) {
+        return (metadata as any).months as number;
+      }
+    }
+    if (marketingSetup.budgetApplication === 'spreadCustom' && marketingSetup.spreadDuration) {
+      return marketingSetup.spreadDuration;
+    }
+    return 12;
+  };
 
   return (
     <Card>
