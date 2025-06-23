@@ -110,7 +110,7 @@ export class FortressDB extends Dexie {
       scenarios: '++id, projectId, modelId, name, createdAt',
       actuals: '++id, &[projectId+period], projectId, period'
     }).upgrade(tx => {
-      // Upgrade handler for schema version 3
+// Upgrade handler for schema version 3: Changes index for 'actuals' table from modelId+period to projectId+period
     });
     
     this.version(2).stores({
