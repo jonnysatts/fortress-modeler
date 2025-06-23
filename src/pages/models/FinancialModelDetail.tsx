@@ -354,13 +354,14 @@ const FinancialModelDetail = () => {
            <ModelOverview model={model as any} projectId={projectId} /> 
          </TabsContent>
 
-         <TabsContent value="marketing">
-           <MarketingChannelsForm 
-             marketingSetup={memoizedMarketingSetup} 
-             updateAssumptions={updateModelAssumptions} 
-             modelTimeUnit={isWeeklyEvent ? 'Week' : 'Month'} 
-           />
-         </TabsContent>
+           <TabsContent value="marketing">
+            <MarketingChannelsForm
+              marketingSetup={memoizedMarketingSetup}
+              updateAssumptions={updateModelAssumptions}
+              modelTimeUnit={isWeeklyEvent ? 'Week' : 'Month'}
+              metadata={memoizedMetadata}
+            />
+          </TabsContent>
 
          <TabsContent value="financial-matrix">
              <Card>
