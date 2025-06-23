@@ -23,8 +23,7 @@ import {
     db, 
     getProject, 
     FinancialModel, 
-    getActualsForProject, 
-    upsertActualsPeriod
+    getActualsForProject
 } from "@/lib/db";
 import { ActualsPeriodEntry } from "@/types/models";
 import { toast } from "@/hooks/use-toast";
