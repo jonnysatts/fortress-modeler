@@ -30,7 +30,17 @@ git clone <YOUR_GIT_URL>
 cd <YOUR_PROJECT_NAME>
 
 # Step 3: Install the necessary dependencies.
-npm i
+# You can use either npm or pnpm for this step.
+npm install
+# or
+pnpm install
+
+# **Important:** Always run `npm install` (or `pnpm install`) before using
+# `npm run dev`, `npm run build`, or `npm run lint`. These commands depend on
+# the packages installed in `node_modules` and will fail if the dependencies are
+# missing.
+# The included npm scripts run a small pre-check and will print a helpful
+# message if `node_modules` is absent.
 
 # Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
