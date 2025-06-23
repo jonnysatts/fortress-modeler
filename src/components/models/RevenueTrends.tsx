@@ -24,7 +24,6 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
 
   const trendData = useMemo(() => {
-    console.log("[RevenueTrends] Recalculating trendData...");
     try {
       const data = [];
       if (!model?.assumptions?.revenue || !model?.assumptions?.metadata) return [];
@@ -140,7 +139,6 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
 
   useEffect(() => {
     if (setCombinedData && trendData) {
-      console.log("[RevenueTrends] Calling setCombinedData");
       setCombinedData(trendData);
     }
   }, [trendData, setCombinedData]);

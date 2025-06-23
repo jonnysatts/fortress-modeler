@@ -144,7 +144,6 @@ export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({
       budgetApplication: allocationMode === 'highLevel' ? budgetApplication : undefined,
       spreadDuration: allocationMode === 'highLevel' && budgetApplication === 'spreadCustom' ? spreadDuration : undefined,
     };
-     console.log("Saving marketing setup:", currentInternalSetup);
      updateAssumptions({ marketing: currentInternalSetup });
   };
 

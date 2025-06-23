@@ -100,7 +100,6 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
   };
 
   const handleSaveActuals = async () => {
-    console.log("[ActualsInputForm] handleSaveActuals triggered."); 
     // Ensure projectId from the model exists and is a number before parsing
     const projectIdNum = model?.projectId;
     if (!model?.id || typeof projectIdNum !== 'number') { 
@@ -119,12 +118,10 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
         notes: periodData.notes
     };
 
-    console.log("[ActualsInputForm] Data prepared for upsert:", JSON.stringify(actualEntry));
 
     try {
         // Use the upsertActualsPeriod helper function correctly
         const savedId = await upsertActualsPeriod(actualEntry);
-        console.log(`[ActualsInputForm] Upsert successful, ID: ${savedId}`);
         
         toast({ title: "Success", description: `Actuals for ${timeUnit} ${selectedPeriod} saved.` });
         setInitialDataString(JSON.stringify(periodData)); 

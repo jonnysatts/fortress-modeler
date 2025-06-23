@@ -65,18 +65,13 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
   const timeUnit = isWeeklyEvent ? "Week" : "Month"; // Define timeUnit here
   const totalWeeks = model.assumptions.metadata?.weeks || 0;
 
-  // Log the received cost data prop
-  console.log(`[CategoryBreakdown Render] Received costTrendData:`, costTrendData);
-
-  console.log(`[CategoryBreakdown] View: ${breakdownView}, Selected Week: ${selectedWeek}`);
+  // Received cost data prop can be inspected during development
 
   // Find the data point for the selected week
   // Note: Assumes trendData arrays start from Week 1 at index 0
   const selectedRevenuePoint = revenueTrendData?.[selectedWeek - 1] || null;
   const selectedCostPoint = costTrendData?.[selectedWeek - 1] || null;
   
-  // Log the selected data point
-  console.log(`[CategoryBreakdown Render] Selected cost point for ${timeUnit} ${selectedWeek}:`, selectedCostPoint);
   
   // Calculate breakdown data for the selected week
   const revenueData = useMemo(() => 
@@ -92,8 +87,6 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
     [selectedCostPoint, model]
   );
 
-  // Log the costData just before rendering
-  console.log("[CategoryBreakdown Render] costData state before JSX:", costData);
   
   const weeklyTotals = useMemo(() => {
     if (!isWeeklyEvent) return null;

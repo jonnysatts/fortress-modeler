@@ -52,10 +52,8 @@ const FinancialModelDetail = () => {
 
   // Callbacks (call unconditionally)
   const updateModelAssumptions = useCallback(async (updatedFields: Partial<ModelAssumptions>) => {
-    console.log("[FinancialModelDetail] updateModelAssumptions called with:", JSON.stringify(updatedFields));
     
     if (!model || !model.id) {
-        console.log("[FinancialModelDetail] updateModelAssumptions skipped: no model or model.id");
         return;
     }
     
@@ -83,23 +81,16 @@ const FinancialModelDetail = () => {
       if (!newAssumptions.marketing) newAssumptions.marketing = { channels: [] };
       if (!newAssumptions.marketing.channels) newAssumptions.marketing.channels = [];
 
-      // *** Add specific log for marketing object before save ***
-      if (newAssumptions.marketing) {
-          console.log("[FinancialModelDetail] Marketing object being saved:", JSON.stringify(newAssumptions.marketing));
-      } else {
-          console.log("[FinancialModelDetail] No marketing object to save.");
-      }
+
       
       const assumptionsToSave = newAssumptions as FinancialModel['assumptions'];
 
-      console.log("[FinancialModelDetail] Attempting to save assumptions:", JSON.stringify(assumptionsToSave));
 
       await db.financialModels.update(model.id, { 
           assumptions: assumptionsToSave, 
           updatedAt: new Date() 
       });
       
-      console.log("[FinancialModelDetail] db.financialModels.update successful for ID:", model.id);
 
       setModel(prevModel => prevModel ? { 
           ...prevModel, 
@@ -307,7 +298,7 @@ const FinancialModelDetail = () => {
   // --- End Conditional Returns ---
 
   // Now it's safe to use the data and memoized props
-  console.log("[FinancialModelDetail Render] Passing marketingSetup:", memoizedMarketingSetup);
+
 
   return (
     <div className="space-y-6">

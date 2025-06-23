@@ -53,9 +53,7 @@ const ProjectDetail = () => {
   const fetchActualsData = useCallback(async () => {
     if (!projectId) return;
     try {
-      console.log(`Fetching actuals for project ID: ${projectId}`);
       const data = await getActualsForProject(parseInt(projectId));
-      console.log("Fetched actuals data:", data);
       setActualsData(data);
     } catch (error) {
       console.error("Error fetching actuals data:", error);
