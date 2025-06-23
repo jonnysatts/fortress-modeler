@@ -52,11 +52,11 @@ npm run dev
 
 ## What technologies are used for this project?
 
-This project is built with .
+This project is built with Vite, React, TypeScript, Tailwind CSS, and shadcn-ui.
 
 - Vite
-- TypeScript
 - React
+- TypeScript
 - shadcn-ui
 - Tailwind CSS
 
