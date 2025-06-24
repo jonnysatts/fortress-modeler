@@ -1,7 +1,5 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Chart, ChartConfiguration, registerables } from 'chart.js';
-import html2canvas from 'html2canvas';
 import { format } from 'date-fns';
 import { Project, FinancialModel } from './db';
 import { 
@@ -13,9 +11,6 @@ import {
   ScenarioAnalysis 
 } from './financial-calculations';
 import { formatCurrency } from './utils';
-
-// Register Chart.js components
-Chart.register(...registerables);
 
 export interface BoardReadyReportData {
   project: Project;
@@ -34,25 +29,23 @@ export interface ExecutiveSummary {
   marketOpportunity: string;
 }
 
-// Helper function to create charts as images
-async function createChartImage(config: ChartConfiguration, width: number = 400, height: number = 300): Promise<string> {
-  return new Promise((resolve) => {
-    // Create temporary canvas
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    document.body.appendChild(canvas);
-    
-    const chart = new Chart(canvas, config);
-    
-    // Wait for chart to render then convert to image
-    setTimeout(() => {
-      const imageData = canvas.toDataURL('image/png');
-      chart.destroy();
-      document.body.removeChild(canvas);
-      resolve(imageData);
-    }, 500);
-  });
+// Helper function to create simple ASCII charts (for now)
+function createSimpleChart(data: number[], labels: string[], title: string): string[] {
+  const chartLines = [];
+  chartLines.push(`${title}:`);
+  chartLines.push('');
+  
+  const maxValue = Math.max(...data);
+  const scale = maxValue > 0 ? 40 / maxValue : 1; // Scale to 40 characters width
+  
+  for (let i = 0; i < Math.min(data.length, labels.length); i++) {
+    const barLength = Math.round(data[i] * scale);
+    const bar = '█'.repeat(Math.max(0, barLength));
+    const value = formatCurrency(data[i]);
+    chartLines.push(`${labels[i].padEnd(12)} ${bar} ${value}`);
+  }
+  
+  return chartLines;
 }
 
 // Generate executive summary based on financial data
@@ -207,77 +200,56 @@ export async function exportBoardReadyPDF(data: BoardReadyReportData): Promise<v
     }
   });
   
-  // Create cash flow chart
-  const cashFlowData = data.cashFlows.slice(0, 12).map(cf => ({
-    period: cf.periodName,
-    netCashFlow: cf.netCashFlow,
-    cumulativeCashFlow: cf.cumulativeCashFlow
-  }));
+  // Cash Flow Analysis (Text-based for now)
+  doc.addPage();
+  doc.setFontSize(20);
+  doc.setTextColor(41, 128, 185);
+  doc.text('CASH FLOW ANALYSIS', margin, 30);
   
-  const chartConfig: ChartConfiguration = {
-    type: 'line',
-    data: {
-      labels: cashFlowData.map(d => d.period),
-      datasets: [
-        {
-          label: 'Net Cash Flow',
-          data: cashFlowData.map(d => d.netCashFlow),
-          borderColor: '#3b82f6',
-          backgroundColor: 'rgba(59, 130, 246, 0.1)',
-          tension: 0.4
-        },
-        {
-          label: 'Cumulative Cash Flow',
-          data: cashFlowData.map(d => d.cumulativeCashFlow),
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16, 185, 129, 0.1)',
-          tension: 0.4
-        }
-      ]
-    },
-    options: {
-      responsive: false,
-      plugins: {
-        title: {
-          display: true,
-          text: 'Cash Flow Projections (First 12 Periods)',
-          font: { size: 16 }
-        },
-        legend: {
-          display: true,
-          position: 'bottom'
-        }
-      },
-      scales: {
-        y: {
-          beginAtZero: false,
-          title: {
-            display: true,
-            text: 'Amount ($)'
-          },
-          ticks: {
-            callback: function(value: any) {
-              return '$' + (value / 1000).toFixed(0) + 'K';
-            }
-          }
-        }
-      }
+  // Create simple cash flow summary
+  const cashFlowSummary = data.cashFlows.slice(0, 6).map(cf => [
+    cf.periodName,
+    formatCurrency(cf.netCashFlow),
+    formatCurrency(cf.cumulativeCashFlow),
+    cf.netCashFlow > 0 ? 'Positive' : 'Negative'
+  ]);
+  
+  autoTable(doc, {
+    startY: 50,
+    head: [['Period', 'Net Cash Flow', 'Cumulative CF', 'Status']],
+    body: cashFlowSummary,
+    theme: 'grid',
+    styles: { fontSize: 10, cellPadding: 4 },
+    headStyles: { fillColor: [41, 128, 185], textColor: [255, 255, 255] },
+    columnStyles: {
+      1: { halign: 'right' },
+      2: { halign: 'right' },
+      3: { halign: 'center' }
     }
-  };
+  });
   
-  try {
-    const chartImage = await createChartImage(chartConfig, 500, 300);
-    
-    // Add chart to PDF
-    doc.addPage();
-    doc.setFontSize(20);
-    doc.setTextColor(41, 128, 185);
-    doc.text('CASH FLOW ANALYSIS', margin, 30);
-    
-    doc.addImage(chartImage, 'PNG', margin, 50, pageWidth - 2 * margin, 120);
-    
-  } catch (error) {
-    console.warn('Chart generation failed, skipping chart:', error);
+  // Add cash flow insights
+  let insightY = (doc as any).lastAutoTable.finalY + 20;
+  
+  doc.setFontSize(14);
+  doc.setTextColor(0, 0, 0);
+  doc.text('Key Cash Flow Insights:', margin, insightY);
+  insightY += 15;
+  
+  const totalNetCF = data.cashFlows.reduce((sum, cf) => sum + cf.netCashFlow, 0);
+  const positiveMonths = data.cashFlows.filter(cf => cf.netCashFlow > 0).length;
+  
+  doc.setFontSize(11);
+  doc.text(`• Total projected net cash flow: ${formatCurrency(totalNetCF)}`, margin + 5, insightY);
+  insightY += 12;
+  doc.text(`• Positive cash flow periods: ${positiveMonths} out of ${data.cashFlows.length}`, margin + 5, insightY);
+  insightY += 12;
+  
+  const breakEvenPeriod = data.cashFlows.findIndex(cf => cf.cumulativeCashFlow >= 0);
+  if (breakEvenPeriod >= 0) {
+    doc.text(`• Cash flow break-even: ${data.cashFlows[breakEvenPeriod].periodName}`, margin + 5, insightY);
+  } else {
+    doc.text('• Cash flow break-even: Not achieved in projection period', margin + 5, insightY);
   }
   
   // Scenario Analysis

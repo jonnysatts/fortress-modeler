@@ -11,6 +11,7 @@ import { getProjects, db } from "@/lib/db";
 import { exportToExcel, exportToPDF } from "@/lib/export";
 import { exportEnhancedExcel } from "@/lib/enhanced-excel-export";
 import { exportBoardReadyPDF, prepareBoardReadyData } from "@/lib/board-ready-export";
+import { exportSimpleExcel, exportSimplePDF } from "@/lib/simple-export";
 import { performFinancialAnalysis, generateCashFlowProjections } from "@/lib/financial-calculations";
 import useStore from "@/store/useStore";
 
@@ -36,40 +37,31 @@ const Settings = () => {
       }
       
       const firstProject = projects[0];
+      console.log('Exporting project:', firstProject);
+      
       const models = await db.financialModels
         .where('projectId')
         .equals(firstProject.id!)
         .toArray();
       
-      if (models.length === 0) {
-        toast({
-          title: "No financial models found",
-          description: "Create at least one financial model to export data.",
-          variant: "destructive",
-        });
-        return;
-      }
+      console.log('Found models:', models);
       
-      // Use enhanced Excel export with comprehensive data
-      await exportEnhancedExcel({
+      // Use simple, reliable Excel export first
+      await exportSimpleExcel({
         project: firstProject,
-        models,
-        includeScenarios: true,
-        includeSensitivity: true,
-        periods: 36,
-        discountRate: 0.1
+        models
       });
       
       toast({
-        title: "Enhanced Excel export completed",
-        description: "Your comprehensive financial analysis has been exported to Excel with multiple worksheets.",
+        title: "Excel export completed",
+        description: "Your project data has been exported to Excel successfully.",
       });
       
     } catch (error) {
       console.error('Export error:', error);
       toast({
         title: "Export failed",
-        description: "There was an error exporting your data. Please try again.",
+        description: `Error: ${error.message}. Please try again or check the console for details.`,
         variant: "destructive",
       });
     } finally {
@@ -96,32 +88,22 @@ const Settings = () => {
         .equals(firstProject.id!)
         .toArray();
       
-      let metrics = undefined;
-      let cashFlows = undefined;
-      
-      if (models.length > 0) {
-        const firstModel = models[0];
-        metrics = performFinancialAnalysis(firstModel, 36, 0.1, false);
-        cashFlows = generateCashFlowProjections(firstModel, 12, false); // 12 periods for PDF
-      }
-      
-      await exportToPDF({
+      // Use simple, reliable PDF export
+      await exportSimplePDF({
         project: firstProject,
-        models,
-        cashFlows,
-        metrics,
+        models
       });
       
       toast({
         title: "PDF export completed",
-        description: "Your basic financial analysis report has been exported to PDF.",
+        description: "Your project report has been exported to PDF successfully.",
       });
       
     } catch (error) {
       console.error('Export error:', error);
       toast({
         title: "Export failed",
-        description: "There was an error exporting your data. Please try again.",
+        description: `Error: ${error.message}. Please try again or check the console for details.`,
         variant: "destructive",
       });
     } finally {
@@ -157,22 +139,39 @@ const Settings = () => {
         return;
       }
       
-      // Prepare comprehensive board-ready data
-      const reportData = await prepareBoardReadyData(firstProject, models, 36, 0.1);
-      
-      // Generate the board-ready PDF
-      await exportBoardReadyPDF(reportData);
-      
-      toast({
-        title: "Executive report generated",
-        description: "Your board-ready executive financial report has been exported successfully.",
-      });
+      try {
+        // Try the enhanced board-ready export
+        const reportData = await prepareBoardReadyData(firstProject, models, 36, 0.1);
+        await exportBoardReadyPDF(reportData);
+        
+        toast({
+          title: "Executive report generated",
+          description: "Your board-ready executive financial report has been exported successfully.",
+        });
+      } catch (boardError) {
+        console.warn('Board-ready export failed, falling back to enhanced PDF:', boardError);
+        
+        // Fallback to enhanced Excel export if board-ready fails
+        await exportEnhancedExcel({
+          project: firstProject,
+          models,
+          includeScenarios: true,
+          includeSensitivity: true,
+          periods: 36,
+          discountRate: 0.1
+        });
+        
+        toast({
+          title: "Enhanced Excel report generated",
+          description: "Board-ready PDF had issues, but your comprehensive Excel analysis has been exported.",
+        });
+      }
       
     } catch (error) {
       console.error('Board-ready export error:', error);
       toast({
         title: "Export failed",
-        description: "There was an error generating the executive report. Please try again.",
+        description: `Error: ${error.message}. Please try basic exports instead.`,
         variant: "destructive",
       });
     } finally {
@@ -283,9 +282,9 @@ const Settings = () => {
                   All data is stored locally in your browser. Export your financial models and analysis in multiple formats:
                 </p>
                 <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-                  <li>• <strong>Excel:</strong> Enhanced export with 8+ worksheets including scenarios, sensitivity analysis, and detailed projections</li>
-                  <li>• <strong>Basic PDF:</strong> Standard financial analysis report</li>
-                  <li>• <strong>Executive Report:</strong> Board-ready PDF with charts, executive summary, and strategic recommendations</li>
+                  <li>• <strong>Excel:</strong> Comprehensive project and financial model data export</li>
+                  <li>• <strong>Basic PDF:</strong> Professional project report with revenue and cost breakdowns</li>
+                  <li>• <strong>Executive Report:</strong> Advanced analysis with scenarios and metrics (Excel fallback if needed)</li>
                 </ul>
               </div>
               
