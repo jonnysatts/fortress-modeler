@@ -79,9 +79,9 @@ export function logError(error: unknown, context?: string): void {
   if (import.meta.env.MODE === 'production') {
     // In production, you would send this to a logging service
     // For now, we'll just use console.error
-    console.error('Application Error:', errorInfo);
+    console.error('Application Error:', JSON.stringify(errorInfo, null, 2));
   } else {
-    console.error('Application Error:', errorInfo);
+    console.error('Application Error:', JSON.stringify(errorInfo, null, 2));
     console.error('Raw error object:', error);
   }
 }

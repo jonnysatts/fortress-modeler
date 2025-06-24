@@ -39,24 +39,39 @@ import { ActualsInputForm } from "@/components/models/ActualsInputForm";
 import ModelOverview from "@/components/models/ModelOverview";
 import { ActualsDisplayTable } from "@/components/models/ActualsDisplayTable";
 import { PerformanceAnalysis } from "@/components/models/PerformanceAnalysis";
+import { config } from "@/lib/config";
 
 const ProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+
+  // Guard against invalid project IDs
+  useEffect(() => {
+    if (!projectId || projectId === 'NaN' || projectId === '[object Object]' || projectId.includes('object')) {
+      console.error('Invalid project ID:', projectId);
+      navigate('/projects', { replace: true });
+      return;
+    }
+  }, [projectId, navigate]);
   const [loading, setLoading] = useState(true);
   const [financialModels, setFinancialModels] = useState<FinancialModel[]>([]);
-  const { currentProject, setCurrentProject, deleteProject } = useStore();
+  const { currentProject, setCurrentProject, deleteProject, loadProjectById } = useStore();
   const [activeTab, setActiveTab] = useState("overview");
 
   const [actualsData, setActualsData] = useState<ActualsPeriodEntry[]>([]);
   const fetchActualsData = useCallback(async () => {
     if (!projectId) return;
     try {
-      const data = await getActualsForProject(parseInt(projectId));
+      // Handle both integer IDs and UUID strings
+      const numericId = isNaN(parseInt(projectId)) ? 0 : parseInt(projectId);
+      const data = await getActualsForProject(numericId);
       setActualsData(data);
     } catch (error) {
       console.error("Error fetching actuals data:", error);
-      toast({ variant: "destructive", title: "Error Loading Actuals", description: "Could not load performance data." });
+      // Don't show error toast for UUID projects (they won't have actuals data yet)
+      if (!isNaN(parseInt(projectId))) {
+        toast({ variant: "destructive", title: "Error Loading Actuals", description: "Could not load performance data." });
+      }
       setActualsData([]);
     }
   }, [projectId]);
@@ -66,11 +81,38 @@ const ProjectDetail = () => {
       if (!projectId) return;
       setLoading(true);
       try {
-        const project = await getProject(parseInt(projectId));
+        // Handle both integer and UUID project IDs
+        const isUUID = isNaN(parseInt(projectId));
+        let project = null;
+        
+        if (isUUID) {
+          // For UUID projects, we need cloud API (check if cloud sync is enabled)
+          if (config.useCloudSync) {
+            project = await loadProjectById(projectId);
+          } else {
+            // Cloud sync is disabled but trying to access UUID project - redirect to projects list
+            toast({
+              variant: "destructive",
+              title: "Project unavailable",
+              description: "This project requires cloud access. Please contact support.",
+            });
+            navigate("/projects");
+            return;
+          }
+        } else {
+          // For integer projects, use the old method
+          project = await getProject(parseInt(projectId));
+        }
+        
         if (project) {
           setCurrentProject(project);
-          const models = await db.financialModels.where('projectId').equals(parseInt(projectId)).toArray();
-          setFinancialModels(models);
+          // Only load financial models for integer projects (UUIDs won't have local models)
+          if (!isUUID) {
+            const models = await db.financialModels.where('projectId').equals(parseInt(projectId)).toArray();
+            setFinancialModels(models);
+          } else {
+            setFinancialModels([]);
+          }
           fetchActualsData();
         } else {
           toast({

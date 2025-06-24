@@ -7,6 +7,8 @@ import { lazy, Suspense } from "react";
 import AppLayout from "./components/layout/AppLayout";
 import AppLoader from "./components/AppLoader";
 import { useAppLoader } from "./hooks/useAppLoader";
+import { AuthProvider } from "./hooks/useAuth";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 // Lazy load components for code splitting
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -19,6 +21,8 @@ const FinancialModelDetail = lazy(() => import("./pages/models/FinancialModelDet
 const EditFinancialModel = lazy(() => import("./pages/models/EditFinancialModel"));
 const Settings = lazy(() => import("./pages/Settings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const Login = lazy(() => import("./pages/Login"));
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 
 // Loading component for Suspense
 const PageLoader = () => (
@@ -53,29 +57,37 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              <Route path="/" element={<AppLayout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="projects" element={<ProjectsList />} />
-                <Route path="projects/new" element={<NewProject />} />
-                <Route path="projects/:projectId" element={<ProjectDetail />} />
-                <Route path="projects/:projectId/edit" element={<EditProject />} />
-                <Route path="projects/:projectId/models/new" element={<NewFinancialModel />} />
-                <Route path="projects/:projectId/models/:modelId" element={<FinancialModelDetail />} />
-                <Route path="projects/:projectId/models/:modelId/edit" element={<EditFinancialModel />} />
-                <Route path="modeling" element={<Dashboard />} />
-                <Route path="performance" element={<Dashboard />} />
-                <Route path="risks" element={<Dashboard />} />
-                <Route path="settings" element={<Settings />} />
-              </Route>
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
+        <AuthProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                {/* Public routes */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
+                
+                {/* Protected routes */}
+                <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+                  <Route index element={<Dashboard />} />
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="projects" element={<ProjectsList />} />
+                  <Route path="projects/new" element={<NewProject />} />
+                  <Route path="projects/:projectId" element={<ProjectDetail />} />
+                  <Route path="projects/:projectId/edit" element={<EditProject />} />
+                  <Route path="projects/:projectId/models/new" element={<NewFinancialModel />} />
+                  <Route path="projects/:projectId/models/:modelId" element={<FinancialModelDetail />} />
+                  <Route path="projects/:projectId/models/:modelId/edit" element={<EditFinancialModel />} />
+                  <Route path="modeling" element={<Dashboard />} />
+                  <Route path="performance" element={<Dashboard />} />
+                  <Route path="risks" element={<Dashboard />} />
+                  <Route path="settings" element={<Settings />} />
+                </Route>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

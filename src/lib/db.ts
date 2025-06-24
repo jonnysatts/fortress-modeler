@@ -148,7 +148,7 @@ export const getProjects = async (): Promise<Project[]> => {
 
 export const getProject = async (id: number): Promise<Project | undefined> => {
   try {
-    if (!id || id <= 0) {
+    if (!id || (typeof id === 'number' && id <= 0)) {
       throw new ValidationError('Invalid project ID provided');
     }
     const project = await db.projects.get(id);
@@ -186,7 +186,7 @@ export const createProject = async (project: Omit<Project, 'id' | 'createdAt' | 
 
 export const updateProject = async (id: number, project: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>): Promise<number> => {
   try {
-    if (!id || id <= 0) {
+    if (!id || (typeof id === 'number' && id <= 0)) {
       throw new ValidationError('Invalid project ID provided');
     }
     
@@ -210,7 +210,7 @@ export const updateProject = async (id: number, project: Partial<Omit<Project, '
 
 export const deleteProject = async (id: number): Promise<void> => {
   try {
-    if (!id || id <= 0) {
+    if (!id || (typeof id === 'number' && id <= 0)) {
       throw new ValidationError('Invalid project ID provided');
     }
     

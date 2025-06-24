@@ -2,19 +2,25 @@ import React, { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import { Toaster } from "@/components/ui/toaster";
-import { db, addDemoData } from "@/lib/db";
+import { addDemoData } from "@/lib/db";
+import { config } from "@/lib/config";
+import { useAuth } from "@/hooks/useAuth";
 import useStore from "@/store/useStore";
 
 const AppLayout = () => {
   const [initializing, setInitializing] = useState(true);
   const loadProjects = useStore((state) => state.loadProjects);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const { user } = useAuth();
 
   // Initialize the database and load projects
   useEffect(() => {
     const init = async () => {
       try {
-        await addDemoData(); // Add demo data if the database is empty
+        // Only add demo data if not using cloud sync or user is not authenticated
+        if (!config.useCloudSync || !user) {
+          await addDemoData(); // Add demo data if the database is empty
+        }
         await loadProjects();
       } catch (error) {
         console.error("Error initializing app:", error);
@@ -24,7 +30,7 @@ const AppLayout = () => {
     };
 
     init();
-  }, [loadProjects]);
+  }, [loadProjects, user]);
 
   const toggleSidebar = () => {
     setIsSidebarCollapsed(!isSidebarCollapsed);
