@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Edit, Download, Share2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { db } from "@/lib/db";
 
 interface ModelOverviewProps {
   model: Model;
@@ -378,10 +379,56 @@ const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverviewProp
     }
   }, [navigate, projectId, model.id]);
   
-  // Placeholder functions for Download/Share
-  const handleDownload = useCallback(() => {
-    alert("Download report functionality not implemented yet.");
-  }, []);
+  // Download report functionality
+  const handleDownload = useCallback(async () => {
+    if (!projectId || !model) {
+      alert("Missing project or model data.");
+      return;
+    }
+
+    try {
+      // Get project data
+      const project = await db.projects.get(Number(projectId));
+      if (!project) {
+        alert("Project not found.");
+        return;
+      }
+
+      // Show format selection with 3 options
+      const choice = prompt("Choose export format:\n1 = Rich PDF with Charts\n2 = Product Strategy PDF\n3 = Excel Report\n\nEnter 1, 2, or 3:");
+      
+      if (choice === "1") {
+        // Export rich PDF with charts and financial data
+        const { exportRichPDF } = await import("@/lib/rich-pdf-export");
+        await exportRichPDF({
+          project,
+          model,
+          simulationResults
+        });
+      } else if (choice === "2") {
+        // Export product strategy PDF
+        const { exportBoardReadyPDF, prepareBoardReadyData } = await import("@/lib/board-ready-export");
+        const reportData = await prepareBoardReadyData(project, [model], 36, 0.1);
+        await exportBoardReadyPDF(reportData);
+      } else if (choice === "3") {
+        // Export Excel using enhanced export
+        const { exportEnhancedExcel } = await import("@/lib/enhanced-excel-export");
+        await exportEnhancedExcel({
+          project,
+          models: [model],
+          includeScenarios: true,
+          includeSensitivity: true,
+          periods: 36,
+          discountRate: 0.1
+        });
+      } else {
+        return; // User cancelled or invalid choice
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      alert(`Download failed: ${error.message}`);
+    }
+  }, [projectId, model, simulationResults]);
   
   const handleShare = useCallback(() => {
     alert("Share model functionality not implemented yet.");

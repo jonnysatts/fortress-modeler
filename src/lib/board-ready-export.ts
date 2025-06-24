@@ -12,21 +12,23 @@ import {
 } from './financial-calculations';
 import { formatCurrency } from './utils';
 
-export interface BoardReadyReportData {
+export interface ProductReportData {
   project: Project;
   models: FinancialModel[];
-  financialMetrics: FinancialMetrics;
-  cashFlows: CashFlowPeriod[];
-  scenarioAnalysis: ScenarioAnalysis;
-  executiveSummary: ExecutiveSummary;
+  productSummary: ProductSummary;
+  revenueProjections: any[];
+  costBreakdown: any[];
 }
 
-export interface ExecutiveSummary {
-  investmentThesis: string;
-  keyHighlights: string[];
-  riskFactors: string[];
+export interface ProductSummary {
+  productOverview: string;
+  keyMetrics: string[];
+  operationalInsights: string[];
   recommendations: string[];
-  marketOpportunity: string;
+  marketPosition: string;
+  revenueAnalysis: string;
+  costStructureInsights: string;
+  resourceRequirements: string[];
 }
 
 // Helper function to create simple ASCII charts (for now)
@@ -48,63 +50,133 @@ function createSimpleChart(data: number[], labels: string[], title: string): str
   return chartLines;
 }
 
-// Generate executive summary based on financial data
-function generateExecutiveSummary(
+// Generate product-focused summary with real data analysis
+function generateProductSummary(
   project: Project, 
-  metrics: FinancialMetrics, 
-  scenarios: ScenarioAnalysis
-): ExecutiveSummary {
-  const npvPositive = metrics.npv > 0;
-  const strongROI = metrics.roi > 15;
-  const reasonablePayback = metrics.paybackPeriod < 24; // Less than 2 years
+  models: FinancialModel[]
+): ProductSummary {
+  const primaryModel = models[0];
+  if (!primaryModel?.assumptions) {
+    throw new Error('No model data available for analysis');
+  }
   
-  // Investment thesis
-  const investmentThesis = npvPositive && strongROI 
-    ? `${project.name} represents a compelling investment opportunity with strong financial returns and manageable risk profile.`
-    : `${project.name} shows potential but requires careful risk management and optimization strategies.`;
+  // Analyze revenue streams
+  const revenueStreams = primaryModel.assumptions.revenue || [];
+  const totalInitialRevenue = revenueStreams.reduce((sum, stream) => sum + (stream.value || 0), 0);
+  const largestStream = revenueStreams.reduce((max, stream) => 
+    (stream.value || 0) > (max.value || 0) ? stream : max, revenueStreams[0] || { name: 'None', value: 0 });
+  const revenueConcentration = totalInitialRevenue > 0 ? ((largestStream.value || 0) / totalInitialRevenue * 100) : 0;
   
-  // Key highlights
-  const keyHighlights = [
-    `Projected NPV of ${formatCurrency(metrics.npv)} with ${metrics.irr.toFixed(1)}% IRR`,
-    `Total revenue potential of ${formatCurrency(metrics.totalRevenue)} over the projection period`,
-    `${metrics.profitMargin.toFixed(1)}% profit margin with ${formatCurrency(metrics.totalProfit)} total profit`,
-    reasonablePayback 
-      ? `Payback period of ${metrics.paybackPeriod.toFixed(1)} months indicates strong cash flow recovery`
-      : `Extended payback period of ${metrics.paybackPeriod.toFixed(1)} months requires sustained commitment`
+  // Analyze cost structure
+  const costs = primaryModel.assumptions.costs || [];
+  const totalCosts = costs.reduce((sum, cost) => sum + (cost.value || 0), 0);
+  const fixedCosts = costs.filter(cost => cost.type?.toLowerCase() === 'fixed');
+  const variableCosts = costs.filter(cost => cost.type?.toLowerCase() === 'variable');
+  const fixedCostRatio = totalCosts > 0 ? (fixedCosts.reduce((sum, cost) => sum + (cost.value || 0), 0) / totalCosts * 100) : 0;
+  
+  // Analyze growth assumptions
+  const metadata = primaryModel.assumptions.metadata;
+  const hasGrowthModel = metadata?.growth || primaryModel.assumptions.growthModel;
+  const isWeeklyModel = metadata?.type === 'WeeklyEvent';
+  
+  // Product overview - data-driven analysis
+  const productOverview = `${project.name} is a ${project.productType} with ${revenueStreams.length} revenue stream${revenueStreams.length !== 1 ? 's' : ''} generating ${formatCurrency(totalInitialRevenue)} in initial monthly revenue. The model ${hasGrowthModel ? 'includes growth projections' : 'assumes static performance'} and operates with ${costs.length} cost component${costs.length !== 1 ? 's' : ''} totaling ${formatCurrency(totalCosts)} monthly.`;
+  
+  // Key metrics - based on actual data
+  const keyMetrics = [
+    `${revenueStreams.length} revenue streams with ${formatCurrency(totalInitialRevenue)} monthly potential`,
+    `Primary revenue driver: ${largestStream.name} (${revenueConcentration.toFixed(1)}% of total)`,
+    `Cost structure: ${fixedCostRatio.toFixed(1)}% fixed costs, ${(100-fixedCostRatio).toFixed(1)}% variable`,
+    `Initial margin: ${totalInitialRevenue > 0 ? ((totalInitialRevenue - totalCosts) / totalInitialRevenue * 100).toFixed(1) : 0}%`,
+    isWeeklyModel && metadata?.initialWeeklyAttendance ? `Weekly attendance target: ${metadata.initialWeeklyAttendance.toLocaleString()}` : 'Monthly recurring model'
   ];
   
-  // Risk factors
-  const riskFactors = [
-    scenarios.worstCase.npv < 0 
-      ? `Worst-case scenario shows negative NPV of ${formatCurrency(scenarios.worstCase.npv)}`
-      : 'Downside scenarios remain profitable with manageable risk',
-    `Revenue sensitivity: 10% revenue decline impacts NPV by ${Math.abs(scenarios.sensitivity.revenueImpact.find(r => r.change === -10)?.npvChange || 0).toFixed(1)}%`,
-    `Cost sensitivity: 10% cost increase impacts NPV by ${Math.abs(scenarios.sensitivity.costImpact.find(c => c.change === 10)?.npvChange || 0).toFixed(1)}%`,
-    'Market adoption and competitive response may impact projections'
-  ];
+  // Operational insights - analyze the data patterns
+  const operationalInsights = [];
   
-  // Recommendations
-  const recommendations = [
-    npvPositive ? 'Proceed with implementation given positive financial projections' : 'Consider optimization strategies before proceeding',
-    metrics.paybackPeriod > 18 ? 'Focus on accelerating revenue generation in early periods' : 'Maintain current revenue trajectory',
-    'Monitor key assumptions and adjust projections quarterly',
-    'Implement risk mitigation strategies for identified downside scenarios'
-  ];
+  if (revenueConcentration > 70) {
+    operationalInsights.push(`High revenue concentration risk: ${largestStream.name} represents ${revenueConcentration.toFixed(1)}% of revenue`);
+  } else if (revenueConcentration < 40) {
+    operationalInsights.push(`Well-diversified revenue model with balanced stream distribution`);
+  }
   
-  // Market opportunity
-  const marketOpportunity = `The ${project.productType} market presents significant opportunity with ${project.targetAudience || 'target customer segments'} showing strong demand indicators. Revenue projections are based on conservative market penetration assumptions with potential for upside in favorable conditions.`;
+  if (fixedCostRatio > 60) {
+    operationalInsights.push(`High fixed cost structure (${fixedCostRatio.toFixed(1)}%) creates operational leverage but increases break-even risk`);
+  } else if (fixedCostRatio < 30) {
+    operationalInsights.push(`Variable cost structure (${(100-fixedCostRatio).toFixed(1)}% variable) provides operational flexibility`);
+  }
+  
+  if (isWeeklyModel && metadata?.growth?.attendanceGrowthRate) {
+    operationalInsights.push(`Event-based model with ${metadata.growth.attendanceGrowthRate}% weekly attendance growth projection`);
+  }
+  
+  if (revenueStreams.some(stream => stream.name?.includes('F&B') || stream.name?.includes('Food'))) {
+    operationalInsights.push(`Includes food & beverage revenue streams requiring inventory and staff management`);
+  }
+  
+  // Recommendations based on data analysis
+  const recommendations = [];
+  
+  if (revenueConcentration > 60) {
+    recommendations.push(`Diversify revenue streams to reduce dependency on ${largestStream.name}`);
+  }
+  
+  if (fixedCostRatio > 70) {
+    recommendations.push('Consider variable cost alternatives to reduce operational risk');
+  } else if (fixedCostRatio < 20) {
+    recommendations.push('Evaluate fixed cost investments to achieve economies of scale');
+  }
+  
+  if (totalInitialRevenue < totalCosts) {
+    recommendations.push('Focus on revenue optimization or cost reduction to achieve positive margins');
+  }
+  
+  if (hasGrowthModel) {
+    recommendations.push('Monitor growth assumptions and adjust projections based on actual performance');
+  }
+  
+  recommendations.push('Implement monthly performance tracking against model assumptions');
+  
+  // Market position analysis
+  const marketPosition = `${project.name} targets ${project.targetAudience || 'defined market segments'} with a ${revenueStreams.length > 2 ? 'multi-revenue' : 'focused'} business model. The ${project.productType} category offers ${totalInitialRevenue > totalCosts ? 'positive initial margins' : 'path to profitability'} with ${hasGrowthModel ? 'growth-oriented' : 'steady-state'} projections.`;
+  
+  // Revenue analysis
+  const topStreams = revenueStreams.sort((a, b) => (b.value || 0) - (a.value || 0)).slice(0, 3);
+  const revenueAnalysis = `Revenue is primarily driven by ${topStreams.map(s => s.name).join(', ')}. ${largestStream.name} contributes ${revenueConcentration.toFixed(1)}% of total revenue at ${formatCurrency(largestStream.value || 0)} monthly. ${revenueStreams.length > 3 ? `Additional streams provide ${(100 - revenueConcentration).toFixed(1)}% diversification.` : 'Revenue concentration requires monitoring.'}`;
+  
+  // Cost structure insights
+  const costCategories = [...new Set(costs.map(c => c.category).filter(Boolean))];
+  const costStructureInsights = `Operating costs total ${formatCurrency(totalCosts)} monthly across ${costCategories.length} categories${costCategories.length > 0 ? ` (${costCategories.join(', ')})` : ''}. Fixed costs represent ${fixedCostRatio.toFixed(1)}% of structure, providing ${fixedCostRatio > 50 ? 'operational leverage potential' : 'cost flexibility'}. ${variableCosts.length > 0 ? `Variable costs scale with ${variableCosts.map(c => c.name).join(', ')}.` : ''}`;
+  
+  // Only include factual resource data from the model
+  const setupCosts = costs.filter(cost => cost.name?.toLowerCase().includes('setup')).reduce((sum, cost) => sum + (cost.value || 0), 0);
+  const operatingCosts = totalCosts - setupCosts;
+  
+  const resourceRequirements = [];
+  if (setupCosts > 0) {
+    resourceRequirements.push(`Setup costs identified: ${formatCurrency(setupCosts)}`);
+  }
+  if (operatingCosts > 0) {
+    resourceRequirements.push(`Monthly operating costs: ${formatCurrency(operatingCosts)}`);
+  }
+  if (totalCosts > 0) {
+    resourceRequirements.push(`Total monthly budget requirement: ${formatCurrency(totalCosts)}`);
+  }
   
   return {
-    investmentThesis,
-    keyHighlights,
-    riskFactors,
+    productOverview,
+    keyMetrics,
+    operationalInsights,
     recommendations,
-    marketOpportunity
+    marketPosition,
+    revenueAnalysis,
+    costStructureInsights,
+    resourceRequirements
   };
 }
 
-// Create board-ready PDF report
-export async function exportBoardReadyPDF(data: BoardReadyReportData): Promise<void> {
+// Create product-focused PDF report
+export async function exportProductPDF(data: ProductReportData): Promise<void> {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
@@ -116,7 +188,7 @@ export async function exportBoardReadyPDF(data: BoardReadyReportData): Promise<v
   
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(28);
-  doc.text('EXECUTIVE FINANCIAL ANALYSIS', pageWidth / 2, 35, { align: 'center' });
+  doc.text('PRODUCT ANALYSIS REPORT', pageWidth / 2, 35, { align: 'center' });
   
   doc.setFontSize(18);
   doc.text(data.project.name, pageWidth / 2, 55, { align: 'center' });
@@ -125,236 +197,280 @@ export async function exportBoardReadyPDF(data: BoardReadyReportData): Promise<v
   doc.setFontSize(12);
   doc.text(`Prepared on ${format(new Date(), 'MMMM dd, yyyy')}`, pageWidth / 2, 100, { align: 'center' });
   doc.text(`Product Type: ${data.project.productType}`, pageWidth / 2, 115, { align: 'center' });
+  doc.text(`Target Audience: ${data.project.targetAudience || 'Not specified'}`, pageWidth / 2, 130, { align: 'center' });
   
-  // Executive Summary Section
+  // Product Overview Section
   doc.addPage();
   doc.setFontSize(20);
   doc.setTextColor(41, 128, 185);
-  doc.text('EXECUTIVE SUMMARY', margin, 30);
+  doc.text('PRODUCT OVERVIEW', margin, 30);
   
   let yPos = 50;
   
-  // Investment Thesis
-  doc.setFontSize(14);
-  doc.setTextColor(0, 0, 0);
-  doc.text('Investment Thesis', margin, yPos);
-  yPos += 10;
-  
+  // Product Overview
   doc.setFontSize(11);
-  const thesisLines = doc.splitTextToSize(data.executiveSummary.investmentThesis, pageWidth - 2 * margin);
-  doc.text(thesisLines, margin, yPos);
-  yPos += thesisLines.length * 6 + 15;
+  doc.setTextColor(0, 0, 0);
+  const overviewLines = doc.splitTextToSize(data.productSummary.productOverview, pageWidth - 2 * margin);
+  doc.text(overviewLines, margin, yPos);
+  yPos += overviewLines.length * 6 + 20;
   
-  // Key Highlights
+  // Key Metrics
   doc.setFontSize(14);
-  doc.text('Key Financial Highlights', margin, yPos);
+  doc.text('Key Performance Metrics', margin, yPos);
   yPos += 15;
   
-  data.executiveSummary.keyHighlights.forEach((highlight, index) => {
+  data.productSummary.keyMetrics.forEach((metric, index) => {
     doc.setFontSize(11);
-    doc.text(`• ${highlight}`, margin + 5, yPos);
+    doc.text(`• ${metric}`, margin + 5, yPos);
     yPos += 12;
   });
   
-  yPos += 10;
-  
-  // Risk Factors
-  doc.setFontSize(14);
-  doc.text('Key Risk Factors', margin, yPos);
   yPos += 15;
   
-  data.executiveSummary.riskFactors.forEach((risk, index) => {
-    doc.setFontSize(11);
-    doc.text(`• ${risk}`, margin + 5, yPos);
-    yPos += 12;
-  });
-  
-  // Financial Metrics Overview
-  doc.addPage();
-  doc.setFontSize(20);
-  doc.setTextColor(41, 128, 185);
-  doc.text('KEY FINANCIAL METRICS', margin, 30);
-  
-  // Metrics table
-  const metricsData = [
-    ['Net Present Value (NPV)', formatCurrency(data.financialMetrics.npv), data.financialMetrics.npv > 0 ? 'Positive' : 'Negative'],
-    ['Internal Rate of Return (IRR)', `${data.financialMetrics.irr.toFixed(1)}%`, data.financialMetrics.irr > 15 ? 'Strong' : 'Moderate'],
-    ['Return on Investment (ROI)', `${data.financialMetrics.roi.toFixed(1)}%`, data.financialMetrics.roi > 20 ? 'Excellent' : 'Good'],
-    ['Payback Period', `${data.financialMetrics.paybackPeriod.toFixed(1)} months`, data.financialMetrics.paybackPeriod < 18 ? 'Fast' : 'Extended'],
-    ['Total Revenue Projection', formatCurrency(data.financialMetrics.totalRevenue), 'Over projection period'],
-    ['Total Profit Projection', formatCurrency(data.financialMetrics.totalProfit), `${data.financialMetrics.profitMargin.toFixed(1)}% margin`],
-  ];
-  
-  autoTable(doc, {
-    startY: 50,
-    head: [['Metric', 'Value', 'Assessment']],
-    body: metricsData,
-    theme: 'grid',
-    styles: { fontSize: 10, cellPadding: 5 },
-    headStyles: { fillColor: [41, 128, 185], textColor: [255, 255, 255] },
-    alternateRowStyles: { fillColor: [245, 245, 245] },
-    columnStyles: {
-      0: { fontStyle: 'bold' },
-      1: { halign: 'right', fontStyle: 'bold' },
-      2: { halign: 'center' }
-    }
-  });
-  
-  // Cash Flow Analysis (Text-based for now)
-  doc.addPage();
-  doc.setFontSize(20);
-  doc.setTextColor(41, 128, 185);
-  doc.text('CASH FLOW ANALYSIS', margin, 30);
-  
-  // Create simple cash flow summary
-  const cashFlowSummary = data.cashFlows.slice(0, 6).map(cf => [
-    cf.periodName,
-    formatCurrency(cf.netCashFlow),
-    formatCurrency(cf.cumulativeCashFlow),
-    cf.netCashFlow > 0 ? 'Positive' : 'Negative'
-  ]);
-  
-  autoTable(doc, {
-    startY: 50,
-    head: [['Period', 'Net Cash Flow', 'Cumulative CF', 'Status']],
-    body: cashFlowSummary,
-    theme: 'grid',
-    styles: { fontSize: 10, cellPadding: 4 },
-    headStyles: { fillColor: [41, 128, 185], textColor: [255, 255, 255] },
-    columnStyles: {
-      1: { halign: 'right' },
-      2: { halign: 'right' },
-      3: { halign: 'center' }
-    }
-  });
-  
-  // Add cash flow insights
-  let insightY = (doc as any).lastAutoTable.finalY + 20;
-  
-  doc.setFontSize(14);
-  doc.setTextColor(0, 0, 0);
-  doc.text('Key Cash Flow Insights:', margin, insightY);
-  insightY += 15;
-  
-  const totalNetCF = data.cashFlows.reduce((sum, cf) => sum + cf.netCashFlow, 0);
-  const positiveMonths = data.cashFlows.filter(cf => cf.netCashFlow > 0).length;
-  
-  doc.setFontSize(11);
-  doc.text(`• Total projected net cash flow: ${formatCurrency(totalNetCF)}`, margin + 5, insightY);
-  insightY += 12;
-  doc.text(`• Positive cash flow periods: ${positiveMonths} out of ${data.cashFlows.length}`, margin + 5, insightY);
-  insightY += 12;
-  
-  const breakEvenPeriod = data.cashFlows.findIndex(cf => cf.cumulativeCashFlow >= 0);
-  if (breakEvenPeriod >= 0) {
-    doc.text(`• Cash flow break-even: ${data.cashFlows[breakEvenPeriod].periodName}`, margin + 5, insightY);
-  } else {
-    doc.text('• Cash flow break-even: Not achieved in projection period', margin + 5, insightY);
+  // Operational Insights
+  if (data.productSummary.operationalInsights.length > 0) {
+    doc.setFontSize(14);
+    doc.text('Operational Insights', margin, yPos);
+    yPos += 15;
+    
+    data.productSummary.operationalInsights.forEach((insight, index) => {
+      doc.setFontSize(11);
+      doc.text(`• ${insight}`, margin + 5, yPos);
+      yPos += 12;
+    });
   }
   
-  // Scenario Analysis
+  // Revenue & Market Analysis
   doc.addPage();
   doc.setFontSize(20);
   doc.setTextColor(41, 128, 185);
-  doc.text('SCENARIO ANALYSIS', margin, 30);
+  doc.text('REVENUE & MARKET ANALYSIS', margin, 30);
   
-  const scenarioData = [
-    ['Worst Case', formatCurrency(data.scenarioAnalysis.worstCase.npv), `${data.scenarioAnalysis.worstCase.irr.toFixed(1)}%`, `${data.scenarioAnalysis.worstCase.roi.toFixed(1)}%`],
-    ['Base Case', formatCurrency(data.scenarioAnalysis.baseCase.npv), `${data.scenarioAnalysis.baseCase.irr.toFixed(1)}%`, `${data.scenarioAnalysis.baseCase.roi.toFixed(1)}%`],
-    ['Best Case', formatCurrency(data.scenarioAnalysis.bestCase.npv), `${data.scenarioAnalysis.bestCase.irr.toFixed(1)}%`, `${data.scenarioAnalysis.bestCase.roi.toFixed(1)}%`],
-  ];
+  yPos = 50;
   
-  autoTable(doc, {
-    startY: 50,
-    head: [['Scenario', 'NPV', 'IRR', 'ROI']],
-    body: scenarioData,
-    theme: 'grid',
-    styles: { fontSize: 12, cellPadding: 8 },
-    headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255] },
-    columnStyles: {
-      1: { halign: 'right', fontStyle: 'bold' },
-      2: { halign: 'right' },
-      3: { halign: 'right' }
-    }
+  // Revenue Analysis
+  doc.setFontSize(14);
+  doc.setTextColor(0, 0, 0);
+  doc.text('Revenue Structure', margin, yPos);
+  yPos += 10;
+  
+  doc.setFontSize(11);
+  const revenueLines = doc.splitTextToSize(data.productSummary.revenueAnalysis, pageWidth - 2 * margin);
+  doc.text(revenueLines, margin, yPos);
+  yPos += revenueLines.length * 6 + 20;
+  
+  // Cost Structure
+  doc.setFontSize(14);
+  doc.text('Cost Structure Analysis', margin, yPos);
+  yPos += 10;
+  
+  doc.setFontSize(11);
+  const costLines = doc.splitTextToSize(data.productSummary.costStructureInsights, pageWidth - 2 * margin);
+  doc.text(costLines, margin, yPos);
+  yPos += costLines.length * 6 + 20;
+  
+  // Market Position
+  doc.setFontSize(14);
+  doc.text('Market Position', margin, yPos);
+  yPos += 10;
+  
+  doc.setFontSize(11);
+  const marketLines = doc.splitTextToSize(data.productSummary.marketPosition, pageWidth - 2 * margin);
+  doc.text(marketLines, margin, yPos);
+  yPos += marketLines.length * 6 + 15;
+  
+  // Implementation & Resource Planning
+  doc.addPage();
+  doc.setFontSize(20);
+  doc.setTextColor(41, 128, 185);
+  doc.text('IMPLEMENTATION PLAN & RESOURCES', margin, 30);
+  
+  yPos = 50;
+  
+  // Skip implementation timeline - no factual data available
+  
+  // Resource Requirements
+  doc.setFontSize(14);
+  doc.text('Resource Requirements', margin, yPos);
+  yPos += 15;
+  
+  data.productSummary.resourceRequirements.forEach((requirement, index) => {
+    doc.setFontSize(11);
+    doc.text(`• ${requirement}`, margin + 5, yPos);
+    yPos += 12;
   });
+  
+  yPos += 20;
   
   // Recommendations
-  let recommendationsY = (doc as any).lastAutoTable.finalY + 30;
-  
   doc.setFontSize(16);
   doc.setTextColor(41, 128, 185);
-  doc.text('RECOMMENDATIONS', margin, recommendationsY);
-  recommendationsY += 20;
+  doc.text('STRATEGIC RECOMMENDATIONS', margin, yPos);
+  yPos += 20;
   
-  data.executiveSummary.recommendations.forEach((recommendation, index) => {
+  data.productSummary.recommendations.forEach((recommendation, index) => {
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
-    doc.text(`${index + 1}. ${recommendation}`, margin, recommendationsY);
-    recommendationsY += 15;
+    doc.text(`${index + 1}. ${recommendation}`, margin, yPos);
+    yPos += 15;
   });
   
-  // Appendix: Detailed Cash Flow Table
+  // Business Model Fundamentals
   doc.addPage();
   doc.setFontSize(20);
   doc.setTextColor(41, 128, 185);
-  doc.text('APPENDIX: DETAILED CASH FLOW', margin, 30);
+  doc.text('BUSINESS MODEL FUNDAMENTALS', margin, 30);
   
-  const cashFlowTableData = data.cashFlows.slice(0, 24).map(cf => [
-    cf.periodName,
-    formatCurrency(cf.operatingCashFlow),
-    formatCurrency(cf.investingCashFlow),
-    formatCurrency(cf.financingCashFlow),
-    formatCurrency(cf.netCashFlow),
-    formatCurrency(cf.cumulativeCashFlow)
-  ]);
+  yPos = 50;
   
-  autoTable(doc, {
-    startY: 50,
-    head: [['Period', 'Operating CF', 'Investing CF', 'Financing CF', 'Net CF', 'Cumulative CF']],
-    body: cashFlowTableData,
-    theme: 'striped',
-    styles: { fontSize: 8, cellPadding: 3 },
-    headStyles: { fillColor: [155, 89, 182], textColor: [255, 255, 255] },
-    columnStyles: {
-      1: { halign: 'right' },
-      2: { halign: 'right' },
-      3: { halign: 'right' },
-      4: { halign: 'right' },
-      5: { halign: 'right' }
+  // Extract key business model data from the first model
+  const primaryModel = data.models[0];
+  if (primaryModel && primaryModel.assumptions) {
+    // Revenue Model
+    doc.setFontSize(14);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Revenue Model', margin, yPos);
+    yPos += 15;
+    
+    if (primaryModel.assumptions.revenue) {
+      const revenueModelData = primaryModel.assumptions.revenue.map(stream => [
+        stream.name,
+        formatCurrency(stream.value),
+        stream.type || 'N/A',
+        stream.frequency || 'Monthly'
+      ]);
+      
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Revenue Stream', 'Value', 'Type', 'Frequency']],
+        body: revenueModelData,
+        theme: 'striped',
+        styles: { fontSize: 10, cellPadding: 4 },
+        headStyles: { fillColor: [34, 197, 94], textColor: [255, 255, 255] },
+        columnStyles: {
+          1: { halign: 'right', fontStyle: 'bold' },
+          2: { halign: 'center' },
+          3: { halign: 'center' }
+        }
+      });
+      
+      yPos = (doc as any).lastAutoTable.finalY + 20;
     }
-  });
+    
+    // Cost Structure
+    doc.setFontSize(14);
+    doc.text('Cost Structure', margin, yPos);
+    yPos += 15;
+    
+    if (primaryModel.assumptions.costs) {
+      const costModelData = primaryModel.assumptions.costs.map(cost => [
+        cost.name,
+        formatCurrency(cost.value),
+        cost.type || 'N/A',
+        cost.category || 'General'
+      ]);
+      
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Cost Item', 'Value', 'Type', 'Category']],
+        body: costModelData,
+        theme: 'striped',
+        styles: { fontSize: 10, cellPadding: 4 },
+        headStyles: { fillColor: [239, 68, 68], textColor: [255, 255, 255] },
+        columnStyles: {
+          1: { halign: 'right', fontStyle: 'bold' },
+          2: { halign: 'center' },
+          3: { halign: 'center' }
+        }
+      });
+      
+      yPos = (doc as any).lastAutoTable.finalY + 20;
+    }
+    
+    // Unit Economics (if available)
+    if (primaryModel.assumptions.metadata) {
+      doc.setFontSize(14);
+      doc.text('Key Unit Economics', margin, yPos);
+      yPos += 15;
+      
+      const unitEconomics = [];
+      const metadata = primaryModel.assumptions.metadata;
+      
+      if (metadata.initialWeeklyAttendance) {
+        unitEconomics.push(['Initial Weekly Attendance', metadata.initialWeeklyAttendance.toLocaleString()]);
+      }
+      if (metadata.perCustomer?.fbSpend) {
+        unitEconomics.push(['F&B Spend per Customer', formatCurrency(metadata.perCustomer.fbSpend)]);
+      }
+      if (metadata.perCustomer?.merchandiseSpend) {
+        unitEconomics.push(['Merchandise Spend per Customer', formatCurrency(metadata.perCustomer.merchandiseSpend)]);
+      }
+      if (metadata.costs?.fbCOGSPercent) {
+        unitEconomics.push(['F&B Cost of Goods Sold', `${metadata.costs.fbCOGSPercent}%`]);
+      }
+      if (metadata.growth?.attendanceGrowthRate) {
+        unitEconomics.push(['Attendance Growth Rate', `${metadata.growth.attendanceGrowthRate}% weekly`]);
+      }
+      
+      if (unitEconomics.length > 0) {
+        autoTable(doc, {
+          startY: yPos,
+          head: [['Metric', 'Value']],
+          body: unitEconomics,
+          theme: 'grid',
+          styles: { fontSize: 10, cellPadding: 5 },
+          headStyles: { fillColor: [155, 89, 182], textColor: [255, 255, 255] },
+          columnStyles: {
+            0: { fontStyle: 'bold' },
+            1: { halign: 'right', fontStyle: 'bold' }
+          }
+        });
+      }
+    }
+  }
   
   // Download the PDF
-  const fileName = `${data.project.name.replace(/[^a-zA-Z0-9]/g, '_')}_Executive_Report_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+  const fileName = `${data.project.name.replace(/[^a-zA-Z0-9]/g, '_')}_Product_Report_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
   doc.save(fileName);
 }
 
-// Prepare data for board-ready report
+// Prepare data for product report
+export async function prepareProductReportData(
+  project: Project,
+  models: FinancialModel[]
+): Promise<ProductReportData> {
+  if (!models || models.length === 0) {
+    throw new Error('No financial model available for analysis');
+  }
+  
+  // Generate product-focused analysis
+  const productSummary = generateProductSummary(project, models);
+  
+  // Prepare simplified revenue and cost data
+  const primaryModel = models[0];
+  const revenueProjections = primaryModel.assumptions?.revenue || [];
+  const costBreakdown = primaryModel.assumptions?.costs || [];
+  
+  return {
+    project,
+    models,
+    productSummary,
+    revenueProjections,
+    costBreakdown
+  };
+}
+
+// Legacy function name for backward compatibility
 export async function prepareBoardReadyData(
   project: Project,
   models: FinancialModel[],
   periods: number = 36,
   discountRate: number = 0.1
-): Promise<BoardReadyReportData> {
-  // Use the first model for primary analysis
-  const primaryModel = models[0];
-  
-  if (!primaryModel) {
-    throw new Error('No financial model available for analysis');
-  }
-  
-  // Generate comprehensive analysis
-  const financialMetrics = performFinancialAnalysis(primaryModel, periods, discountRate, false);
-  const cashFlows = generateCashFlowProjections(primaryModel, periods, false);
-  const scenarioAnalysis = performScenarioAnalysis(primaryModel, periods, discountRate, false);
-  const executiveSummary = generateExecutiveSummary(project, financialMetrics, scenarioAnalysis);
-  
-  return {
-    project,
-    models,
-    financialMetrics,
-    cashFlows,
-    scenarioAnalysis,
-    executiveSummary
-  };
+): Promise<ProductReportData> {
+  return prepareProductReportData(project, models);
+}
+
+// Legacy function name for backward compatibility  
+export async function exportBoardReadyPDF(data: ProductReportData): Promise<void> {
+  return exportProductPDF(data);
 }

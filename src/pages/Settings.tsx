@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -21,7 +21,70 @@ const Settings = () => {
   const [backupFrequency, setBackupFrequency] = useState("weekly");
   const [isExporting, setIsExporting] = useState(false);
   
-  const { projects } = useStore();
+  const { projects, loadProjects } = useStore();
+  
+  // Debug: log projects on component mount
+  useEffect(() => {
+    console.log('Settings component - Current projects:', projects);
+    loadProjects(); // Ensure projects are loaded
+  }, [loadProjects]);
+
+  // Test export function that works without projects
+  const handleTestExport = async () => {
+    try {
+      setIsExporting(true);
+      
+      // Create a test project for export
+      const testProject = {
+        id: 1,
+        name: "Test Export Project",
+        description: "This is a test export to verify functionality",
+        productType: "Test Product",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        targetAudience: "Test users"
+      };
+
+      const testModels = [{
+        id: 1,
+        projectId: 1,
+        name: "Test Financial Model",
+        assumptions: {
+          revenue: [
+            { name: "Primary Revenue Stream", value: 10000, type: "recurring", frequency: "monthly" },
+            { name: "Secondary Revenue", value: 5000, type: "variable", frequency: "monthly" }
+          ],
+          costs: [
+            { name: "Operating Costs", value: 3000, type: "fixed", category: "operations" },
+            { name: "Marketing Spend", value: 2000, type: "variable", category: "marketing" }
+          ],
+          growthModel: { type: "linear", rate: 0.05 }
+        },
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }];
+      
+      await exportSimpleExcel({
+        project: testProject,
+        models: testModels
+      });
+      
+      toast({
+        title: "Test export completed",
+        description: "Test Excel file has been downloaded to verify export functionality.",
+      });
+      
+    } catch (error) {
+      console.error('Test export error:', error);
+      toast({
+        title: "Test export failed",
+        description: `Error: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
   
   const handleExportExcel = async () => {
     try {
@@ -282,13 +345,23 @@ const Settings = () => {
                   All data is stored locally in your browser. Export your financial models and analysis in multiple formats:
                 </p>
                 <ul className="text-sm text-muted-foreground space-y-1 ml-4">
+                  <li>• <strong>Test Export:</strong> Download sample Excel file to verify export functionality works</li>
                   <li>• <strong>Excel:</strong> Comprehensive project and financial model data export</li>
                   <li>• <strong>Basic PDF:</strong> Professional project report with revenue and cost breakdowns</li>
                   <li>• <strong>Executive Report:</strong> Advanced analysis with scenarios and metrics (Excel fallback if needed)</li>
                 </ul>
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                <Button 
+                  onClick={handleTestExport}
+                  disabled={isExporting}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  {isExporting ? "Testing..." : "Test Export"}
+                </Button>
+                
                 <Button 
                   onClick={handleExportExcel} 
                   disabled={isExporting || projects.length === 0}
@@ -322,11 +395,19 @@ const Settings = () => {
                 </Button>
               </div>
               
-              {projects.length === 0 && (
-                <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                  <strong>Note:</strong> Create some projects and financial models first to enable export functionality.
+              <div className="space-y-3">
+                {projects.length === 0 && (
+                  <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <strong>Note:</strong> Create some projects and financial models first to enable full export functionality. 
+                    Use "Test Export" to verify downloads work on your system.
+                  </p>
+                )}
+                
+                <p className="text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <strong>Debug Info:</strong> Projects found: {projects.length}. 
+                  Check browser console (F12) for detailed logging.
                 </p>
-              )}
+              </div>
             </div>
           </CardContent>
         </Card>
