@@ -5,10 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Trash2, FileText, FileSpreadsheet } from "lucide-react";
+import { Download, Trash2, FileText, FileSpreadsheet, Presentation } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getProjects, db } from "@/lib/db";
 import { exportToExcel, exportToPDF } from "@/lib/export";
+import { exportEnhancedExcel } from "@/lib/enhanced-excel-export";
+import { exportBoardReadyPDF, prepareBoardReadyData } from "@/lib/board-ready-export";
 import { performFinancialAnalysis, generateCashFlowProjections } from "@/lib/financial-calculations";
 import useStore from "@/store/useStore";
 
@@ -33,48 +35,34 @@ const Settings = () => {
         return;
       }
       
-      // Get all financial models for all projects
-      const allModels = [];
-      const allCashFlows = [];
-      
-      for (const project of projects) {
-        const models = await db.financialModels
-          .where('projectId')
-          .equals(project.id!)
-          .toArray();
-        
-        allModels.push(...models);
-        
-        // Generate financial analysis for each model
-        for (const model of models) {
-          const cashFlows = generateCashFlowProjections(model, 36, false);
-          allCashFlows.push(...cashFlows.map(cf => ({
-            ...cf,
-            projectName: project.name,
-            modelName: model.name,
-          })));
-        }
-      }
-      
-      // Calculate metrics for the first project as example
       const firstProject = projects[0];
-      const firstModel = allModels.find(m => m.projectId === firstProject.id);
-      let metrics = undefined;
+      const models = await db.financialModels
+        .where('projectId')
+        .equals(firstProject.id!)
+        .toArray();
       
-      if (firstModel) {
-        metrics = performFinancialAnalysis(firstModel, 36, 0.1, false);
+      if (models.length === 0) {
+        toast({
+          title: "No financial models found",
+          description: "Create at least one financial model to export data.",
+          variant: "destructive",
+        });
+        return;
       }
       
-      await exportToExcel({
+      // Use enhanced Excel export with comprehensive data
+      await exportEnhancedExcel({
         project: firstProject,
-        models: allModels,
-        cashFlows: allCashFlows.slice(0, 36), // Limit to first 36 periods
-        metrics,
+        models,
+        includeScenarios: true,
+        includeSensitivity: true,
+        periods: 36,
+        discountRate: 0.1
       });
       
       toast({
-        title: "Excel export completed",
-        description: "Your financial analysis has been exported to Excel.",
+        title: "Enhanced Excel export completed",
+        description: "Your comprehensive financial analysis has been exported to Excel with multiple worksheets.",
       });
       
     } catch (error) {
@@ -126,7 +114,7 @@ const Settings = () => {
       
       toast({
         title: "PDF export completed",
-        description: "Your financial analysis report has been exported to PDF.",
+        description: "Your basic financial analysis report has been exported to PDF.",
       });
       
     } catch (error) {
@@ -134,6 +122,57 @@ const Settings = () => {
       toast({
         title: "Export failed",
         description: "There was an error exporting your data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportBoardReadyPDF = async () => {
+    try {
+      setIsExporting(true);
+      
+      if (projects.length === 0) {
+        toast({
+          title: "No data to export",
+          description: "Create some projects and financial models first.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const firstProject = projects[0];
+      const models = await db.financialModels
+        .where('projectId')
+        .equals(firstProject.id!)
+        .toArray();
+      
+      if (models.length === 0) {
+        toast({
+          title: "No financial models found",
+          description: "Create at least one financial model to generate a board-ready report.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Prepare comprehensive board-ready data
+      const reportData = await prepareBoardReadyData(firstProject, models, 36, 0.1);
+      
+      // Generate the board-ready PDF
+      await exportBoardReadyPDF(reportData);
+      
+      toast({
+        title: "Executive report generated",
+        description: "Your board-ready executive financial report has been exported successfully.",
+      });
+      
+    } catch (error) {
+      console.error('Board-ready export error:', error);
+      toast({
+        title: "Export failed",
+        description: "There was an error generating the executive report. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -239,11 +278,18 @@ const Settings = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col space-y-4">
-              <p className="text-sm text-muted-foreground">
-                All data is stored locally in your browser. Export your financial models and analysis to Excel or PDF format.
-              </p>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  All data is stored locally in your browser. Export your financial models and analysis in multiple formats:
+                </p>
+                <ul className="text-sm text-muted-foreground space-y-1 ml-4">
+                  <li>• <strong>Excel:</strong> Enhanced export with 8+ worksheets including scenarios, sensitivity analysis, and detailed projections</li>
+                  <li>• <strong>Basic PDF:</strong> Standard financial analysis report</li>
+                  <li>• <strong>Executive Report:</strong> Board-ready PDF with charts, executive summary, and strategic recommendations</li>
+                </ul>
+              </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <Button 
                   onClick={handleExportExcel} 
                   disabled={isExporting || projects.length === 0}
@@ -259,7 +305,16 @@ const Settings = () => {
                   className="bg-red-600 hover:bg-red-700"
                 >
                   <FileText className="mr-2 h-4 w-4" />
-                  {isExporting ? "Exporting..." : "Export PDF"}
+                  {isExporting ? "Exporting..." : "Basic PDF"}
+                </Button>
+                
+                <Button 
+                  onClick={handleExportBoardReadyPDF}
+                  disabled={isExporting || projects.length === 0}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Presentation className="mr-2 h-4 w-4" />
+                  {isExporting ? "Generating..." : "Executive Report"}
                 </Button>
                 
                 <Button variant="destructive" onClick={handleClearAllData}>
