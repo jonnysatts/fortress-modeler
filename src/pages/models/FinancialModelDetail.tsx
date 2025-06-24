@@ -25,7 +25,7 @@ import CostTrends from "@/components/models/CostTrends";
 import CategoryBreakdown from "@/components/models/CategoryBreakdown";
 import FinancialMatrix from "@/components/models/FinancialMatrix";
 import { calculateTotalRevenue, calculateTotalCosts } from "@/lib/financialCalculations";
-import { ModelOverview } from "@/components/models/ModelOverview";
+import ModelOverview from "@/components/models/ModelOverview";
 import { MarketingChannelsForm } from "@/components/models/MarketingChannelsForm";
 import { ModelAssumptions, MarketingSetup, RevenueStream, CostCategory } from "@/types/models";
 import { TrendDataPoint } from "@/types/trends";
@@ -344,7 +344,7 @@ const FinancialModelDetail = () => {
          </TabsList>
 
          <TabsContent value="overview" className="space-y-4">
-           <ModelOverview model={model as any} projectId={projectId} /> 
+           <ModelOverview model={model} projectId={projectId} /> 
          </TabsContent>
 
          <TabsContent value="marketing">

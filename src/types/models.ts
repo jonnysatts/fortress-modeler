@@ -24,6 +24,7 @@ export interface GrowthModel {
 export interface ModelMetadata {
   type?: string;
   weeks?: number;
+  months?: number;
   initialWeeklyAttendance?: number;
   perCustomer?: {
     ticketPrice?: number;

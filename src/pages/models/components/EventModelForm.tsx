@@ -99,7 +99,7 @@ interface EventModelFormProps {
 }
 
 const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: EventModelFormProps) => {
-  const eventMetadata = existingModel?.assumptions.metadata as any;
+  const eventMetadata = existingModel?.assumptions.metadata;
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),

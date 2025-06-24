@@ -1,7 +1,7 @@
 import { FinancialModel } from "@/lib/db";
 
 // Import statements (will be commented out progressively)
-import { useState, useMemo } from "react";
+import { useState, useMemo, memo } from "react";
 import { Tooltip } from "recharts";
 import { Card } from "@/components/ui/card";
 import { calculateTotalRevenue, calculateTotalCosts } from "@/lib/financialCalculations";
@@ -39,7 +39,18 @@ const COST_COLOR_MAP: Record<string, string> = {
   "Management Costs": "#22c55e",
 };
 
-const CustomTooltip = ({ active, payload }: any) => {
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    payload: {
+      name: string;
+      value: number;
+      percentage: number;
+    };
+  }>;
+}
+
+const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     const dataItem = payload[0].payload;
     return (
@@ -302,4 +313,4 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
   );
 };
 
-export default CategoryBreakdown;
+export default memo(CategoryBreakdown);

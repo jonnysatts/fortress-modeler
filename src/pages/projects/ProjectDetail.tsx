@@ -36,7 +36,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ActualsInputForm } from "@/components/models/ActualsInputForm";
-import { ModelOverview } from "@/components/models/ModelOverview";
+import ModelOverview from "@/components/models/ModelOverview";
 import { ActualsDisplayTable } from "@/components/models/ActualsDisplayTable";
 import { PerformanceAnalysis } from "@/components/models/PerformanceAnalysis";
 

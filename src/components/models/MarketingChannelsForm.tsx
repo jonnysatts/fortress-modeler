@@ -156,9 +156,8 @@ export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({
       if (modelTimeUnit === 'Week') {
         return metadata.weeks ?? 12;
       }
-      // @ts-ignore - allow optional months in metadata
-      if ((metadata as any).months !== undefined) {
-        return (metadata as any).months as number;
+      if (metadata.months !== undefined) {
+        return metadata.months;
       }
     }
     if (marketingSetup.budgetApplication === 'spreadCustom' && marketingSetup.spreadDuration) {

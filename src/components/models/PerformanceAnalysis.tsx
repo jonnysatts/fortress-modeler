@@ -257,12 +257,23 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
   }
 
   // Helper function for chart tooltips
-  const ChartTooltip = ({ active, payload, label }: any) => {
+  interface ChartTooltipProps {
+    active?: boolean;
+    payload?: Array<{
+      value: number;
+      name: string;
+      dataKey: string;
+      color: string;
+    }>;
+    label?: string;
+  }
+  
+  const ChartTooltip = ({ active, payload, label }: ChartTooltipProps) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-background border px-2 py-1 rounded shadow-lg text-xs">
           <p className="font-semibold mb-1">{label}</p>
-          {payload.map((pld: any, index: number) => {
+          {payload.map((pld, index: number) => {
               // Determine if the key is attendance-related
               const isAttendance = pld.dataKey === 'attendanceForecast' || pld.dataKey === 'attendanceActual';
               // Format value based on whether it's attendance or currency

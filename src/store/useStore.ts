@@ -1,6 +1,7 @@
 
 import { create } from 'zustand';
-import { Project, FinancialModel, db } from '@/lib/db';
+import { Project, FinancialModel, db, getProjects, getProject, createProject } from '@/lib/db';
+import { getErrorMessage, isAppError, logError } from '@/lib/errors';
 
 interface AppState {
   projects: Project[];
@@ -35,18 +36,19 @@ const useStore = create<AppState>((set, get) => ({
   loadProjects: async () => {
     set({ isLoading: true, error: null });
     try {
-      const projects = await db.projects.toArray();
+      const projects = await getProjects();
       set({ projects, isLoading: false });
     } catch (error) {
-      console.error('Error loading projects:', error);
-      set({ error: 'Failed to load projects', isLoading: false });
+      logError(error, 'Store.loadProjects');
+      const errorMessage = getErrorMessage(error);
+      set({ error: errorMessage, isLoading: false });
     }
   },
   
   loadProjectById: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      const project = await db.projects.get(id);
+      const project = await getProject(id);
       if (project) {
         set({ currentProject: project, isLoading: false });
         return project;
@@ -55,8 +57,9 @@ const useStore = create<AppState>((set, get) => ({
         return null;
       }
     } catch (error) {
-      console.error('Error loading project:', error);
-      set({ error: 'Failed to load project', isLoading: false });
+      logError(error, 'Store.loadProjectById');
+      const errorMessage = getErrorMessage(error);
+      set({ error: errorMessage, isLoading: false });
       return null;
     }
   },
@@ -66,19 +69,42 @@ const useStore = create<AppState>((set, get) => ({
   setCurrentModel: (model) => set({ currentModel: model }),
   
   addProject: async (project) => {
-    set({ isLoading: true, error: null });
+    const tempId = Date.now(); // Temporary ID for optimistic update
+    const timestamp = new Date();
+    const optimisticProject: Project = {
+      id: tempId,
+      ...project,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    
+    // Optimistic update
+    const currentProjects = get().projects;
+    set({ 
+      projects: [...currentProjects, optimisticProject],
+      isLoading: true, 
+      error: null 
+    });
+    
     try {
-      const id = await db.projects.add({
-        ...project,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-      await get().loadProjects();
-      set({ isLoading: false });
-      return id;
+      const realId = await createProject(project);
+      const realProject = { ...optimisticProject, id: realId };
+      
+      // Replace optimistic project with real one
+      set(state => ({
+        projects: state.projects.map(p => p.id === tempId ? realProject : p),
+        isLoading: false
+      }));
+      
+      return realId;
     } catch (error) {
-      console.error('Error adding project:', error);
-      set({ error: 'Failed to add project', isLoading: false });
+      logError(error, 'Store.addProject');
+      // Rollback optimistic update
+      set(state => ({
+        projects: state.projects.filter(p => p.id !== tempId),
+        error: getErrorMessage(error),
+        isLoading: false
+      }));
       return -1;
     }
   },

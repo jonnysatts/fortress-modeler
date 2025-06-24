@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Model, RevenueStream, CostCategory, ActualsPeriodEntry } from "@/types/models";
 import { formatCurrency } from "@/lib/utils";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, memo, useCallback } from "react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -31,7 +31,7 @@ interface SimulationPeriod {
   attendance?: number;
 }
 
-export const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverviewProps) => {
+const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverviewProps) => {
   const navigate = useNavigate();
   // Calculate isWeekly here, outside useMemo
   const isWeekly = model?.assumptions?.metadata?.type === "WeeklyEvent"; 
@@ -345,7 +345,17 @@ export const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverv
   } = simulationResults;
 
   // Simplified Tooltip for Sparklines
-  const SparklineTooltip = ({ active, payload, label }: any) => {
+  interface SparklineTooltipProps {
+    active?: boolean;
+    payload?: Array<{
+      value: number;
+      dataKey: string;
+      color: string;
+    }>;
+    label?: string;
+  }
+  
+  const SparklineTooltip = ({ active, payload, label }: SparklineTooltipProps) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload; // Access the full data point
       return (
@@ -362,15 +372,20 @@ export const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverv
     return null;
   };
 
-  const handleEdit = () => {
+  const handleEdit = useCallback(() => {
     if (projectId && model.id) {
         navigate(`/projects/${projectId}/models/${model.id}/edit`);
     }
-  };
+  }, [navigate, projectId, model.id]);
   
   // Placeholder functions for Download/Share
-  const handleDownload = () => alert("Download report functionality not implemented yet.");
-  const handleShare = () => alert("Share model functionality not implemented yet.");
+  const handleDownload = useCallback(() => {
+    alert("Download report functionality not implemented yet.");
+  }, []);
+  
+  const handleShare = useCallback(() => {
+    alert("Share model functionality not implemented yet.");
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -628,4 +643,6 @@ export const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverv
       </Card>
     </div>
   );
-}; 
+};
+
+export default memo(ModelOverview); 

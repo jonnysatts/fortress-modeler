@@ -237,6 +237,41 @@ const CostTrends = ({
   // Ref to store the previous costData string representation
   const prevCostDataStringRef = useRef<string | null>(null);
   
+  // Dynamically generate the cost keys for the chart - MOVED BEFORE EARLY RETURN
+  const costKeys = useMemo(() => {
+    if (!costData || costData.length === 0) {
+      return [];
+    }
+    
+    const keys = new Set<string>();
+    costs.forEach(cost => {
+        keys.add(cost.name.replace(/[^a-zA-Z0-9]/g, ""));
+    });
+    if (costData.some(point => Object.prototype.hasOwnProperty.call(point, 'MarketingBudget'))) {
+        keys.add("MarketingBudget");
+    }
+    const presentKeys = Array.from(keys);
+
+    const costRenderOrder = [
+        "SetupCosts",       
+        "MarketingBudget",  
+        "FBCOGS",
+        "StaffCosts",
+        "ManagementCosts",
+    ];
+
+    const sortedKeys = presentKeys.sort((a, b) => {
+        let indexA = costRenderOrder.indexOf(a);
+        let indexB = costRenderOrder.indexOf(b);
+        if (indexA === -1) indexA = costRenderOrder.length;
+        if (indexB === -1) indexB = costRenderOrder.length;
+        return indexA - indexB;
+    });
+    
+    return sortedKeys;
+
+  }, [costs, costData]);
+
   useEffect(() => {
     if (onUpdateCostData && costData) { 
       const currentCostDataString = JSON.stringify(costData);
@@ -261,37 +296,6 @@ const CostTrends = ({
       </div>
     );
   }
-  
-  // Dynamically generate the cost keys for the chart
-  const costKeys = useMemo(() => {
-    const keys = new Set<string>();
-    costs.forEach(cost => {
-        keys.add(cost.name.replace(/[^a-zA-Z0-9]/g, ""));
-    });
-    if (costData.some(point => point.hasOwnProperty('MarketingBudget'))) {
-        keys.add("MarketingBudget");
-    }
-    const presentKeys = Array.from(keys);
-
-    const costRenderOrder = [
-        "SetupCosts",       
-        "MarketingBudget",  
-        "FBCOGS",
-        "StaffCosts",
-        "ManagementCosts",
-    ];
-
-    const sortedKeys = presentKeys.sort((a, b) => {
-        let indexA = costRenderOrder.indexOf(a);
-        let indexB = costRenderOrder.indexOf(b);
-        if (indexA === -1) indexA = costRenderOrder.length;
-        if (indexB === -1) indexB = costRenderOrder.length;
-        return indexA - indexB;
-    });
-    
-    return sortedKeys;
-
-  }, [costs, costData]);
 
   // Define a color mapping function or object
   const getColor = (key: string): string => { // Removed index param, not needed with map lookup
