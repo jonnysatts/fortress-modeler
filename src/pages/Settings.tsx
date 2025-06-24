@@ -5,28 +5,168 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Trash2 } from "lucide-react";
+import { Download, Trash2, FileText, FileSpreadsheet } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { getProjects, db } from "@/lib/db";
+import { exportToExcel, exportToPDF } from "@/lib/export";
+import { performFinancialAnalysis, generateCashFlowProjections } from "@/lib/financial-calculations";
+import useStore from "@/store/useStore";
 
 const Settings = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [backupReminders, setBackupReminders] = useState(true);
   const [backupFrequency, setBackupFrequency] = useState("weekly");
+  const [isExporting, setIsExporting] = useState(false);
   
-  const handleExportAllData = () => {
-    toast({
-      title: "Data export initiated",
-      description: "Your data export is being prepared.",
-    });
-    // In a real app, this would trigger the IndexedDB export logic
+  const { projects } = useStore();
+  
+  const handleExportExcel = async () => {
+    try {
+      setIsExporting(true);
+      
+      if (projects.length === 0) {
+        toast({
+          title: "No data to export",
+          description: "Create some projects and financial models first.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Get all financial models for all projects
+      const allModels = [];
+      const allCashFlows = [];
+      
+      for (const project of projects) {
+        const models = await db.financialModels
+          .where('projectId')
+          .equals(project.id!)
+          .toArray();
+        
+        allModels.push(...models);
+        
+        // Generate financial analysis for each model
+        for (const model of models) {
+          const cashFlows = generateCashFlowProjections(model, 36, false);
+          allCashFlows.push(...cashFlows.map(cf => ({
+            ...cf,
+            projectName: project.name,
+            modelName: model.name,
+          })));
+        }
+      }
+      
+      // Calculate metrics for the first project as example
+      const firstProject = projects[0];
+      const firstModel = allModels.find(m => m.projectId === firstProject.id);
+      let metrics = undefined;
+      
+      if (firstModel) {
+        metrics = performFinancialAnalysis(firstModel, 36, 0.1, false);
+      }
+      
+      await exportToExcel({
+        project: firstProject,
+        models: allModels,
+        cashFlows: allCashFlows.slice(0, 36), // Limit to first 36 periods
+        metrics,
+      });
+      
+      toast({
+        title: "Excel export completed",
+        description: "Your financial analysis has been exported to Excel.",
+      });
+      
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Export failed",
+        description: "There was an error exporting your data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
   
-  const handleClearAllData = () => {
-    toast({
-      title: "Data cleared",
-      description: "All application data has been cleared.",
-    });
-    // In a real app, this would clear the IndexedDB
+  const handleExportPDF = async () => {
+    try {
+      setIsExporting(true);
+      
+      if (projects.length === 0) {
+        toast({
+          title: "No data to export",
+          description: "Create some projects and financial models first.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const firstProject = projects[0];
+      const models = await db.financialModels
+        .where('projectId')
+        .equals(firstProject.id!)
+        .toArray();
+      
+      let metrics = undefined;
+      let cashFlows = undefined;
+      
+      if (models.length > 0) {
+        const firstModel = models[0];
+        metrics = performFinancialAnalysis(firstModel, 36, 0.1, false);
+        cashFlows = generateCashFlowProjections(firstModel, 12, false); // 12 periods for PDF
+      }
+      
+      await exportToPDF({
+        project: firstProject,
+        models,
+        cashFlows,
+        metrics,
+      });
+      
+      toast({
+        title: "PDF export completed",
+        description: "Your financial analysis report has been exported to PDF.",
+      });
+      
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Export failed",
+        description: "There was an error exporting your data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+  
+  const handleClearAllData = async () => {
+    try {
+      // Clear all tables
+      await db.transaction('rw', [db.projects, db.financialModels, db.actualPerformance, db.risks, db.scenarios], async () => {
+        await db.projects.clear();
+        await db.financialModels.clear();
+        await db.actualPerformance.clear();
+        await db.risks.clear();
+        await db.scenarios.clear();
+      });
+      
+      // Refresh the store
+      window.location.reload();
+      
+      toast({
+        title: "Data cleared",
+        description: "All application data has been cleared successfully.",
+      });
+    } catch (error) {
+      console.error('Clear data error:', error);
+      toast({
+        title: "Clear failed",
+        description: "There was an error clearing your data. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -98,20 +238,41 @@ const Settings = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex flex-col space-y-2">
+            <div className="flex flex-col space-y-4">
               <p className="text-sm text-muted-foreground">
-                All data is stored locally in your browser. It's recommended to export your data regularly to prevent loss.
+                All data is stored locally in your browser. Export your financial models and analysis to Excel or PDF format.
               </p>
-              <div className="flex flex-col sm:flex-row sm:justify-between gap-2 pt-2">
-                <Button onClick={handleExportAllData} className="bg-fortress-blue hover:bg-fortress-blue/90">
-                  <Download className="mr-2 h-4 w-4" />
-                  Export All Data
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Button 
+                  onClick={handleExportExcel} 
+                  disabled={isExporting || projects.length === 0}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  {isExporting ? "Exporting..." : "Export Excel"}
                 </Button>
+                
+                <Button 
+                  onClick={handleExportPDF}
+                  disabled={isExporting || projects.length === 0}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  {isExporting ? "Exporting..." : "Export PDF"}
+                </Button>
+                
                 <Button variant="destructive" onClick={handleClearAllData}>
                   <Trash2 className="mr-2 h-4 w-4" />
                   Clear All Data
                 </Button>
               </div>
+              
+              {projects.length === 0 && (
+                <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <strong>Note:</strong> Create some projects and financial models first to enable export functionality.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

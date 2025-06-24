@@ -24,6 +24,7 @@ import RevenueTrends from "@/components/models/RevenueTrends";
 import CostTrends from "@/components/models/CostTrends";
 import CategoryBreakdown from "@/components/models/CategoryBreakdown";
 import FinancialMatrix from "@/components/models/FinancialMatrix";
+import FinancialAnalysis from "@/components/models/FinancialAnalysis";
 import { calculateTotalRevenue, calculateTotalCosts } from "@/lib/financialCalculations";
 import ModelOverview from "@/components/models/ModelOverview";
 import { MarketingChannelsForm } from "@/components/models/MarketingChannelsForm";
@@ -336,6 +337,7 @@ const FinancialModelDetail = () => {
       <Tabs defaultValue="overview" className="space-y-4">
          <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="analysis">Financial Analysis</TabsTrigger>
             <TabsTrigger value="marketing">Marketing</TabsTrigger>
             <TabsTrigger value="financial-matrix">Financial Matrix</TabsTrigger>
             <TabsTrigger value="trends">Trends</TabsTrigger>
@@ -345,6 +347,10 @@ const FinancialModelDetail = () => {
 
          <TabsContent value="overview" className="space-y-4">
            <ModelOverview model={model} projectId={projectId} /> 
+         </TabsContent>
+
+         <TabsContent value="analysis" className="space-y-4">
+           <FinancialAnalysis model={model} isWeekly={isWeeklyEvent} />
          </TabsContent>
 
          <TabsContent value="marketing">
