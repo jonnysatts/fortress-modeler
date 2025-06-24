@@ -279,7 +279,7 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
             />
             <YAxis 
               tick={{ fontSize: 12 }}
-              tickFormatter={(value) => `$${value.toLocaleString()}`}
+              tickFormatter={(value) => formatCurrency(value)}
             />
             {isWeeklyEvent && 'attendance' in finalDataPoint && (
               <YAxis 
@@ -294,10 +294,10 @@ const ModelProjections = ({ model, shouldSpreadSetupCosts }: ModelProjectionsPro
                 if (name === "attendance" && typeof value === "number") {
                   return [value.toLocaleString(), "Attendance"];
                 }
-                if (name === "displayRevenue") return [`$${value.toLocaleString()}`, "Revenue"];
-                if (name === "displayCosts") return [`$${value.toLocaleString()}`, "Costs"];
-                if (name === "displayProfit") return [`$${value.toLocaleString()}`, "Profit"];
-                return [`$${value.toLocaleString()}`, name.charAt(0).toUpperCase() + name.slice(1)];
+                if (name === "displayRevenue") return [formatCurrency(value), "Revenue"];
+                if (name === "displayCosts") return [formatCurrency(value), "Costs"];
+                if (name === "displayProfit") return [formatCurrency(value), "Profit"];
+                return [formatCurrency(value), name.charAt(0).toUpperCase() + name.slice(1)];
               }}
             />
             <Legend />

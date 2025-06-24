@@ -191,10 +191,10 @@ export const exportToPDF = async (data: ExportData): Promise<void> => {
     doc.text('Key Financial Metrics', margin, finalY + 20);
 
     const metricsData = [
-      ['Net Present Value (NPV)', `$${data.metrics.npv.toLocaleString()}`],
+      ['Net Present Value (NPV)', formatCurrency(data.metrics.npv)],
       ['Internal Rate of Return (IRR)', `${data.metrics.irr.toFixed(2)}%`],
       ['Break-even Units', data.metrics.breakEvenUnits?.toLocaleString() || 'N/A'],
-      ['Break-even Revenue', data.metrics.breakEvenRevenue ? `$${data.metrics.breakEvenRevenue.toLocaleString()}` : 'N/A'],
+      ['Break-even Revenue', data.metrics.breakEvenRevenue ? formatCurrency(data.metrics.breakEvenRevenue) : 'N/A'],
       ['Payback Period', `${data.metrics.paybackPeriod.toFixed(1)} months`],
       ['Return on Investment (ROI)', `${data.metrics.roi.toFixed(2)}%`],
     ];
@@ -218,11 +218,11 @@ export const exportToPDF = async (data: ExportData): Promise<void> => {
 
     const cashFlowData = data.cashFlows.map(cf => [
       cf.period,
-      `$${cf.operatingCashFlow.toLocaleString()}`,
-      `$${cf.investingCashFlow.toLocaleString()}`,
-      `$${cf.financingCashFlow.toLocaleString()}`,
-      `$${cf.netCashFlow.toLocaleString()}`,
-      `$${cf.cumulativeCashFlow.toLocaleString()}`,
+      formatCurrency(cf.operatingCashFlow),
+      formatCurrency(cf.investingCashFlow),
+      formatCurrency(cf.financingCashFlow),
+      formatCurrency(cf.netCashFlow),
+      formatCurrency(cf.cumulativeCashFlow),
     ]);
 
     autoTable(doc, {
@@ -252,7 +252,9 @@ export const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-  }).format(amount);
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.round(amount));
 };
 
 // Utility function to format percentage

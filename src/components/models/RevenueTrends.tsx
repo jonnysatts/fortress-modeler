@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import FinancialMatrix from "./FinancialMatrix";
 import { TrendDataPoint } from "@/types/trends";
+import { formatCurrency } from "@/lib/utils";
 
 interface RevenueTrendsProps {
   model: FinancialModel;
@@ -205,10 +206,10 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
             />
             <YAxis 
               tick={{ fontSize: 12 }}
-              tickFormatter={(value) => `$${Math.ceil(value).toLocaleString()}`}
+              tickFormatter={(value) => formatCurrency(value)}
             />
             <Tooltip 
-              formatter={(value: number) => [`$${Math.ceil(value).toLocaleString()}`, ""]}
+              formatter={(value: number) => [formatCurrency(value), ""]}
               labelFormatter={(label) => `${label}`}
             />
             <Legend />

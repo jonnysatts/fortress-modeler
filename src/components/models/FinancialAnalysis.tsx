@@ -199,7 +199,7 @@ const FinancialAnalysis = ({ model, isWeekly = false }: FinancialAnalysisProps) 
                       textAnchor="end"
                       height={60}
                     />
-                    <YAxis tickFormatter={(value) => `$${(value / 1000).toFixed(0)}K`} />
+                    <YAxis tickFormatter={(value) => `$${Math.round(value / 1000)}K`} />
                     <Tooltip 
                       formatter={(value: number) => [formatCurrency(value), '']}
                       labelFormatter={(label) => `Period: ${label}`}
@@ -323,7 +323,7 @@ const FinancialAnalysis = ({ model, isWeekly = false }: FinancialAnalysisProps) 
                     <BarChart data={cashFlowChartData.slice(0, 12)}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="period" />
-                      <YAxis tickFormatter={(value) => `$${(value / 1000).toFixed(0)}K`} />
+                      <YAxis tickFormatter={(value) => `$${Math.round(value / 1000)}K`} />
                       <Tooltip formatter={(value: number) => [formatCurrency(value), '']} />
                       <Bar dataKey="revenue" fill="#10b981" name="Revenue" />
                       <Bar dataKey="costs" fill="#ef4444" name="Costs" />

@@ -56,7 +56,7 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
     return (
       <div className="bg-white p-3 border rounded-md shadow-sm">
         <p className="font-medium">{dataItem.name || payload[0].name}</p>
-        <p>Value: ${dataItem.value.toLocaleString()}</p>
+        <p>Value: {formatCurrency(dataItem.value)}</p>
         {dataItem.percentage !== undefined && (
           <p>Percentage: {dataItem.percentage}%</p>
         )}
@@ -282,21 +282,21 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
             <div className="p-4 bg-green-50 border border-green-100 rounded-md">
               <div className="text-sm text-green-700">Total Revenue</div>
               <div className="text-2xl font-bold text-green-800">
-                ${weeklyTotals.totalRevenue.toLocaleString()}
+                {formatCurrency(weeklyTotals.totalRevenue)}
               </div>
             </div>
             {/* Total Costs */}
             <div className="p-4 bg-red-50 border border-red-100 rounded-md">
               <div className="text-sm text-red-700">Total Costs</div>
               <div className="text-2xl font-bold text-red-800">
-                ${weeklyTotals.totalCosts.toLocaleString()}
+                {formatCurrency(weeklyTotals.totalCosts)}
               </div>
             </div>
             {/* Total Profit */}
             <div className="p-4 bg-blue-50 border border-blue-100 rounded-md">
               <div className="text-sm text-blue-700">Total Profit</div>
               <div className="text-2xl font-bold text-blue-800">
-                ${weeklyTotals.profit.toLocaleString()}
+                {formatCurrency(weeklyTotals.profit)}
               </div>
             </div>
             {/* Profit Margin */}

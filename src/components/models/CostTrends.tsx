@@ -13,6 +13,7 @@ import {
 import FinancialMatrix from "./FinancialMatrix";
 import { MarketingSetup, ModelMetadata, GrowthModel } from "@/types/models";
 import { TrendDataPoint } from "@/types/trends";
+import { formatCurrency } from "@/lib/utils";
 
 interface CostTrendsProps {
   costs: CostAssumption[];
@@ -354,11 +355,11 @@ const CostTrends = ({
             />
             <YAxis 
               tick={{ fontSize: 12 }}
-              tickFormatter={(value) => `$${Math.ceil(value).toLocaleString()}`}
+              tickFormatter={(value) => formatCurrency(value)}
             />
             <Tooltip 
               formatter={(value: number, name: string) => [
-                  `$${Math.ceil(value).toLocaleString()}`,
+                  formatCurrency(value),
                   name
               ]}
               labelFormatter={(label) => `${label}`}
