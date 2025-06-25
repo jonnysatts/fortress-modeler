@@ -1,7 +1,7 @@
 import { FinancialModel } from "@/lib/db";
 
 // Import statements (will be commented out progressively)
-import { useState, useMemo } from "react";
+import { useState, useMemo, memo } from "react";
 import { Tooltip } from "recharts";
 import { Card } from "@/components/ui/card";
 import { calculateTotalRevenue, calculateTotalCosts } from "@/lib/financialCalculations";
@@ -39,13 +39,24 @@ const COST_COLOR_MAP: Record<string, string> = {
   "Management Costs": "#22c55e",
 };
 
-const CustomTooltip = ({ active, payload }: any) => {
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    payload: {
+      name: string;
+      value: number;
+      percentage: number;
+    };
+  }>;
+}
+
+const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     const dataItem = payload[0].payload;
     return (
       <div className="bg-white p-3 border rounded-md shadow-sm">
         <p className="font-medium">{dataItem.name || payload[0].name}</p>
-        <p>Value: ${dataItem.value.toLocaleString()}</p>
+        <p>Value: {formatCurrency(dataItem.value)}</p>
         {dataItem.percentage !== undefined && (
           <p>Percentage: {dataItem.percentage}%</p>
         )}
@@ -271,21 +282,21 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
             <div className="p-4 bg-green-50 border border-green-100 rounded-md">
               <div className="text-sm text-green-700">Total Revenue</div>
               <div className="text-2xl font-bold text-green-800">
-                ${weeklyTotals.totalRevenue.toLocaleString()}
+                {formatCurrency(weeklyTotals.totalRevenue)}
               </div>
             </div>
             {/* Total Costs */}
             <div className="p-4 bg-red-50 border border-red-100 rounded-md">
               <div className="text-sm text-red-700">Total Costs</div>
               <div className="text-2xl font-bold text-red-800">
-                ${weeklyTotals.totalCosts.toLocaleString()}
+                {formatCurrency(weeklyTotals.totalCosts)}
               </div>
             </div>
             {/* Total Profit */}
             <div className="p-4 bg-blue-50 border border-blue-100 rounded-md">
               <div className="text-sm text-blue-700">Total Profit</div>
               <div className="text-2xl font-bold text-blue-800">
-                ${weeklyTotals.profit.toLocaleString()}
+                {formatCurrency(weeklyTotals.profit)}
               </div>
             </div>
             {/* Profit Margin */}
@@ -302,4 +313,4 @@ const CategoryBreakdown = ({ model, revenueTrendData, costTrendData }: CategoryB
   );
 };
 
-export default CategoryBreakdown;
+export default memo(CategoryBreakdown);

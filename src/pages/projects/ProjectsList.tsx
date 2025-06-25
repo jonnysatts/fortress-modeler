@@ -7,6 +7,7 @@ import { PlusCircle, Search } from "lucide-react";
 import useStore from "@/store/useStore";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
+import { config } from "@/lib/config";
 
 const ProjectsList = () => {
   const navigate = useNavigate();
@@ -16,12 +17,21 @@ const ProjectsList = () => {
     loadProjects();
   }, [loadProjects]);
 
-  const handleProjectClick = (projectId: number) => {
-    const project = projects.find(p => p.id === projectId);
+  // Filter out UUID projects if cloud sync is disabled
+  const availableProjects = config.useCloudSync 
+    ? projects 
+    : projects.filter(project => typeof project.id === 'number');
+
+  const handleProjectClick = (projectId: number | string) => {
+    const project = availableProjects.find((p) => p.id === projectId);
     if (project) {
       setCurrentProject(project);
-      navigate(`/projects/${projectId}`);
+    } else {
+      console.warn(
+        `Project with id ${projectId} not found in local state. Navigation will still occur.`
+      );
     }
+    navigate(`/projects/${projectId}`);
   };
 
   return (
@@ -45,7 +55,7 @@ const ProjectsList = () => {
         />
       </div>
       
-      {projects.length === 0 ? (
+      {availableProjects.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 space-y-4">
           <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
             <FolderIcon className="h-8 w-8 text-muted-foreground" />
@@ -64,7 +74,7 @@ const ProjectsList = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((project) => (
+          {availableProjects.map((project) => (
             <Card 
               key={project.id} 
               className="hover:shadow-md transition-shadow cursor-pointer"
@@ -82,8 +92,20 @@ const ProjectsList = () => {
                     </p>
                   )}
                   <div className="flex justify-between text-xs text-muted-foreground pt-2">
-                    <span>Created {format(new Date(project.createdAt), 'MMM d, yyyy')}</span>
-                    <span>Updated {format(new Date(project.updatedAt), 'MMM d, yyyy')}</span>
+                    <span>Created {(() => {
+                      try {
+                        return project.createdAt ? format(new Date(project.createdAt), 'MMM d, yyyy') : 'Unknown';
+                      } catch {
+                        return 'Unknown';
+                      }
+                    })()}</span>
+                    <span>Updated {(() => {
+                      try {
+                        return project.updatedAt ? format(new Date(project.updatedAt), 'MMM d, yyyy') : 'Unknown';
+                      } catch {
+                        return 'Unknown';
+                      }
+                    })()}</span>
                   </div>
                 </div>
               </CardContent>

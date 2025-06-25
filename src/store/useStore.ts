@@ -1,6 +1,7 @@
-
 import { create } from 'zustand';
-import { Project, FinancialModel, db } from '@/lib/db';
+import { Project, FinancialModel } from '@/types/models';
+import { storageService } from '@/lib/hybrid-storage';
+import { getErrorMessage, isAppError, logError } from '@/lib/errors';
 
 interface AppState {
   projects: Project[];
@@ -10,19 +11,22 @@ interface AppState {
   error: string | null;
   
   loadProjects: () => Promise<void>;
-  loadProjectById: (id: number) => Promise<Project | null>;
+  loadProjectById: (id: string) => Promise<Project | null>;
   setCurrentProject: (project: Project | null) => void;
   setCurrentModel: (model: FinancialModel | null) => void;
-  addProject: (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => Promise<number>;
-  updateProject: (id: number, updates: Partial<Project>) => Promise<void>;
-  deleteProject: (id: number) => Promise<void>;
+  addProject: (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+  updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
+  deleteProject: (id: string) => Promise<void>;
   
   // Financial model methods
-  loadModelsForProject: (projectId: number) => Promise<FinancialModel[]>;
-  loadModelById: (id: number) => Promise<FinancialModel | null>;
-  addFinancialModel: (model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>) => Promise<number>;
-  updateFinancialModel: (id: number, updates: Partial<FinancialModel>) => Promise<void>;
-  deleteFinancialModel: (id: number) => Promise<void>;
+  loadModelsForProject: (projectId: string) => Promise<FinancialModel[]>;
+  loadModelById: (id: string) => Promise<FinancialModel | null>;
+  addFinancialModel: (model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>) => Promise<FinancialModel>;
+  updateFinancialModel: (id: string, updates: Partial<FinancialModel>) => Promise<void>;
+  deleteFinancialModel: (id: string) => Promise<void>;
+  
+  // Sync methods
+  syncWithCloud: () => Promise<void>;
 }
 
 const useStore = create<AppState>((set, get) => ({
@@ -35,18 +39,19 @@ const useStore = create<AppState>((set, get) => ({
   loadProjects: async () => {
     set({ isLoading: true, error: null });
     try {
-      const projects = await db.projects.toArray();
+      const projects = await storageService.getProjects();
       set({ projects, isLoading: false });
     } catch (error) {
-      console.error('Error loading projects:', error);
-      set({ error: 'Failed to load projects', isLoading: false });
+      logError(error, 'Store.loadProjects');
+      const errorMessage = getErrorMessage(error);
+      set({ error: errorMessage, isLoading: false });
     }
   },
   
   loadProjectById: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      const project = await db.projects.get(id);
+      const project = await storageService.getProject(id);
       if (project) {
         set({ currentProject: project, isLoading: false });
         return project;
@@ -55,8 +60,9 @@ const useStore = create<AppState>((set, get) => ({
         return null;
       }
     } catch (error) {
-      console.error('Error loading project:', error);
-      set({ error: 'Failed to load project', isLoading: false });
+      logError(error, 'Store.loadProjectById');
+      const errorMessage = getErrorMessage(error);
+      set({ error: errorMessage, isLoading: false });
       return null;
     }
   },
@@ -68,75 +74,103 @@ const useStore = create<AppState>((set, get) => ({
   addProject: async (project) => {
     set({ isLoading: true, error: null });
     try {
-      const id = await db.projects.add({
-        ...project,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-      await get().loadProjects();
-      set({ isLoading: false });
-      return id;
+      const newProject = await storageService.createProject(project);
+      
+      // Update projects list
+      set(state => ({
+        projects: [...state.projects, newProject],
+        isLoading: false
+      }));
+      
+      return newProject.id.toString();
     } catch (error) {
-      console.error('Error adding project:', error);
-      set({ error: 'Failed to add project', isLoading: false });
-      return -1;
+      logError(error, 'Store.addProject');
+      const errorMessage = getErrorMessage(error);
+      set({ error: errorMessage, isLoading: false });
+      throw error;
     }
   },
   
   updateProject: async (id, updates) => {
     set({ isLoading: true, error: null });
     try {
-      await db.projects.update(id, { ...updates, updatedAt: new Date() });
-      await get().loadProjects();
+      const updatedProject = await storageService.updateProject(id, updates);
+      
+      // Update projects list
+      set(state => ({
+        projects: state.projects.map(p => p.id.toString() === id ? updatedProject : p),
+        isLoading: false
+      }));
       
       // Update current project if it's the one being edited
       const currentProject = get().currentProject;
-      if (currentProject && currentProject.id === id) {
-        const updatedProject = await db.projects.get(id);
-        if (updatedProject) {
-          set({ currentProject: updatedProject });
-        }
+      if (currentProject && currentProject.id.toString() === id) {
+        set({ currentProject: updatedProject });
       }
-      
-      set({ isLoading: false });
     } catch (error) {
-      console.error('Error updating project:', error);
-      set({ error: 'Failed to update project', isLoading: false });
+      logError(error, 'Store.updateProject');
+      const errorMessage = getErrorMessage(error);
+      set({ error: errorMessage, isLoading: false });
+      throw error;
     }
   },
   
   deleteProject: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      await db.projects.delete(id);
+      await storageService.deleteProject(id);
+      
+      // Remove from projects list
+      set(state => ({
+        projects: state.projects.filter(p => p.id.toString() !== id),
+        isLoading: false
+      }));
       
       // Reset current project if it's the one being deleted
       const currentProject = get().currentProject;
-      if (currentProject && currentProject.id === id) {
+      if (currentProject && currentProject.id.toString() === id) {
         set({ currentProject: null });
       }
-      
-      await get().loadProjects();
-      set({ isLoading: false });
     } catch (error) {
-      console.error('Error deleting project:', error);
-      set({ error: 'Failed to delete project', isLoading: false });
+      logError(error, 'Store.deleteProject');
+      const errorMessage = getErrorMessage(error);
+      
+      // If project doesn't exist in storage but exists in UI (phantom project), remove it anyway
+      if (errorMessage.includes('Project not found') || errorMessage.includes('not found')) {
+        console.log('Removing phantom project from UI:', id);
+        set(state => ({
+          projects: state.projects.filter(p => p.id.toString() !== id),
+          isLoading: false
+        }));
+        
+        // Reset current project if it's the one being deleted
+        const currentProject = get().currentProject;
+        if (currentProject && currentProject.id.toString() === id) {
+          set({ currentProject: null });
+        }
+        return; // Don't throw error for phantom projects
+      }
+      
+      set({ error: errorMessage, isLoading: false });
+      throw error;
     }
   },
 
   loadModelById: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      const model = await db.financialModels.get(id);
+      const model = await storageService.getModel(id);
       if (model) {
         set({ currentModel: model, isLoading: false });
+        return model;
       } else {
         set({ error: 'Model not found', isLoading: false });
+        return null;
       }
-      return model || null;
     } catch (error) {
-      console.error('Error loading financial model:', error);
-      set({ error: 'Failed to load financial model', isLoading: false });
+      logError(error, 'Store.loadModelById');
+      const errorMessage = getErrorMessage(error);
+      set({ error: errorMessage, isLoading: false });
       return null;
     }
   },
@@ -144,15 +178,13 @@ const useStore = create<AppState>((set, get) => ({
   loadModelsForProject: async (projectId) => {
     set({ isLoading: true, error: null });
     try {
-      const models = await db.financialModels
-        .where('projectId')
-        .equals(projectId)
-        .toArray();
+      const models = await storageService.getModelsForProject(projectId);
       set({ isLoading: false });
       return models;
     } catch (error) {
-      console.error('Error loading financial models:', error);
-      set({ error: 'Failed to load financial models', isLoading: false });
+      logError(error, 'Store.loadModelsForProject');
+      const errorMessage = getErrorMessage(error);
+      set({ error: errorMessage, isLoading: false });
       return [];
     }
   },
@@ -160,56 +192,74 @@ const useStore = create<AppState>((set, get) => ({
   addFinancialModel: async (model) => {
     set({ isLoading: true, error: null });
     try {
-      const id = await db.financialModels.add({
-        ...model,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
+      const newModel = await storageService.createModel(model);
       set({ isLoading: false });
-      return id;
+      return newModel;
     } catch (error) {
-      console.error('Error adding financial model:', error);
-      set({ error: 'Failed to add financial model', isLoading: false });
-      return -1;
+      logError(error, 'Store.addFinancialModel');
+      const errorMessage = getErrorMessage(error);
+      set({ error: errorMessage, isLoading: false });
+      throw error;
     }
   },
 
   updateFinancialModel: async (id, updates) => {
     set({ isLoading: true, error: null });
     try {
-      await db.financialModels.update(id, { ...updates, updatedAt: new Date() });
+      const updatedModel = await storageService.updateModel(id, updates);
       
       // Update current model if it's the one being edited
       const currentModel = get().currentModel;
-      if (currentModel && currentModel.id === id) {
-        const updatedModel = await db.financialModels.get(id);
-        if (updatedModel) {
-          set({ currentModel: updatedModel });
-        }
+      if (currentModel && currentModel.id.toString() === id) {
+        set({ currentModel: updatedModel });
       }
       
       set({ isLoading: false });
     } catch (error) {
-      console.error('Error updating financial model:', error);
-      set({ error: 'Failed to update financial model', isLoading: false });
+      logError(error, 'Store.updateFinancialModel');
+      const errorMessage = getErrorMessage(error);
+      set({ error: errorMessage, isLoading: false });
+      throw error;
     }
   },
 
   deleteFinancialModel: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      await db.financialModels.delete(id);
+      await storageService.deleteModel(id);
       
       // Reset current model if it's the one being deleted
       const currentModel = get().currentModel;
-      if (currentModel && currentModel.id === id) {
+      if (currentModel && currentModel.id.toString() === id) {
         set({ currentModel: null });
       }
       
       set({ isLoading: false });
     } catch (error) {
-      console.error('Error deleting financial model:', error);
-      set({ error: 'Failed to delete financial model', isLoading: false });
+      logError(error, 'Store.deleteFinancialModel');
+      const errorMessage = getErrorMessage(error);
+      set({ error: errorMessage, isLoading: false });
+      throw error;
+    }
+  },
+
+  syncWithCloud: async () => {
+    if (!storageService.syncWithCloud) {
+      console.log('Sync not supported by current storage service');
+      return;
+    }
+
+    set({ isLoading: true, error: null });
+    try {
+      await storageService.syncWithCloud();
+      // Reload projects after sync
+      await get().loadProjects();
+      set({ isLoading: false });
+    } catch (error) {
+      logError(error, 'Store.syncWithCloud');
+      const errorMessage = getErrorMessage(error);
+      set({ error: errorMessage, isLoading: false });
+      throw error;
     }
   },
 }));

@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CostData, TypeCategoryData } from "./breakdownCalculations";
+import { formatCurrency } from "@/lib/utils";
 
 interface CostBreakdownViewProps {
   costData: CostData[];
@@ -86,7 +87,7 @@ const CostBreakdownView: React.FC<CostBreakdownViewProps> = ({
                 margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" tickFormatter={(value) => `$${value}`} />
+                <XAxis type="number" tickFormatter={(value) => formatCurrency(value)} />
                 <YAxis 
                   type="category" 
                   dataKey="name" 
@@ -94,7 +95,7 @@ const CostBreakdownView: React.FC<CostBreakdownViewProps> = ({
                   width={100}
                 />
                 <Tooltip
-                  formatter={(value) => [`$${value.toLocaleString()}`, ""]}
+                  formatter={(value) => [formatCurrency(value), ""]}
                 />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                   {costData.map((entry, index) => (
@@ -119,9 +120,9 @@ const CostBreakdownView: React.FC<CostBreakdownViewProps> = ({
               >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
-                <YAxis tickFormatter={(value) => `$${value}`} />
+                <YAxis tickFormatter={(value) => formatCurrency(value)} />
                 <Tooltip
-                  formatter={(value) => [`$${value.toLocaleString()}`, ""]}
+                  formatter={(value) => [formatCurrency(value), ""]}
                 />
                 <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                   {typeData.map((entry, index) => {
@@ -157,7 +158,7 @@ const CostBreakdownView: React.FC<CostBreakdownViewProps> = ({
                 <TableRow key={idx} className={idx % 2 === 0 ? "bg-gray-50" : ""}>
                   <TableCell>{item.name}</TableCell>
                   <TableCell className="capitalize">{item.type}</TableCell>
-                  <TableCell className="text-right">${item.value.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(item.value)}</TableCell>
                   <TableCell className="text-right">{item.percentage}%</TableCell>
                 </TableRow>
               ))}

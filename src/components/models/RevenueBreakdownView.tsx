@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { RevenueData } from "./breakdownCalculations";
+import { formatCurrency } from "@/lib/utils";
 
 interface RevenueBreakdownViewProps {
   data: RevenueData[];
@@ -83,7 +84,7 @@ const RevenueBreakdownView: React.FC<RevenueBreakdownViewProps> = ({ data, color
                 margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" tickFormatter={(value) => `$${value}`} />
+                <XAxis type="number" tickFormatter={(value) => formatCurrency(value)} />
                 <YAxis 
                   type="category" 
                   dataKey="name" 
@@ -91,7 +92,7 @@ const RevenueBreakdownView: React.FC<RevenueBreakdownViewProps> = ({ data, color
                   width={100}
                 />
                 <Tooltip
-                  formatter={(value) => [`$${value.toLocaleString()}`, ""]}
+                  formatter={(value) => [formatCurrency(value), ""]}
                 />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                   {data.map((entry, index) => (
@@ -120,7 +121,7 @@ const RevenueBreakdownView: React.FC<RevenueBreakdownViewProps> = ({ data, color
               {data.map((item, idx) => (
                 <TableRow key={idx} className={idx % 2 === 0 ? "bg-gray-50" : ""}>
                   <TableCell>{item.name}</TableCell>
-                  <TableCell className="text-right">${item.value.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(item.value)}</TableCell>
                   <TableCell className="text-right">{item.percentage}%</TableCell>
                 </TableRow>
               ))}

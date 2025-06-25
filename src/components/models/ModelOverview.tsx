@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Model, RevenueStream, CostCategory, ActualsPeriodEntry } from "@/types/models";
 import { formatCurrency } from "@/lib/utils";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, memo, useCallback } from "react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Edit, Download, Share2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { db } from "@/lib/db";
 
 interface ModelOverviewProps {
   model: Model;
@@ -31,7 +32,7 @@ interface SimulationPeriod {
   attendance?: number;
 }
 
-export const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverviewProps) => {
+const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverviewProps) => {
   const navigate = useNavigate();
   // Calculate isWeekly here, outside useMemo
   const isWeekly = model?.assumptions?.metadata?.type === "WeeklyEvent"; 
@@ -345,7 +346,17 @@ export const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverv
   } = simulationResults;
 
   // Simplified Tooltip for Sparklines
-  const SparklineTooltip = ({ active, payload, label }: any) => {
+  interface SparklineTooltipProps {
+    active?: boolean;
+    payload?: Array<{
+      value: number;
+      dataKey: string;
+      color: string;
+    }>;
+    label?: string;
+  }
+  
+  const SparklineTooltip = ({ active, payload, label }: SparklineTooltipProps) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload; // Access the full data point
       return (
@@ -362,15 +373,66 @@ export const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverv
     return null;
   };
 
-  const handleEdit = () => {
+  const handleEdit = useCallback(() => {
     if (projectId && model.id) {
         navigate(`/projects/${projectId}/models/${model.id}/edit`);
     }
-  };
+  }, [navigate, projectId, model.id]);
   
-  // Placeholder functions for Download/Share
-  const handleDownload = () => alert("Download report functionality not implemented yet.");
-  const handleShare = () => alert("Share model functionality not implemented yet.");
+  // Download report functionality
+  const handleDownload = useCallback(async () => {
+    if (!projectId || !model) {
+      alert("Missing project or model data.");
+      return;
+    }
+
+    try {
+      // Get project data
+      const project = await db.projects.get(Number(projectId));
+      if (!project) {
+        alert("Project not found.");
+        return;
+      }
+
+      // Show format selection with 3 options
+      const choice = prompt("Choose export format:\n1 = Rich PDF with Charts\n2 = Product Strategy PDF\n3 = Excel Report\n\nEnter 1, 2, or 3:");
+      
+      if (choice === "1") {
+        // Export rich PDF with charts and financial data
+        const { exportRichPDF } = await import("@/lib/rich-pdf-export");
+        await exportRichPDF({
+          project,
+          model,
+          simulationResults
+        });
+      } else if (choice === "2") {
+        // Export product strategy PDF
+        const { exportBoardReadyPDF, prepareBoardReadyData } = await import("@/lib/board-ready-export");
+        const reportData = await prepareBoardReadyData(project, [model], 36, 0.1);
+        await exportBoardReadyPDF(reportData);
+      } else if (choice === "3") {
+        // Export Excel using enhanced export
+        const { exportEnhancedExcel } = await import("@/lib/enhanced-excel-export");
+        await exportEnhancedExcel({
+          project,
+          models: [model],
+          includeScenarios: true,
+          includeSensitivity: true,
+          periods: 36,
+          discountRate: 0.1
+        });
+      } else {
+        return; // User cancelled or invalid choice
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      alert(`Download failed: ${error.message}`);
+    }
+  }, [projectId, model, simulationResults]);
+  
+  const handleShare = useCallback(() => {
+    alert("Share model functionality not implemented yet.");
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -628,4 +690,6 @@ export const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverv
       </Card>
     </div>
   );
-}; 
+};
+
+export default memo(ModelOverview); 

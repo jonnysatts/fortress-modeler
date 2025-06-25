@@ -1,9 +1,12 @@
 import Dexie, { Table } from 'dexie';
-import { MarketingSetup, ActualsPeriodEntry } from '@/types/models';
+import { MarketingSetup, ActualsPeriodEntry, ModelMetadata } from '@/types/models';
+import { DatabaseError, NotFoundError, ValidationError, logError } from './errors';
+import { getDemoData } from './demo-data';
+import config from './config';
 
 // Define interfaces for our database tables
 export interface Project {
-  id?: number;
+  id?: number | string;
   name: string;
   description?: string;
   productType: string;
@@ -26,7 +29,7 @@ export interface FinancialModel {
     costs: CostAssumption[];
     growthModel: GrowthModel;
     marketing?: MarketingSetup;
-    metadata?: any; // For product-specific data
+    metadata?: ModelMetadata; // For product-specific data
   };
   createdAt: Date;
   updatedAt: Date;
@@ -135,37 +138,112 @@ export class FortressDB extends Dexie {
 export const db = new FortressDB();
 
 export const getProjects = async (): Promise<Project[]> => {
-  return await db.projects.toArray();
+  try {
+    return await db.projects.toArray();
+  } catch (error) {
+    logError(error, 'getProjects');
+    throw new DatabaseError('Failed to fetch projects', error);
+  }
 };
 
-export const getProject = async (id: number): Promise<Project | undefined> => {
-  return await db.projects.get(id);
+export const getProject = async (id: number | string): Promise<Project | undefined> => {
+  try {
+    const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
+    if (!idNum || isNaN(idNum) || idNum <= 0) {
+      throw new ValidationError('Invalid project ID provided');
+    }
+    const project = await db.projects.get(idNum);
+    return project;
+  } catch (error) {
+    if (error instanceof ValidationError) throw error;
+    logError(error, 'getProject');
+    throw new DatabaseError(`Failed to fetch project with ID ${id}`, error);
+  }
 };
 
 export const createProject = async (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<number> => {
-  const timestamp = new Date();
-  return await db.projects.add({
-    ...project,
-    createdAt: timestamp,
-    updatedAt: timestamp
-  });
+  try {
+    if (!project.name?.trim()) {
+      throw new ValidationError('Project name is required');
+    }
+    if (!project.productType?.trim()) {
+      throw new ValidationError('Product type is required');
+    }
+    
+    const timestamp = new Date();
+    const projectId = await db.projects.add({
+      ...project,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    });
+    
+    return projectId;
+  } catch (error) {
+    if (error instanceof ValidationError) throw error;
+    logError(error, 'createProject');
+    throw new DatabaseError('Failed to create project', error);
+  }
 };
 
-export const updateProject = async (id: number, project: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>): Promise<number> => {
-  await db.projects.update(id, { ...project, updatedAt: new Date() });
-  return id;
+export const updateProject = async (id: number | string, project: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>): Promise<number> => {
+  try {
+    const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
+    if (!idNum || isNaN(idNum) || idNum <= 0) {
+      throw new ValidationError('Invalid project ID provided');
+    }
+
+    const existingProject = await db.projects.get(idNum);
+    if (!existingProject) {
+      throw new NotFoundError(`Project with ID ${id} not found`);
+    }
+
+    const updatedCount = await db.projects.update(idNum, { ...project, updatedAt: new Date() });
+    if (updatedCount === 0) {
+      throw new DatabaseError('Failed to update project - no changes made');
+    }
+
+    return idNum;
+  } catch (error) {
+    if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
+    logError(error, 'updateProject');
+    throw new DatabaseError(`Failed to update project with ID ${id}`, error);
+  }
 };
 
-export const deleteProject = async (id: number): Promise<void> => {
-  await db.projects.delete(id);
-  await db.financialModels.where('projectId').equals(id).delete();
-  await db.actualPerformance.where('projectId').equals(id).delete();
-  await db.risks.where('projectId').equals(id).delete();
-  await db.scenarios.where('projectId').equals(id).delete();
+export const deleteProject = async (id: number | string): Promise<void> => {
+  try {
+    const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
+    if (!idNum || isNaN(idNum) || idNum <= 0) {
+      throw new ValidationError('Invalid project ID provided');
+    }
+
+    const existingProject = await db.projects.get(idNum);
+    if (!existingProject) {
+      throw new NotFoundError(`Project with ID ${id} not found`);
+    }
+
+    // Use transaction for atomicity
+    await db.transaction('rw', [db.projects, db.financialModels, db.actualPerformance, db.risks, db.scenarios, db.actuals], async () => {
+      await db.projects.delete(idNum);
+      await db.financialModels.where('projectId').equals(idNum).delete();
+      await db.actualPerformance.where('projectId').equals(idNum).delete();
+      await db.risks.where('projectId').equals(idNum).delete();
+      await db.scenarios.where('projectId').equals(idNum).delete();
+      await db.actuals.where('projectId').equals(idNum).delete();
+    });
+  } catch (error) {
+    if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
+    logError(error, 'deleteProject');
+    throw new DatabaseError(`Failed to delete project with ID ${id}`, error);
+  }
 };
 
-export const getModelsForProject = async (projectId: number): Promise<FinancialModel[]> => {
-  return await db.financialModels.where('projectId').equals(projectId).toArray();
+export const getModelsForProject = async (projectId: number | string): Promise<FinancialModel[]> => {
+  const idNum = typeof projectId === 'string' ? parseInt(projectId, 10) : projectId;
+  if (!idNum || isNaN(idNum) || idNum <= 0) {
+    throw new ValidationError('Invalid project ID provided');
+  }
+  return await db.financialModels.where('projectId').equals(idNum).toArray();
 };
 
 export const getActualsForProject = async (projectId: number): Promise<ActualsPeriodEntry[]> => {
@@ -187,139 +265,38 @@ export const upsertActualsPeriod = async (actualEntry: Omit<ActualsPeriodEntry, 
 };
 
 export const addDemoData = async (): Promise<void> => {
-  const projectCount = await db.projects.count();
-  if (projectCount > 0) return;
-
-  const projectId = await db.projects.add({
-    name: "SaaS Marketing Platform",
-    description: "A cloud-based marketing automation platform for small businesses",
-    productType: "SaaS",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    targetAudience: "Small and medium businesses with marketing teams of 1-5 people",
-    timeline: {
-      startDate: new Date(),
-      endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1))
+  try {
+    // Only add demo data if enabled in config
+    if (!config.enableDemoData) {
+      return;
     }
-  });
 
-  const modelId = await db.financialModels.add({
-    projectId,
-    name: "Base Financial Model",
-    assumptions: {
-      revenue: [
-        {
-          name: "Monthly Subscription",
-          value: 49.99,
-          type: "recurring",
-          frequency: "monthly"
-        },
-        {
-          name: "Implementation Fee",
-          value: 500,
-          type: "fixed",
-          frequency: "one-time"
-        }
-      ],
-      costs: [
-        {
-          name: "Cloud Infrastructure",
-          value: 2000,
-          type: "fixed",
-          category: "operations"
-        },
-        {
-          name: "Customer Success Team",
-          value: 5000,
-          type: "fixed",
-          category: "staffing"
-        },
-        {
-          name: "Marketing Spend",
-          value: 3000,
-          type: "variable",
-          category: "marketing"
-        }
-      ],
-      growthModel: {
-        type: "exponential",
-        rate: 0.1
-      }
-    },
-    createdAt: new Date(),
-    updatedAt: new Date()
-  });
+    const projectCount = await db.projects.count();
+    if (projectCount > 0) return;
 
-  await db.risks.bulkAdd([
-    {
+    const demoData = getDemoData();
+    const timestamp = new Date();
+    
+    // Add demo project
+    const projectId = await db.projects.add({
+      ...demoData.project,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    });
+
+    // Add demo financial model
+    await db.financialModels.add({
+      ...demoData.financialModel,
       projectId,
-      name: "Increased Cloud Costs",
-      type: "financial",
-      likelihood: "medium",
-      impact: "high",
-      mitigation: "Negotiate long-term agreements with cloud provider",
-      notes: "AWS has announced potential price increases in Q3",
-      status: "identified",
-      owner: "DevOps Team"
-    },
-    {
-      projectId,
-      name: "New Competitor Entry",
-      type: "strategic",
-      likelihood: "high",
-      impact: "medium",
-      mitigation: "Accelerate roadmap for differentiating features",
-      notes: "Rumors of venture-backed competitor launching in 6 months",
-      status: "identified",
-      owner: "Product Team"
+      createdAt: timestamp,
+      updatedAt: timestamp
+    });
+
+    if (config.isDevelopment) {
+      console.log('Demo data added successfully');
     }
-  ]);
-
-  await db.scenarios.add({
-    projectId,
-    modelId,
-    name: "Aggressive Growth Scenario",
-    description: "Assuming higher marketing spend and faster customer acquisition",
-    assumptions: {
-      revenue: [
-        {
-          name: "Monthly Subscription",
-          value: 59.99,
-          type: "recurring",
-          frequency: "monthly"
-        },
-        {
-          name: "Implementation Fee",
-          value: 500,
-          type: "fixed",
-          frequency: "one-time"
-        }
-      ],
-      costs: [
-        {
-          name: "Cloud Infrastructure",
-          value: 3000,
-          type: "fixed",
-          category: "operations"
-        },
-        {
-          name: "Customer Success Team",
-          value: 8000,
-          type: "fixed",
-          category: "staffing"
-        },
-        {
-          name: "Marketing Spend",
-          value: 10000,
-          type: "variable",
-          category: "marketing"
-        }
-      ],
-      growthModel: {
-        type: "exponential",
-        rate: 0.2
-      }
-    },
-    createdAt: new Date()
-  });
+  } catch (error) {
+    logError(error, 'addDemoData');
+    throw new DatabaseError('Failed to add demo data', error);
+  }
 };

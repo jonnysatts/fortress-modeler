@@ -21,6 +21,39 @@ const FinancialMatrix = ({
   const isWeeklyEvent = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
   
+  // Determine headers dynamically based on data keys present - MOVED BEFORE EARLY RETURNS
+  const revenueKeys = useMemo(() => {
+      if (!trendData || trendData.length === 0) return model.assumptions.revenue.map(r => r.name.replace(/[^a-zA-Z0-9]/g, ""));
+      // Get keys from the first data point, excluding known non-revenue keys
+      const firstPointKeys = Object.keys(trendData[0]);
+      const knownCostKeys = new Set(model.assumptions.costs.map(c => c.name.replace(/[^a-zA-Z0-9]/g, "")));
+      knownCostKeys.add('MarketingBudget').add('costs').add('cumulativeCosts').add('profit').add('cumulativeProfit').add('point').add('attendance');
+      return firstPointKeys.filter(key => !knownCostKeys.has(key) && !key.endsWith('Color') && key !== 'revenue' && key !== 'cumulativeRevenue');
+  }, [trendData, model.assumptions.revenue, model.assumptions.costs]);
+  
+  const costKeys = useMemo(() => {
+      if (!trendData || trendData.length === 0) return model.assumptions.costs.map(c => c.name.replace(/[^a-zA-Z0-9]/g, ""));
+      // Get keys from the first data point, filter for likely cost keys
+      const firstPointKeys = Object.keys(trendData[0]);
+      const knownRevenueKeys = new Set(model.assumptions.revenue.map(r => r.name.replace(/[^a-zA-Z0-9]/g, "")));
+      knownRevenueKeys.add('revenue').add('cumulativeRevenue').add('profit').add('cumulativeProfit').add('point').add('attendance');
+      // Include MarketingBudget if present
+      const potentialCostKeys = firstPointKeys.filter(key => !knownRevenueKeys.has(key) && !key.endsWith('Color') && key !== 'costs' && key !== 'cumulativeCosts');
+      // Basic check: include if it's in original costs OR it's MarketingBudget
+      const costAssumptionKeys = new Set(model.assumptions.costs.map(c => c.name.replace(/[^a-zA-Z0-9]/g, "")));
+      const finalKeys = potentialCostKeys.filter(key => costAssumptionKeys.has(key) || key === 'MarketingBudget');
+      
+      // Sort these keys like in CostTrends
+       const costRenderOrder = ["SetupCosts", "MarketingBudget", "FBCOGS", "StaffCosts", "ManagementCosts"];
+       finalKeys.sort((a, b) => {
+           let indexA = costRenderOrder.indexOf(a); let indexB = costRenderOrder.indexOf(b);
+           if (indexA === -1) indexA = costRenderOrder.length; if (indexB === -1) indexB = costRenderOrder.length;
+           return indexA - indexB;
+       });
+       
+      return finalKeys;
+  }, [trendData, model.assumptions.costs, model.assumptions.revenue]);
+  
   // Check if data is valid and not empty
   if (!trendData || trendData.length === 0) {
     return (
@@ -136,38 +169,6 @@ const FinancialMatrix = ({
     }).filter(Boolean);
   };
 
-  // Determine headers dynamically based on data keys present
-  const revenueKeys = useMemo(() => {
-      if (!trendData || trendData.length === 0) return model.assumptions.revenue.map(r => r.name.replace(/[^a-zA-Z0-9]/g, ""));
-      // Get keys from the first data point, excluding known non-revenue keys
-      const firstPointKeys = Object.keys(trendData[0]);
-      const knownCostKeys = new Set(model.assumptions.costs.map(c => c.name.replace(/[^a-zA-Z0-9]/g, "")));
-      knownCostKeys.add('MarketingBudget').add('costs').add('cumulativeCosts').add('profit').add('cumulativeProfit').add('point').add('attendance');
-      return firstPointKeys.filter(key => !knownCostKeys.has(key) && !key.endsWith('Color') && key !== 'revenue' && key !== 'cumulativeRevenue');
-  }, [trendData, model.assumptions.revenue, model.assumptions.costs]);
-  
-  const costKeys = useMemo(() => {
-      if (!trendData || trendData.length === 0) return model.assumptions.costs.map(c => c.name.replace(/[^a-zA-Z0-9]/g, ""));
-      // Get keys from the first data point, filter for likely cost keys
-      const firstPointKeys = Object.keys(trendData[0]);
-      const knownRevenueKeys = new Set(model.assumptions.revenue.map(r => r.name.replace(/[^a-zA-Z0-9]/g, "")));
-      knownRevenueKeys.add('revenue').add('cumulativeRevenue').add('profit').add('cumulativeProfit').add('point').add('attendance');
-      // Include MarketingBudget if present
-      const potentialCostKeys = firstPointKeys.filter(key => !knownRevenueKeys.has(key) && !key.endsWith('Color') && key !== 'costs' && key !== 'cumulativeCosts');
-      // Basic check: include if it's in original costs OR it's MarketingBudget
-      const costAssumptionKeys = new Set(model.assumptions.costs.map(c => c.name.replace(/[^a-zA-Z0-9]/g, "")));
-      const finalKeys = potentialCostKeys.filter(key => costAssumptionKeys.has(key) || key === 'MarketingBudget');
-      
-      // Sort these keys like in CostTrends
-       const costRenderOrder = ["SetupCosts", "MarketingBudget", "FBCOGS", "StaffCosts", "ManagementCosts"];
-       finalKeys.sort((a, b) => {
-           let indexA = costRenderOrder.indexOf(a); let indexB = costRenderOrder.indexOf(b);
-           if (indexA === -1) indexA = costRenderOrder.length; if (indexB === -1) indexB = costRenderOrder.length;
-           return indexA - indexB;
-       });
-       
-      return finalKeys;
-  }, [trendData, model.assumptions.costs, model.assumptions.revenue]);
 
   // Combined data view - both revenue and cost data in one table
   if (combinedView) {
@@ -303,7 +304,7 @@ const FinancialMatrix = ({
                 const safeName = stream.name.replace(/[^a-zA-Z0-9]/g, "");
                 return (
                   <td key={streamIdx} className="text-right py-2 px-3">
-                    {Math.ceil(period[safeName] || 0).toLocaleString()}
+                    {formatCurrency(period[safeName] || 0)}
                   </td>
                 );
               })}
@@ -311,15 +312,15 @@ const FinancialMatrix = ({
                 const safeName = cost.name.replace(/[^a-zA-Z0-9]/g, "");
                 return (
                   <td key={costIdx} className="text-right py-2 px-3">
-                    {Math.ceil(period[safeName] || 0).toLocaleString()}
+                    {formatCurrency(period[safeName] || 0)}
                   </td>
                 );
               })}
               <td className="text-right py-2 px-3 font-bold">
-                {Math.ceil(period.total || period.revenue || period.costs || 0).toLocaleString()}
+                {formatCurrency(period.total || period.revenue || period.costs || 0)}
               </td>
               <td className="text-right py-2 px-3 font-bold text-green-700">
-                {Math.ceil(period.cumulativeTotal || period.cumulativeRevenue || period.cumulativeCosts || 0).toLocaleString()}
+                {formatCurrency(period.cumulativeTotal || period.cumulativeRevenue || period.cumulativeCosts || 0)}
               </td>
             </tr>
           ))}

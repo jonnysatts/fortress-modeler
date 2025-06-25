@@ -1,4 +1,5 @@
 import { FinancialModel } from "@/lib/db";
+import { TrendDataPoint } from "@/types/trends";
 
 // Define interfaces for our data objects
 export interface RevenueData {
@@ -22,11 +23,11 @@ export interface TypeCategoryData {
 }
 
 // Prepare Revenue Breakdown Data for a SPECIFIC week's data point
-export const prepareRevenueDataForWeek = (weekDataPoint: any | null): RevenueData[] => {
+export const prepareRevenueDataForWeek = (weekDataPoint: TrendDataPoint | null): RevenueData[] => {
   if (!weekDataPoint) return [];
 
   const revenueStreams: RevenueData[] = [];
-  let totalWeeklyRevenue = weekDataPoint.revenue || 0; // Get total revenue for this week
+  const totalWeeklyRevenue = weekDataPoint.revenue || 0; // Get total revenue for this week
 
   // Extract individual revenue stream values from the data point
   // Assumes keys match original revenue stream names (e.g., 'Ticket Sales')
@@ -53,7 +54,7 @@ export const prepareRevenueDataForWeek = (weekDataPoint: any | null): RevenueDat
 };
 
 // Prepare Cost Breakdown Data for a SPECIFIC week's data point
-export const prepareCostDataForWeek = (weekDataPoint: any | null, model: FinancialModel): CostData[] => {
+export const prepareCostDataForWeek = (weekDataPoint: TrendDataPoint | null, model: FinancialModel): CostData[] => {
   if (!weekDataPoint) return [];
 
   const costItems: CostData[] = [];
@@ -101,7 +102,7 @@ export const prepareCostDataForWeek = (weekDataPoint: any | null, model: Financi
 };
 
 // Prepare Cost Data Categorized by Type for a SPECIFIC week's data point
-export const prepareTypeCategorizedDataForWeek = (weekDataPoint: any | null, model: FinancialModel): TypeCategoryData[] => {
+export const prepareTypeCategorizedDataForWeek = (weekDataPoint: TrendDataPoint | null, model: FinancialModel): TypeCategoryData[] => {
   if (!weekDataPoint) return [];
 
   const typeCategories: Record<string, TypeCategoryData> = {

@@ -11,7 +11,7 @@ export const formatCurrency = (amount: number): string => {
     currency: 'USD',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(Math.round(amount));
 };
 
 export const formatPercent = (value: number): string => {
