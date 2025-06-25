@@ -6,7 +6,7 @@ import config from './config';
 
 // Define interfaces for our database tables
 export interface Project {
-  id?: number;
+  id?: number | string;
   name: string;
   description?: string;
   productType: string;
@@ -146,12 +146,13 @@ export const getProjects = async (): Promise<Project[]> => {
   }
 };
 
-export const getProject = async (id: number): Promise<Project | undefined> => {
+export const getProject = async (id: number | string): Promise<Project | undefined> => {
   try {
-    if (!id || (typeof id === 'number' && id <= 0)) {
+    const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
+    if (!idNum || isNaN(idNum) || idNum <= 0) {
       throw new ValidationError('Invalid project ID provided');
     }
-    const project = await db.projects.get(id);
+    const project = await db.projects.get(idNum);
     return project;
   } catch (error) {
     if (error instanceof ValidationError) throw error;
@@ -184,23 +185,24 @@ export const createProject = async (project: Omit<Project, 'id' | 'createdAt' | 
   }
 };
 
-export const updateProject = async (id: number, project: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>): Promise<number> => {
+export const updateProject = async (id: number | string, project: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>): Promise<number> => {
   try {
-    if (!id || (typeof id === 'number' && id <= 0)) {
+    const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
+    if (!idNum || isNaN(idNum) || idNum <= 0) {
       throw new ValidationError('Invalid project ID provided');
     }
-    
-    const existingProject = await db.projects.get(id);
+
+    const existingProject = await db.projects.get(idNum);
     if (!existingProject) {
       throw new NotFoundError(`Project with ID ${id} not found`);
     }
-    
-    const updatedCount = await db.projects.update(id, { ...project, updatedAt: new Date() });
+
+    const updatedCount = await db.projects.update(idNum, { ...project, updatedAt: new Date() });
     if (updatedCount === 0) {
       throw new DatabaseError('Failed to update project - no changes made');
     }
-    
-    return id;
+
+    return idNum;
   } catch (error) {
     if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
     logError(error, 'updateProject');
@@ -208,25 +210,26 @@ export const updateProject = async (id: number, project: Partial<Omit<Project, '
   }
 };
 
-export const deleteProject = async (id: number): Promise<void> => {
+export const deleteProject = async (id: number | string): Promise<void> => {
   try {
-    if (!id || (typeof id === 'number' && id <= 0)) {
+    const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
+    if (!idNum || isNaN(idNum) || idNum <= 0) {
       throw new ValidationError('Invalid project ID provided');
     }
-    
-    const existingProject = await db.projects.get(id);
+
+    const existingProject = await db.projects.get(idNum);
     if (!existingProject) {
       throw new NotFoundError(`Project with ID ${id} not found`);
     }
-    
+
     // Use transaction for atomicity
     await db.transaction('rw', [db.projects, db.financialModels, db.actualPerformance, db.risks, db.scenarios, db.actuals], async () => {
-      await db.projects.delete(id);
-      await db.financialModels.where('projectId').equals(id).delete();
-      await db.actualPerformance.where('projectId').equals(id).delete();
-      await db.risks.where('projectId').equals(id).delete();
-      await db.scenarios.where('projectId').equals(id).delete();
-      await db.actuals.where('projectId').equals(id).delete();
+      await db.projects.delete(idNum);
+      await db.financialModels.where('projectId').equals(idNum).delete();
+      await db.actualPerformance.where('projectId').equals(idNum).delete();
+      await db.risks.where('projectId').equals(idNum).delete();
+      await db.scenarios.where('projectId').equals(idNum).delete();
+      await db.actuals.where('projectId').equals(idNum).delete();
     });
   } catch (error) {
     if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
@@ -235,8 +238,12 @@ export const deleteProject = async (id: number): Promise<void> => {
   }
 };
 
-export const getModelsForProject = async (projectId: number): Promise<FinancialModel[]> => {
-  return await db.financialModels.where('projectId').equals(projectId).toArray();
+export const getModelsForProject = async (projectId: number | string): Promise<FinancialModel[]> => {
+  const idNum = typeof projectId === 'string' ? parseInt(projectId, 10) : projectId;
+  if (!idNum || isNaN(idNum) || idNum <= 0) {
+    throw new ValidationError('Invalid project ID provided');
+  }
+  return await db.financialModels.where('projectId').equals(idNum).toArray();
 };
 
 export const getActualsForProject = async (projectId: number): Promise<ActualsPeriodEntry[]> => {

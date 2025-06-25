@@ -28,9 +28,10 @@ class LocalStorageService implements StorageService {
     return localDb.getProjects();
   }
 
-  async getProject(id: string): Promise<Project | null> {
-    const numericId = parseInt(id, 10);
-    return localDb.getProject(numericId);
+  async getProject(id: string | number): Promise<Project | null> {
+    const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
+    if (isNaN(idNum)) return null;
+    return localDb.getProject(idNum);
   }
 
   async createProject(project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> {
@@ -40,27 +41,31 @@ class LocalStorageService implements StorageService {
     return created;
   }
 
-  async updateProject(id: string, updates: Partial<Project>): Promise<Project> {
-    const numericId = parseInt(id, 10);
-    await localDb.updateProject(numericId, updates);
-    const updated = await localDb.getProject(numericId);
+  async updateProject(id: string | number, updates: Partial<Project>): Promise<Project> {
+    const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
+    if (isNaN(idNum)) throw new Error('Invalid project ID');
+    await localDb.updateProject(idNum, updates);
+    const updated = await localDb.getProject(idNum);
     if (!updated) throw new Error('Failed to update project');
     return updated;
   }
 
-  async deleteProject(id: string): Promise<void> {
-    const numericId = parseInt(id, 10);
-    await localDb.deleteProject(numericId);
+  async deleteProject(id: string | number): Promise<void> {
+    const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
+    if (isNaN(idNum)) throw new Error('Invalid project ID');
+    await localDb.deleteProject(idNum);
   }
 
-  async getModelsForProject(projectId: string): Promise<FinancialModel[]> {
-    const numericId = parseInt(projectId, 10);
-    return localDb.getModelsForProject(numericId);
+  async getModelsForProject(projectId: string | number): Promise<FinancialModel[]> {
+    const idNum = typeof projectId === 'string' ? parseInt(projectId, 10) : projectId;
+    if (isNaN(idNum)) return [];
+    return localDb.getModelsForProject(idNum);
   }
 
-  async getModel(id: string): Promise<FinancialModel | null> {
-    const numericId = parseInt(id, 10);
-    return localDb.getModelById(numericId);
+  async getModel(id: string | number): Promise<FinancialModel | null> {
+    const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
+    if (isNaN(idNum)) return null;
+    return localDb.getModelById(idNum);
   }
 
   async createModel(model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>): Promise<FinancialModel> {
@@ -70,17 +75,19 @@ class LocalStorageService implements StorageService {
     return created;
   }
 
-  async updateModel(id: string, updates: Partial<FinancialModel>): Promise<FinancialModel> {
-    const numericId = parseInt(id, 10);
-    await localDb.updateFinancialModel(numericId, updates);
-    const updated = await localDb.getModelById(numericId);
+  async updateModel(id: string | number, updates: Partial<FinancialModel>): Promise<FinancialModel> {
+    const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
+    if (isNaN(idNum)) throw new Error('Invalid model ID');
+    await localDb.updateFinancialModel(idNum, updates);
+    const updated = await localDb.getModelById(idNum);
     if (!updated) throw new Error('Failed to update model');
     return updated;
   }
 
-  async deleteModel(id: string): Promise<void> {
-    const numericId = parseInt(id, 10);
-    await localDb.deleteFinancialModel(numericId);
+  async deleteModel(id: string | number): Promise<void> {
+    const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
+    if (isNaN(idNum)) throw new Error('Invalid model ID');
+    await localDb.deleteFinancialModel(idNum);
   }
 }
 
@@ -175,10 +182,10 @@ class HybridStorageService implements StorageService {
     } catch (error) {
       console.warn('Cloud storage unavailable, checking if local fallback is possible:', error);
       // Only fallback to local storage for numeric IDs (not UUIDs)
-      const numericId = parseInt(id, 10);
+      const numericId = typeof id === 'string' ? parseInt(id, 10) : NaN;
       if (!isNaN(numericId) && numericId > 0) {
         console.log('Falling back to local storage for numeric ID:', numericId);
-        return await this.local.getProject(id);
+        return await this.local.getProject(numericId);
       } else {
         console.log('Cannot fallback to local storage for UUID:', id);
         throw error; // Re-throw the original cloud error for UUID projects
@@ -189,9 +196,12 @@ class HybridStorageService implements StorageService {
   async createProject(project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> {
     try {
       const cloudProject = await this.cloud.createProject(project);
-      // Also save locally for offline access
+      // Also save locally for offline access when ID is numeric
       try {
-        await this.local.createProject({ ...project, id: cloudProject.id } as any);
+        const idNum = typeof cloudProject.id === 'string' ? parseInt(cloudProject.id as string, 10) : cloudProject.id;
+        if (!isNaN(idNum)) {
+          await this.local.createProject({ ...project, id: idNum } as any);
+        }
       } catch (localError) {
         console.warn('Failed to save to local storage:', localError);
       }
@@ -205,9 +215,12 @@ class HybridStorageService implements StorageService {
   async updateProject(id: string, updates: Partial<Project>): Promise<Project> {
     try {
       const updated = await this.cloud.updateProject(id, updates);
-      // Also update locally
+      // Also update locally when ID is numeric
       try {
-        await this.local.updateProject(id, updates);
+        const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
+        if (!isNaN(idNum)) {
+          await this.local.updateProject(idNum, updates);
+        }
       } catch (localError) {
         console.warn('Failed to update local storage:', localError);
       }
@@ -221,9 +234,12 @@ class HybridStorageService implements StorageService {
   async deleteProject(id: string): Promise<void> {
     try {
       await this.cloud.deleteProject(id);
-      // Also delete locally
+      // Also delete locally when ID is numeric
       try {
-        await this.local.deleteProject(id);
+        const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
+        if (!isNaN(idNum)) {
+          await this.local.deleteProject(idNum);
+        }
       } catch (localError) {
         console.warn('Failed to delete from local storage:', localError);
       }
@@ -256,7 +272,10 @@ class HybridStorageService implements StorageService {
       const cloudModel = await this.cloud.createModel(model);
       // Also save locally
       try {
-        await this.local.createModel({ ...model, id: cloudModel.id } as any);
+        const idNum = typeof cloudModel.id === 'string' ? parseInt(cloudModel.id as string, 10) : cloudModel.id;
+        if (!isNaN(idNum)) {
+          await this.local.createModel({ ...model, id: idNum } as any);
+        }
       } catch (localError) {
         console.warn('Failed to save to local storage:', localError);
       }
@@ -272,7 +291,10 @@ class HybridStorageService implements StorageService {
       const updated = await this.cloud.updateModel(id, updates);
       // Also update locally
       try {
-        await this.local.updateModel(id, updates);
+        const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
+        if (!isNaN(idNum)) {
+          await this.local.updateModel(idNum, updates);
+        }
       } catch (localError) {
         console.warn('Failed to update local storage:', localError);
       }
@@ -288,7 +310,10 @@ class HybridStorageService implements StorageService {
       await this.cloud.deleteModel(id);
       // Also delete locally
       try {
-        await this.local.deleteModel(id);
+        const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
+        if (!isNaN(idNum)) {
+          await this.local.deleteModel(idNum);
+        }
       } catch (localError) {
         console.warn('Failed to delete from local storage:', localError);
       }
@@ -320,7 +345,10 @@ class HybridStorageService implements StorageService {
       if (response.syncedProjects) {
         for (const project of response.syncedProjects) {
           try {
-            await this.local.updateProject(project.id.toString(), project);
+            const idNum = typeof project.id === 'string' ? parseInt(project.id, 10) : project.id;
+            if (!isNaN(idNum)) {
+              await this.local.updateProject(idNum, project);
+            }
           } catch (error) {
             console.warn('Failed to update local project:', project.id, error);
           }
@@ -330,7 +358,10 @@ class HybridStorageService implements StorageService {
       if (response.syncedModels) {
         for (const model of response.syncedModels) {
           try {
-            await this.local.updateModel(model.id.toString(), model);
+            const idNum = typeof model.id === 'string' ? parseInt(model.id, 10) : model.id;
+            if (!isNaN(idNum)) {
+              await this.local.updateModel(idNum, model);
+            }
           } catch (error) {
             console.warn('Failed to update local model:', model.id, error);
           }
