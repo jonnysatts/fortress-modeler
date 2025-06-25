@@ -3,10 +3,33 @@ export const camelCaseKeys = <T = any>(input: any): T => {
     return input.map((v) => camelCaseKeys(v)) as T;
   }
   if (input && typeof input === 'object') {
+    if (input instanceof Date) {
+      return input as T;
+    }
     const result: any = {};
     for (const [key, value] of Object.entries(input)) {
       const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
       result[camelKey] = camelCaseKeys(value);
+    }
+    return result;
+  }
+  return input as T;
+};
+
+export const snakeCaseKeys = <T = any>(input: any): T => {
+  if (Array.isArray(input)) {
+    return input.map((v) => snakeCaseKeys(v)) as T;
+  }
+  if (input && typeof input === 'object') {
+    if (input instanceof Date) {
+      return input as T;
+    }
+    const result: any = {};
+    for (const [key, value] of Object.entries(input)) {
+      const snakeKey = key
+        .replace(/([A-Z])/g, '_$1')
+        .toLowerCase();
+      result[snakeKey] = snakeCaseKeys(value);
     }
     return result;
   }

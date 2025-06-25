@@ -1,6 +1,6 @@
 import { config } from './config';
 import { Project, FinancialModel } from '../types/models';
-import { normalizeProject, normalizeProjects } from './normalizeProject';
+import { normalizeProject, normalizeProjects, snakeCaseKeys } from './normalizeProject';
 
 export interface ApiResponse<T = any> {
   data?: T;
@@ -69,7 +69,7 @@ class ApiService {
   async createProject(project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ project: Project }> {
     const res = await this.request<{ project: any }>('/api/projects', {
       method: 'POST',
-      body: JSON.stringify(project),
+      body: JSON.stringify(snakeCaseKeys(project)),
     });
     return { ...res, project: normalizeProject(res.project) as Project };
   }
@@ -77,7 +77,7 @@ class ApiService {
   async updateProject(id: string, project: Partial<Project>): Promise<{ project: Project }> {
     const res = await this.request<{ project: any }>(`/api/projects/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(project),
+      body: JSON.stringify(snakeCaseKeys(project)),
     });
     return { ...res, project: normalizeProject(res.project) as Project };
   }
@@ -129,6 +129,12 @@ class ApiService {
     syncedModels?: FinancialModel[];
     lastSyncTimestamp: string;
   }> {
+    const payload = {
+      ...data,
+      projects: data.projects ? snakeCaseKeys(data.projects) : undefined,
+      models: data.models ? snakeCaseKeys(data.models) : undefined,
+    };
+
     const res = await this.request<{
       status: string;
       conflicts?: any[];
@@ -137,7 +143,7 @@ class ApiService {
       lastSyncTimestamp: string;
     }>('/api/sync', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
     return {
       ...res,
