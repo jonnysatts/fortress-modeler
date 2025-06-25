@@ -11,7 +11,7 @@ steps:
     env:
       - 'VITE_API_URL=https://fortress-modeler-backend-928130924917.australia-southeast2.run.app'
       - 'VITE_GOOGLE_CLIENT_ID=928130924917-fcu6m854ua2ajutk3eu191okl4f29uqv.apps.googleusercontent.com'
-      - 'VITE_ENABLE_DEMO_DATA=false'
+      - 'VITE_ENABLE_DEMO_DATA=true'
       - 'VITE_ENABLE_ANALYTICS=false'
 
   # Deploy to Cloud Run (serving static files)

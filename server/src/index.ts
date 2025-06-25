@@ -40,6 +40,7 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:8083',
   'https://fortress-modeler-frontend-928130924917.australia-southeast2.run.app',
+  'https://fortress-modeler-frontend-pqiu2rcyqq-km.a.run.app',
   'https://fortress-modeler.vercel.app',
   'https://fortress-modeler.netlify.app'
 ];

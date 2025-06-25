@@ -19,7 +19,7 @@ export const config: AppConfig = {
   apiUrl: import.meta.env.VITE_API_URL || 'https://fortress-modeler-backend-928130924917.australia-southeast2.run.app',
   googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '928130924917-fcu6m854ua2ajutk3eu191okl4f29uqv.apps.googleusercontent.com',
   version: '1.0.0',
-  useCloudSync: true // Re-enabled with proper UUID handling
+  useCloudSync: true // Re-enabled with working navigation
 };
 
 export default config;

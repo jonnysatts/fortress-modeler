@@ -264,6 +264,87 @@ export const upsertActualsPeriod = async (actualEntry: Omit<ActualsPeriodEntry, 
   }
 };
 
+// Financial Model operations
+export const getModelById = async (id: number): Promise<FinancialModel | undefined> => {
+  try {
+    if (!id || isNaN(id) || id <= 0) {
+      throw new ValidationError('Invalid model ID provided');
+    }
+    return await db.financialModels.get(id);
+  } catch (error) {
+    if (error instanceof ValidationError) throw error;
+    logError(error, 'getModelById');
+    throw new DatabaseError(`Failed to fetch model with ID ${id}`, error);
+  }
+};
+
+export const addFinancialModel = async (model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>): Promise<number> => {
+  try {
+    if (!model.projectId || isNaN(model.projectId) || model.projectId <= 0) {
+      throw new ValidationError('Invalid project ID provided');
+    }
+    if (!model.name?.trim()) {
+      throw new ValidationError('Model name is required');
+    }
+
+    const timestamp = new Date();
+    const modelId = await db.financialModels.add({
+      ...model,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+
+    return modelId;
+  } catch (error) {
+    if (error instanceof ValidationError) throw error;
+    logError(error, 'addFinancialModel');
+    throw new DatabaseError('Failed to create financial model', error);
+  }
+};
+
+export const updateFinancialModel = async (id: number, updates: Partial<Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>>): Promise<number> => {
+  try {
+    if (!id || isNaN(id) || id <= 0) {
+      throw new ValidationError('Invalid model ID provided');
+    }
+
+    const existingModel = await db.financialModels.get(id);
+    if (!existingModel) {
+      throw new NotFoundError(`Financial model with ID ${id} not found`);
+    }
+
+    const updatedCount = await db.financialModels.update(id, { ...updates, updatedAt: new Date() });
+    if (updatedCount === 0) {
+      throw new DatabaseError('Failed to update financial model - no changes made');
+    }
+
+    return id;
+  } catch (error) {
+    if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
+    logError(error, 'updateFinancialModel');
+    throw new DatabaseError(`Failed to update financial model with ID ${id}`, error);
+  }
+};
+
+export const deleteFinancialModel = async (id: number): Promise<void> => {
+  try {
+    if (!id || isNaN(id) || id <= 0) {
+      throw new ValidationError('Invalid model ID provided');
+    }
+
+    const existingModel = await db.financialModels.get(id);
+    if (!existingModel) {
+      throw new NotFoundError(`Financial model with ID ${id} not found`);
+    }
+
+    await db.financialModels.delete(id);
+  } catch (error) {
+    if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
+    logError(error, 'deleteFinancialModel');
+    throw new DatabaseError(`Failed to delete financial model with ID ${id}`, error);
+  }
+};
+
 export const addDemoData = async (): Promise<void> => {
   try {
     // Only add demo data if enabled in config
