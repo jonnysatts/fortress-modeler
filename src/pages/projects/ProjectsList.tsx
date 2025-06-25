@@ -23,11 +23,15 @@ const ProjectsList = () => {
     : projects.filter(project => typeof project.id === 'number');
 
   const handleProjectClick = (projectId: number | string) => {
-    const project = availableProjects.find(p => p.id === projectId);
+    const project = availableProjects.find((p) => p.id === projectId);
     if (project) {
       setCurrentProject(project);
-      navigate(`/projects/${projectId}`);
+    } else {
+      console.warn(
+        `Project with id ${projectId} not found in local state. Navigation will still occur.`
+      );
     }
+    navigate(`/projects/${projectId}`);
   };
 
   return (
