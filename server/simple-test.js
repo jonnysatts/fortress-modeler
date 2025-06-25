@@ -6,7 +6,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    service: 'fortress-modeler-api',
+    service: 'fortress-modeler-backend',
     version: '3.0.0-test'
   });
 });

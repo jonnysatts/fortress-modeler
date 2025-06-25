@@ -13,7 +13,7 @@ You're absolutely right! We built the complete Google Cloud infrastructure and s
 - **Features**: Full React app with authentication and cloud sync
 
 #### 🔧 **Backend API**
-- **URL**: https://fortress-modeler-api-928130924917.australia-southeast2.run.app  
+- **URL**: https://fortress-modeler-backend-928130924917.australia-southeast2.run.app
 - **Status**: ✅ **OPERATIONAL**
 - **Hosting**: Google Cloud Run
 - **Database**: PostgreSQL on Google Cloud SQL
@@ -88,6 +88,6 @@ Your Fortress Modeler application is now:
 - ✅ **Ready for production users**
 
 **Frontend**: https://fortress-modeler-frontend-928130924917.australia-southeast2.run.app  
-**Backend**: https://fortress-modeler-api-928130924917.australia-southeast2.run.app
+**Backend**: https://fortress-modeler-backend-928130924917.australia-southeast2.run.app
 
 You've successfully built and deployed a complete cloud-native application! 🚀

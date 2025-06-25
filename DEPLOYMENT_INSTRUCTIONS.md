@@ -5,7 +5,7 @@
 The Fortress Modeler application has been successfully prepared for deployment with cloud API integration.
 
 ### ✅ Backend (API) - Already Deployed
-- **URL**: https://fortress-modeler-api-928130924917.australia-southeast2.run.app
+- **URL**: https://fortress-modeler-backend-928130924917.australia-southeast2.run.app
 - **Status**: ✅ Live and operational
 - **Database**: ✅ Connected to Cloud SQL
 - **Authentication**: ✅ Google OAuth configured
@@ -33,7 +33,7 @@ netlify deploy --prod --dir=dist
 #### Option 3: Manual Upload
 1. Upload the `dist/` folder to any static hosting service
 2. Configure environment variables:
-   - `VITE_API_URL=https://fortress-modeler-api-928130924917.australia-southeast2.run.app`
+   - `VITE_API_URL=https://fortress-modeler-backend-928130924917.australia-southeast2.run.app`
    - `VITE_GOOGLE_CLIENT_ID=928130924917-fcu6m854ua2ajutk3eu191okl4f29uqv.apps.googleusercontent.com`
 
 ### 🔧 Post-Deployment Configuration

@@ -31,7 +31,7 @@ Upload the contents of the `dist/` folder to:
 
 ### ⚙️ Environment Variables (if supported)
 ```
-VITE_API_URL=https://fortress-modeler-api-928130924917.australia-southeast2.run.app
+VITE_API_URL=https://fortress-modeler-backend-928130924917.australia-southeast2.run.app
 VITE_GOOGLE_CLIENT_ID=928130924917-fcu6m854ua2ajutk3eu191okl4f29uqv.apps.googleusercontent.com
 ```
 
@@ -52,5 +52,5 @@ VITE_GOOGLE_CLIENT_ID=928130924917-fcu6m854ua2ajutk3eu191okl4f29uqv.apps.googleu
 
 The `dist/` folder contains everything needed for a production deployment. Simply upload it to any static hosting service and you'll have a fully functional, cloud-enabled financial modeling application!
 
-**Backend API**: Already live at `https://fortress-modeler-api-928130924917.australia-southeast2.run.app`
+**Backend API**: Already live at `https://fortress-modeler-backend-928130924917.australia-southeast2.run.app`
 **Frontend**: Ready to deploy from `dist/` folder

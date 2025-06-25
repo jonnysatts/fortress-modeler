@@ -8,7 +8,7 @@ echo "======================================================="
 
 if [ -z "$1" ]; then
     echo "Usage: $0 <cloud-run-url>"
-    echo "Example: $0 https://fortress-modeler-api-xyz.run.app"
+    echo "Example: $0 https://fortress-modeler-backend-xyz.run.app"
     exit 1
 fi
 

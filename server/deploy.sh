@@ -11,7 +11,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 PROJECT_ID="yield-dashboard"
-SERVICE_NAME="fortress-modeler-api"
+SERVICE_NAME="fortress-modeler-backend"
 REGION="australia-southeast2"
 
 # Check if gcloud is installed

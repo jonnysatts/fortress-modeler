@@ -3,7 +3,7 @@
 ## ✅ What We've Accomplished
 
 ### 🚀 **Backend Infrastructure (LIVE)**
-- **API URL**: `https://fortress-modeler-api-928130924917.australia-southeast2.run.app`
+- **API URL**: `https://fortress-modeler-backend-928130924917.australia-southeast2.run.app`
 - **Status**: ✅ **OPERATIONAL**
 - **Database**: ✅ PostgreSQL on Google Cloud SQL (healthy connection)
 - **Authentication**: ✅ Google OAuth 2.0 configured
@@ -78,7 +78,7 @@ Upload `/dist/` folder contents to any web host:
 
 | Component | Status | URL |
 |-----------|--------|-----|
-| Backend API | 🟢 LIVE | https://fortress-modeler-api-928130924917.australia-southeast2.run.app |
+| Backend API | 🟢 LIVE | https://fortress-modeler-backend-928130924917.australia-southeast2.run.app |
 | Database | 🟢 HEALTHY | Cloud SQL PostgreSQL |
 | Authentication | 🟢 READY | Google OAuth 2.0 |
 | Frontend Build | 🟢 READY | `/dist/` folder |
