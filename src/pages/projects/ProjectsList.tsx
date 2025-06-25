@@ -23,11 +23,9 @@ const ProjectsList = () => {
     : projects.filter(project => typeof project.id === 'number');
 
   const handleProjectClick = (projectId: number | string) => {
-    const project = availableProjects.find(p => p.id === projectId);
-    if (project) {
-      setCurrentProject(project);
-      navigate(`/projects/${projectId}`);
-    }
+    navigate(`/projects/${projectId}`);
+    const project = availableProjects.find(p => String(p.id) === String(projectId));
+    if (project) setCurrentProject(project);
   };
 
   return (
