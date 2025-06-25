@@ -1,5 +1,6 @@
 import { config } from './config';
 import { Project, FinancialModel } from '../types/models';
+import { normalizeProject, normalizeProjects } from './normalizeProject';
 
 export interface ApiResponse<T = any> {
   data?: T;
@@ -54,25 +55,31 @@ class ApiService {
 
   // Projects API
   async getProjects(): Promise<{ projects: Project[]; total: number }> {
-    return this.request('/api/projects');
+    const res = await this.request<{ projects: any[]; total: number }>(
+      '/api/projects'
+    );
+    return { ...res, projects: normalizeProjects(res.projects) as Project[] };
   }
 
   async getProject(id: string): Promise<{ project: Project }> {
-    return this.request(`/api/projects/${id}`);
+    const res = await this.request<{ project: any }>(`/api/projects/${id}`);
+    return { ...res, project: normalizeProject(res.project) as Project };
   }
 
   async createProject(project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ project: Project }> {
-    return this.request('/api/projects', {
+    const res = await this.request<{ project: any }>('/api/projects', {
       method: 'POST',
       body: JSON.stringify(project),
     });
+    return { ...res, project: normalizeProject(res.project) as Project };
   }
 
   async updateProject(id: string, project: Partial<Project>): Promise<{ project: Project }> {
-    return this.request(`/api/projects/${id}`, {
+    const res = await this.request<{ project: any }>(`/api/projects/${id}`, {
       method: 'PUT',
       body: JSON.stringify(project),
     });
+    return { ...res, project: normalizeProject(res.project) as Project };
   }
 
   async deleteProject(id: string): Promise<void> {
@@ -122,10 +129,22 @@ class ApiService {
     syncedModels?: FinancialModel[];
     lastSyncTimestamp: string;
   }> {
-    return this.request('/api/sync', {
+    const res = await this.request<{
+      status: string;
+      conflicts?: any[];
+      syncedProjects?: any[];
+      syncedModels?: FinancialModel[];
+      lastSyncTimestamp: string;
+    }>('/api/sync', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    return {
+      ...res,
+      syncedProjects: res.syncedProjects
+        ? normalizeProjects(res.syncedProjects) as Project[]
+        : undefined,
+    };
   }
 
   async getSyncStatus(): Promise<{
@@ -143,9 +162,18 @@ class ApiService {
     syncedModels: FinancialModel[];
     lastSyncTimestamp: string;
   }> {
-    return this.request('/api/sync/full', {
+    const res = await this.request<{
+      status: string;
+      syncedProjects: any[];
+      syncedModels: FinancialModel[];
+      lastSyncTimestamp: string;
+    }>('/api/sync/full', {
       method: 'POST',
     });
+    return {
+      ...res,
+      syncedProjects: normalizeProjects(res.syncedProjects) as Project[],
+    };
   }
 }
 
