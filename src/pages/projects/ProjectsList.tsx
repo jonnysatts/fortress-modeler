@@ -26,8 +26,8 @@ const ProjectsList = () => {
     const project = availableProjects.find(p => p.id === projectId);
     if (project) {
       setCurrentProject(project);
-      navigate(`/projects/${projectId}`);
     }
+    navigate(`/projects/${projectId}`);
   };
 
   return (
