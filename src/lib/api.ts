@@ -1,5 +1,5 @@
 import { config } from './config';
-import { Project, FinancialModel } from '../types/models';
+import { Project, FinancialModel } from './db';
 import { normalizeProject, normalizeProjects, snakeCaseKeys } from './normalizeProject';
 
 export interface ApiResponse<T = any> {
@@ -62,7 +62,7 @@ class ApiService {
   }
 
   async getProject(id: string): Promise<{ project: Project }> {
-    const res = await this.request<{ project: any }>(`/api/projects/${id}`);
+    const res = await this.request<{ project: any }>(`/api/project/${id}`);
     return { ...res, project: normalizeProject(res.project) as Project };
   }
 
