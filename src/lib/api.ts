@@ -67,10 +67,13 @@ class ApiService {
   }
 
   async createProject(project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ project: Project }> {
+    const payload = snakeCaseKeys(project);
+    console.log('🎆 Creating project with payload:', JSON.stringify(payload, null, 2));
     const res = await this.request<{ project: any }>('/api/projects', {
       method: 'POST',
-      body: JSON.stringify(snakeCaseKeys(project)),
+      body: JSON.stringify(payload),
     });
+    console.log('✅ Project created response:', res);
     return { ...res, project: normalizeProject(res.project) as Project };
   }
 
@@ -132,7 +135,7 @@ class ApiService {
 
   async createModel(model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ model: FinancialModel }> {
     const payload = snakeCaseKeys(model);
-    console.log('🚀 Creating model with payload:', payload);
+    console.log('🚀 Creating model with payload:', JSON.stringify(payload, null, 2));
     return this.request('/api/models', {
       method: 'POST',
       body: JSON.stringify(payload),
