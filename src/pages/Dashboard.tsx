@@ -17,9 +17,10 @@ const Dashboard = () => {
   }, [loadProjects]);
 
   // Filter out UUID projects if cloud sync is disabled
+  const projectsArray = Object.values(projects);
   const availableProjects = config.useCloudSync 
-    ? projects 
-    : projects.filter(project => typeof project.id === 'number');
+    ? projectsArray 
+    : projectsArray.filter(project => typeof project.id === 'number');
 
   // Calculate real metrics from actual project data
   const calculateTotalRevenue = () => {
