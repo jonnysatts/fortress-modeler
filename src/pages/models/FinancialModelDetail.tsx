@@ -246,7 +246,10 @@ const FinancialModelDetail = () => {
 
     loadModelData();
     return () => { isMounted = false; }; // Cleanup function
-  }, [projectId, modelId, navigate]); // Dependencies
+  // Intentionally exclude `navigate` from deps to avoid re-renders when the
+  // unstable navigate function changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, modelId]); // Dependencies
 
   useEffect(() => {
     if (revenueData.length > 0 && costData.length > 0) {
