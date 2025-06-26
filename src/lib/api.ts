@@ -133,14 +133,14 @@ class ApiService {
   async createModel(model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ model: FinancialModel }> {
     return this.request('/api/models', {
       method: 'POST',
-      body: JSON.stringify(model),
+      body: JSON.stringify(snakeCaseKeys(model)),
     });
   }
 
   async updateModel(id: string, model: Partial<FinancialModel>): Promise<{ model: FinancialModel }> {
     return this.request(`/api/models/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(model),
+      body: JSON.stringify(snakeCaseKeys(model)),
     });
   }
 
