@@ -44,14 +44,6 @@ const ProjectDetail = () => {
 
   const navigate = useNavigate();
 
-  // Guard against invalid project IDs
-  useEffect(() => {
-    if (!projectId || projectId === 'NaN' || projectId === '[object Object]' || projectId.includes('object')) {
-      console.error('Invalid project ID:', projectId);
-      navigate('/projects', { replace: true });
-      return;
-    }
-  }, [projectId]);
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<Project | null>(null);
   const [financialModels, setFinancialModels] = useState<FinancialModel[]>([]);
@@ -76,7 +68,12 @@ const ProjectDetail = () => {
 
   useEffect(() => {
     const fetchProjectAndRelatedData = async () => {
-      if (!projectId || projectId === 'undefined') return;
+      // More robust check for invalid projectId from URL params
+      if (!projectId || projectId === 'undefined' || projectId === 'null') {
+        console.error('Rendered with invalid projectId, redirecting.');
+        navigate('/projects', { replace: true });
+        return;
+      }
 
       // Prevent re-fetching if the component re-mounts with the same ID.
       // The effect itself won't re-run unless projectId changes, but this

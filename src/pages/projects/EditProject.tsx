@@ -86,8 +86,7 @@ const EditProject = () => {
     };
     loadData();
   // setInitialImage is stable and doesn't need to be in the dependency array
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, navigate, form]);
+  }, [projectId, navigate, form.reset, setInitialImage]);
 
   // Submit handler (uses updateProject)
   const onSubmit = async (data: FormValues) => {

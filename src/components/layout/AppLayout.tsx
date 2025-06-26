@@ -30,7 +30,9 @@ const AppLayout = () => {
     };
 
     init();
-  }, [loadProjects, user]);
+    // This effect should run when the user's auth state changes,
+    // as that determines which projects to load.
+  }, [user]);
 
   const toggleSidebar = () => {
     setIsSidebarCollapsed(!isSidebarCollapsed);

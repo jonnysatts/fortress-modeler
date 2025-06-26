@@ -20,14 +20,16 @@ const Settings = () => {
   const [backupReminders, setBackupReminders] = useState(true);
   const [backupFrequency, setBackupFrequency] = useState("weekly");
   const [isExporting, setIsExporting] = useState(false);
-  
+
   const { projects, loadProjects } = useStore();
-  
+
   // Debug: log projects on component mount
   useEffect(() => {
     console.log('Settings component - Current projects:', projects);
     loadProjects(); // Ensure projects are loaded
   }, [loadProjects]);
+
+  const projectsArray = Object.values(projects);
 
   // Test export function that works without projects
   const handleTestExport = async () => {
@@ -90,7 +92,7 @@ const Settings = () => {
     try {
       setIsExporting(true);
       
-      if (projects.length === 0) {
+      if (projectsArray.length === 0) {
         toast({
           title: "No data to export",
           description: "Create some projects and financial models first.",
@@ -99,7 +101,7 @@ const Settings = () => {
         return;
       }
       
-      const firstProject = projects[0];
+      const firstProject = projectsArray[0];
       console.log('Exporting project:', firstProject);
       
       const models = await db.financialModels
@@ -136,7 +138,7 @@ const Settings = () => {
     try {
       setIsExporting(true);
       
-      if (projects.length === 0) {
+      if (projectsArray.length === 0) {
         toast({
           title: "No data to export",
           description: "Create some projects and financial models first.",
@@ -145,7 +147,7 @@ const Settings = () => {
         return;
       }
       
-      const firstProject = projects[0];
+      const firstProject = projectsArray[0];
       const models = await db.financialModels
         .where('projectId')
         .equals(firstProject.id!)
@@ -178,7 +180,7 @@ const Settings = () => {
     try {
       setIsExporting(true);
       
-      if (projects.length === 0) {
+      if (projectsArray.length === 0) {
         toast({
           title: "No data to export",
           description: "Create some projects and financial models first.",
@@ -187,7 +189,7 @@ const Settings = () => {
         return;
       }
       
-      const firstProject = projects[0];
+      const firstProject = projectsArray[0];
       const models = await db.financialModels
         .where('projectId')
         .equals(firstProject.id!)
@@ -364,7 +366,7 @@ const Settings = () => {
                 
                 <Button 
                   onClick={handleExportExcel} 
-                  disabled={isExporting || projects.length === 0}
+                  disabled={isExporting || projectsArray.length === 0}
                   className="bg-green-600 hover:bg-green-700"
                 >
                   <FileSpreadsheet className="mr-2 h-4 w-4" />
@@ -373,7 +375,7 @@ const Settings = () => {
                 
                 <Button 
                   onClick={handleExportPDF}
-                  disabled={isExporting || projects.length === 0}
+                  disabled={isExporting || projectsArray.length === 0}
                   className="bg-red-600 hover:bg-red-700"
                 >
                   <FileText className="mr-2 h-4 w-4" />
@@ -381,8 +383,8 @@ const Settings = () => {
                 </Button>
                 
                 <Button 
-                  onClick={handleExportBoardReadyPDF}
-                  disabled={isExporting || projects.length === 0}
+                  onClick={handleExportBoardReadyPDF} 
+                  disabled={isExporting || projectsArray.length === 0}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
                   <Presentation className="mr-2 h-4 w-4" />
@@ -396,7 +398,7 @@ const Settings = () => {
               </div>
               
               <div className="space-y-3">
-                {projects.length === 0 && (
+                {projectsArray.length === 0 && (
                   <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
                     <strong>Note:</strong> Create some projects and financial models first to enable full export functionality. 
                     Use "Test Export" to verify downloads work on your system.
@@ -404,7 +406,7 @@ const Settings = () => {
                 )}
                 
                 <p className="text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <strong>Debug Info:</strong> Projects found: {projects.length}. 
+                  <strong>Debug Info:</strong> Projects found: {projectsArray.length}. 
                   Check browser console (F12) for detailed logging.
                 </p>
               </div>
