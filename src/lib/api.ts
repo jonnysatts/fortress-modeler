@@ -1,6 +1,6 @@
 import { config } from './config';
 import { Project, FinancialModel } from './db';
-import { normalizeProject, normalizeProjects, snakeCaseKeys } from './normalizeProject';
+import { normalizeProject, normalizeProjects, normalizeModel, normalizeModels, snakeCaseKeys } from './normalizeProject';
 
 export interface ApiResponse<T = any> {
   data?: T;
@@ -126,31 +126,36 @@ class ApiService {
 
   // Financial Models API
   async getModels(): Promise<{ models: FinancialModel[]; total: number }> {
-    return this.request('/api/models');
+    const res = await this.request<{ models: any[]; total: number }>('/api/models');
+    return { ...res, models: normalizeModels(res.models) as FinancialModel[] };
   }
 
   async getModelsForProject(projectId: string): Promise<{ models: FinancialModel[]; total: number }> {
-    return this.request(`/api/models?project_id=${encodeURIComponent(projectId)}`);
+    const res = await this.request<{ models: any[]; total: number }>(`/api/models?project_id=${encodeURIComponent(projectId)}`);
+    return { ...res, models: normalizeModels(res.models) as FinancialModel[] };
   }
 
   async getModel(id: string): Promise<{ model: FinancialModel }> {
-    return this.request(`/api/models/${id}`);
+    const res = await this.request<{ model: any }>(`/api/models/${id}`);
+    return { ...res, model: normalizeModel(res.model) as FinancialModel };
   }
 
   async createModel(model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ model: FinancialModel }> {
     const payload = snakeCaseKeys(model);
     console.log('🚀 Creating model with payload:', JSON.stringify(payload, null, 2));
-    return this.request('/api/models', {
+    const res = await this.request<{ model: any }>('/api/models', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+    return { ...res, model: normalizeModel(res.model) as FinancialModel };
   }
 
   async updateModel(id: string, model: Partial<FinancialModel>): Promise<{ model: FinancialModel }> {
-    return this.request(`/api/models/${id}`, {
+    const res = await this.request<{ model: any }>(`/api/models/${id}`, {
       method: 'PUT',
       body: JSON.stringify(snakeCaseKeys(model)),
     });
+    return { ...res, model: normalizeModel(res.model) as FinancialModel };
   }
 
   async deleteModel(id: string): Promise<void> {

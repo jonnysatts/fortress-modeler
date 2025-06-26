@@ -48,3 +48,26 @@ export const normalizeProject = (project: ServerProject): NormalizedProject => {
 
 export const normalizeProjects = (projects: ServerProject[]): NormalizedProject[] =>
   projects.map(normalizeProject);
+
+export interface ServerModel {
+  [key: string]: any;
+  model_data?: any;
+}
+
+export const normalizeModel = (model: ServerModel): any => {
+  const camelModel = camelCaseKeys(model);
+  
+  // If the model has model_data, extract its contents to the root level
+  if (camelModel.modelData) {
+    const { modelData, ...rest } = camelModel;
+    return {
+      ...rest,
+      ...modelData,
+    };
+  }
+  
+  return camelModel;
+};
+
+export const normalizeModels = (models: ServerModel[]): any[] =>
+  models.map(normalizeModel);
