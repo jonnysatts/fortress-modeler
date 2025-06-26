@@ -212,6 +212,18 @@ const useStore = create<AppState>((set, get) => ({
           }
         }
         
+        // Try to reload the project from backend to ensure we have the correct state
+        try {
+          console.log('🔄 Reloading project from backend to ensure correct state...');
+          const reloadedProject = await storageService.getProject(currentProject.id);
+          if (reloadedProject) {
+            console.log('✅ Reloaded project:', reloadedProject.id, reloadedProject.name);
+            set({ currentProject: reloadedProject });
+          }
+        } catch (reloadError) {
+          console.warn('⚠️ Could not reload project from backend:', reloadError);
+        }
+        
         // Add a small delay to ensure backend has processed the project creation
         if (isUUID) {
           console.log('⏱️ Adding small delay for backend propagation...');
