@@ -26,6 +26,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { db } from "@/lib/db";
 import useStore from "@/store/useStore";
+import { storageService } from "@/lib/hybrid-storage";
 import { toast } from "@/hooks/use-toast";
 import EventModelForm from "./components/EventModelForm";
 
@@ -63,8 +64,7 @@ const defaultCostAssumption: CostAssumption = {
 const NewFinancialModel = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { createModelForCurrentProject } = useStore();
-  const { currentProject, loadProjectById } = useStore();
+  const { createModelForCurrentProject, currentProject, setCurrentProject } = useStore();
   const [revenueAssumptions, setRevenueAssumptions] = useState<RevenueAssumption[]>([
     { ...defaultRevenueAssumption, name: "Monthly Subscription" },
   ]);
@@ -72,12 +72,21 @@ const NewFinancialModel = () => {
     { ...defaultCostAssumption, name: "Cloud Infrastructure" },
   ]);
 
-  // Load project if not already loaded
+  // Load project if not already loaded. Avoid using unstable store functions in
+  // the dependency array to prevent unnecessary re-renders.
   useEffect(() => {
     if (projectId && (!currentProject || currentProject.uuid !== projectId)) {
-      loadProjectById(projectId);
+      const fetchProject = async () => {
+        const project = await storageService.getProject(projectId);
+        if (project) {
+          // eslint-disable-next-line react-hooks/exhaustive-deps
+          setCurrentProject(project);
+        }
+      };
+      fetchProject();
     }
-  }, [projectId, currentProject, loadProjectById]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, currentProject]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),

@@ -4,16 +4,17 @@ import { ArrowLeft, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { FinancialModel, db } from "@/lib/db";
+import { FinancialModel } from "@/lib/db";
 import useStore from "@/store/useStore";
 import EventModelForm from "./components/EventModelForm";
+import { storageService } from "@/lib/hybrid-storage";
 
 const EditFinancialModel = () => {
   const { projectId, modelId } = useParams<{ projectId: string; modelId: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState<FinancialModel | null>(null);
-  const { loadProjectById, currentProject } = useStore();
+  const [projectName, setProjectName] = useState<string>("");
 
   useEffect(() => {
     const loadData = async () => {
@@ -29,22 +30,13 @@ const EditFinancialModel = () => {
 
       setLoading(true);
       try {
-        // Load the project if it's not already loaded
-        if (!currentProject || currentProject.uuid !== projectId) {
-          const project = await loadProjectById(projectId);
-          if (!project) {
-            toast({
-              variant: "destructive",
-              title: "Project not found",
-              description: "The requested project could not be found.",
-            });
-            navigate("/projects");
-            return;
-          }
-        }
+        // Fetch project directly to get its name, avoiding Zustand dependency
+        const project = await storageService.getProject(projectId);
+        if (!project) throw new Error("Project not found");
+        setProjectName(project.name);
 
         // Load the financial model
-        const financialModel = await db.financialModels.get(parseInt(modelId));
+        const financialModel = await storageService.getModel(modelId);
         if (financialModel) {
           // Ensure proper formatting of model metadata
           if (financialModel.assumptions.metadata?.type === "WeeklyEvent") {
@@ -88,9 +80,9 @@ const EditFinancialModel = () => {
     };
 
     loadData();
-  }, [projectId, modelId, navigate, currentProject, loadProjectById]);
+  }, [projectId, modelId, navigate]);
 
-  if (loading || !model || !currentProject) {
+  if (loading || !model) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="h-10 w-10 border-4 border-fortress-emerald border-t-transparent rounded-full animate-spin"></div>
@@ -102,7 +94,7 @@ const EditFinancialModel = () => {
     return (
       <EventModelForm 
         projectId={Number(projectId)}
-        projectName={currentProject.name}
+        projectName={projectName}
         existingModel={model}
         onCancel={() => navigate(`/projects/${projectId}/models/${modelId}`)}
       />
@@ -124,7 +116,7 @@ const EditFinancialModel = () => {
             Edit: {model.name}
           </h1>
           <p className="text-muted-foreground">
-            Edit financial model for {currentProject.name}
+            Edit financial model for {projectName}
           </p>
         </div>
       </div>

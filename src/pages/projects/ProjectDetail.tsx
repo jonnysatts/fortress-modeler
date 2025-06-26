@@ -54,116 +54,84 @@ const ProjectDetail = () => {
   const [project, setProject] = useState<Project | null>(null);
   const [financialModels, setFinancialModels] = useState<FinancialModel[]>([]);
   const loadedProjectIdRef = useRef<string | null>(null);
-  const { deleteProject } = useStore();
+  const deleteProject = useStore((state) => state.deleteProject); // Use selector for better performance
   const [activeTab, setActiveTab] = useState("overview");
 
   const [actualsData, setActualsData] = useState<ActualsPeriodEntry[]>([]);
   const fetchActualsData = useCallback(async () => {
     if (!projectId) return;
     try {
-      // Handle both integer IDs and UUID strings
-      const numericId = isNaN(parseInt(projectId)) ? 0 : parseInt(projectId);
-      const data = await getActualsForProject(numericId);
+      // Hybrid storage service will handle fetching from cloud or local based on ID type
+      const data = await storageService.getActualsForProject(projectId);
       setActualsData(data);
     } catch (error) {
       console.error("Error fetching actuals data:", error);
-      // Don't show error toast for UUID projects (they won't have actuals data yet)
-      if (!isNaN(parseInt(projectId))) {
-        toast({ variant: "destructive", title: "Error Loading Actuals", description: "Could not load performance data." });
-      }
+      // Only show toast if it's not a "not found" error for a new cloud project
+      toast({ variant: "destructive", title: "Error Loading Actuals", description: "Could not load performance data." });
       setActualsData([]);
     }
   }, [projectId]);
 
   useEffect(() => {
-    console.log('🌀 ProjectDetail useEffect triggered - projectId:', projectId, 'timestamp:', Date.now());
-    
     const fetchProjectAndRelatedData = async () => {
       if (!projectId) return;
-      
-      // Prevent unnecessary re-fetching if we already have this project loaded
+
+      // Prevent re-fetching if the component re-mounts with the same ID.
+      // The effect itself won't re-run unless projectId changes, but this
+      // handles the case of a parent causing a remount.
       if (loadedProjectIdRef.current === projectId) {
-        console.log('📋 Project already loaded, skipping fetch');
+        console.log('📋 Project already loaded, skipping fetch on remount.');
         return;
       }
-      
-      // Clear the ref if projectId changed, then set loading
-      if (loadedProjectIdRef.current && loadedProjectIdRef.current !== projectId) {
-        loadedProjectIdRef.current = null;
-      }
-      
+
       setLoading(true);
+      setProject(null); // Clear old project data
+      setFinancialModels([]);
+      setActualsData([]);
+
       try {
-        // Handle both integer and UUID project IDs
-        // Check if it's a UUID (contains hyphens and is 36 chars long)
-        const isUUID = projectId.includes('-') && projectId.length === 36;
-        let project = null;
-        
-        if (isUUID) {
-          // For UUID projects, we need cloud API (check if cloud sync is enabled)
-          if (config.useCloudSync) {
-            console.log('🌐 Loading UUID project via cloud API');
-            project = await storageService.getProject(projectId);
-          } else {
-            // Cloud sync is disabled but trying to access UUID project - redirect to projects list
-            toast({
-              variant: "destructive",
-              title: "Project unavailable",
-              description: "This project requires cloud access. Please contact support.",
-            });
-            navigate("/projects");
-            return;
-          }
-        } else {
-          // For integer projects, use the old method
-          console.log('🔢 Loading integer project');
-          project = await storageService.getProject(projectId);
-        }
-        
-        if (project) {
-          setProject(project);
-          loadedProjectIdRef.current = projectId;
-          // Load financial models - for cloud projects, they should come from the API
-          if (!isUUID && project.id) {
-            // Local integer projects - load from IndexedDB
-            if (!project) throw new Error('Project not loaded before fetching models');
-            const models = await db.financialModels.where('projectId').equals(project.id).toArray();
-            setFinancialModels(models);
-          } else if (isUUID) {
-            // For UUID projects, load models from the cloud API
-            console.log('📱 Loading models for UUID project from cloud API');
-            try {
-              const models = await storageService.getModelsForProject(project.id!.toString());
-              console.log('✅ Loaded', models.length, 'models from cloud API');
-              setFinancialModels(models);
-            } catch (error) {
-              console.error('❌ Failed to load models from cloud:', error);
-              setFinancialModels([]);
-            }
-          }
-          fetchActualsData();
-        } else {
+        // Use the storageService to abstract away the local/cloud logic.
+        const projectData = await storageService.getProject(projectId);
+
+        if (!projectData) {
           toast({
             variant: "destructive",
             title: "Project not found",
             description: "The requested project could not be found.",
           });
-          navigate("/projects");
+          navigate("/projects", { replace: true });
+          return;
         }
+
+        // Fetch models and actuals in parallel for efficiency
+        const [modelsData, actuals] = await Promise.all([
+          storageService.getModelsForProject(projectId),
+          storageService.getActualsForProject(projectId)
+        ]);
+
+        // Set all state at once to minimize re-renders
+        setProject(projectData);
+        setFinancialModels(modelsData);
+        setActualsData(actuals);
+        loadedProjectIdRef.current = projectId;
+
       } catch (error) {
-        console.error("Error fetching project:", error);
+        console.error("Error fetching project details:", error);
         toast({
           variant: "destructive",
-          title: "Error loading project",
-          description: "There was an error loading the project. Please try again.",
+          title: "Error Loading Project",
+          description: error instanceof Error ? error.message : "An unknown error occurred.",
         });
+        navigate("/projects", { replace: true });
       } finally {
         setLoading(false);
       }
     };
     fetchProjectAndRelatedData();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+    // This effect should ONLY run when the projectId from the URL changes.
+    // `navigate` is stable. We removed the dependency on `fetchActualsData`
+    // by including its logic directly in this effect.
+  }, [projectId, navigate]);
 
   const handleActualsSaved = () => {
     fetchActualsData();

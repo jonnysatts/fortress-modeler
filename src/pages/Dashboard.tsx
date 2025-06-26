@@ -14,7 +14,8 @@ const Dashboard = () => {
 
   useEffect(() => {
     loadProjects();
-  }, [loadProjects]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Filter out UUID projects if cloud sync is disabled
   const projectsArray = Object.values(projects);
@@ -48,27 +49,39 @@ const Dashboard = () => {
   };
 
   const generatePerformanceData = () => {
-    if (availableProjects.length === 0) return [];
-    // Generate last 6 months of data based on project creation dates and models
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    return months.map((month, index) => {
-      const monthRevenue = availableProjects.reduce((total, project) => {
-        const modelRevenue = project.financialModels?.reduce((modelTotal, model) => {
-          return modelTotal + (model.monthlyRevenue || 0);
-        }, 0) || 0;
-        return total + modelRevenue;
-      }, 0);
-      return { name: month, value: Math.round(monthRevenue * (0.8 + Math.random() * 0.4)) };
+    const dataByMonth: { [key: string]: number } = {};
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    availableProjects.forEach(project => {
+      const creationDate = new Date(project.createdAt);
+      const monthIndex = creationDate.getMonth();
+      const year = creationDate.getFullYear();
+      const key = `${monthNames[monthIndex]} ${year}`;
+
+      const projectRevenue = project.financialModels?.reduce((total, model) => total + (model.monthlyRevenue || 0), 0) || 0;
+
+      if (!dataByMonth[key]) {
+        dataByMonth[key] = 0;
+      }
+      dataByMonth[key] += projectRevenue;
     });
+
+    // Return the last 6 months of data, sorted
+    return Object.entries(dataByMonth)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime())
+      .slice(-6);
   };
 
   const generateRiskData = () => {
-    if (availableProjects.length === 0) return [];
-    const riskCategories = ['Financial', 'Operational', 'Strategic', 'Regulatory'];
-    return riskCategories.map(category => {
-      const risks = Math.floor(Math.random() * calculateActiveRisks() / 2) + 1;
-      return { name: category, value: risks };
-    }).filter(item => item.value > 0);
+    const riskCounts: { [key: string]: number } = { Financial: 0, Operational: 0, Strategic: 0 };
+    availableProjects.forEach(project => {
+      project.financialModels?.forEach(model => {
+        if (model.monthlyCosts > 5000) riskCounts.Operational++;
+        if (model.monthlyRevenue > 0 && ((model.monthlyRevenue - model.monthlyCosts) / model.monthlyRevenue) < 0.2) riskCounts.Financial++;
+      });
+    });
+    return Object.entries(riskCounts).map(([name, value]) => ({ name, value })).filter(item => item.value > 0);
   };
 
   const totalRevenue = calculateTotalRevenue();
@@ -275,10 +288,7 @@ const Dashboard = () => {
                   <li 
                     key={project.id} 
                     className="p-3 border rounded-md hover:bg-gray-50 cursor-pointer"
-                    onClick={() => {
-                      useStore.getState().setCurrentProject(project);
-                      navigate(`/projects/${project.id}`);
-                    }}
+                    onClick={() => navigate(`/projects/${project.id}`)}
                   >
                     <div className="flex justify-between items-center">
                       <div>

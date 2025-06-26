@@ -1,232 +1,72 @@
 import { config } from './config';
-import { Project, FinancialModel } from './db';
-import { normalizeProject, normalizeProjects, normalizeModel, normalizeModels, snakeCaseKeys } from './normalizeProject';
+import { FinancialModel, ActualsPeriodEntry, Project } from '@/types/models';
+import { normalizeModel, normalizeProject } from './normalizeProject';
 
-export interface ApiResponse<T = any> {
-  data?: T;
-  message?: string;
-  error?: string;
-  success?: boolean;
-}
+// A helper function to get the auth token.
+// In a real app, this would come from your auth context or secure storage.
+const getAuthToken = (): string | null => {
+  try {
+    const authData = localStorage.getItem('auth-storage');
+    if (authData) {
+      const { state } = JSON.parse(authData);
+      return state.token;
+    }
+  } catch (error) {
+    console.error("Could not parse auth token from localStorage", error);
+  }
+  return null;
+};
 
 class ApiService {
-  private apiUrl: string;
-  
-  constructor() {
-    this.apiUrl = config.apiUrl;
-  }
-
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const token = localStorage.getItem('auth_token');
-    
-    const defaultOptions: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` }),
-        ...options.headers,
-      },
-    };
-
-    const response = await fetch(`${this.apiUrl}${endpoint}`, {
-      ...defaultOptions,
-      ...options,
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || data.error || 'API request failed');
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const token = getAuthToken();
+    const headers = new Headers(options.headers || {});
+    headers.append('Content-Type', 'application/json');
+    if (token) {
+      headers.append('Authorization', `Bearer ${token}`);
     }
 
-    return data;
-  }
-
-  // Health check
-  async healthCheck(): Promise<any> {
-    return this.request('/health');
-  }
-
-  async detailedHealthCheck(): Promise<any> {
-    return this.request('/health/detailed');
-  }
-
-  // Projects API
-  async getProjects(): Promise<{ projects: Project[]; total: number }> {
-    const res = await this.request<{ projects: any[]; total: number }>(
-      '/api/projects'
-    );
-    return { ...res, projects: normalizeProjects(res.projects) as Project[] };
-  }
-
-  async getProject(id: string): Promise<{ project: Project }> {
-    const res = await this.request<{ project: any }>(`/api/projects/${id}`);
-    return { ...res, project: normalizeProject(res.project) as Project };
-  }
-
-  async createProject(project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ project: Project }> {
-    const payload = snakeCaseKeys(project);
-    console.log('🎆 Creating project with payload:', JSON.stringify(payload, null, 2));
-    const res = await this.request<{ project: any }>('/api/projects', {
-      method: 'POST',
-      body: JSON.stringify(payload),
+    const response = await fetch(`${config.apiUrl}${endpoint}`, {
+      ...options,
+      headers,
     });
-    console.log('✅ Project created response:', res);
-    return { ...res, project: normalizeProject(res.project) as Project };
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: `${response.status} ${response.statusText}` }));
+      throw new Error(errorData.message || `API request failed with status ${response.status}`);
+    }
+
+    if (response.status === 204) {
+      return null as T;
+    }
+
+    return response.json();
   }
 
-  async updateProject(id: string, project: Partial<Project>): Promise<{ project: Project }> {
-    const res = await this.request<{ project: any }>(`/api/projects/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(snakeCaseKeys(project)),
-    });
-    return { ...res, project: normalizeProject(res.project) as Project };
+  // --- Project Endpoints ---
+  async getProject(projectId: string): Promise<Project> {
+    const project = await this.request<Project>(`/api/projects/${projectId}`);
+    return normalizeProject(project);
   }
 
-  async deleteProject(id: string): Promise<void> {
-    return this.request(`/api/projects/${id}`, {
-      method: 'DELETE',
-    });
+  // --- Model Endpoints ---
+  async getModelsForProject(projectId: string): Promise<FinancialModel[]> {
+    const models = await this.request<FinancialModel[]>(`/api/projects/${projectId}/models`);
+    return models.map(normalizeModel);
   }
 
-  // Project sharing API
-  async shareProject(
-    id: string, 
-    shares: { email: string; permission: 'view' | 'edit' }[]
-  ): Promise<{ success: boolean }> {
-    return this.request(`/api/projects/${id}/share`, {
-      method: 'POST',
-      body: JSON.stringify({ shares }),
-    });
+  async getModel(modelId: string): Promise<FinancialModel> {
+    const model = await this.request<FinancialModel>(`/api/models/${modelId}`);
+    return normalizeModel(model);
   }
 
-  async getSharedWithMeProjects(): Promise<{ projects: Project[]; total: number }> {
-    const res = await this.request<{ projects: any[]; total: number }>(
-      '/api/projects/shared'
-    );
-    return { ...res, projects: normalizeProjects(res.projects) as Project[] };
+  async deleteModel(modelId: string): Promise<void> {
+    await this.request<void>(`/api/models/${modelId}`, { method: 'DELETE' });
   }
 
-  async getPublicProjects(): Promise<{ projects: Project[]; total: number }> {
-    const res = await this.request<{ projects: any[]; total: number }>(
-      '/api/projects/public'
-    );
-    return { ...res, projects: normalizeProjects(res.projects) as Project[] };
-  }
-
-  async updateProjectVisibility(id: string, isPublic: boolean): Promise<{ project: Project }> {
-    const res = await this.request<{ project: any }>(`/api/projects/${id}/visibility`, {
-      method: 'PATCH',
-      body: JSON.stringify({ is_public: isPublic }),
-    });
-    return { ...res, project: normalizeProject(res.project) as Project };
-  }
-
-  // Financial Models API
-  async getModels(): Promise<{ models: FinancialModel[]; total: number }> {
-    const res = await this.request<{ models: any[]; total: number }>('/api/models');
-    return { ...res, models: normalizeModels(res.models) as FinancialModel[] };
-  }
-
-  async getModelsForProject(projectId: string): Promise<{ models: FinancialModel[]; total: number }> {
-    const res = await this.request<{ models: any[]; total: number }>(`/api/models?project_id=${encodeURIComponent(projectId)}`);
-    return { ...res, models: normalizeModels(res.models) as FinancialModel[] };
-  }
-
-  async getModel(id: string): Promise<{ model: FinancialModel }> {
-    const res = await this.request<{ model: any }>(`/api/models/${id}`);
-    return { ...res, model: normalizeModel(res.model) as FinancialModel };
-  }
-
-  async createModel(model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ model: FinancialModel }> {
-    const payload = snakeCaseKeys(model);
-    console.log('🚀 Creating model with payload:', JSON.stringify(payload, null, 2));
-    const res = await this.request<{ model: any }>('/api/models', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-    return { ...res, model: normalizeModel(res.model) as FinancialModel };
-  }
-
-  async updateModel(id: string, model: Partial<FinancialModel>): Promise<{ model: FinancialModel }> {
-    const res = await this.request<{ model: any }>(`/api/models/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(snakeCaseKeys(model)),
-    });
-    return { ...res, model: normalizeModel(res.model) as FinancialModel };
-  }
-
-  async deleteModel(id: string): Promise<void> {
-    return this.request(`/api/models/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // Sync API
-  async syncData(data: {
-    projects?: Project[];
-    models?: FinancialModel[];
-    lastSyncTimestamp?: string;
-  }): Promise<{
-    status: string;
-    conflicts?: any[];
-    syncedProjects?: Project[];
-    syncedModels?: FinancialModel[];
-    lastSyncTimestamp: string;
-  }> {
-    const payload = {
-      ...data,
-      projects: data.projects ? snakeCaseKeys(data.projects) : undefined,
-      models: data.models ? snakeCaseKeys(data.models) : undefined,
-    };
-
-    const res = await this.request<{
-      status: string;
-      conflicts?: any[];
-      syncedProjects?: any[];
-      syncedModels?: FinancialModel[];
-      lastSyncTimestamp: string;
-    }>('/api/sync', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-    return {
-      ...res,
-      syncedProjects: res.syncedProjects
-        ? normalizeProjects(res.syncedProjects) as Project[]
-        : undefined,
-    };
-  }
-
-  async getSyncStatus(): Promise<{
-    status: string;
-    lastSync?: string;
-    pendingChanges: number;
-    conflicts: number;
-  }> {
-    return this.request('/api/sync/status');
-  }
-
-  async forceSyncAll(): Promise<{
-    status: string;
-    syncedProjects: Project[];
-    syncedModels: FinancialModel[];
-    lastSyncTimestamp: string;
-  }> {
-    const res = await this.request<{
-      status: string;
-      syncedProjects: any[];
-      syncedModels: FinancialModel[];
-      lastSyncTimestamp: string;
-    }>('/api/sync/full', {
-      method: 'POST',
-    });
-    return {
-      ...res,
-      syncedProjects: normalizeProjects(res.syncedProjects) as Project[],
-    };
+  // --- Actuals Endpoints ---
+  async getActualsForProject(projectId:string): Promise<ActualsPeriodEntry[]> {
+    return this.request<ActualsPeriodEntry[]>(`/api/projects/${projectId}/actuals`);
   }
 }
 

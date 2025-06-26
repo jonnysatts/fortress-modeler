@@ -55,60 +55,38 @@ const FinancialModelDetail = () => {
 
   // Callbacks (call unconditionally)
   const updateModelAssumptions = useCallback(async (updatedFields: Partial<ModelAssumptions>) => {
-    
-    if (!model || !model.id) {
-        return;
-    }
-    
-    try {
-            const currentAssumptions = model?.assumptions || { 
-          revenue: [], 
-          costs: [], 
-          growthModel: { type: 'linear', rate: 0 }, 
-          marketing: { allocationMode: 'channels', channels: [] }
+    setModel(prevModel => {
+      if (!prevModel || !prevModel.id) {
+        toast({ variant: "destructive", title: "Error", description: "Cannot update a model that is not loaded." });
+        return prevModel;
+      }
+
+      // Deep merge the new fields into the existing assumptions
+      const newAssumptions: ModelAssumptions = {
+        ...prevModel.assumptions,
+        ...updatedFields,
+        // Ensure nested objects are merged, not replaced
+        marketing: {
+          ...prevModel.assumptions.marketing,
+          ...updatedFields.marketing,
+        },
       };
 
-      const newAssumptions = { ...currentAssumptions, ...updatedFields };
-
-            if (updatedFields.marketing) {
-         newAssumptions.marketing = {
-            ...currentAssumptions.marketing,
-            ...updatedFields.marketing,
-         };
-      }
-      
-      if (!newAssumptions.revenue) newAssumptions.revenue = [];
-      if (!newAssumptions.costs) newAssumptions.costs = [];
-      if (!newAssumptions.growthModel) newAssumptions.growthModel = { type: 'linear', rate: 0 };
-            if (!newAssumptions.marketing) newAssumptions.marketing = { allocationMode: 'channels', channels: [] };
-      if (!newAssumptions.marketing.channels) newAssumptions.marketing.channels = [];
-
-      // Normalize marketing object
-      if (newAssumptions.marketing) {
-          /* no-op */
-      }
-      
-      const assumptionsToSave = newAssumptions as FinancialModel['assumptions'];
-
-
-      await db.financialModels.update(model.id, {
-          assumptions: assumptionsToSave,
-          updatedAt: new Date()
+      // Perform the database update
+      db.financialModels.update(prevModel.id, {
+        assumptions: newAssumptions,
+        updatedAt: new Date()
+      }).then(() => {
+        toast({ title: "Assumptions Updated", description: "Your changes have been saved." });
+      }).catch(error => {
+        console.error("[FinancialModelDetail] Error saving assumptions:", error);
+        toast({ variant: "destructive", title: "Error Saving", description: "Could not save your changes." });
       });
 
-      setModel(prevModel => prevModel ? { 
-          ...prevModel, 
-          assumptions: assumptionsToSave, 
-          updatedAt: new Date() 
-      } : null);
-      
-      toast({ title: "Assumptions Updated", description: "Marketing changes saved." });
-      
-    } catch (error) {
-      console.error("[FinancialModelDetail] Error saving assumptions:", error);
-      toast({ variant: "destructive", title: "Error Saving", description: "Could not save marketing changes." });
-    }
-  }, [model]); // Dependency might need refinement if model reference changes too often
+      // Return the new state immediately for a responsive UI
+      return { ...prevModel, assumptions: newAssumptions, updatedAt: new Date() };
+    });
+  }, []); // This callback is now stable and has no dependencies.
 
   const combineFinancialData = useCallback(() => {
     if (revenueData.length === 0 || costData.length === 0) {
@@ -181,18 +159,24 @@ const FinancialModelDetail = () => {
         return;
     }
     try {
-      await db.financialModels.delete(parseInt(modelId));
+      // Use storageService to handle deletion from cloud or local
+      await storageService.deleteModel(modelId);
       toast({ title: "Model deleted", description: "The financial model has been successfully deleted." });
       navigate(`/projects/${projectId}`);
     } catch (error) {
       console.error("Error deleting model:", error);
-      toast({ variant: "destructive", title: "Error deleting model", description: "There was an error deleting the financial model." });
+      toast({ 
+        variant: "destructive", 
+        title: "Error deleting model", 
+        description: error instanceof Error ? error.message : "An unknown error occurred." 
+      });
     }
   }, [modelId, projectId, navigate]);
 
   // Effects (call unconditionally)
   useEffect(() => {
-    let isMounted = true; // Flag to prevent state updates on unmounted component
+    const controller = new AbortController();
+    const { signal } = controller;
     const loadModelData = async () => {
       if (!projectId || !modelId) {
         toast({
@@ -207,7 +191,7 @@ const FinancialModelDetail = () => {
       setLoading(true);
       try {
         // Load project directly without using Zustand store to avoid infinite loops
-        const project = await storageService.getProject(projectId);
+        const project = await storageService.getProject(projectId); // This should ideally accept a signal
         if (!project) {
           toast({
             variant: "destructive",
@@ -218,34 +202,41 @@ const FinancialModelDetail = () => {
           return;
         }
 
-        const financialModel = await db.financialModels.where('uuid').equals(modelId).first();
-        if (isMounted) {
-          if (financialModel) {
-            setModel(financialModel);
-          } else {
-            toast({
-              variant: "destructive",
-              title: "Model not found",
-              description: "The requested financial model could not be found.",
-            });
-            navigate(`/projects/${projectId}`);
-          }
+        if (signal.aborted) return;
+
+        // Use storageService to get model from cloud or local
+        const financialModel = await storageService.getModel(modelId);
+        if (signal.aborted) return;
+
+        if (financialModel) {
+          setModel(financialModel);
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Model not found",
+            description: "The requested financial model could not be found.",
+          });
+          navigate(`/projects/${projectId}`);
         }
       } catch (error) {
-        console.error("Error loading financial model:", error);
-        toast({
-          variant: "destructive",
-          title: "Error loading model",
-          description: "There was an error loading the financial model.",
-        });
-        navigate(`/projects/${projectId}`);
+        if (!signal.aborted) {
+          console.error("Error loading financial model:", error);
+          toast({
+            variant: "destructive",
+            title: "Error loading model",
+            description: "There was an error loading the financial model.",
+          });
+          navigate(`/projects/${projectId}`);
+        }
       } finally {
-        if (isMounted) setLoading(false);
+        if (!signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
     loadModelData();
-    return () => { isMounted = false; }; // Cleanup function
+    return () => { controller.abort(); }; // Cleanup function
   }, [projectId, modelId, navigate]); // Dependencies
 
   useEffect(() => {
