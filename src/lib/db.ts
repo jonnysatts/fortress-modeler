@@ -30,7 +30,7 @@ export interface Project {
 export interface FinancialModel {
   id?: number;
   uuid?: string; // Add a UUID for unique identification across systems
-  projectId: number;
+  projectId: number | string; // Support both numeric IDs (local) and UUID strings (cloud)
   name: string;
   assumptions: {
     revenue: RevenueAssumption[];
@@ -68,7 +68,7 @@ export interface GrowthModel {
 
 export interface ActualPerformance {
   id?: number;
-  projectId: number;
+  projectId: number | string; // Support both numeric IDs (local) and UUID strings (cloud)
   date: Date;
   metrics: {
     [key: string]: number;
@@ -78,7 +78,7 @@ export interface ActualPerformance {
 
 export interface Risk {
   id?: number;
-  projectId: number;
+  projectId: number | string; // Support both numeric IDs (local) and UUID strings (cloud)
   name: string;
   type: 'financial' | 'operational' | 'strategic' | 'regulatory' | 'other';
   likelihood: 'low' | 'medium' | 'high';
@@ -91,7 +91,7 @@ export interface Risk {
 
 export interface Scenario {
   id?: number;
-  projectId: number;
+  projectId: number | string; // Support both numeric IDs (local) and UUID strings (cloud)
   modelId: number;
   name: string;
   description?: string;
@@ -272,7 +272,7 @@ export const getModelsForProject = async (projectId: number | string): Promise<F
   }
 };
 
-export const getActualsForProject = async (projectId: number): Promise<ActualsPeriodEntry[]> => {
+export const getActualsForProject = async (projectId: number | string): Promise<ActualsPeriodEntry[]> => {
   return await db.actuals.where({ projectId: projectId }).toArray();
 };
 
@@ -306,8 +306,17 @@ export const getModelById = async (id: number): Promise<FinancialModel | undefin
 
 export const addFinancialModel = async (model: Omit<FinancialModel, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>): Promise<number> => {
   try {
-    if (!model.projectId || isNaN(model.projectId) || model.projectId <= 0) {
-      throw new ValidationError('Invalid project ID provided');
+    // Validate project ID - support both numeric IDs (local) and UUID strings (cloud)
+    if (!model.projectId) {
+      throw new ValidationError('Project ID is required');
+    }
+    // For numeric IDs, validate they are positive numbers
+    if (typeof model.projectId === 'number' && (isNaN(model.projectId) || model.projectId <= 0)) {
+      throw new ValidationError('Invalid numeric project ID provided');
+    }
+    // For string IDs (UUIDs), validate they are not empty
+    if (typeof model.projectId === 'string' && !model.projectId.trim()) {
+      throw new ValidationError('Invalid string project ID provided');
     }
     if (!model.name?.trim()) {
       throw new ValidationError('Model name is required');
