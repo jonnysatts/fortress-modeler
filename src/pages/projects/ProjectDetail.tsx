@@ -18,7 +18,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import useStore from "@/store/useStore";
-import { db, FinancialModel, getActualsForProject } from "@/lib/db";
+import { db, FinancialModel, Project, getActualsForProject } from "@/lib/db";
 import { storageService } from "@/lib/hybrid-storage";
 import { ActualsPeriodEntry } from "@/types/models";
 import { toast } from "@/hooks/use-toast";

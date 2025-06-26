@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { db } from "@/lib/db";
+import { db, RevenueAssumption, CostAssumption } from "@/lib/db";
 import useStore from "@/store/useStore";
 import { storageService } from "@/lib/hybrid-storage";
 import { toast } from "@/hooks/use-toast";
@@ -80,7 +80,7 @@ const NewFinancialModel = () => {
   // Load project if not already loaded. Avoid using unstable store functions in
   // the dependency array to prevent unnecessary re-renders.
   useEffect(() => {
-    if (projectId && (!currentProject || currentProject.uuid !== projectId)) {
+    if (projectId && (!currentProject || currentProject.id?.toString() !== projectId)) {
       const fetchProject = async () => {
         const project = await storageService.getProject(projectId);
         if (project) {

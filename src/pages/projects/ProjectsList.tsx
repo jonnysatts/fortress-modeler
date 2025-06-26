@@ -5,7 +5,6 @@
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PlusCircle, Search, Globe, Users, User, Folder as FolderIcon } from "lucide-react";
-import { PlusCircle, Search, Globe, Users, User, Folder as FolderIcon } from "lucide-react"; // Removed unused icons
 import useStore from "@/store/useStore";
 import { Input } from "@/components/ui/input";
 import { config } from "@/lib/config";
@@ -20,7 +19,6 @@ Unchanged lines  const [searchTerm, setSearchTerm] = useState('');
   const loadSharedProjects = useCallback(async () => {
     try {
       const response = await apiService.getSharedWithMeProjects();
-      const response = await apiService.getSharedWithMeProjects(); // This was the source of I.getSharedWithMeProjects error
       setSharedProjects(response.projects);
     } catch (error) {
       console.error('Failed to load shared projects:', error);
@@ -30,7 +28,6 @@ Unchanged lines  const [searchTerm, setSearchTerm] = useState('');
   const loadPublicProjects = useCallback(async () => {
     try {
       const response = await apiService.getPublicProjects();
-      const response = await apiService.getPublicProjects(); // This was the source of I.getPublicProjects error
       setPublicProjects(response.projects);
     } catch (error) {
       console.error('Failed to load public projects:', error);
