@@ -175,6 +175,7 @@ const useStore = create<AppState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const modelToCreate = { ...newModel, projectId: currentProject.id };
+      console.log('🎯 Creating model for project:', currentProject.id, 'Model data:', modelToCreate);
       const createdModel = await storageService.createModel(modelToCreate);
       set({ currentModel: createdModel, isLoading: false });
       return createdModel;

@@ -131,9 +131,11 @@ class ApiService {
   }
 
   async createModel(model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ model: FinancialModel }> {
+    const payload = snakeCaseKeys(model);
+    console.log('🚀 Creating model with payload:', payload);
     return this.request('/api/models', {
       method: 'POST',
-      body: JSON.stringify(snakeCaseKeys(model)),
+      body: JSON.stringify(payload),
     });
   }
 
