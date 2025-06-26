@@ -149,7 +149,7 @@ const ProjectDetail = () => {
     };
     fetchProjectAndRelatedData();
       // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, navigate]);
+  }, [projectId]);
 
   const handleActualsSaved = () => {
     fetchActualsData();
