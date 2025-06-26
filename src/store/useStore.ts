@@ -1,266 +1,246 @@
 import { create } from 'zustand';
-import { Project, FinancialModel } from '@/types/models';
+import { Project, FinancialModel } from '@/lib/db';
 import { storageService } from '@/lib/hybrid-storage';
-import { getErrorMessage, isAppError, logError } from '@/lib/errors';
+import { getErrorMessage, logError } from '@/lib/errors';
+
+// Synchronous, module-level lock to prevent race conditions during project loading
+const projectLoadLocks = new Set<string>();
 
 interface AppState {
-  projects: Project[];
+  // State
+  projects: Record<string, Project>;
+  // NOTE: The StorageService does not support separate fetching for shared/public projects.
+  // This functionality will need to be re-evaluated. For now, all projects are in one list.
   currentProject: Project | null;
   currentModel: FinancialModel | null;
   isLoading: boolean;
+  isCalculating: boolean;
   error: string | null;
-  
+  isSidebarOpen: boolean;
+  isCommandPaletteOpen: boolean;
+  activeView: 'summary' | 'parameters' | 'scenarios' | 'charts';
+
+  // Actions
   loadProjects: () => Promise<void>;
-  loadProjectById: (id: string) => Promise<Project | null>;
-  setCurrentProject: (project: Project | null) => void;
-  setCurrentModel: (model: FinancialModel | null) => void;
-  addProject: (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
-  updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
+  loadProjectById: (id: string | null | undefined) => Promise<Project | null>;
+  createProject: (newProject: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Project | null>;
+  updateProject: (id: string, updatedProject: Partial<Project>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
-  
-  // Financial model methods
-  loadModelsForProject: (projectId: string) => Promise<FinancialModel[]>;
-  loadModelById: (id: string) => Promise<FinancialModel | null>;
-  addFinancialModel: (model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>) => Promise<FinancialModel>;
-  updateFinancialModel: (id: string, updates: Partial<FinancialModel>) => Promise<void>;
-  deleteFinancialModel: (id: string) => Promise<void>;
-  
-  // Sync methods
-  syncWithCloud: () => Promise<void>;
+  setCurrentProject: (project: Project | null) => void;
+
+  // Model Actions
+  createModelForCurrentProject: (newModel: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt' | 'projectId'>) => Promise<FinancialModel | null>;
+  updateModelForCurrentProject: (id: string, updatedModel: Partial<FinancialModel>) => Promise<void>;
+  deleteModelForCurrentProject: (modelId: string) => Promise<void>;
+  selectModel: (model: FinancialModel | null) => void;
+
+  // UI Actions
+  setIsLoading: (isLoading: boolean) => void;
+  setError: (error: string | null) => void;
+  recalculateForecast: () => Promise<void>;
+  setIsCalculating: (isCalculating: boolean) => void;
+  toggleSidebar: () => void;
+  setCommandPaletteOpen: (isOpen: boolean) => void;
+  setActiveView: (view: 'summary' | 'parameters' | 'scenarios' | 'charts') => void;
+  triggerFullExport: (format: 'pdf' | 'xlsx') => Promise<void>;
 }
 
 const useStore = create<AppState>((set, get) => ({
-  projects: [],
+  // Initial State
+  projects: {},
   currentProject: null,
   currentModel: null,
   isLoading: false,
+  isCalculating: false,
   error: null,
-  
+  isSidebarOpen: false,
+  isCommandPaletteOpen: false,
+  activeView: 'summary',
+
+  // Actions
   loadProjects: async () => {
     set({ isLoading: true, error: null });
     try {
-      const projects = await storageService.getProjects();
+      const projectsArray = await storageService.getProjects();
+      const projects = projectsArray.reduce((acc, p) => {
+        if (p.id) acc[p.id.toString()] = p; // Ensure key is string
+        return acc;
+      }, {} as Record<string, Project>);
       set({ projects, isLoading: false });
     } catch (error) {
-      logError(error, 'Store.loadProjects');
       const errorMessage = getErrorMessage(error);
+      logError(error, 'Failed to load projects');
       set({ error: errorMessage, isLoading: false });
     }
   },
-  
-  loadProjectById: async (id) => {
+
+  loadProjectById: async (id: string | null | undefined): Promise<Project | null> => {
+    console.log('🔍 loadProjectById called with:', id, 'timestamp:', Date.now());
+    if (!id || projectLoadLocks.has(id)) {
+      console.log('⚠️ Skipping load - either no ID or already loading:', { id, isLocked: projectLoadLocks.has(id || '') });
+      return null;
+    }
+
+    try {
+      projectLoadLocks.add(id);
+      console.log('🔒 Added lock for project:', id);
+      set({ isLoading: true, error: null });
+
+      const project = await storageService.getProject(id);
+      console.log('📦 Retrieved project:', project?.id, project?.name);
+      if (project && project.id) {
+        set(state => ({
+          projects: { ...state.projects, [project.id!.toString()]: project },
+        }));
+        return project;
+      }
+      return null;
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      logError(error, `Failed to load project ${id}`);
+      set({ error: errorMessage });
+      return null;
+    } finally {
+      projectLoadLocks.delete(id);
+      console.log('🔓 Released lock for project:', id);
+      set({ isLoading: false });
+    }
+  },
+
+  createProject: async (newProject) => {
     set({ isLoading: true, error: null });
     try {
-      const project = await storageService.getProject(id);
-      if (project) {
-        set({ currentProject: project, isLoading: false });
-        return project;
-      } else {
-        set({ error: 'Project not found', isLoading: false });
-        return null;
+      const createdProject = await storageService.createProject(newProject);
+      if (createdProject && createdProject.id) {
+        set(state => ({
+          projects: { ...state.projects, [createdProject.id!.toString()]: createdProject },
+          isLoading: false
+        }));
       }
+      return createdProject;
     } catch (error) {
-      logError(error, 'Store.loadProjectById');
       const errorMessage = getErrorMessage(error);
+      logError(error, 'Failed to create project');
       set({ error: errorMessage, isLoading: false });
       return null;
     }
   },
-  
-  setCurrentProject: (project) => set({ currentProject: project }),
-  
-  setCurrentModel: (model) => set({ currentModel: model }),
-  
-  addProject: async (project) => {
+
+  updateProject: async (id, updatedProject) => {
     set({ isLoading: true, error: null });
     try {
-      const newProject = await storageService.createProject(project);
-      
-      // Update projects list
+      const returnedProject = await storageService.updateProject(id, updatedProject);
       set(state => ({
-        projects: [...state.projects, newProject],
+        projects: { ...state.projects, [id]: returnedProject },
+        currentProject: state.currentProject?.id?.toString() === id ? returnedProject : state.currentProject,
         isLoading: false
       }));
-      
-      return newProject.id.toString();
     } catch (error) {
-      logError(error, 'Store.addProject');
       const errorMessage = getErrorMessage(error);
+      logError(error, `Failed to update project ${id}`);
       set({ error: errorMessage, isLoading: false });
-      throw error;
     }
   },
-  
-  updateProject: async (id, updates) => {
-    set({ isLoading: true, error: null });
-    try {
-      const updatedProject = await storageService.updateProject(id, updates);
-      
-      // Update projects list
-      set(state => ({
-        projects: state.projects.map(p => p.id.toString() === id ? updatedProject : p),
-        isLoading: false
-      }));
-      
-      // Update current project if it's the one being edited
-      const currentProject = get().currentProject;
-      if (currentProject && currentProject.id.toString() === id) {
-        set({ currentProject: updatedProject });
-      }
-    } catch (error) {
-      logError(error, 'Store.updateProject');
-      const errorMessage = getErrorMessage(error);
-      set({ error: errorMessage, isLoading: false });
-      throw error;
-    }
-  },
-  
-  deleteProject: async (id) => {
+
+  deleteProject: async (id: string) => {
     set({ isLoading: true, error: null });
     try {
       await storageService.deleteProject(id);
-      
-      // Remove from projects list
-      set(state => ({
-        projects: state.projects.filter(p => p.id.toString() !== id),
-        isLoading: false
-      }));
-      
-      // Reset current project if it's the one being deleted
-      const currentProject = get().currentProject;
-      if (currentProject && currentProject.id.toString() === id) {
-        set({ currentProject: null });
-      }
-    } catch (error) {
-      logError(error, 'Store.deleteProject');
-      const errorMessage = getErrorMessage(error);
-      
-      // If project doesn't exist in storage but exists in UI (phantom project), remove it anyway
-      if (errorMessage.includes('Project not found') || errorMessage.includes('not found')) {
-        console.log('Removing phantom project from UI:', id);
-        set(state => ({
-          projects: state.projects.filter(p => p.id.toString() !== id),
+      set(state => {
+        const newProjects = { ...state.projects };
+        delete newProjects[id];
+        return {
+          projects: newProjects,
+          currentProject: state.currentProject?.id?.toString() === id ? null : state.currentProject,
           isLoading: false
-        }));
-        
-        // Reset current project if it's the one being deleted
-        const currentProject = get().currentProject;
-        if (currentProject && currentProject.id.toString() === id) {
-          set({ currentProject: null });
-        }
-        return; // Don't throw error for phantom projects
-      }
-      
+        };
+      });
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      logError(error, `Failed to delete project ${id}`);
       set({ error: errorMessage, isLoading: false });
-      throw error;
     }
   },
 
-  loadModelById: async (id) => {
+  setCurrentProject: (project) => set({ currentProject: project, currentModel: null }),
+
+  createModelForCurrentProject: async (newModel) => {
+    const currentProject = get().currentProject;
+    if (!currentProject || !currentProject.id) {
+      const err = 'No current project selected to add a model to.';
+      logError(new Error(err));
+      set({ error: err });
+      return null;
+    }
     set({ isLoading: true, error: null });
     try {
-      const model = await storageService.getModel(id);
-      if (model) {
-        set({ currentModel: model, isLoading: false });
-        return model;
-      } else {
-        set({ error: 'Model not found', isLoading: false });
-        return null;
-      }
+      const modelToCreate = { ...newModel, projectId: currentProject.id };
+      const createdModel = await storageService.createModel(modelToCreate);
+      set({ currentModel: createdModel, isLoading: false });
+      return createdModel;
     } catch (error) {
-      logError(error, 'Store.loadModelById');
       const errorMessage = getErrorMessage(error);
+      logError(error, 'Failed to create financial model');
       set({ error: errorMessage, isLoading: false });
       return null;
     }
   },
 
-  loadModelsForProject: async (projectId) => {
+  updateModelForCurrentProject: async (id, updatedModel) => {
     set({ isLoading: true, error: null });
     try {
-      const models = await storageService.getModelsForProject(projectId);
-      set({ isLoading: false });
-      return models;
+      const returnedModel = await storageService.updateModel(id, updatedModel);
+      set(state => ({
+        currentModel: state.currentModel?.id?.toString() === id ? returnedModel : state.currentModel,
+        isLoading: false
+      }));
     } catch (error) {
-      logError(error, 'Store.loadModelsForProject');
       const errorMessage = getErrorMessage(error);
+      logError(error, `Failed to update model ${id}`);
       set({ error: errorMessage, isLoading: false });
-      return [];
     }
   },
 
-  addFinancialModel: async (model) => {
+  deleteModelForCurrentProject: async (modelId) => {
     set({ isLoading: true, error: null });
     try {
-      const newModel = await storageService.createModel(model);
-      set({ isLoading: false });
-      return newModel;
+      await storageService.deleteModel(modelId);
+      set(state => ({
+        currentModel: state.currentModel?.id?.toString() === modelId ? null : state.currentModel,
+        isLoading: false
+      }));
     } catch (error) {
-      logError(error, 'Store.addFinancialModel');
       const errorMessage = getErrorMessage(error);
+      logError(error, `Failed to delete model ${modelId}`);
       set({ error: errorMessage, isLoading: false });
-      throw error;
     }
   },
 
-  updateFinancialModel: async (id, updates) => {
-    set({ isLoading: true, error: null });
-    try {
-      const updatedModel = await storageService.updateModel(id, updates);
-      
-      // Update current model if it's the one being edited
-      const currentModel = get().currentModel;
-      if (currentModel && currentModel.id.toString() === id) {
-        set({ currentModel: updatedModel });
-      }
-      
-      set({ isLoading: false });
-    } catch (error) {
-      logError(error, 'Store.updateFinancialModel');
-      const errorMessage = getErrorMessage(error);
-      set({ error: errorMessage, isLoading: false });
-      throw error;
-    }
+  selectModel: (model) => set({ currentModel: model }),
+
+  setIsLoading: (isLoading) => set({ isLoading }),
+
+  setError: (error) => set({ error }),
+
+  recalculateForecast: async () => {
+    console.log('Recalculating forecast...');
+    set({ isCalculating: true });
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate async work
+    set({ isCalculating: false });
+    console.log('Forecast recalculated.');
   },
 
-  deleteFinancialModel: async (id) => {
-    set({ isLoading: true, error: null });
-    try {
-      await storageService.deleteModel(id);
-      
-      // Reset current model if it's the one being deleted
-      const currentModel = get().currentModel;
-      if (currentModel && currentModel.id.toString() === id) {
-        set({ currentModel: null });
-      }
-      
-      set({ isLoading: false });
-    } catch (error) {
-      logError(error, 'Store.deleteFinancialModel');
-      const errorMessage = getErrorMessage(error);
-      set({ error: errorMessage, isLoading: false });
-      throw error;
-    }
-  },
+  setIsCalculating: (isCalculating) => set({ isCalculating }),
 
-  syncWithCloud: async () => {
-    if (!storageService.syncWithCloud) {
-      console.log('Sync not supported by current storage service');
-      return;
-    }
+  toggleSidebar: () => set(state => ({ isSidebarOpen: !state.isSidebarOpen })),
 
-    set({ isLoading: true, error: null });
-    try {
-      await storageService.syncWithCloud();
-      // Reload projects after sync
-      await get().loadProjects();
-      set({ isLoading: false });
-    } catch (error) {
-      logError(error, 'Store.syncWithCloud');
-      const errorMessage = getErrorMessage(error);
-      set({ error: errorMessage, isLoading: false });
-      throw error;
-    }
+  setCommandPaletteOpen: (isOpen) => set({ isCommandPaletteOpen: isOpen }),
+
+  setActiveView: (view) => set({ activeView: view }),
+
+  triggerFullExport: async (format) => {
+    console.log(`Triggering full export for format: ${format}`);
+    alert(`Export to ${format.toUpperCase()} is not yet implemented.`);
   },
 }));
 

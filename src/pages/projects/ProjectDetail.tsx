@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
-import { useNavigate, useParams, Link, Outlet } from "react-router-dom";
+import { useEffect, useState, useCallback } from "react";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { ArrowLeft, Edit, Trash2, PlusCircle, BarChart3, AlertTriangle, Building } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -18,13 +18,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import useStore from "@/store/useStore";
-import { 
-    Project, 
-    db, 
-    getProject, 
-    FinancialModel, 
-    getActualsForProject
-} from "@/lib/db";
+import { db, FinancialModel, getActualsForProject } from "@/lib/db";
 import { ActualsPeriodEntry } from "@/types/models";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -42,7 +36,9 @@ import { PerformanceAnalysis } from "@/components/models/PerformanceAnalysis";
 import { config } from "@/lib/config";
 
 const ProjectDetail = () => {
-  const { projectId } = useParams<{ projectId: string }>();
+    const { projectId } = useParams<{ projectId: string }>();
+    console.log('🎨 ProjectDetail render - projectId:', projectId, 'timestamp:', Date.now());
+
   const navigate = useNavigate();
 
   // Guard against invalid project IDs
@@ -77,6 +73,8 @@ const ProjectDetail = () => {
   }, [projectId]);
 
   useEffect(() => {
+    console.log('🌀 ProjectDetail useEffect triggered - projectId:', projectId, 'timestamp:', Date.now());
+    
     const fetchProjectAndRelatedData = async () => {
       if (!projectId) return;
       setLoading(true);
@@ -88,6 +86,7 @@ const ProjectDetail = () => {
         if (isUUID) {
           // For UUID projects, we need cloud API (check if cloud sync is enabled)
           if (config.useCloudSync) {
+            console.log('🌐 Loading UUID project via cloud API');
             project = await loadProjectById(projectId);
           } else {
             // Cloud sync is disabled but trying to access UUID project - redirect to projects list
@@ -101,14 +100,16 @@ const ProjectDetail = () => {
           }
         } else {
           // For integer projects, use the old method
-          project = await getProject(parseInt(projectId));
+          console.log('🔢 Loading integer project');
+          project = await loadProjectById(projectId);
         }
         
         if (project) {
           setCurrentProject(project);
           // Only load financial models for integer projects (UUIDs won't have local models)
           if (!isUUID) {
-            const models = await db.financialModels.where('projectId').equals(parseInt(projectId)).toArray();
+            if (!project) throw new Error('Project not loaded before fetching models');
+            const models = await db.financialModels.where('projectId').equals(project.id).toArray();
             setFinancialModels(models);
           } else {
             setFinancialModels([]);
@@ -134,7 +135,8 @@ const ProjectDetail = () => {
       }
     };
     fetchProjectAndRelatedData();
-  }, [projectId, setCurrentProject, navigate, fetchActualsData]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
 
   const handleActualsSaved = () => {
     fetchActualsData();

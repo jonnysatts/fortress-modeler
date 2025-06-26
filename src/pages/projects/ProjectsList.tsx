@@ -39,7 +39,8 @@ const ProjectsList = () => {
       loadSharedProjects();
       loadPublicProjects();
     }
-  }, [loadProjects]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadSharedProjects = async () => {
     try {
@@ -60,9 +61,10 @@ const ProjectsList = () => {
   };
 
   // Filter out UUID projects if cloud sync is disabled
+  const projectsArray = Object.values(projects);
   const availableProjects = config.useCloudSync 
-    ? projects 
-    : projects.filter(project => typeof project.id === 'number');
+    ? projectsArray 
+    : projectsArray.filter(project => typeof project.id === 'number');
   
   console.log('🔍 ProjectsList: availableProjects:', availableProjects.map(p => ({ id: p.id, name: p.name, idType: typeof p.id })));
 
