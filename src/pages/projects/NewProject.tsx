@@ -18,6 +18,7 @@ import { toast } from "@/hooks/use-toast";
 import useStore from "@/store/useStore";
 import { Label } from "@/components/ui/label";
 import { useImageUpload } from "@/hooks/useImageUpload";
+import { productTypes } from "@/lib/constants";
 
 const formSchema = z.object({
   name: z.string().min(3, "Project name must be at least 3 characters"),
@@ -29,14 +30,6 @@ const formSchema = z.object({
 });
 
 type FormValues = z.infer<typeof formSchema>;
-
-const productTypes = [
-  { value: "SaaS", label: "SaaS Product" },
-  { value: "WeeklyEvent", label: "Weekly Event" },
-  { value: "DigitalProduct", label: "Digital Product" },
-  { value: "PhysicalGood", label: "Physical Good" },
-  { value: "ConsultingProject", label: "Consulting Project" },
-];
 
 const NewProject = () => {
   const navigate = useNavigate();
@@ -74,7 +67,12 @@ const NewProject = () => {
         description: `${data.name} has been created successfully.`,
       });
       
-      navigate(`/projects/${createdProject?.id}`);
+      if (createdProject && createdProject.id) {
+        navigate(`/projects/${createdProject.id}`);
+      } else {
+        // If creation failed or didn't return an ID, go back to the list.
+        navigate('/projects');
+      }
     } catch (error) {
       console.error("Error creating project:", error);
       toast({

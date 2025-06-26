@@ -20,6 +20,7 @@ import { apiService } from "@/lib/api";
 import { Project } from "@/lib/db";
 import { toast } from "sonner";
 import { ProjectCard } from "./ProjectCard";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const ProjectsList = () => {
   const navigate = useNavigate();
@@ -87,27 +88,6 @@ const ProjectsList = () => {
       await loadPublicProjects();
     }
   };
-
-  const EmptyState = ({ 
-    icon: Icon, 
-    title, 
-    description, 
-    action 
-  }: { 
-    icon: any; 
-    title: string; 
-    description: string; 
-    action?: React.ReactNode; 
-  }) => (
-    <div className="flex flex-col items-center justify-center py-12 space-y-4">
-      <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-        <Icon className="h-8 w-8 text-muted-foreground" />
-      </div>
-      <h2 className="text-xl font-semibold">{title}</h2>
-      <p className="text-muted-foreground text-center max-w-md">{description}</p>
-      {action}
-    </div>
-  );
 
   return (
     <>

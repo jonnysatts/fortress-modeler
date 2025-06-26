@@ -31,6 +31,7 @@ import ModelOverview from "@/components/models/ModelOverview";
 import { MarketingChannelsForm } from "@/components/models/MarketingChannelsForm";
 import { ModelAssumptions } from "@/types/models";
 import { TrendDataPoint } from "@/types/trends";
+import { formatDate } from "@/lib/utils";
 
 const FinancialModelDetail = () => {
   const { projectId, modelId } = useParams<{ projectId: string; modelId: string }>();
@@ -244,22 +245,6 @@ const FinancialModelDetail = () => {
       combineFinancialData();
     }
   }, [revenueData, costData, combineFinancialData]);
-
-  // Helper functions (can be defined here)
-  const formatDate = (dateString: string | Date | undefined): string => {
-    if (!dateString) return "N/A";
-    try {
-        // Handle both string and Date objects
-        const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
-        if (isNaN(date.getTime())) return "Invalid Date"; 
-        return date.toLocaleDateString("en-US", {
-            year: "numeric", month: "short", day: "numeric",
-        });
-    } catch (error) {
-        console.error("Error formatting date:", dateString, error);
-        return "Error Date";
-    }
-  };
 
   // --- Conditional Returns (AFTER all hooks) --- 
   if (loading) { // Only check loading state

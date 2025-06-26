@@ -35,6 +35,8 @@ import ModelOverview from "@/components/models/ModelOverview";
 import { ActualsDisplayTable } from "@/components/models/ActualsDisplayTable";
 import { PerformanceAnalysis } from "@/components/models/PerformanceAnalysis";
 import { config } from "@/lib/config";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { formatDate } from "@/lib/utils";
 
 const ProjectDetail = () => {
     const { projectId } = useParams<{ projectId: string }>();
@@ -74,7 +76,7 @@ const ProjectDetail = () => {
 
   useEffect(() => {
     const fetchProjectAndRelatedData = async () => {
-      if (!projectId) return;
+      if (!projectId || projectId === 'undefined') return;
 
       // Prevent re-fetching if the component re-mounts with the same ID.
       // The effect itself won't re-run unless projectId changes, but this
@@ -165,10 +167,6 @@ const ProjectDetail = () => {
     );
   }
 
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString();
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -189,7 +187,7 @@ const ProjectDetail = () => {
                 {project.productType}
               </Badge>
               <p className="text-sm text-muted-foreground">
-                Created on {new Date(project.createdAt).toLocaleDateString()}
+                Created on {formatDate(project.createdAt)}
               </p>
             </div>
           </div>
@@ -249,9 +247,20 @@ const ProjectDetail = () => {
                 actualsData={actualsData} 
              />
           ) : (
-              <div className="text-center py-10 text-muted-foreground">
-                 {loading ? "Loading..." : "Create a financial model to see an overview."}
-              </div>
+            <Card>
+              <CardContent>
+                <EmptyState
+                  icon={BarChart3}
+                  title="No Financial Model"
+                  description="Create a financial model for this project to see an overview and start making projections."
+                  action={
+                    <Button onClick={() => navigate(`/projects/${projectId}/models/new`)} className="bg-fortress-emerald hover:bg-fortress-emerald/90">
+                      <PlusCircle className="mr-2 h-4 w-4" /> Create First Model
+                    </Button>
+                  }
+                />
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
         

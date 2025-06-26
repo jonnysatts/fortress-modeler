@@ -19,6 +19,7 @@ import useStore from "@/store/useStore";
 import { Label } from "@/components/ui/label";
 import { storageService } from "@/lib/hybrid-storage";
 import { useImageUpload } from "@/hooks/useImageUpload";
+import { productTypes } from "@/lib/constants";
 
 // Schema likely same as NewProject
 const formSchema = z.object({
@@ -30,14 +31,6 @@ const formSchema = z.object({
   endDate: z.date().optional(),
 });
 type FormValues = z.infer<typeof formSchema>;
-
-const productTypes = [
-  { value: "SaaS", label: "SaaS Product" },
-  { value: "WeeklyEvent", label: "Weekly Event" },
-  { value: "DigitalProduct", label: "Digital Product" },
-  { value: "PhysicalGood", label: "Physical Good" },
-  { value: "ConsultingProject", label: "Consulting Project" },
-];
 
 const EditProject = () => {
   const { projectId } = useParams<{ projectId: string }>();
