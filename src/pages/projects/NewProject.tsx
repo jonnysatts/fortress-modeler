@@ -39,7 +39,7 @@ const productTypes = [
 
 const NewProject = () => {
   const navigate = useNavigate();
-  const { addProject } = useStore();
+  const { createProject } = useStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | undefined>(undefined);
@@ -85,7 +85,7 @@ const NewProject = () => {
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
     try {
-      const projectId = await addProject({
+      const createdProject = await createProject({
         name: data.name,
         description: data.description,
         productType: data.productType,
@@ -102,7 +102,7 @@ const NewProject = () => {
         description: `${data.name} has been created successfully.`,
       });
       
-      navigate(`/projects/${projectId}`);
+      navigate(`/projects/${createdProject?.id}`);
     } catch (error) {
       console.error("Error creating project:", error);
       toast({
