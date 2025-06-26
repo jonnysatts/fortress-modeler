@@ -31,6 +31,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
 import { db, FinancialModel } from '@/lib/db';
+import useStore from '@/store/useStore';
 
 interface PerCustomerRevenue {
   ticketPrice: number;
@@ -92,7 +93,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 interface EventModelFormProps {
-  projectId: number;
+  projectId: number | string;
   projectName: string;
   existingModel?: FinancialModel;
   onCancel: () => void;
@@ -100,6 +101,7 @@ interface EventModelFormProps {
 
 const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: EventModelFormProps) => {
   const eventMetadata = existingModel?.assumptions.metadata;
+  const { createModelForCurrentProject, updateModelForCurrentProject } = useStore();
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -233,7 +235,6 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
       };
 
       const modelData = {
-        projectId,
         name: data.name,
         assumptions: {
           revenue: revenueAssumptions,
@@ -241,22 +242,23 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
           growthModel,
           metadata: eventMetadata,
         },
-        updatedAt: new Date(),
       };
 
-
-      if (existingModel) {
-        await db.financialModels.update(existingModel.id, modelData);
+      if (existingModel && existingModel.id) {
+        // Update existing model
+        await updateModelForCurrentProject(existingModel.id.toString(), modelData);
         
         toast({
           title: "Event model updated",
           description: `Successfully updated "${data.name}" weekly event model.`,
         });
       } else {
-        await db.financialModels.add({
-          ...modelData,
-          createdAt: new Date(),
-        });
+        // Create new model
+        const createdModel = await createModelForCurrentProject(modelData);
+        
+        if (!createdModel) {
+          throw new Error('Failed to create model');
+        }
         
         toast({
           title: "Event model created",
