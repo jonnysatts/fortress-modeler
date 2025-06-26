@@ -1,4 +1,5 @@
 import { query, withTransaction } from '../db/connection';
+import { validate as uuidValidate } from 'uuid';
 import { PoolClient } from 'pg';
 
 export interface Project {
@@ -66,11 +67,40 @@ export class ProjectService {
   
   // Get project by ID
   static async getProjectById(userId: string, projectId: string): Promise<Project | null> {
+    console.log(`[getProjectById] Checking access for user ${userId} on project ${projectId}`);
+    if (!uuidValidate(projectId)) {
+      console.error(`[getProjectById] Invalid UUID format for projectId: ${projectId}`);
+      return null;
+    }
+
+    // Get the current user's email, which is needed for the sharing check.
+    const userResult = await query('SELECT email FROM users WHERE id = $1', [userId]);
+    if (userResult.rows.length === 0) {
+      console.error(`Could not find user with ID: ${userId} to check project permissions.`);
+      return null;
+    }
+    const userEmail = userResult.rows[0].email;
+    console.log(`[getProjectById] User email for sharing check: ${userEmail}`);
+
     const sql = `
-      SELECT * FROM projects 
-      WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+      SELECT p.*
+      FROM projects p
+      LEFT JOIN project_shares ps ON p.id = ps.project_id AND ps.shared_with_email = $2
+      WHERE p.id = $1 AND p.deleted_at IS NULL
+      AND (
+        p.user_id = $3 OR -- User owns the project
+        p.data->>'is_public' = 'true' OR -- Project is public
+        ps.project_id IS NOT NULL -- Project is shared with the user
+      )
+      LIMIT 1;
     `;
-    const result = await query(sql, [projectId, userId]);
+
+    const result = await query(sql, [projectId, userEmail, userId]);
+    if (result.rows.length > 0) {
+      console.log(`[getProjectById] Access GRANTED for user ${userId} on project ${projectId}`);
+    } else {
+      console.warn(`[getProjectById] Access DENIED for user ${userId} on project ${projectId}`);
+    }
     return result.rows[0] || null;
   }
   
@@ -82,6 +112,44 @@ export class ProjectService {
     `;
     const result = await query(sql, [localId, userId]);
     return result.rows[0] || null;
+  }
+
+  // Get all public projects
+  static async getPublicProjects(): Promise<Project[]> {
+    const sql = `
+      SELECT p.*, u.name as author_name, u.picture as author_avatar_url
+      FROM projects p
+      JOIN users u ON p.user_id = u.id
+      WHERE p.data->>'is_public' = 'true' AND p.deleted_at IS NULL
+      ORDER BY p.updated_at DESC
+    `;
+    const result = await query(sql);
+    return result.rows;
+  }
+
+  // Get projects shared with the user
+  static async getSharedProjectsForUser(userId: string): Promise<Project[]> {
+    // First, get the current user's email from their ID
+    const userResult = await query('SELECT email FROM users WHERE id = $1', [userId]);
+    if (userResult.rows.length === 0) {
+      console.error(`Could not find user with ID: ${userId}`);
+      return []; // User not found, so no projects can be shared with them.
+    }
+    const userEmail = userResult.rows[0].email;
+
+    const sql = `
+      SELECT p.*,
+             u.name as author_name,
+             u.picture as author_avatar_url,
+             ps.permission as permission_level
+      FROM projects p
+      JOIN project_shares ps ON p.id = ps.project_id
+      JOIN users u ON p.user_id = u.id
+      WHERE ps.shared_with_email = $1 AND p.deleted_at IS NULL
+      ORDER BY p.updated_at DESC
+    `;
+    const result = await query(sql, [userEmail]);
+    return result.rows;
   }
   
   // Get all user projects

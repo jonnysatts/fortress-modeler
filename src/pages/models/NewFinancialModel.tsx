@@ -15,7 +15,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+
 import {
   Select,
   SelectContent,
@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { db, getProject, RevenueAssumption, CostAssumption } from "@/lib/db";
+import { db } from "@/lib/db";
 import useStore from "@/store/useStore";
 import { toast } from "@/hooks/use-toast";
 import EventModelForm from "./components/EventModelForm";
@@ -63,6 +63,7 @@ const defaultCostAssumption: CostAssumption = {
 const NewFinancialModel = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const { createModelForCurrentProject } = useStore();
   const { currentProject, loadProjectById } = useStore();
   const [revenueAssumptions, setRevenueAssumptions] = useState<RevenueAssumption[]>([
     { ...defaultRevenueAssumption, name: "Monthly Subscription" },
@@ -73,8 +74,8 @@ const NewFinancialModel = () => {
 
   // Load project if not already loaded
   useEffect(() => {
-    if (projectId && (!currentProject || currentProject.id !== Number(projectId))) {
-      loadProjectById(Number(projectId));
+    if (projectId && (!currentProject || currentProject.uuid !== projectId)) {
+      loadProjectById(projectId);
     }
   }, [projectId, currentProject, loadProjectById]);
 
@@ -89,7 +90,14 @@ const NewFinancialModel = () => {
   });
 
   const onSubmit = async (data: FormValues) => {
-    if (!projectId || !currentProject) return;
+    if (!projectId || !currentProject || !currentProject.id) {
+      toast({
+        variant: "destructive",
+        title: "Project not loaded",
+        description: "Could not create a model because the project data is missing.",
+      });
+      return;
+    }
 
     try {
       // Handle submission based on product type
@@ -125,18 +133,19 @@ const NewFinancialModel = () => {
         seasonalFactors: seasonalFactorsArray,
       };
 
-      // Create new financial model
-      const modelId = await db.financialModels.add({
-        projectId: parseInt(projectId),
+      // Create new financial model using the store method which handles cloud sync
+      const createdModel = await createModelForCurrentProject({
         name: data.name,
         assumptions: {
           revenue: revenueAssumptions,
           costs: costAssumptions,
           growthModel,
         },
-        createdAt: new Date(),
-        updatedAt: new Date(),
       });
+      
+      if (!createdModel) {
+        throw new Error('Failed to create model');
+      }
 
       toast({
         title: "Financial model created",

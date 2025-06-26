@@ -80,7 +80,8 @@ const ProjectDetail = () => {
       setLoading(true);
       try {
         // Handle both integer and UUID project IDs
-        const isUUID = isNaN(parseInt(projectId));
+        // Check if it's a UUID (contains hyphens and is 36 chars long)
+        const isUUID = projectId.includes('-') && projectId.length === 36;
         let project = null;
         
         if (isUUID) {
@@ -106,12 +107,16 @@ const ProjectDetail = () => {
         
         if (project) {
           setCurrentProject(project);
-          // Only load financial models for integer projects (UUIDs won't have local models)
-          if (!isUUID) {
+          // Load financial models - for cloud projects, they should come from the API
+          if (!isUUID && project.id) {
+            // Local integer projects - load from IndexedDB
             if (!project) throw new Error('Project not loaded before fetching models');
             const models = await db.financialModels.where('projectId').equals(project.id).toArray();
             setFinancialModels(models);
-          } else {
+          } else if (isUUID) {
+            // For UUID projects, models should be loaded from the cloud API
+            // TODO: Implement cloud model loading
+            console.log('📱 UUID project detected - cloud models not yet implemented');
             setFinancialModels([]);
           }
           fetchActualsData();

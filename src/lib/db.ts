@@ -6,7 +6,8 @@ import config from './config';
 
 // Define interfaces for our database tables
 export interface Project {
-  id?: number | string;
+  id?: number; // Auto-incrementing primary key
+  uuid: string; // Universal unique identifier
   name: string;
   description?: string;
   productType: string;
@@ -28,6 +29,7 @@ export interface Project {
 
 export interface FinancialModel {
   id?: number;
+  uuid?: string; // Add a UUID for unique identification across systems
   projectId: number;
   name: string;
   assumptions: {
@@ -111,15 +113,25 @@ export class FortressDB extends Dexie {
 
   constructor() {
     super('FortressDB');
-    this.version(3).stores({
+
+    this.version(5).stores({
+      projects: '++id, &uuid, name, productType, createdAt, updatedAt',
+      financialModels: '++id, &uuid, projectId, name, createdAt, updatedAt',
+      actualPerformance: '++id, projectId, date',
+      risks: '++id, projectId, type, likelihood, impact, status',
+      scenarios: '++id, projectId, modelId, name, createdAt',
+      actuals: '++id, &[projectId+period], projectId, period'
+    });
+
+    this.version(4).stores({
       projects: '++id, name, productType, createdAt, updatedAt',
-      financialModels: '++id, projectId, name, createdAt, updatedAt',
+      financialModels: '++id, &uuid, projectId, name, createdAt, updatedAt',
       actualPerformance: '++id, projectId, date',
       risks: '++id, projectId, type, likelihood, impact, status',
       scenarios: '++id, projectId, modelId, name, createdAt',
       actuals: '++id, &[projectId+period], projectId, period'
     }).upgrade(tx => {
-// Upgrade handler for schema version 3: Changes index for 'actuals' table from modelId+period to projectId+period
+// Upgrade handler for schema version 4: Adds uuid to financialModels
     });
     
     this.version(2).stores({
@@ -154,20 +166,29 @@ export const getProjects = async (): Promise<Project[]> => {
 
 export const getProject = async (id: number | string): Promise<Project | undefined> => {
   try {
-    const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
-    if (!idNum || isNaN(idNum) || idNum <= 0) {
-      throw new ValidationError('Invalid project ID provided');
+    if (typeof id === 'number') {
+      return await db.projects.get(id);
     }
-    const project = await db.projects.get(idNum);
-    return project;
+    if (typeof id === 'string') {
+      // Try to find by UUID first
+      const projectByUuid = await db.projects.where('uuid').equals(id).first();
+      if (projectByUuid) {
+        return projectByUuid;
+      }
+      // Fallback for old numeric IDs stored as strings
+      const idNum = parseInt(id, 10);
+      if (!isNaN(idNum)) {
+        return await db.projects.get(idNum);
+      }
+    }
+    return undefined;
   } catch (error) {
-    if (error instanceof ValidationError) throw error;
     logError(error, 'getProject');
     throw new DatabaseError(`Failed to fetch project with ID ${id}`, error);
   }
 };
 
-export const createProject = async (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<number> => {
+export const createProject = async (project: Omit<Project, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>): Promise<number> => {
   try {
     if (!project.name?.trim()) {
       throw new ValidationError('Project name is required');
@@ -179,6 +200,7 @@ export const createProject = async (project: Omit<Project, 'id' | 'createdAt' | 
     const timestamp = new Date();
     const projectId = await db.projects.add({
       ...project,
+      uuid: crypto.randomUUID(), // Standard browser API for generating UUIDs
       createdAt: timestamp,
       updatedAt: timestamp
     });
@@ -191,21 +213,17 @@ export const createProject = async (project: Omit<Project, 'id' | 'createdAt' | 
   }
 };
 
-export const updateProject = async (id: number | string, project: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>): Promise<number> => {
+export const updateProject = async (id: number | string, projectData: Partial<Omit<Project, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>>): Promise<number> => {
   try {
-    const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
-    if (!idNum || isNaN(idNum) || idNum <= 0) {
-      throw new ValidationError('Invalid project ID provided');
-    }
-
-    const existingProject = await db.projects.get(idNum);
-    if (!existingProject) {
+    const existingProject = await getProject(id);
+    if (!existingProject || !existingProject.id) {
       throw new NotFoundError(`Project with ID ${id} not found`);
     }
+    const idNum = existingProject.id;
 
-    const updatedCount = await db.projects.update(idNum, { ...project, updatedAt: new Date() });
+    const updatedCount = await db.projects.update(idNum, { ...projectData, updatedAt: new Date() });
     if (updatedCount === 0) {
-      throw new DatabaseError('Failed to update project - no changes made');
+      // No error, but can be useful to know no changes were made.
     }
 
     return idNum;
@@ -218,15 +236,11 @@ export const updateProject = async (id: number | string, project: Partial<Omit<P
 
 export const deleteProject = async (id: number | string): Promise<void> => {
   try {
-    const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
-    if (!idNum || isNaN(idNum) || idNum <= 0) {
-      throw new ValidationError('Invalid project ID provided');
-    }
-
-    const existingProject = await db.projects.get(idNum);
-    if (!existingProject) {
+    const existingProject = await getProject(id);
+    if (!existingProject || !existingProject.id) {
       throw new NotFoundError(`Project with ID ${id} not found`);
     }
+    const idNum = existingProject.id;
 
     // Use transaction for atomicity
     await db.transaction('rw', [db.projects, db.financialModels, db.actualPerformance, db.risks, db.scenarios, db.actuals], async () => {
@@ -245,11 +259,17 @@ export const deleteProject = async (id: number | string): Promise<void> => {
 };
 
 export const getModelsForProject = async (projectId: number | string): Promise<FinancialModel[]> => {
-  const idNum = typeof projectId === 'string' ? parseInt(projectId, 10) : projectId;
-  if (!idNum || isNaN(idNum) || idNum <= 0) {
-    throw new ValidationError('Invalid project ID provided');
+  try {
+    const project = await getProject(projectId);
+    if (!project || !project.id) {
+      throw new NotFoundError(`Project with ID ${projectId} not found`);
+    }
+    return await db.financialModels.where('projectId').equals(project.id).toArray();
+  } catch (error) {
+    if (error instanceof NotFoundError) throw error;
+    logError(error, 'getModelsForProject');
+    throw new DatabaseError(`Failed to get models for project ${projectId}`, error);
   }
-  return await db.financialModels.where('projectId').equals(idNum).toArray();
 };
 
 export const getActualsForProject = async (projectId: number): Promise<ActualsPeriodEntry[]> => {
@@ -284,7 +304,7 @@ export const getModelById = async (id: number): Promise<FinancialModel | undefin
   }
 };
 
-export const addFinancialModel = async (model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>): Promise<number> => {
+export const addFinancialModel = async (model: Omit<FinancialModel, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>): Promise<number> => {
   try {
     if (!model.projectId || isNaN(model.projectId) || model.projectId <= 0) {
       throw new ValidationError('Invalid project ID provided');
@@ -296,6 +316,7 @@ export const addFinancialModel = async (model: Omit<FinancialModel, 'id' | 'crea
     const timestamp = new Date();
     const modelId = await db.financialModels.add({
       ...model,
+      uuid: crypto.randomUUID(),
       createdAt: timestamp,
       updatedAt: timestamp,
     });
@@ -308,7 +329,7 @@ export const addFinancialModel = async (model: Omit<FinancialModel, 'id' | 'crea
   }
 };
 
-export const updateFinancialModel = async (id: number, updates: Partial<Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>>): Promise<number> => {
+export const updateFinancialModel = async (id: number, updates: Partial<Omit<FinancialModel, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>>): Promise<number> => {
   try {
     if (!id || isNaN(id) || id <= 0) {
       throw new ValidationError('Invalid model ID provided');
@@ -321,7 +342,7 @@ export const updateFinancialModel = async (id: number, updates: Partial<Omit<Fin
 
     const updatedCount = await db.financialModels.update(id, { ...updates, updatedAt: new Date() });
     if (updatedCount === 0) {
-      throw new DatabaseError('Failed to update financial model - no changes made');
+      // No error, but can be useful to know no changes were made.
     }
 
     return id;
@@ -367,6 +388,7 @@ export const addDemoData = async (): Promise<void> => {
     // Add demo project
     const projectId = await db.projects.add({
       ...demoData.project,
+      uuid: crypto.randomUUID(),
       createdAt: timestamp,
       updatedAt: timestamp
     });
@@ -374,6 +396,7 @@ export const addDemoData = async (): Promise<void> => {
     // Add demo financial model
     await db.financialModels.add({
       ...demoData.financialModel,
+      uuid: crypto.randomUUID(),
       projectId,
       createdAt: timestamp,
       updatedAt: timestamp

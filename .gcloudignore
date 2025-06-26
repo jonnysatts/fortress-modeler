@@ -1,0 +1,46 @@
+# This file specifies files that are *not* uploaded to Google Cloud Build.
+#
+# For more information, see:
+#   $ gcloud topic gcloudignore
+
+# Node.js dependencies - these should be installed in the cloud
+node_modules/
+
+# Build output directory - this is generated in the cloud
+dist/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS-generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Local environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Git directory
+.git/
+
+# The cloud build configuration file itself
+frontend-cloudbuild.yaml
+
+# Don't ignore the .gitignore file, it's good practice to see it
+!.gitignore

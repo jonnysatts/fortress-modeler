@@ -62,7 +62,7 @@ class ApiService {
   }
 
   async getProject(id: string): Promise<{ project: Project }> {
-    const res = await this.request<{ project: any }>(`/api/project/${id}`);
+    const res = await this.request<{ project: any }>(`/api/projects/${id}`);
     return { ...res, project: normalizeProject(res.project) as Project };
   }
 

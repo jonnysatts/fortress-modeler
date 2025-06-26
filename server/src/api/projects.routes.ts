@@ -40,6 +40,35 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 });
 
 // POST /projects - Create new project
+// GET /projects/public - Get all public projects
+router.get('/public', async (req: AuthRequest, res: Response) => {
+  try {
+    const projects = await ProjectService.getPublicProjects();
+    res.json({ projects, count: projects.length });
+  } catch (error) {
+    console.error('Get public projects error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch public projects',
+      code: 'FETCH_ERROR'
+    });
+  }
+});
+
+// GET /projects/shared - Get projects shared with the user
+router.get('/shared', async (req: AuthRequest, res: Response) => {
+  try {
+    const projects = await ProjectService.getSharedProjectsForUser(req.userId);
+    res.json({ projects, count: projects.length });
+  } catch (error) {
+    console.error('Get shared projects error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch shared projects',
+      code: 'FETCH_ERROR'
+    });
+  }
+});
+
+// POST /projects - Create new project
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const { name, description, product_type, target_audience, data, local_id } = req.body;

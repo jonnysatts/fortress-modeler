@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, BarChart3, ChartLine, Edit, Trash2, Megaphone } from "lucide-react";
+import { ArrowLeft, BarChart3, ChartLine, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,10 +25,10 @@ import CostTrends from "@/components/models/CostTrends";
 import CategoryBreakdown from "@/components/models/CategoryBreakdown";
 import FinancialMatrix from "@/components/models/FinancialMatrix";
 import FinancialAnalysis from "@/components/models/FinancialAnalysis";
-import { calculateTotalRevenue, calculateTotalCosts } from "@/lib/financialCalculations";
+
 import ModelOverview from "@/components/models/ModelOverview";
 import { MarketingChannelsForm } from "@/components/models/MarketingChannelsForm";
-import { ModelAssumptions, MarketingSetup, RevenueStream, CostCategory } from "@/types/models";
+import { ModelAssumptions } from "@/types/models";
 import { TrendDataPoint } from "@/types/trends";
 
 const FinancialModelDetail = () => {
@@ -60,18 +60,17 @@ const FinancialModelDetail = () => {
     }
     
     try {
-      const currentAssumptions = model?.assumptions || { 
+            const currentAssumptions = model?.assumptions || { 
           revenue: [], 
           costs: [], 
           growthModel: { type: 'linear', rate: 0 }, 
-          marketing: { channels: [] }
+          marketing: { allocationMode: 'channels', channels: [] }
       };
 
       const newAssumptions = { ...currentAssumptions, ...updatedFields };
 
-      if (updatedFields.marketing) {
+            if (updatedFields.marketing) {
          newAssumptions.marketing = {
-            channels: [],
             ...currentAssumptions.marketing,
             ...updatedFields.marketing,
          };
@@ -80,7 +79,7 @@ const FinancialModelDetail = () => {
       if (!newAssumptions.revenue) newAssumptions.revenue = [];
       if (!newAssumptions.costs) newAssumptions.costs = [];
       if (!newAssumptions.growthModel) newAssumptions.growthModel = { type: 'linear', rate: 0 };
-      if (!newAssumptions.marketing) newAssumptions.marketing = { channels: [] };
+            if (!newAssumptions.marketing) newAssumptions.marketing = { allocationMode: 'channels', channels: [] };
       if (!newAssumptions.marketing.channels) newAssumptions.marketing.channels = [];
 
       // Normalize marketing object
@@ -207,7 +206,7 @@ const FinancialModelDetail = () => {
       setLoading(true);
       try {
         if (!currentProject || currentProject.id !== parseInt(projectId)) {
-          const project = await loadProjectById(parseInt(projectId));
+          const project = await loadProjectById(projectId);
           if (!project) {
             toast({
               variant: "destructive",
@@ -220,7 +219,7 @@ const FinancialModelDetail = () => {
           setCurrentProject(project);
         }
 
-        const financialModel = await db.financialModels.get(parseInt(modelId));
+        const financialModel = await db.financialModels.where('uuid').equals(modelId).first();
         if (isMounted) {
           if (financialModel) {
             setModel(financialModel);

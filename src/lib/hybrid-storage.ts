@@ -1,5 +1,5 @@
 // Hybrid storage service that can use either local IndexedDB or cloud API
-import { Project, FinancialModel } from '../types/models';
+import { Project, FinancialModel } from './db';
 import { config } from './config';
 import { apiService } from './api';
 import * as localDb from './db';
@@ -31,7 +31,8 @@ class LocalStorageService implements StorageService {
   async getProject(id: string | number): Promise<Project | null> {
     const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
     if (isNaN(idNum)) return null;
-    return localDb.getProject(idNum);
+        const project = await localDb.getProject(idNum);
+    return project || null;
   }
 
   async createProject(project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> {
@@ -65,7 +66,8 @@ class LocalStorageService implements StorageService {
   async getModel(id: string | number): Promise<FinancialModel | null> {
     const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
     if (isNaN(idNum)) return null;
-    return localDb.getModelById(idNum);
+        const model = await localDb.getModelById(idNum);
+    return model || null;
   }
 
   async createModel(model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>): Promise<FinancialModel> {
@@ -100,6 +102,7 @@ class CloudStorageService implements StorageService {
   async getProject(id: string): Promise<Project | null> {
     try {
       const response = await apiService.getProject(id);
+      console.log('API Response for getProject:', response);
       return response.project;
     } catch (error) {
       if (error instanceof Error && error.message.includes('404')) {
@@ -198,9 +201,11 @@ class HybridStorageService implements StorageService {
       const cloudProject = await this.cloud.createProject(project);
       // Also save locally for offline access when ID is numeric
       try {
-        const idNum = typeof cloudProject.id === 'string' ? parseInt(cloudProject.id as string, 10) : cloudProject.id;
-        if (!isNaN(idNum)) {
-          await this.local.createProject({ ...project, id: idNum } as any);
+        if (cloudProject.id !== undefined) {
+          const idNum = typeof cloudProject.id === 'string' ? parseInt(cloudProject.id, 10) : cloudProject.id;
+          if (!isNaN(idNum)) {
+            await this.local.createProject({ ...project, id: idNum } as any);
+          }
         }
       } catch (localError) {
         console.warn('Failed to save to local storage:', localError);
@@ -272,9 +277,11 @@ class HybridStorageService implements StorageService {
       const cloudModel = await this.cloud.createModel(model);
       // Also save locally
       try {
-        const idNum = typeof cloudModel.id === 'string' ? parseInt(cloudModel.id as string, 10) : cloudModel.id;
-        if (!isNaN(idNum)) {
-          await this.local.createModel({ ...model, id: idNum } as any);
+        if (cloudModel.id !== undefined) {
+          const idNum = typeof cloudModel.id === 'string' ? parseInt(cloudModel.id, 10) : cloudModel.id;
+          if (!isNaN(idNum)) {
+            await this.local.createModel({ ...model, id: idNum } as any);
+          }
         }
       } catch (localError) {
         console.warn('Failed to save to local storage:', localError);
@@ -330,8 +337,10 @@ class HybridStorageService implements StorageService {
       const localModels: FinancialModel[] = [];
       
       for (const project of localProjects) {
-        const models = await this.local.getModelsForProject(project.id.toString());
-        localModels.push(...models);
+        if (project.id !== undefined) {
+          const models = await this.local.getModelsForProject(project.id.toString());
+          localModels.push(...models);
+        }
       }
 
       // Sync with cloud
@@ -345,9 +354,11 @@ class HybridStorageService implements StorageService {
       if (response.syncedProjects) {
         for (const project of response.syncedProjects) {
           try {
-            const idNum = typeof project.id === 'string' ? parseInt(project.id, 10) : project.id;
-            if (!isNaN(idNum)) {
-              await this.local.updateProject(idNum, project);
+            if (project.id !== undefined) {
+              const idNum = typeof project.id === 'string' ? parseInt(project.id, 10) : project.id;
+              if (!isNaN(idNum)) {
+                await this.local.updateProject(idNum, project);
+              }
             }
           } catch (error) {
             console.warn('Failed to update local project:', project.id, error);
@@ -358,9 +369,11 @@ class HybridStorageService implements StorageService {
       if (response.syncedModels) {
         for (const model of response.syncedModels) {
           try {
-            const idNum = typeof model.id === 'string' ? parseInt(model.id, 10) : model.id;
-            if (!isNaN(idNum)) {
-              await this.local.updateModel(idNum, model);
+            if (model.id !== undefined) {
+              const idNum = typeof model.id === 'string' ? parseInt(model.id, 10) : model.id;
+              if (!isNaN(idNum)) {
+                await this.local.updateModel(idNum, model);
+              }
             }
           } catch (error) {
             console.warn('Failed to update local model:', model.id, error);

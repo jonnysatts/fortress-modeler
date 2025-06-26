@@ -147,24 +147,18 @@ export class AuthService {
       const emailDomain = googleProfile.email.split('@')[1];
       const companyDomain = googleProfile.hd || emailDomain;
       
-      let user;
+      console.log('🔍 Authenticating user with Google profile...');
       
-      console.log('🔍 OAUTH DEBUG - Creating user for authentication');
-      
-      // For now, always use fallback user object to bypass database issues
-      user = {
-        id: googleProfile.id,
+      // Find or create the user in the database
+      const user = await UserService.upsertUser({
         google_id: googleProfile.id,
         email: googleProfile.email,
-        name: googleProfile.name || googleProfile.email,
+        name: googleProfile.name,
         picture: googleProfile.picture,
         company_domain: companyDomain,
-        preferences: {},
-        created_at: new Date(),
-        updated_at: new Date()
-      };
+      });
       
-      console.log('✅ OAUTH DEBUG - Temporary user created:', { id: user.id, email: user.email });
+      console.log('✅ User authenticated via upsert:', { id: user.id, email: user.email });
       
       // Generate JWT token
       const accessToken = await this.generateJWT(user);

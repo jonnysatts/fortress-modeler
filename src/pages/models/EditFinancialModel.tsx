@@ -30,8 +30,8 @@ const EditFinancialModel = () => {
       setLoading(true);
       try {
         // Load the project if it's not already loaded
-        if (!currentProject || currentProject.id !== parseInt(projectId)) {
-          const project = await loadProjectById(parseInt(projectId));
+        if (!currentProject || currentProject.uuid !== projectId) {
+          const project = await loadProjectById(projectId);
           if (!project) {
             toast({
               variant: "destructive",

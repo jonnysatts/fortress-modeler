@@ -12,7 +12,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "cache-bust": "echo 'Force re-build'"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
