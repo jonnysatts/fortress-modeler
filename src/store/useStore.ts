@@ -211,6 +211,12 @@ const useStore = create<AppState>((set, get) => ({
             // Continue anyway and let the model creation attempt
           }
         }
+        
+        // Add a small delay to ensure backend has processed the project creation
+        if (isUUID) {
+          console.log('⏱️ Adding small delay for backend propagation...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
       }
       
       // Use the updated current project (which may have been synced)
