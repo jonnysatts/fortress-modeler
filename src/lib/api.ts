@@ -129,6 +129,10 @@ class ApiService {
     return this.request('/api/models');
   }
 
+  async getModelsForProject(projectId: string): Promise<{ models: FinancialModel[]; total: number }> {
+    return this.request(`/api/models?project_id=${encodeURIComponent(projectId)}`);
+  }
+
   async getModel(id: string): Promise<{ model: FinancialModel }> {
     return this.request(`/api/models/${id}`);
   }

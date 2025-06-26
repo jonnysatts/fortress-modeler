@@ -127,10 +127,9 @@ class CloudStorageService implements StorageService {
   }
 
   async getModelsForProject(projectId: string): Promise<FinancialModel[]> {
-    // For now, get all models and filter by projectId
-    // TODO: Add API endpoint for models by project
-    const response = await apiService.getModels();
-    return response.models.filter(model => model.projectId === parseInt(projectId, 10));
+    // Use the backend API endpoint to get models filtered by project
+    const response = await apiService.getModelsForProject(projectId);
+    return response.models;
   }
 
   async getModel(id: string): Promise<FinancialModel | null> {

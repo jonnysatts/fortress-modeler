@@ -114,10 +114,16 @@ const ProjectDetail = () => {
             const models = await db.financialModels.where('projectId').equals(project.id).toArray();
             setFinancialModels(models);
           } else if (isUUID) {
-            // For UUID projects, models should be loaded from the cloud API
-            // TODO: Implement cloud model loading
-            console.log('📱 UUID project detected - cloud models not yet implemented');
-            setFinancialModels([]);
+            // For UUID projects, load models from the cloud API
+            console.log('📱 Loading models for UUID project from cloud API');
+            try {
+              const models = await storageService.getModelsForProject(project.id!.toString());
+              console.log('✅ Loaded', models.length, 'models from cloud API');
+              setFinancialModels(models);
+            } catch (error) {
+              console.error('❌ Failed to load models from cloud:', error);
+              setFinancialModels([]);
+            }
           }
           fetchActualsData();
         } else {
