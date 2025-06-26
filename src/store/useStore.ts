@@ -174,61 +174,51 @@ const useStore = create<AppState>((set, get) => ({
     }
     set({ isLoading: true, error: null });
     try {
-      // WORKAROUND: For UUID projects that may not exist in backend, try to create them first
+      // WORKAROUND: For UUID projects that may not exist in backend, check if they exist first
       const isUUID = typeof currentProject.id === 'string' && currentProject.id.includes('-');
       if (isUUID) {
-        console.log('🔄 UUID project detected, ensuring it exists in backend...');
+        console.log('🔄 UUID project detected, checking if it exists in backend...');
         try {
-          const backendProject = {
-            name: currentProject.name,
-            description: currentProject.description || '',
-            productType: currentProject.productType || 'WeeklyEvent',
-            targetAudience: currentProject.targetAudience || '',
-            data: currentProject.data || {}
-          };
-          console.log('🔄 Attempting to sync project to backend:', backendProject);
-          const syncedProject = await storageService.createProject(backendProject);
-          console.log('✅ Project successfully synced to backend:', syncedProject);
-          
-          // Update the current project with the backend project ID if different
-          if (syncedProject && syncedProject.id && syncedProject.id !== currentProject.id) {
-            console.log('🔄 Updating project ID from', currentProject.id, 'to', syncedProject.id);
-            const updatedProject = { ...currentProject, id: syncedProject.id };
-            set({ currentProject: updatedProject });
-            // Also update in the projects store
-            set(state => ({
-              projects: { 
-                ...state.projects, 
-                [syncedProject.id!.toString()]: updatedProject 
-              },
-            }));
+          // First, try to get the project from backend
+          const existingProject = await storageService.getProject(currentProject.id);
+          if (existingProject) {
+            console.log('✅ Project already exists in backend:', existingProject.id, existingProject.name);
+            // Update our current project with the backend version
+            set({ currentProject: existingProject });
+          } else {
+            console.log('🔄 Project not found in backend, creating it...');
+            const backendProject = {
+              name: currentProject.name,
+              description: currentProject.description || '',
+              productType: currentProject.productType || 'WeeklyEvent',
+              targetAudience: currentProject.targetAudience || '',
+              data: currentProject.data || {}
+            };
+            console.log('🔄 Attempting to sync project to backend:', backendProject);
+            const syncedProject = await storageService.createProject(backendProject);
+            console.log('✅ Project successfully synced to backend:', syncedProject);
+            
+            // Update the current project with the backend project
+            if (syncedProject && syncedProject.id) {
+              console.log('🔄 Updating project with backend version:', syncedProject.id);
+              set({ currentProject: syncedProject });
+              // Also update in the projects store
+              set(state => ({
+                projects: { 
+                  ...state.projects, 
+                  [syncedProject.id!.toString()]: syncedProject 
+                },
+              }));
+            }
           }
         } catch (syncError: any) {
-          console.log('ℹ️ Project sync error (may already exist):', syncError.message);
-          // If it's not a "project already exists" type error, this might be a real problem
-          if (!syncError.message?.includes('already') && !syncError.message?.includes('exist') && !syncError.message?.includes('duplicate')) {
-            console.error('❌ Failed to sync project to backend:', syncError);
-            // Continue anyway and let the model creation attempt
-          }
+          console.log('ℹ️ Project sync error:', syncError.message);
+          // Continue anyway and let the model creation attempt with the original project
         }
         
-        // Try to reload the project from backend to ensure we have the correct state
-        try {
-          console.log('🔄 Reloading project from backend to ensure correct state...');
-          const reloadedProject = await storageService.getProject(currentProject.id);
-          if (reloadedProject) {
-            console.log('✅ Reloaded project:', reloadedProject.id, reloadedProject.name);
-            set({ currentProject: reloadedProject });
-          }
-        } catch (reloadError) {
-          console.warn('⚠️ Could not reload project from backend:', reloadError);
-        }
-        
-        // Add a small delay to ensure backend has processed the project creation
-        if (isUUID) {
-          console.log('⏱️ Adding small delay for backend propagation...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
+        // Add a small delay to ensure backend has processed any changes
+        console.log('⏱️ Adding small delay for backend propagation...');
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
       
       // Use the updated current project (which may have been synced)
