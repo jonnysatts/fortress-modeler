@@ -51,8 +51,9 @@ const ProjectDetail = () => {
     }
   }, [projectId, navigate]);
   const [loading, setLoading] = useState(true);
+  const [project, setProject] = useState<Project | null>(null);
   const [financialModels, setFinancialModels] = useState<FinancialModel[]>([]);
-  const { currentProject, setCurrentProject, deleteProject, loadProjectById } = useStore();
+  const { deleteProject } = useStore();
   const [activeTab, setActiveTab] = useState("overview");
 
   const [actualsData, setActualsData] = useState<ActualsPeriodEntry[]>([]);
@@ -89,7 +90,7 @@ const ProjectDetail = () => {
           // For UUID projects, we need cloud API (check if cloud sync is enabled)
           if (config.useCloudSync) {
             console.log('🌐 Loading UUID project via cloud API');
-            project = await loadProjectById(projectId);
+            project = await storageService.getProject(projectId);
           } else {
             // Cloud sync is disabled but trying to access UUID project - redirect to projects list
             toast({
@@ -103,11 +104,11 @@ const ProjectDetail = () => {
         } else {
           // For integer projects, use the old method
           console.log('🔢 Loading integer project');
-          project = await loadProjectById(projectId);
+          project = await storageService.getProject(projectId);
         }
         
         if (project) {
-          setCurrentProject(project);
+          setProject(project);
           // Load financial models - for cloud projects, they should come from the API
           if (!isUUID && project.id) {
             // Local integer projects - load from IndexedDB
@@ -148,17 +149,17 @@ const ProjectDetail = () => {
     };
     fetchProjectAndRelatedData();
       // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+  }, [projectId, navigate]);
 
   const handleActualsSaved = () => {
     fetchActualsData();
   };
 
   const handleDeleteProject = async () => {
-    if (!currentProject?.id) return;
+    if (!project?.id) return;
     
     try {
-      await deleteProject(currentProject.id);
+      await deleteProject(project.id);
       toast({
         title: "Project deleted",
         description: "The project has been successfully deleted.",
@@ -174,7 +175,7 @@ const ProjectDetail = () => {
     }
   };
 
-  if (loading || !currentProject) {
+  if (loading || !project) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="h-10 w-10 border-4 border-fortress-emerald border-t-transparent rounded-full animate-spin"></div>
@@ -194,19 +195,19 @@ const ProjectDetail = () => {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <Avatar className="h-16 w-16 border">
-            <AvatarImage src={currentProject.avatarImage} alt={`${currentProject.name} avatar`} />
+            <AvatarImage src={project.avatarImage} alt={`${project.name} avatar`} />
             <AvatarFallback>
-               {currentProject.name.substring(0, 2).toUpperCase() || <Building size={24}/>}
+               {project.name.substring(0, 2).toUpperCase() || <Building size={24}/>}
             </AvatarFallback>
           </Avatar>
           <div>
-            <h1 className="text-3xl font-bold text-fortress-blue">{currentProject.name}</h1>
+            <h1 className="text-3xl font-bold text-fortress-blue">{project.name}</h1>
             <div className="flex items-center mt-1 space-x-2">
               <Badge variant="outline" className="text-fortress-blue border-fortress-blue">
-                {currentProject.productType}
+                {project.productType}
               </Badge>
               <p className="text-sm text-muted-foreground">
-                Created on {new Date(currentProject.createdAt).toLocaleDateString()}
+                Created on {new Date(project.createdAt).toLocaleDateString()}
               </p>
             </div>
           </div>
@@ -241,10 +242,10 @@ const ProjectDetail = () => {
         </div>
       </div>
 
-      {currentProject.description && (
+      {project.description && (
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm">{currentProject.description}</p>
+            <p className="text-sm">{project.description}</p>
           </CardContent>
         </Card>
       )}
@@ -259,7 +260,7 @@ const ProjectDetail = () => {
         </TabsList>
         
         <TabsContent value="overview" className="space-y-4">
-          {currentProject && financialModels.length > 0 ? (
+          {project && financialModels.length > 0 ? (
              <ModelOverview 
                 model={financialModels[0]} // Pass directly, types should match now
                 projectId={projectId} 
