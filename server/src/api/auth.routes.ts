@@ -6,9 +6,9 @@ import { authenticateToken, AuthRequest } from '../middleware/auth.middleware';
 const router = Router();
 
 // GET /auth/google - Get Google OAuth URL
-router.get('/google', (req: Request, res: Response) => {
+router.get('/google', async (req: Request, res: Response) => {
   try {
-    const authUrl = AuthService.getAuthURL();
+    const authUrl = await AuthService.getAuthURL();
     
     res.json({
       authUrl,

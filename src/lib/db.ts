@@ -18,6 +18,12 @@ export interface Project {
     endDate?: Date;
   };
   avatarImage?: string;
+  // Sharing and visibility fields
+  is_public?: boolean;
+  shared_by?: string;
+  owner_email?: string;
+  share_count?: number;
+  permission?: 'owner' | 'view' | 'edit';
 }
 
 export interface FinancialModel {

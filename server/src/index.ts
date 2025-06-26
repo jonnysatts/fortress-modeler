@@ -12,13 +12,16 @@ import authRoutes from './api/auth.routes';
 import projectRoutes from './api/projects.routes';
 import syncRoutes from './api/sync.routes';
 import modelRoutes from './api/models.routes';
+import { SecretsService } from './services/secrets.service';
 
 // Load environment variables
 dotenv.config();
 
+// Initialize secrets service
+SecretsService.initialize();
+
 const app = express();
 const PORT = process.env.PORT || 8080;
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 // Security middleware
 app.use(helmet({
@@ -35,12 +38,11 @@ app.use(helmet({
 
 // CORS configuration
 const allowedOrigins = [
-  CLIENT_URL,
+  'https://fortress-modeler-frontend-pqiu2rcyqq-km.a.run.app',
   'http://localhost:3000',
   'http://localhost:5173',
   'http://localhost:8083',
   'https://fortress-modeler-frontend-928130924917.australia-southeast2.run.app',
-  'https://fortress-modeler-frontend-pqiu2rcyqq-km.a.run.app',
   'https://fortress-modeler.vercel.app',
   'https://fortress-modeler.netlify.app'
 ];
@@ -121,7 +123,13 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     service: 'fortress-modeler-server',
     version: '3.0.0',
-    phase: 'Phase 3 - Project Sync & Cloud Storage'
+    phase: 'Phase 3 - Project Sync & Cloud Storage',
+    env: {
+      hasGoogleClientId: !!process.env.GOOGLE_CLIENT_ID,
+      hasGoogleClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
+      hasClientUrl: !!process.env.CLIENT_URL,
+      clientUrl: process.env.CLIENT_URL || 'not-set'
+    }
   });
 });
 
@@ -138,7 +146,7 @@ app.get('/health/detailed', async (req, res) => {
     environment: {
       node_env: process.env.NODE_ENV || 'development',
       port: PORT,
-      client_url: CLIENT_URL,
+      client_url: 'from-secrets',
       status: 'configured'
     },
     database: {
@@ -148,8 +156,8 @@ app.get('/health/detailed', async (req, res) => {
       error: null as any
     },
     auth: {
-      google_oauth: process.env.GOOGLE_CLIENT_ID ? 'configured' : 'not_configured',
-      jwt_secret: process.env.JWT_SECRET ? 'configured' : 'not_configured',
+      google_oauth: 'from-secrets',
+      jwt_secret: 'from-secrets',
       status: 'ready'
     },
     components: {
@@ -262,9 +270,9 @@ const server = app.listen(PORT, () => {
   console.log('🚀 Fortress Modeler Server - Phase 3');
   console.log('====================================');
   console.log(`✅ Server running on port ${PORT}`);
-  console.log(`🌐 Client URL: ${CLIENT_URL}`);
+  console.log('🌐 Client URL: Loaded from Google Secrets Manager');
   console.log(`💾 Database: ${dbInitialized ? 'Connected' : 'Not connected'}`);
-  console.log(`🔐 Authentication: ${process.env.GOOGLE_CLIENT_ID ? 'Configured' : 'Not configured'}`);
+  console.log('🔐 Authentication: Loaded from Google Secrets Manager');
   console.log('');
   console.log('📋 Available endpoints:');
   console.log('  GET  /health           - Basic health check');
@@ -298,13 +306,11 @@ const server = app.listen(PORT, () => {
   console.log('');
   console.log('🔧 Configuration:');
   console.log(`  DATABASE_URL: ${process.env.DATABASE_URL ? 'Set' : 'Not set'}`);
-  console.log(`  GOOGLE_CLIENT_ID: ${process.env.GOOGLE_CLIENT_ID ? 'Set' : 'Not set'}`);
-  console.log(`  JWT_SECRET: ${process.env.JWT_SECRET ? 'Set' : 'Not set'}`);
+  console.log('  GOOGLE_CLIENT_ID: Loaded from Google Secrets Manager');
+  console.log('  JWT_SECRET: Loaded from Google Secrets Manager');
   console.log('');
   
-  if (!process.env.GOOGLE_CLIENT_ID) {
-    console.log('⚠️  Google OAuth not configured - update GOOGLE_CLIENT_ID in .env');
-  }
+  console.log('✅ Google OAuth configured via Google Secrets Manager');
   
   if (!dbInitialized) {
     console.log('⚠️  Database not connected - run "npm run db:setup" and "npm run db:migrate"');

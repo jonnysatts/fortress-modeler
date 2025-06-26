@@ -88,6 +88,39 @@ class ApiService {
     });
   }
 
+  // Project sharing API
+  async shareProject(
+    id: string, 
+    shares: { email: string; permission: 'view' | 'edit' }[]
+  ): Promise<{ success: boolean }> {
+    return this.request(`/api/projects/${id}/share`, {
+      method: 'POST',
+      body: JSON.stringify({ shares }),
+    });
+  }
+
+  async getSharedWithMeProjects(): Promise<{ projects: Project[]; total: number }> {
+    const res = await this.request<{ projects: any[]; total: number }>(
+      '/api/projects/shared'
+    );
+    return { ...res, projects: normalizeProjects(res.projects) as Project[] };
+  }
+
+  async getPublicProjects(): Promise<{ projects: Project[]; total: number }> {
+    const res = await this.request<{ projects: any[]; total: number }>(
+      '/api/projects/public'
+    );
+    return { ...res, projects: normalizeProjects(res.projects) as Project[] };
+  }
+
+  async updateProjectVisibility(id: string, isPublic: boolean): Promise<{ project: Project }> {
+    const res = await this.request<{ project: any }>(`/api/projects/${id}/visibility`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_public: isPublic }),
+    });
+    return { ...res, project: normalizeProject(res.project) as Project };
+  }
+
   // Financial Models API
   async getModels(): Promise<{ models: FinancialModel[]; total: number }> {
     return this.request('/api/models');
