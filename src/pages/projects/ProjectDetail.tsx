@@ -49,7 +49,7 @@ const ProjectDetail = () => {
       navigate('/projects', { replace: true });
       return;
     }
-  }, [projectId, navigate]);
+  }, [projectId]);
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<Project | null>(null);
   const [financialModels, setFinancialModels] = useState<FinancialModel[]>([]);
