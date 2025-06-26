@@ -187,8 +187,22 @@ const useStore = create<AppState>((set, get) => ({
             data: currentProject.data || {}
           };
           console.log('🔄 Attempting to sync project to backend:', backendProject);
-          await storageService.createProject(backendProject);
-          console.log('✅ Project successfully synced to backend');
+          const syncedProject = await storageService.createProject(backendProject);
+          console.log('✅ Project successfully synced to backend:', syncedProject);
+          
+          // Update the current project with the backend project ID if different
+          if (syncedProject && syncedProject.id && syncedProject.id !== currentProject.id) {
+            console.log('🔄 Updating project ID from', currentProject.id, 'to', syncedProject.id);
+            const updatedProject = { ...currentProject, id: syncedProject.id };
+            set({ currentProject: updatedProject });
+            // Also update in the projects store
+            set(state => ({
+              projects: { 
+                ...state.projects, 
+                [syncedProject.id!.toString()]: updatedProject 
+              },
+            }));
+          }
         } catch (syncError: any) {
           console.log('ℹ️ Project sync error (may already exist):', syncError.message);
           // If it's not a "project already exists" type error, this might be a real problem
@@ -199,8 +213,10 @@ const useStore = create<AppState>((set, get) => ({
         }
       }
       
-      const modelToCreate = { ...newModel, projectId: currentProject.id };
-      console.log('🎯 Creating model for project:', currentProject.id, 'Model data:', modelToCreate);
+      // Use the updated current project (which may have been synced)
+      const finalProject = get().currentProject;
+      const modelToCreate = { ...newModel, projectId: finalProject?.id || currentProject.id };
+      console.log('🎯 Creating model for project:', finalProject?.id || currentProject.id, 'Model data:', modelToCreate);
       const createdModel = await storageService.createModel(modelToCreate);
       set({ currentModel: createdModel, isLoading: false });
       return createdModel;
