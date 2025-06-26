@@ -12,6 +12,7 @@ import authRoutes from './api/auth.routes';
 import projectRoutes from './api/projects.routes';
 import syncRoutes from './api/sync.routes';
 import modelRoutes from './api/models.routes';
+import maintenanceRoutes from './api/maintenance.routes';
 import { SecretsService } from './services/secrets.service';
 
 // Load environment variables
@@ -194,6 +195,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/models', modelRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

@@ -11,7 +11,8 @@
     "test": "echo \"Tests coming soon\" && exit 0",
     "db:migrate": "ts-node src/scripts/migrate.ts",
     "db:test": "ts-node src/scripts/test-db.ts",
-    "db:setup": "./setup-database.sh"
+    "db:setup": "./setup-database.sh",
+    "db:fix-schema": "ts-node src/scripts/fix-schema.ts"
   },
   "keywords": [
     "fortress",

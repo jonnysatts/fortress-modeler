@@ -51,8 +51,8 @@ export class FinancialModelService {
     }
     
     const sql = `
-      INSERT INTO financial_models (project_id, user_id, local_id, name, assumptions, results_cache)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO financial_models (project_id, user_id, local_id, name, model_data)
+      VALUES ($1, $2, $3, $4, $5)
       RETURNING *;
     `;
     
@@ -61,8 +61,10 @@ export class FinancialModelService {
       userId,
       modelData.local_id || null,
       modelData.name,
-      JSON.stringify(modelData.assumptions || {}),
-      JSON.stringify(modelData.results_cache || {})
+      JSON.stringify({
+        assumptions: modelData.assumptions || {},
+        results_cache: modelData.results_cache || {}
+      })
     ];
     
     const result = await query(sql, values);
