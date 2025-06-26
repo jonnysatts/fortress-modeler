@@ -174,6 +174,31 @@ const useStore = create<AppState>((set, get) => ({
     }
     set({ isLoading: true, error: null });
     try {
+      // WORKAROUND: For UUID projects that may not exist in backend, try to create them first
+      const isUUID = typeof currentProject.id === 'string' && currentProject.id.includes('-');
+      if (isUUID) {
+        console.log('🔄 UUID project detected, ensuring it exists in backend...');
+        try {
+          const backendProject = {
+            name: currentProject.name,
+            description: currentProject.description || '',
+            productType: currentProject.productType || 'WeeklyEvent',
+            targetAudience: currentProject.targetAudience || '',
+            data: currentProject.data || {}
+          };
+          console.log('🔄 Attempting to sync project to backend:', backendProject);
+          await storageService.createProject(backendProject);
+          console.log('✅ Project successfully synced to backend');
+        } catch (syncError: any) {
+          console.log('ℹ️ Project sync error (may already exist):', syncError.message);
+          // If it's not a "project already exists" type error, this might be a real problem
+          if (!syncError.message?.includes('already') && !syncError.message?.includes('exist') && !syncError.message?.includes('duplicate')) {
+            console.error('❌ Failed to sync project to backend:', syncError);
+            // Continue anyway and let the model creation attempt
+          }
+        }
+      }
+      
       const modelToCreate = { ...newModel, projectId: currentProject.id };
       console.log('🎯 Creating model for project:', currentProject.id, 'Model data:', modelToCreate);
       const createdModel = await storageService.createModel(modelToCreate);
