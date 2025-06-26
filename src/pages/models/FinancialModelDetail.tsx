@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { FinancialModel, db } from "@/lib/db";
 import useStore from "@/store/useStore";
+import { storageService } from "@/lib/hybrid-storage";
 import { toast } from "@/hooks/use-toast";
 import ModelProjections from "@/components/models/ModelProjections";
 import RevenueTrends from "@/components/models/RevenueTrends";
@@ -38,7 +39,7 @@ const FinancialModelDetail = () => {
   // --- Call ALL hooks at the top level --- 
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState<FinancialModel | null>(null);
-  const { loadProjectById, currentProject, setCurrentProject } = useStore();
+  // Note: Not using any Zustand store functions to avoid infinite loops
   const [revenueData, setRevenueData] = useState<TrendDataPoint[]>([]);
   const [costData, setCostData] = useState<TrendDataPoint[]>([]);
   const [combinedFinancialData, setCombinedFinancialData] = useState<TrendDataPoint[]>([]);
@@ -205,18 +206,16 @@ const FinancialModelDetail = () => {
 
       setLoading(true);
       try {
-        if (!currentProject || currentProject.id !== parseInt(projectId)) {
-          const project = await loadProjectById(projectId);
-          if (!project) {
-            toast({
-              variant: "destructive",
-              title: "Project not found",
-              description: "The requested project could not be found.",
-            });
-            navigate("/projects");
-            return;
-          }
-          setCurrentProject(project);
+        // Load project directly without using Zustand store to avoid infinite loops
+        const project = await storageService.getProject(projectId);
+        if (!project) {
+          toast({
+            variant: "destructive",
+            title: "Project not found",
+            description: "The requested project could not be found.",
+          });
+          navigate("/projects");
+          return;
         }
 
         const financialModel = await db.financialModels.where('uuid').equals(modelId).first();
@@ -247,7 +246,7 @@ const FinancialModelDetail = () => {
 
     loadModelData();
     return () => { isMounted = false; }; // Cleanup function
-  }, [projectId, modelId, navigate, currentProject, loadProjectById, setCurrentProject]); // Dependencies
+  }, [projectId, modelId, navigate]); // Dependencies
 
   useEffect(() => {
     if (revenueData.length > 0 && costData.length > 0) {
@@ -272,7 +271,7 @@ const FinancialModelDetail = () => {
   };
 
   // --- Conditional Returns (AFTER all hooks) --- 
-  if (loading || !currentProject) { // Check currentProject as well for header info
+  if (loading) { // Only check loading state
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
          <div className="h-10 w-10 border-4 border-fortress-emerald border-t-transparent rounded-full animate-spin"></div>
