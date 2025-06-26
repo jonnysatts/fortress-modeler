@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { ArrowLeft, Edit, Trash2, PlusCircle, BarChart3, AlertTriangle, Building } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,7 @@ const ProjectDetail = () => {
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<Project | null>(null);
   const [financialModels, setFinancialModels] = useState<FinancialModel[]>([]);
+  const loadedProjectIdRef = useRef<string | null>(null);
   const { deleteProject } = useStore();
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -79,6 +80,18 @@ const ProjectDetail = () => {
     
     const fetchProjectAndRelatedData = async () => {
       if (!projectId) return;
+      
+      // Prevent unnecessary re-fetching if we already have this project loaded
+      if (loadedProjectIdRef.current === projectId) {
+        console.log('📋 Project already loaded, skipping fetch');
+        return;
+      }
+      
+      // Clear the ref if projectId changed, then set loading
+      if (loadedProjectIdRef.current && loadedProjectIdRef.current !== projectId) {
+        loadedProjectIdRef.current = null;
+      }
+      
       setLoading(true);
       try {
         // Handle both integer and UUID project IDs
@@ -109,6 +122,7 @@ const ProjectDetail = () => {
         
         if (project) {
           setProject(project);
+          loadedProjectIdRef.current = projectId;
           // Load financial models - for cloud projects, they should come from the API
           if (!isUUID && project.id) {
             // Local integer projects - load from IndexedDB
