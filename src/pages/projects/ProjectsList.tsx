@@ -35,13 +35,11 @@ const ProjectsList = () => {
   // Helper function to check if user is authenticated
   const isAuthenticated = () => {
     try {
-      const authData = localStorage.getItem('auth-storage');
-      if (authData) {
-        const { state } = JSON.parse(authData);
-        return !!state.token;
-      }
+      const token = localStorage.getItem('auth_token');
+      const userData = localStorage.getItem('user_data');
+      return !!(token && userData);
     } catch (error) {
-      console.error("Could not parse auth token from localStorage", error);
+      console.error("Could not get auth data from localStorage", error);
     }
     return false;
   };

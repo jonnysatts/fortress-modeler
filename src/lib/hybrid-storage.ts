@@ -10,23 +10,24 @@ const isCloudEnabled = () => {
     return false;
   }
   
-  // Check if user is authenticated by looking for a valid token
+  // Check if user is authenticated by looking for auth_token in localStorage
   try {
-    const authData = localStorage.getItem('auth-storage');
-    if (authData) {
-      const { state } = JSON.parse(authData);
-      const hasToken = !!state.token;
-      console.log('🔑 Authentication check:', { 
-        hasAuthData: true, 
-        hasToken, 
-        tokenLength: state.token?.length || 0 
-      });
-      return hasToken;
-    } else {
-      console.log('🔑 No auth data found in localStorage');
-    }
+    const token = localStorage.getItem('auth_token');
+    const userData = localStorage.getItem('user_data');
+    
+    const hasToken = !!token;
+    const hasUserData = !!userData;
+    
+    console.log('🔑 Authentication check:', { 
+      hasToken, 
+      hasUserData,
+      tokenLength: token?.length || 0,
+      userEmail: userData ? JSON.parse(userData)?.email : 'none'
+    });
+    
+    return hasToken && hasUserData;
   } catch (error) {
-    console.error("Could not parse auth token from localStorage", error);
+    console.error("Could not parse auth data from localStorage", error);
   }
   return false;
 };

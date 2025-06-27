@@ -6,13 +6,10 @@ import { normalizeModel, normalizeProject } from './normalizeProject';
 // In a real app, this would come from your auth context or secure storage.
 const getAuthToken = (): string | null => {
   try {
-    const authData = localStorage.getItem('auth-storage');
-    if (authData) {
-      const { state } = JSON.parse(authData);
-      return state.token;
-    }
+    const token = localStorage.getItem('auth_token');
+    return token;
   } catch (error) {
-    console.error("Could not parse auth token from localStorage", error);
+    console.error("Could not get auth token from localStorage", error);
   }
   return null;
 };
