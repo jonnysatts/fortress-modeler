@@ -7,7 +7,7 @@ const router = Router();
 
 // Apply authentication to all project routes
 router.use(authenticateToken);
-router.use(rateLimitByUser(120)); // 120 requests per minute for authenticated users
+router.use(rateLimitByUser(300)); // 300 requests per minute for authenticated users
 
 // GET /projects - Get all user projects
 router.get('/', async (req: AuthRequest, res: Response) => {
