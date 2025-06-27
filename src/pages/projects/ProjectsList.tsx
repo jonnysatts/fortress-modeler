@@ -93,6 +93,9 @@ const ProjectsList = () => {
     : projectsArray.filter(project => typeof project.id === 'number');
   
   console.log('🔍 ProjectsList: availableProjects:', availableProjects.map(p => ({ id: p.id, name: p.name, idType: typeof p.id })));
+  console.log('🔍 ProjectsList: first few projects:', availableProjects.slice(0, 3));
+  console.log('🔍 ProjectsList: projects object from store:', Object.keys(projects).length, 'keys');
+  console.log('🔍 ProjectsList: config.useCloudSync:', config.useCloudSync);
 
   const filterProjects = (projectList: Project[]) => {
     if (!searchTerm) return projectList;

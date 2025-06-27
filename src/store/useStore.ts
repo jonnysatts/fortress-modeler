@@ -66,6 +66,10 @@ const useStore = create<AppState>((set, get) => ({
         if (p.id) acc[p.id.toString()] = p; // Ensure key is string
         return acc;
       }, {} as Record<string, Project>);
+      
+      console.log('🏪 Store: setting projects in state:', Object.keys(projects).length, 'projects');
+      console.log('🏪 Store: first few project keys:', Object.keys(projects).slice(0, 3));
+      
       set({ projects, isLoading: false });
     } catch (error) {
       const errorMessage = getErrorMessage(error);
