@@ -66,6 +66,9 @@ const ProjectDetail = () => {
     }
   }, [projectId]);
 
+  // Track if actuals have already been loaded to avoid refetching
+  const actualsLoadedRef = useRef(false);
+
   // Handle project not found error
   useEffect(() => {
     if (!projectId || projectId === 'undefined' || projectId === 'null') {
@@ -85,12 +88,13 @@ const ProjectDetail = () => {
     }
   }, [projectId, projectError, navigate]);
 
-  // Load actuals data when project changes
+  // Load actuals data once when a valid project ID is available
   useEffect(() => {
-    if (project && projectId) {
-      fetchActualsData();
-    }
-  }, [project?.id, projectId]); // Remove fetchActualsData dependency to prevent loops
+    const id = projectId ?? project?.id;
+    if (!id || actualsLoadedRef.current) return;
+    fetchActualsData();
+    actualsLoadedRef.current = true;
+  }, [projectId, project?.id]);
 
 
   const handleActualsSaved = () => {
