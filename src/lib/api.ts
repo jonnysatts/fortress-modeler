@@ -96,7 +96,20 @@ class ApiService {
 
   // --- Model Endpoints ---
   async getModelsForProject(projectId: string): Promise<FinancialModel[]> {
-    const models = await this.request<FinancialModel[]>(`/api/projects/${projectId}/models`);
+    const response = await this.request<any>(`/api/projects/${projectId}/models`);
+    console.log('🔍 API getModelsForProject response:', response);
+    
+    // Handle wrapped response format
+    let models: any[];
+    if (Array.isArray(response)) {
+      models = response;
+    } else if (response && Array.isArray(response.models)) {
+      models = response.models;
+    } else {
+      console.error('❌ Unexpected models response format:', response);
+      return [];
+    }
+    
     return models.map(normalizeModel);
   }
 
