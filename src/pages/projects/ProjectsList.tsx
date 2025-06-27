@@ -32,27 +32,57 @@ const ProjectsList = () => {
   const [activeTab, setActiveTab] = useState('my-projects');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Helper function to check if user is authenticated
+  const isAuthenticated = () => {
+    try {
+      const authData = localStorage.getItem('auth-storage');
+      if (authData) {
+        const { state } = JSON.parse(authData);
+        return !!state.token;
+      }
+    } catch (error) {
+      console.error("Could not parse auth token from localStorage", error);
+    }
+    return false;
+  };
+
   const loadSharedProjects = useCallback(async () => {
+    if (!isAuthenticated()) {
+      console.log('Not authenticated, skipping shared projects load');
+      return;
+    }
     try {
       const response = await apiService.getSharedWithMeProjects();
       setSharedProjects(response.projects);
     } catch (error) {
       console.error('Failed to load shared projects:', error);
+      // If we get a 401, clear the shared projects array
+      if (error instanceof Error && error.message.includes('401')) {
+        setSharedProjects([]);
+      }
     }
   }, []);
 
   const loadPublicProjects = useCallback(async () => {
+    if (!isAuthenticated()) {
+      console.log('Not authenticated, skipping public projects load');
+      return;
+    }
     try {
       const response = await apiService.getPublicProjects();
       setPublicProjects(response.projects);
     } catch (error) {
       console.error('Failed to load public projects:', error);
+      // If we get a 401, clear the public projects array
+      if (error instanceof Error && error.message.includes('401')) {
+        setPublicProjects([]);
+      }
     }
   }, []);
 
   useEffect(() => {
     loadProjects();
-    if (config.useCloudSync) {
+    if (config.useCloudSync && isAuthenticated()) {
       loadSharedProjects();
       loadPublicProjects();
     }

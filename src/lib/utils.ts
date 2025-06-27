@@ -36,8 +36,14 @@ export const formatVariance = (variance: number | undefined, forecast: number | 
   return `${sign}${formattedAmount}${percentageString}`;
 };
 
-export const formatDate = (date: Date | string): string => {
+export const formatDate = (date: Date | string | undefined | null): string => {
+  if (!date) return 'N/A';
+  
   const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  // Check if the date is valid
+  if (isNaN(dateObj.getTime())) return 'Invalid Date';
+  
   return dateObj.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
