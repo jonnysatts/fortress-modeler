@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { devLog } from '../lib/devLog';
 
 export default function AuthCallback() {
   const [searchParams] = useSearchParams();
@@ -40,7 +41,7 @@ export default function AuthCallback() {
       }
 
       try {
-        console.log('Processing OAuth callback with code:', code);
+        devLog('Processing OAuth callback with code:', code);
         await handleCallback(code);
         setStatus('success');
         

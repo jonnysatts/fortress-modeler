@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Project, FinancialModel } from '@/lib/db';
 import { storageService } from '@/lib/hybrid-storage';
 import { getErrorMessage, logError } from '@/lib/errors';
+import { devLog } from '@/lib/devLog';
 
 
 interface AppState {
@@ -62,16 +63,16 @@ const useStore = create<AppState>((set, get) => ({
       // WORKAROUND: For UUID projects that may not exist in backend, check if they exist first
       const isUUID = typeof currentProject.id === 'string' && currentProject.id.includes('-');
       if (isUUID) {
-        console.log('🔄 UUID project detected, checking if it exists in backend...');
+        devLog('🔄 UUID project detected, checking if it exists in backend...');
         try {
           // First, try to get the project from backend
           const existingProject = await storageService.getProjectLocal(currentProject.id);
           if (existingProject) {
-            console.log('✅ Project already exists in backend:', existingProject.id, existingProject.name);
+            devLog('✅ Project already exists in backend:', existingProject.id, existingProject.name);
             // Update our current project with the backend version
             set({ currentProject: existingProject });
           } else {
-            console.log('🔄 Project not found in backend, creating it...');
+            devLog('🔄 Project not found in backend, creating it...');
             const backendProject = {
               name: currentProject.name,
               description: currentProject.description || '',
@@ -79,30 +80,30 @@ const useStore = create<AppState>((set, get) => ({
               targetAudience: currentProject.targetAudience || '',
               data: currentProject.data || {}
             };
-            console.log('🔄 Attempting to sync project to backend:', backendProject);
+            devLog('🔄 Attempting to sync project to backend:', backendProject);
             const syncedProject = await storageService.createProjectLocal(backendProject);
-            console.log('✅ Project successfully synced to backend:', syncedProject);
+            devLog('✅ Project successfully synced to backend:', syncedProject);
             
             // Update the current project with the backend project
             if (syncedProject && syncedProject.id) {
-              console.log('🔄 Updating project with backend version:', syncedProject.id);
+              devLog('🔄 Updating project with backend version:', syncedProject.id);
               set({ currentProject: syncedProject });
             }
           }
         } catch (syncError: any) {
-          console.log('ℹ️ Project sync error:', syncError.message);
+          devLog('ℹ️ Project sync error:', syncError.message);
           // Continue anyway and let the model creation attempt with the original project
         }
         
         // Add a small delay to ensure backend has processed any changes
-        console.log('⏱️ Adding small delay for backend propagation...');
+        devLog('⏱️ Adding small delay for backend propagation...');
         await new Promise(resolve => setTimeout(resolve, 500));
       }
       
       // Use the updated current project (which may have been synced)
       const finalProject = get().currentProject;
       const modelToCreate = { ...newModel, projectId: finalProject?.id || currentProject.id };
-      console.log('🎯 Creating model for project:', finalProject?.id || currentProject.id, 'Model data:', modelToCreate);
+      devLog('🎯 Creating model for project:', finalProject?.id || currentProject.id, 'Model data:', modelToCreate);
       const createdModel = await storageService.createModelLocal(modelToCreate);
       set({ currentModel: createdModel, isLoading: false });
       return createdModel;
@@ -151,11 +152,11 @@ const useStore = create<AppState>((set, get) => ({
   setError: (error) => set({ error }),
 
   recalculateForecast: async () => {
-    console.log('Recalculating forecast...');
+    devLog('Recalculating forecast...');
     set({ isCalculating: true });
     await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate async work
     set({ isCalculating: false });
-    console.log('Forecast recalculated.');
+    devLog('Forecast recalculated.');
   },
 
   setIsCalculating: (isCalculating) => set({ isCalculating }),
@@ -167,7 +168,7 @@ const useStore = create<AppState>((set, get) => ({
   setActiveView: (view) => set({ activeView: view }),
 
   triggerFullExport: async (format) => {
-    console.log(`Triggering full export for format: ${format}`);
+    devLog(`Triggering full export for format: ${format}`);
     alert(`Export to ${format.toUpperCase()} is not yet implemented.`);
   },
 }));

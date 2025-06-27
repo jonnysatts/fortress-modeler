@@ -41,16 +41,11 @@ const PageLoader = () => (
 
 
 const App = () => {
-  console.log('App component rendering...');
   const { isLoading, currentMessage, progress } = useAppLoader();
-  console.log('App loader state:', { isLoading, currentMessage, progress });
 
   if (isLoading) {
-    console.log('Showing app loader');
     return <AppLoader message={currentMessage} progress={progress} />;
   }
-
-  console.log('App loader finished, showing main app');
 
   return (
     <TooltipProvider>

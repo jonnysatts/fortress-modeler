@@ -14,6 +14,7 @@ import { exportBoardReadyPDF, prepareBoardReadyData } from "@/lib/board-ready-ex
 import { exportSimpleExcel, exportSimplePDF } from "@/lib/simple-export";
 import { performFinancialAnalysis, generateCashFlowProjections } from "@/lib/financial-calculations";
 import { useMyProjects } from "@/hooks/useProjects";
+import { devLog } from "@/lib/devLog";
 
 const Settings = () => {
   const [darkMode, setDarkMode] = useState(false);
@@ -25,7 +26,7 @@ const Settings = () => {
 
   // Debug: log projects on component mount
   useEffect(() => {
-    console.log('Settings component - Current projects:', projects);
+    devLog('Settings component - Current projects:', projects);
   }, [projects]);
 
   const projectsArray = projects;
@@ -101,14 +102,14 @@ const Settings = () => {
       }
       
       const firstProject = projectsArray[0];
-      console.log('Exporting project:', firstProject);
+      devLog('Exporting project:', firstProject);
       
       const models = await db.financialModels
         .where('projectId')
         .equals(firstProject.id!)
         .toArray();
-      
-      console.log('Found models:', models);
+
+      devLog('Found models:', models);
       
       // Use simple, reliable Excel export first
       await exportSimpleExcel({

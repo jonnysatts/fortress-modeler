@@ -1,6 +1,7 @@
 import { config } from './config';
 import { FinancialModel, ActualsPeriodEntry, Project } from '@/types/models';
 import { normalizeModel, normalizeProject } from './normalizeProject';
+import { devLog } from './devLog';
 
 // A helper function to get the auth token.
 // In a real app, this would come from your auth context or secure storage.
@@ -48,7 +49,7 @@ class ApiService {
 
   async getProjects(): Promise<Project[]> {
     const response = await this.request<any>(`/api/projects`);
-    console.log('🔍 API getProjects response:', response);
+    devLog('🔍 API getProjects response:', response);
     
     // Handle different response formats
     let projects: any[];
@@ -63,13 +64,13 @@ class ApiService {
       throw new Error('Invalid projects response format');
     }
     
-    console.log('📊 Processing', projects.length, 'projects from API');
+    devLog('📊 Processing', projects.length, 'projects from API');
     return projects.map(normalizeProject);
   }
 
   async createProject(projectData: Partial<Project>): Promise<Project> {
     const response = await this.request<any>('/api/projects', { method: 'POST', body: JSON.stringify(projectData) });
-    console.log('🔍 API createProject response:', response);
+    devLog('🔍 API createProject response:', response);
     
     // Handle wrapped response format
     let project: any;
@@ -81,7 +82,7 @@ class ApiService {
       project = response; // Direct project object
     }
     
-    console.log('📦 Extracted project from response:', project);
+    devLog('📦 Extracted project from response:', project);
     return normalizeProject(project);
   }
 
@@ -97,7 +98,7 @@ class ApiService {
   // --- Model Endpoints ---
   async getModelsForProject(projectId: string): Promise<FinancialModel[]> {
     const response = await this.request<any>(`/api/projects/${projectId}/models`);
-    console.log('🔍 API getModelsForProject response:', response);
+    devLog('🔍 API getModelsForProject response:', response);
     
     // Handle wrapped response format
     let models: any[];
