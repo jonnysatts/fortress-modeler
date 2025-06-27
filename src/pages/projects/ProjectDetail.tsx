@@ -174,7 +174,7 @@ const ProjectDetail = () => {
           <Avatar className="h-16 w-16 border">
             <AvatarImage src={project.avatarImage} alt={`${project.name} avatar`} />
             <AvatarFallback>
-               {project.name.substring(0, 2).toUpperCase() || <Building size={24}/>}
+               {project.name ? project.name.substring(0, 2).toUpperCase() : <Building size={24}/>}
             </AvatarFallback>
           </Avatar>
           <div>
