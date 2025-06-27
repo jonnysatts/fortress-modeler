@@ -11,8 +11,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { formatCurrency, formatPercent } from "@/lib/utils";
+import { formatCurrency, formatPercent, formatVariance } from "@/lib/utils";
 import { VarianceCard } from '@/components/ui/VarianceCard';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface PerformanceAnalysisProps {
   financialModels: FinancialModel[];
@@ -461,10 +462,54 @@ export const PerformanceAnalysis: React.FC<PerformanceAnalysisProps> = ({
                            </ResponsiveContainer>
                         </div>
                      )}
+            </CardContent>
+            </Card>
+            {/* Category Variance Breakdown Table */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg font-semibold">Category Variance Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Category</TableHead>
+                                <TableHead className="text-right">Forecast</TableHead>
+                                <TableHead className="text-right">Revised</TableHead>
+                                <TableHead className="text-right">Variance</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow>
+                                <TableCell>Total Revenue</TableCell>
+                                <TableCell className="text-right">{formatCurrency(totalRevenueForecast)}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(revisedTotalRevenue)}</TableCell>
+                                <TableCell className="text-right">{formatVariance(totalRevenueVariance, totalRevenueForecast)}</TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell>Total Costs</TableCell>
+                                <TableCell className="text-right">{formatCurrency(totalCostForecast)}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(revisedTotalCost)}</TableCell>
+                                <TableCell className="text-right">{formatVariance(totalCostVariance, totalCostForecast)}</TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell>Total Profit</TableCell>
+                                <TableCell className="text-right">{formatCurrency(totalProfitForecast)}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(revisedTotalProfit)}</TableCell>
+                                <TableCell className="text-right">{formatVariance(totalProfitVariance, totalProfitForecast)}</TableCell>
+                            </TableRow>
+                            {isWeeklyEvent && (
+                                <TableRow>
+                                    <TableCell>Total Attendance</TableCell>
+                                    <TableCell className="text-right">{totalAttendanceForecast.toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">{totalAttendanceActual.toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">{formatVariance(totalAttendanceVariance, totalAttendanceForecast)}</TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
                 </CardContent>
             </Card>
-
-            {/* TODO: Add Category Variance Breakdown Table */}
          </>
       )}
     </div>
