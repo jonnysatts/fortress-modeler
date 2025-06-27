@@ -41,13 +41,7 @@ export const useMyProjects = () => {
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
-    retry: (failureCount, error) => {
-      // Only retry on network errors or 429s
-      if (error instanceof Error && error.message.includes('429')) {
-        return failureCount < 3; // Retry up to 3 times for rate limits
-      }
-      return false;
-    },
+    retry: 3,
   });
 };
 
@@ -64,12 +58,7 @@ export const useSharedProjects = () => {
     enabled: isCloudEnabled(), // Only fetch if cloud is enabled
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
-    retry: (failureCount, error) => {
-      if (error instanceof Error && error.message.includes('429')) {
-        return failureCount < 3;
-      }
-      return false;
-    },
+    retry: 3,
   });
 };
 
@@ -86,12 +75,7 @@ export const usePublicProjects = () => {
     enabled: isCloudEnabled(),
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
-    retry: (failureCount, error) => {
-      if (error instanceof Error && error.message.includes('429')) {
-        return failureCount < 3;
-      }
-      return false;
-    },
+    retry: 3,
   });
 };
 
@@ -108,12 +92,7 @@ export const useProject = (projectId: string | number | undefined) => {
     enabled: !!projectId,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
-    retry: (failureCount, error) => {
-      if (error instanceof Error && error.message.includes('429')) {
-        return failureCount < 3;
-      }
-      return false;
-    },
+    retry: 3,
   });
 };
 
@@ -191,12 +170,7 @@ export const useModelsForProject = (projectId: string | number | undefined) => {
     enabled: !!projectId,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
-    retry: (failureCount, error) => {
-      if (error instanceof Error && error.message.includes('429')) {
-        return failureCount < 3;
-      }
-      return false;
-    },
+    retry: 3,
   });
 };
 
