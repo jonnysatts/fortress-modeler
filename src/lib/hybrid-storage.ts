@@ -45,6 +45,19 @@ class HybridStorageService {
     return (await db.financialModels.get(newModelId))!;
   }
 
+  async updateModelLocal(modelId: string | number, modelData: Partial<FinancialModel>): Promise<FinancialModel> {
+    if (isUUID(modelId)) {
+        const localModel = await db.financialModels.where('uuid').equals(modelId).first();
+        if (localModel?.id) {
+            await db.financialModels.update(localModel.id, modelData);
+            return (await db.financialModels.get(localModel.id))!;
+        }
+        throw new Error(`Model with UUID ${modelId} not found`);
+    }
+    await db.financialModels.update(Number(modelId), modelData);
+    return (await db.financialModels.get(Number(modelId)))!;
+  }
+
   async deleteModelLocal(modelId: string | number): Promise<void> {
     if (isUUID(modelId)) {
         const localModel = await db.financialModels.where('uuid').equals(modelId).first();

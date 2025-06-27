@@ -65,7 +65,7 @@ const useStore = create<AppState>((set, get) => ({
         console.log('🔄 UUID project detected, checking if it exists in backend...');
         try {
           // First, try to get the project from backend
-          const existingProject = await storageService.getProject(currentProject.id);
+          const existingProject = await storageService.getProjectLocal(currentProject.id);
           if (existingProject) {
             console.log('✅ Project already exists in backend:', existingProject.id, existingProject.name);
             // Update our current project with the backend version
@@ -80,7 +80,7 @@ const useStore = create<AppState>((set, get) => ({
               data: currentProject.data || {}
             };
             console.log('🔄 Attempting to sync project to backend:', backendProject);
-            const syncedProject = await storageService.createProject(backendProject);
+            const syncedProject = await storageService.createProjectLocal(backendProject);
             console.log('✅ Project successfully synced to backend:', syncedProject);
             
             // Update the current project with the backend project
@@ -103,7 +103,7 @@ const useStore = create<AppState>((set, get) => ({
       const finalProject = get().currentProject;
       const modelToCreate = { ...newModel, projectId: finalProject?.id || currentProject.id };
       console.log('🎯 Creating model for project:', finalProject?.id || currentProject.id, 'Model data:', modelToCreate);
-      const createdModel = await storageService.createModel(modelToCreate);
+      const createdModel = await storageService.createModelLocal(modelToCreate);
       set({ currentModel: createdModel, isLoading: false });
       return createdModel;
     } catch (error) {
@@ -117,7 +117,7 @@ const useStore = create<AppState>((set, get) => ({
   updateModelForCurrentProject: async (id, updatedModel) => {
     set({ isLoading: true, error: null });
     try {
-      const returnedModel = await storageService.updateModel(id, updatedModel);
+      const returnedModel = await storageService.updateModelLocal(id, updatedModel);
       set(state => ({
         currentModel: state.currentModel?.id?.toString() === id ? returnedModel : state.currentModel,
         isLoading: false
@@ -132,7 +132,7 @@ const useStore = create<AppState>((set, get) => ({
   deleteModelForCurrentProject: async (modelId) => {
     set({ isLoading: true, error: null });
     try {
-      await storageService.deleteModel(modelId);
+      await storageService.deleteModelLocal(modelId);
       set(state => ({
         currentModel: state.currentModel?.id?.toString() === modelId ? null : state.currentModel,
         isLoading: false
