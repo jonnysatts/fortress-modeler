@@ -92,8 +92,8 @@ const EditFinancialModel = () => {
 
   if (model.assumptions.metadata?.type === "WeeklyEvent") {
     return (
-      <EventModelForm 
-        projectId={Number(projectId)}
+      <EventModelForm
+        projectId={projectId!}
         projectName={projectName}
         existingModel={model}
         onCancel={() => navigate(`/projects/${projectId}/models/${modelId}`)}

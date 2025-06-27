@@ -89,7 +89,7 @@ export const useProject = (projectId: string | number | undefined) => {
         if (!project) throw new Error('Project not found');
         return project;
       }
-      const project = await storageService.getProjectLocal(Number(projectId));
+      const project = await storageService.getProjectLocal(projectId);
       if (!project) throw new Error('Project not found');
       return project;
     },
@@ -126,7 +126,7 @@ export const useUpdateProject = () => {
       if (typeof id === 'string' && id.includes('-') && isCloudEnabled()) {
         return apiService.updateProject(id, data);
       }
-      return storageService.updateProjectLocal(Number(id), data);
+      return storageService.updateProjectLocal(id, data);
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['projects', 'my'] });
@@ -146,7 +146,7 @@ export const useDeleteProject = () => {
       if (typeof id === 'string' && id.includes('-') && isCloudEnabled()) {
         await apiService.deleteProject(id);
       } else {
-        await storageService.deleteProjectLocal(Number(id));
+        await storageService.deleteProjectLocal(id);
       }
     },
     onSuccess: () => {
@@ -169,7 +169,7 @@ export const useModelsForProject = (projectId: string | number | undefined) => {
       if (typeof projectId === 'string' && projectId.includes('-') && isCloudEnabled()) {
         return apiService.getModelsForProject(projectId);
       }
-      return storageService.getModelsForProjectLocal(Number(projectId));
+      return storageService.getModelsForProjectLocal(projectId);
     },
     enabled: !!projectId,
     staleTime: 5 * 60 * 1000,
@@ -204,7 +204,7 @@ export const useUpdateModel = () => {
       if (typeof id === 'string' && id.includes('-') && isCloudEnabled()) {
         return apiService.updateModel(id, data);
       }
-      return storageService.updateModelLocal(Number(id), data);
+      return storageService.updateModelLocal(id, data);
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['models', variables.projectId] });
@@ -224,7 +224,7 @@ export const useDeleteModel = () => {
       if (typeof modelId === 'string' && modelId.includes('-') && isCloudEnabled()) {
         await apiService.deleteModel(modelId);
       } else {
-        await storageService.deleteModelLocal(Number(modelId));
+        await storageService.deleteModelLocal(modelId);
       }
     },
     onSuccess: (_, variables) => {

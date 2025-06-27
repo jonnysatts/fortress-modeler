@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Edit, Download, Share2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { db } from "@/lib/db";
+import { db, getProject } from "@/lib/db";
 
 interface ModelOverviewProps {
   model: Model;
@@ -388,7 +388,7 @@ const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverviewProp
 
     try {
       // Get project data
-      const project = await db.projects.get(Number(projectId));
+      const project = await getProject(projectId as string | number);
       if (!project) {
         alert("Project not found.");
         return;

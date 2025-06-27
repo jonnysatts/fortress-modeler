@@ -1,13 +1,23 @@
-import { db, FinancialModel, Project, getActualsForProject } from './db';
+import {
+  db,
+  FinancialModel,
+  Project,
+  getProject,
+  updateProject,
+  deleteProject,
+  getModelsForProject,
+  getModelById,
+  addFinancialModel,
+  updateFinancialModel,
+  deleteFinancialModel,
+  getActualsForProject,
+} from './db';
 import { ActualsPeriodEntry } from '@/types/models';
-
-const isUUID = (id: string | number): id is string => 
-  typeof id === 'string' && id.includes('-') && id.length === 36;
 
 class HybridStorageService {
   // --- Project Methods ---
   async getProjectLocal(projectId: string | number): Promise<Project | undefined> {
-    return db.projects.get(Number(projectId));
+    return getProject(projectId);
   }
 
   async getAllProjectsLocal(): Promise<Project[]> {
@@ -20,24 +30,22 @@ class HybridStorageService {
   }
 
   async updateProjectLocal(projectId: string | number, projectData: Partial<Project>): Promise<Project> {
-    await db.projects.update(Number(projectId), projectData);
-    return (await db.projects.get(Number(projectId)))!;
+    await updateProject(projectId, projectData);
+    const updated = await getProject(projectId);
+    return updated!;
   }
 
   async deleteProjectLocal(projectId: string | number): Promise<void> {
-    await db.projects.delete(Number(projectId));
+    await deleteProject(projectId);
   }
 
   // --- Model Methods ---
   async getModelsForProjectLocal(projectId: string | number): Promise<FinancialModel[]> {
-    return db.financialModels.where('projectId').equals(Number(projectId)).toArray();
+    return getModelsForProject(projectId);
   }
 
   async getModelLocal(modelId: string | number): Promise<FinancialModel | undefined> {
-    if (isUUID(modelId)) {
-        return db.financialModels.where('uuid').equals(modelId).first();
-    }
-    return db.financialModels.get(Number(modelId));
+    return getModelById(modelId);
   }
 
   async createModelLocal(modelData: Partial<FinancialModel>): Promise<FinancialModel> {
@@ -46,32 +54,18 @@ class HybridStorageService {
   }
 
   async updateModelLocal(modelId: string | number, modelData: Partial<FinancialModel>): Promise<FinancialModel> {
-    if (isUUID(modelId)) {
-        const localModel = await db.financialModels.where('uuid').equals(modelId).first();
-        if (localModel?.id) {
-            await db.financialModels.update(localModel.id, modelData);
-            return (await db.financialModels.get(localModel.id))!;
-        }
-        throw new Error(`Model with UUID ${modelId} not found`);
-    }
-    await db.financialModels.update(Number(modelId), modelData);
-    return (await db.financialModels.get(Number(modelId)))!;
+    await updateFinancialModel(modelId, modelData);
+    const updated = await getModelById(modelId);
+    return updated!;
   }
 
   async deleteModelLocal(modelId: string | number): Promise<void> {
-    if (isUUID(modelId)) {
-        const localModel = await db.financialModels.where('uuid').equals(modelId).first();
-        if (localModel?.id) {
-            await db.financialModels.delete(localModel.id);
-        }
-    } else {
-        await db.financialModels.delete(Number(modelId));
-    }
+    await deleteFinancialModel(modelId);
   }
 
   // --- Actuals Methods ---
   async getActualsForProjectLocal(projectId: string | number): Promise<ActualsPeriodEntry[]> {
-    return getActualsForProject(Number(projectId));
+    return getActualsForProject(projectId);
   }
 
   // --- Backward Compatibility Aliases ---

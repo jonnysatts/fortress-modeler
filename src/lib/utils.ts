@@ -50,3 +50,8 @@ export const formatDate = (date: Date | string | undefined | null): string => {
     day: 'numeric',
   });
 };
+
+export const isUUID = (id: string | number): id is string => {
+  const str = typeof id === 'string' ? id : '';
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(str);
+};

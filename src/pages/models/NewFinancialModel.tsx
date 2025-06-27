@@ -200,9 +200,9 @@ const NewFinancialModel = () => {
   // Check if this is a weekly event project
   if (currentProject.productType === "WeeklyEvent") {
     return (
-      <EventModelForm 
-        projectId={Number(projectId)} 
-        projectName={currentProject.name} 
+      <EventModelForm
+        projectId={projectId!}
+        projectName={currentProject.name}
         onCancel={() => navigate(`/projects/${projectId}`)}
       />
     );
