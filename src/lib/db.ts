@@ -3,6 +3,7 @@ import { MarketingSetup, ActualsPeriodEntry, ModelMetadata } from '@/types/model
 import { DatabaseError, NotFoundError, ValidationError, logError } from './errors';
 import { getDemoData } from './demo-data';
 import config from './config';
+import { isUUID } from './utils';
 
 // Define interfaces for our database tables
 export interface Project {
@@ -164,23 +165,23 @@ export const getProjects = async (): Promise<Project[]> => {
   }
 };
 
-export const getProject = async (id: number | string): Promise<Project | undefined> => {
+export const getProject = async (
+  id: number | string,
+): Promise<Project | undefined> => {
   try {
     if (typeof id === 'number') {
-      return await db.projects.get(id);
+      return db.projects.get(id);
     }
-    if (typeof id === 'string') {
-      // Try to find by UUID first
+
+    if (isUUID(id)) {
       const projectByUuid = await db.projects.where('uuid').equals(id).first();
-      if (projectByUuid) {
-        return projectByUuid;
-      }
-      // Fallback for old numeric IDs stored as strings
-      const idNum = parseInt(id, 10);
-      if (!isNaN(idNum)) {
-        return await db.projects.get(idNum);
-      }
+      if (projectByUuid) return projectByUuid;
     }
+
+    if (/^\d+$/.test(id)) {
+      return db.projects.get(parseInt(id, 10));
+    }
+
     return undefined;
   } catch (error) {
     logError(error, 'getProject');
@@ -261,10 +262,12 @@ export const deleteProject = async (id: number | string): Promise<void> => {
 export const getModelsForProject = async (projectId: number | string): Promise<FinancialModel[]> => {
   try {
     const project = await getProject(projectId);
-    if (!project || !project.id) {
+    if (!project) {
       throw new NotFoundError(`Project with ID ${projectId} not found`);
     }
-    return await db.financialModels.where('projectId').equals(project.id).toArray();
+
+    const searchId = project.id ?? projectId;
+    return db.financialModels.where('projectId').equals(searchId as any).toArray();
   } catch (error) {
     if (error instanceof NotFoundError) throw error;
     logError(error, 'getModelsForProject');
@@ -273,30 +276,50 @@ export const getModelsForProject = async (projectId: number | string): Promise<F
 };
 
 export const getActualsForProject = async (projectId: number | string): Promise<ActualsPeriodEntry[]> => {
-  return await db.actuals.where({ projectId: projectId }).toArray();
+  const project = await getProject(projectId);
+  const searchId = project?.id ?? projectId;
+  return db.actuals.where({ projectId: searchId as any }).toArray();
 };
 
 export const upsertActualsPeriod = async (actualEntry: Omit<ActualsPeriodEntry, 'id'>): Promise<number> => {
-  const existing = await db.actuals.get({ 
-    projectId: actualEntry.projectId, 
-    period: actualEntry.period 
+  const project = await getProject(actualEntry.projectId);
+  const searchId = project?.id ?? actualEntry.projectId;
+
+  const existing = await db.actuals.get({
+    projectId: searchId as any,
+    period: actualEntry.period
   });
-  
+
   if (existing?.id) {
-    await db.actuals.update(existing.id, actualEntry);
+    await db.actuals.update(existing.id, { ...actualEntry, projectId: searchId });
     return existing.id;
   } else {
-    return await db.actuals.add(actualEntry as ActualsPeriodEntry);
+    return db.actuals.add({ ...actualEntry, projectId: searchId } as ActualsPeriodEntry);
   }
 };
 
 // Financial Model operations
-export const getModelById = async (id: number): Promise<FinancialModel | undefined> => {
+export const getModelById = async (
+  id: number | string,
+): Promise<FinancialModel | undefined> => {
   try {
-    if (!id || isNaN(id) || id <= 0) {
-      throw new ValidationError('Invalid model ID provided');
+    if (typeof id === 'number') {
+      if (isNaN(id) || id <= 0) {
+        throw new ValidationError('Invalid model ID provided');
+      }
+      return db.financialModels.get(id);
     }
-    return await db.financialModels.get(id);
+
+    if (isUUID(id)) {
+      const modelByUuid = await db.financialModels.where('uuid').equals(id).first();
+      if (modelByUuid) return modelByUuid;
+    }
+
+    if (/^\d+$/.test(id)) {
+      return db.financialModels.get(parseInt(id, 10));
+    }
+
+    return undefined;
   } catch (error) {
     if (error instanceof ValidationError) throw error;
     logError(error, 'getModelById');
@@ -338,23 +361,25 @@ export const addFinancialModel = async (model: Omit<FinancialModel, 'id' | 'uuid
   }
 };
 
-export const updateFinancialModel = async (id: number, updates: Partial<Omit<FinancialModel, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>>): Promise<number> => {
+export const updateFinancialModel = async (
+  id: number | string,
+  updates: Partial<Omit<FinancialModel, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>>,
+): Promise<number> => {
   try {
-    if (!id || isNaN(id) || id <= 0) {
-      throw new ValidationError('Invalid model ID provided');
-    }
-
-    const existingModel = await db.financialModels.get(id);
-    if (!existingModel) {
+    const model = await getModelById(id);
+    if (!model || !model.id) {
       throw new NotFoundError(`Financial model with ID ${id} not found`);
     }
 
-    const updatedCount = await db.financialModels.update(id, { ...updates, updatedAt: new Date() });
+    const updatedCount = await db.financialModels.update(model.id, {
+      ...updates,
+      updatedAt: new Date(),
+    });
     if (updatedCount === 0) {
       // No error, but can be useful to know no changes were made.
     }
 
-    return id;
+    return model.id;
   } catch (error) {
     if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
     logError(error, 'updateFinancialModel');
@@ -362,18 +387,14 @@ export const updateFinancialModel = async (id: number, updates: Partial<Omit<Fin
   }
 };
 
-export const deleteFinancialModel = async (id: number): Promise<void> => {
+export const deleteFinancialModel = async (id: number | string): Promise<void> => {
   try {
-    if (!id || isNaN(id) || id <= 0) {
-      throw new ValidationError('Invalid model ID provided');
-    }
-
-    const existingModel = await db.financialModels.get(id);
-    if (!existingModel) {
+    const model = await getModelById(id);
+    if (!model || !model.id) {
       throw new NotFoundError(`Financial model with ID ${id} not found`);
     }
 
-    await db.financialModels.delete(id);
+    await db.financialModels.delete(model.id);
   } catch (error) {
     if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
     logError(error, 'deleteFinancialModel');
