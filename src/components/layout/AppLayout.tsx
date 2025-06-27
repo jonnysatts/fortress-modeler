@@ -5,15 +5,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { addDemoData } from "@/lib/db";
 import { config } from "@/lib/config";
 import { useAuth } from "@/hooks/useAuth";
-import useStore from "@/store/useStore";
 
 const AppLayout = () => {
   const [initializing, setInitializing] = useState(true);
-  const loadProjects = useStore((state) => state.loadProjects);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { user } = useAuth();
 
-  // Initialize the database and load projects
+  // Initialize the database
   useEffect(() => {
     const init = async () => {
       try {
@@ -21,7 +19,7 @@ const AppLayout = () => {
         if (!config.useCloudSync || !user) {
           await addDemoData(); // Add demo data if the database is empty
         }
-        await loadProjects();
+        // No need to load projects here - components will load their own data via React Query
       } catch (error) {
         console.error("Error initializing app:", error);
       } finally {

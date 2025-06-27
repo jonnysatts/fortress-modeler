@@ -13,7 +13,7 @@ import { exportEnhancedExcel } from "@/lib/enhanced-excel-export";
 import { exportBoardReadyPDF, prepareBoardReadyData } from "@/lib/board-ready-export";
 import { exportSimpleExcel, exportSimplePDF } from "@/lib/simple-export";
 import { performFinancialAnalysis, generateCashFlowProjections } from "@/lib/financial-calculations";
-import useStore from "@/store/useStore";
+import { useMyProjects } from "@/hooks/useProjects";
 
 const Settings = () => {
   const [darkMode, setDarkMode] = useState(false);
@@ -21,15 +21,14 @@ const Settings = () => {
   const [backupFrequency, setBackupFrequency] = useState("weekly");
   const [isExporting, setIsExporting] = useState(false);
 
-  const { projects, loadProjects } = useStore();
+  const { data: projects = [], isLoading } = useMyProjects();
 
   // Debug: log projects on component mount
   useEffect(() => {
     console.log('Settings component - Current projects:', projects);
-    loadProjects(); // Ensure projects are loaded
-  }, [loadProjects]);
+  }, [projects]);
 
-  const projectsArray = Object.values(projects);
+  const projectsArray = projects;
 
   // Test export function that works without projects
   const handleTestExport = async () => {
