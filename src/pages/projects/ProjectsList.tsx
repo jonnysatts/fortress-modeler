@@ -92,40 +92,45 @@ const ProjectsList = () => {
     ? projectsArray 
     : projectsArray.filter(project => typeof project.id === 'number');
   
+  // Simple inline filtering to avoid function hoisting issues
+  const filteredAvailableProjects = React.useMemo(() => {
+    console.log('🔍 filtering availableProjects:', availableProjects.length, 'searchTerm:', searchTerm);
+    if (!searchTerm) return availableProjects;
+    
+    return availableProjects.filter(project => {
+      if (!project?.name) return false;
+      return project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+             (project.description && project.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+             (project.productType && project.productType.toLowerCase().includes(searchTerm.toLowerCase()));
+    });
+  }, [availableProjects, searchTerm]);
+
+  const filteredSharedProjects = React.useMemo(() => {
+    if (!searchTerm) return sharedProjects;
+    return sharedProjects.filter(project => {
+      if (!project?.name) return false;
+      return project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+             (project.description && project.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+             (project.productType && project.productType.toLowerCase().includes(searchTerm.toLowerCase()));
+    });
+  }, [sharedProjects, searchTerm]);
+
+  const filteredPublicProjects = React.useMemo(() => {
+    if (!searchTerm) return publicProjects;
+    return publicProjects.filter(project => {
+      if (!project?.name) return false;
+      return project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+             (project.description && project.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+             (project.productType && project.productType.toLowerCase().includes(searchTerm.toLowerCase()));
+    });
+  }, [publicProjects, searchTerm]);
+  
   console.log('🔍 ProjectsList: availableProjects:', availableProjects.map(p => ({ id: p.id, name: p.name, idType: typeof p.id })));
   console.log('🔍 ProjectsList: first few projects:', availableProjects.slice(0, 3).map(p => ({ id: p.id, name: p.name, productType: p.productType })));
   console.log('🔍 ProjectsList: searchTerm:', searchTerm);
-  console.log('🔍 ProjectsList: filtered projects count:', filterProjects(availableProjects).length);
+  console.log('🔍 ProjectsList: filtered projects count:', filteredAvailableProjects.length);
   console.log('🔍 ProjectsList: projects object from store:', Object.keys(projects).length, 'keys');
   console.log('🔍 ProjectsList: config.useCloudSync:', config.useCloudSync);
-
-  const filterProjects = (projectList: Project[]) => {
-    console.log('🔍 filterProjects: input list length:', projectList.length);
-    console.log('🔍 filterProjects: searchTerm:', searchTerm);
-    
-    if (!searchTerm) {
-      console.log('🔍 filterProjects: no search term, returning full list');
-      return projectList;
-    }
-    
-    try {
-      return projectList.filter(project => {
-        if (!project || !project.name) {
-          console.warn('⚠️ Project missing or has no name:', project);
-          return false;
-        }
-        
-        const nameMatch = project.name.toLowerCase().includes(searchTerm.toLowerCase());
-        const descMatch = project.description ? project.description.toLowerCase().includes(searchTerm.toLowerCase()) : false;
-        const typeMatch = project.productType ? project.productType.toLowerCase().includes(searchTerm.toLowerCase()) : false;
-        
-        return nameMatch || descMatch || typeMatch;
-      });
-    } catch (error) {
-      console.error('🔍 filterProjects error:', error);
-      return projectList; // Return unfiltered list on error
-    }
-  };
 
   function handleShareClick(project: Project, e: React.MouseEvent) {
     e.stopPropagation();
@@ -171,20 +176,20 @@ const ProjectsList = () => {
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="my-projects" className="flex items-center gap-2">
                 <User className="h-4 w-4" />
-                My Projects ({filterProjects(availableProjects).length})
+                My Projects ({filteredAvailableProjects.length})
               </TabsTrigger>
               <TabsTrigger value="shared" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
-                Shared with Me ({filterProjects(sharedProjects).length})
+                Shared with Me ({filteredSharedProjects.length})
               </TabsTrigger>
               <TabsTrigger value="public" className="flex items-center gap-2">
                 <Globe className="h-4 w-4" />
-                Public ({filterProjects(publicProjects).length})
+                Public ({filteredPublicProjects.length})
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="my-projects" className="space-y-4">
-              {filterProjects(availableProjects).length === 0 ? (
+              {filteredAvailableProjects.length === 0 ? (
                 <EmptyState
                   icon={FolderIcon}
                   title="No projects found"
@@ -200,7 +205,7 @@ const ProjectsList = () => {
                 />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filterProjects(availableProjects).map((project) => (
+                  {filteredAvailableProjects.map((project) => (
                     <ProjectCard 
                       key={project.id} 
                       project={project} 
@@ -213,7 +218,7 @@ const ProjectsList = () => {
             </TabsContent>
 
             <TabsContent value="shared" className="space-y-4">
-              {filterProjects(sharedProjects).length === 0 ? (
+              {filteredSharedProjects.length === 0 ? (
                 <EmptyState
                   icon={Users}
                   title="No shared projects"
@@ -221,7 +226,7 @@ const ProjectsList = () => {
                 />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filterProjects(sharedProjects).map((project) => (
+                  {filteredSharedProjects.map((project) => (
                     <ProjectCard 
                       key={project.id} 
                       project={project} 
@@ -235,7 +240,7 @@ const ProjectsList = () => {
             </TabsContent>
 
             <TabsContent value="public" className="space-y-4">
-              {filterProjects(publicProjects).length === 0 ? (
+              {filteredPublicProjects.length === 0 ? (
                 <EmptyState
                   icon={Globe}
                   title="No public projects"
@@ -243,7 +248,7 @@ const ProjectsList = () => {
                 />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filterProjects(publicProjects).map((project) => (
+                  {filteredPublicProjects.map((project) => (
                     <ProjectCard 
                       key={project.id} 
                       project={project} 
@@ -258,7 +263,7 @@ const ProjectsList = () => {
         ) : (
           // Non-cloud sync fallback
           <>
-            {filterProjects(availableProjects).length === 0 ? (
+            {filteredAvailableProjects.length === 0 ? (
               <EmptyState
                 icon={FolderIcon}
                 title="No projects found"
@@ -274,7 +279,7 @@ const ProjectsList = () => {
               />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filterProjects(availableProjects).map((project) => (
+                {filteredAvailableProjects.map((project) => (
                   <ProjectCard 
                     key={project.id} 
                     project={project} 
