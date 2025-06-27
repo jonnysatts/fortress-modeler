@@ -61,8 +61,7 @@ const ProjectDetail = () => {
       setActualsData(data);
     } catch (error) {
       console.error("Error fetching actuals data:", error);
-      // Only show toast if it's not a "not found" error for a new cloud project
-      toast({ variant: "destructive", title: "Error Loading Actuals", description: "Could not load performance data." });
+      // Silently handle errors for actuals data - not critical for app functionality
       setActualsData([]);
     }
   }, [projectId]);
