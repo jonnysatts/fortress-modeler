@@ -5,14 +5,25 @@ import useStore from '@/store/useStore';
 import { ActualsPeriodEntry } from '@/types/models';
 
 const isCloudEnabled = () => {
-  if (!config.useCloudSync) return false;
+  if (!config.useCloudSync) {
+    console.log('🔒 Cloud sync disabled in config');
+    return false;
+  }
   
   // Check if user is authenticated by looking for a valid token
   try {
     const authData = localStorage.getItem('auth-storage');
     if (authData) {
       const { state } = JSON.parse(authData);
-      return !!state.token;
+      const hasToken = !!state.token;
+      console.log('🔑 Authentication check:', { 
+        hasAuthData: true, 
+        hasToken, 
+        tokenLength: state.token?.length || 0 
+      });
+      return hasToken;
+    } else {
+      console.log('🔑 No auth data found in localStorage');
     }
   } catch (error) {
     console.error("Could not parse auth token from localStorage", error);
@@ -32,19 +43,53 @@ class HybridStorageService {
   }
 
   async getAllProjects(): Promise<Project[]> {
-    if (isCloudEnabled()) {
-      return apiService.getProjects();
+    const cloudEnabled = isCloudEnabled();
+    console.log('📂 HybridStorage.getAllProjects - cloudEnabled:', cloudEnabled);
+    
+    if (cloudEnabled) {
+      try {
+        const cloudProjects = await apiService.getProjects();
+        console.log('☁️ Loaded projects from cloud:', cloudProjects.length, 'projects');
+        return cloudProjects;
+      } catch (error) {
+        console.error('❌ Failed to load projects from cloud:', error);
+        console.log('🔄 Falling back to local projects');
+      }
     }
-    return db.projects.toArray();
+    
+    const localProjects = await db.projects.toArray();
+    console.log('💾 Loaded projects from local storage:', localProjects.length, 'projects');
+    return localProjects;
   }
 
   async createProject(projectData: Partial<Project>): Promise<Project> {
-    if (isCloudEnabled()) {
-      return apiService.createProject(projectData);
+    const cloudEnabled = isCloudEnabled();
+    console.log('🔄 HybridStorage.createProject:', {
+      cloudEnabled,
+      useCloudSync: config.useCloudSync,
+      projectData: { name: projectData.name, productType: projectData.productType }
+    });
+    
+    if (cloudEnabled) {
+      console.log('☁️ Creating project in cloud via API');
+      try {
+        const result = await apiService.createProject(projectData);
+        console.log('✅ Cloud project created successfully:', { id: result.id, name: result.name });
+        return result;
+      } catch (error) {
+        console.error('❌ Failed to create project in cloud:', error);
+        // Fall back to local creation if cloud fails
+        console.log('🔄 Falling back to local creation');
+      }
+    } else {
+      console.log('💾 Creating project locally (cloud not enabled)');
     }
+    
     // Local creation
     const newProjectId = await db.projects.add(projectData as Project);
-    return (await db.projects.get(newProjectId))!;
+    const localProject = await db.projects.get(newProjectId);
+    console.log('✅ Local project created:', { id: localProject?.id, name: localProject?.name });
+    return localProject!;
   }
 
   async updateProject(projectId: string | number, projectData: Partial<Project>): Promise<Project> {
