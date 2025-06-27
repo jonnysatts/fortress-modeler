@@ -87,10 +87,10 @@ const ProjectDetail = () => {
 
   // Load actuals data when project changes
   useEffect(() => {
-    if (project) {
+    if (project && projectId) {
       fetchActualsData();
     }
-  }, [project, fetchActualsData]);
+  }, [project?.id, projectId]); // Remove fetchActualsData dependency to prevent loops
 
 
   const handleActualsSaved = () => {

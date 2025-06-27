@@ -85,14 +85,18 @@ export const useProject = (projectId: string | number | undefined) => {
     queryFn: async () => {
       if (!projectId) throw new Error('Project ID is required');
       if (typeof projectId === 'string' && projectId.includes('-') && isCloudEnabled()) {
-        return apiService.getProject(projectId);
+        const project = await apiService.getProject(projectId);
+        if (!project) throw new Error('Project not found');
+        return project;
       }
-      return storageService.getProjectLocal(Number(projectId));
+      const project = await storageService.getProjectLocal(Number(projectId));
+      if (!project) throw new Error('Project not found');
+      return project;
     },
     enabled: !!projectId,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
-    retry: 3,
+    retry: 1, // Reduce retries to prevent hanging
   });
 };
 
