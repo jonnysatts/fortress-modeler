@@ -114,6 +114,13 @@ const useStore = create<AppState>((set, get) => ({
       console.log('🏪 Store: received created project:', createdProject);
       console.log('🏪 Store: project properties:', Object.keys(createdProject || {}));
       
+      // Log the actual property names and values to debug
+      if (createdProject) {
+        Object.keys(createdProject).forEach(key => {
+          console.log(`🏪 Store: property "${key}":`, createdProject[key]);
+        });
+      }
+      
       // Check for different ID field names
       const projectId = createdProject?.id || createdProject?.uuid || createdProject?.projectId;
       console.log('🏪 Store: extracted project ID:', projectId);

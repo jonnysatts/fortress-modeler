@@ -75,7 +75,13 @@ class HybridStorageService {
       console.log('☁️ Creating project in cloud via API');
       try {
         const result = await apiService.createProject(projectData);
-        console.log('✅ Cloud project created successfully:', { id: result.id, name: result.name });
+        console.log('✅ Cloud project created successfully:', result);
+        console.log('✅ Project properties from API:', Object.keys(result || {}));
+        if (result) {
+          Object.keys(result).forEach(key => {
+            console.log(`✅ API property "${key}":`, result[key]);
+          });
+        }
         return result;
       } catch (error) {
         console.error('❌ Failed to create project in cloud:', error);
