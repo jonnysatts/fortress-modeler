@@ -93,17 +93,40 @@ const ProjectsList = () => {
     : projectsArray.filter(project => typeof project.id === 'number');
   
   console.log('🔍 ProjectsList: availableProjects:', availableProjects.map(p => ({ id: p.id, name: p.name, idType: typeof p.id })));
-  console.log('🔍 ProjectsList: first few projects:', availableProjects.slice(0, 3));
+  console.log('🔍 ProjectsList: first few projects:', availableProjects.slice(0, 3).map(p => ({ id: p.id, name: p.name, productType: p.productType })));
+  console.log('🔍 ProjectsList: searchTerm:', searchTerm);
+  console.log('🔍 ProjectsList: filtered projects count:', filterProjects(availableProjects).length);
   console.log('🔍 ProjectsList: projects object from store:', Object.keys(projects).length, 'keys');
   console.log('🔍 ProjectsList: config.useCloudSync:', config.useCloudSync);
 
   const filterProjects = (projectList: Project[]) => {
-    if (!searchTerm) return projectList;
-    return projectList.filter(project =>
-      project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.productType.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    console.log('🔍 filterProjects: input list length:', projectList.length);
+    console.log('🔍 filterProjects: searchTerm:', searchTerm);
+    
+    if (!searchTerm) {
+      console.log('🔍 filterProjects: no search term, returning full list');
+      return projectList;
+    }
+    
+    const filtered = projectList.filter(project => {
+      const hasName = project.name && typeof project.name === 'string';
+      const hasDescription = project.description && typeof project.description === 'string';
+      const hasProductType = project.productType && typeof project.productType === 'string';
+      
+      if (!hasName) {
+        console.warn('⚠️ Project missing name:', project);
+        return false;
+      }
+      
+      return (
+        project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (hasDescription && project.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (hasProductType && project.productType.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+    });
+    
+    console.log('🔍 filterProjects: filtered result length:', filtered.length);
+    return filtered;
   };
 
   function handleShareClick(project: Project, e: React.MouseEvent) {
