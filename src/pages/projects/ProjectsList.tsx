@@ -108,25 +108,23 @@ const ProjectsList = () => {
       return projectList;
     }
     
-    const filtered = projectList.filter(project => {
-      const hasName = project.name && typeof project.name === 'string';
-      const hasDescription = project.description && typeof project.description === 'string';
-      const hasProductType = project.productType && typeof project.productType === 'string';
-      
-      if (!hasName) {
-        console.warn('⚠️ Project missing name:', project);
-        return false;
-      }
-      
-      return (
-        project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (hasDescription && project.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (hasProductType && project.productType.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
-    });
-    
-    console.log('🔍 filterProjects: filtered result length:', filtered.length);
-    return filtered;
+    try {
+      return projectList.filter(project => {
+        if (!project || !project.name) {
+          console.warn('⚠️ Project missing or has no name:', project);
+          return false;
+        }
+        
+        const nameMatch = project.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const descMatch = project.description ? project.description.toLowerCase().includes(searchTerm.toLowerCase()) : false;
+        const typeMatch = project.productType ? project.productType.toLowerCase().includes(searchTerm.toLowerCase()) : false;
+        
+        return nameMatch || descMatch || typeMatch;
+      });
+    } catch (error) {
+      console.error('🔍 filterProjects error:', error);
+      return projectList; // Return unfiltered list on error
+    }
   };
 
   function handleShareClick(project: Project, e: React.MouseEvent) {
