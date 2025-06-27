@@ -19,7 +19,7 @@ import {
 import { FinancialModel, db } from "@/lib/db";
 import { useProject } from "@/hooks/useProjects";
 import { useModel, useDeleteModel } from "@/hooks/useModels";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import ModelProjections from "@/components/models/ModelProjections";
 import RevenueTrends from "@/components/models/RevenueTrends";
 import CostTrends from "@/components/models/CostTrends";
@@ -61,7 +61,7 @@ const FinancialModelDetail = () => {
   const updateModelAssumptions = useCallback(async (updatedFields: Partial<ModelAssumptions>) => {
     setModel(prevModel => {
       if (!prevModel || !prevModel.id) {
-        toast({ variant: "destructive", title: "Error", description: "Cannot update a model that is not loaded." });
+        toast.error("Error", { description: "Cannot update a model that is not loaded." });
         return prevModel;
       }
 
@@ -81,10 +81,10 @@ const FinancialModelDetail = () => {
         assumptions: newAssumptions,
         updatedAt: new Date()
       }).then(() => {
-        toast({ title: "Assumptions Updated", description: "Your changes have been saved." });
+        toast.success("Assumptions Updated", { description: "Your changes have been saved." });
       }).catch(error => {
         console.error("[FinancialModelDetail] Error saving assumptions:", error);
-        toast({ variant: "destructive", title: "Error Saving", description: "Could not save your changes." });
+        toast.error("Error Saving", { description: "Could not save your changes." });
       });
 
       // Return the new state immediately for a responsive UI
@@ -148,9 +148,7 @@ const FinancialModelDetail = () => {
       setIsFinancialDataReady(true);
     } catch (error) {
       console.error("Error combining financial data:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
+      toast.error("Error", {
         description: "There was a problem combining financial data.",
       });
     }
@@ -158,7 +156,7 @@ const FinancialModelDetail = () => {
 
   const handleDeleteModel = useCallback(async () => {
     if (!modelId || !projectId) {
-      toast({ variant: "destructive", title: "Error", description: "Model ID is missing, cannot delete." });
+      toast.error("Error", { description: "Model ID is missing, cannot delete." });
       return;
     }
     try {
@@ -166,9 +164,7 @@ const FinancialModelDetail = () => {
       navigate(`/projects/${projectId}`);
     } catch (error) {
       console.error("Error deleting model:", error);
-      toast({
-        variant: "destructive",
-        title: "Error deleting model",
+      toast.error("Error deleting model", {
         description: error instanceof Error ? error.message : "An unknown error occurred."
       });
     }

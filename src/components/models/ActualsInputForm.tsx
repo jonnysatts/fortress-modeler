@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { upsertActualsPeriod } from "@/lib/db";
 
 interface ActualsInputFormProps {
@@ -104,7 +104,7 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
     const projectIdNum = model?.projectId;
     if (!model?.id || typeof projectIdNum !== 'number') { 
         console.error("[ActualsInputForm] Save failed: Model ID or valid Project ID missing.");
-        toast({ variant: "destructive", title: "Error", description: "Model or Project ID is invalid." });
+        toast.error("Error", { description: "Model or Project ID is invalid." });
         return;
     }
     
@@ -123,13 +123,13 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
         // Use the upsertActualsPeriod helper function correctly
         const savedId = await upsertActualsPeriod(actualEntry);
         
-        toast({ title: "Success", description: `Actuals for ${timeUnit} ${selectedPeriod} saved.` });
+        toast.success("Success", { description: `Actuals for ${timeUnit} ${selectedPeriod} saved.` });
         setInitialDataString(JSON.stringify(periodData)); 
         setIsDirty(false);
         onActualsSaved(); 
     } catch (error) {
         console.error("[ActualsInputForm] Error saving actuals via upsertActualsPeriod:", error);
-        toast({ variant: "destructive", title: "Save Error", description: "Could not save actuals data." });
+        toast.error("Save Error", { description: "Could not save actuals data." });
     }
   };
 

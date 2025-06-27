@@ -14,7 +14,7 @@ import { ArrowLeft, CalendarIcon, Check } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { useProject, useUpdateProject } from "@/hooks/useProjects";
 import { useImageUpload } from "@/hooks/useImageUpload";
@@ -88,9 +88,7 @@ const EditProject = () => {
       navigate(`/projects/${projectId}`);
     } catch (error) {
       console.error("Error updating project:", error);
-      toast({
-        variant: "destructive",
-        title: "Failed to update project",
+      toast.error("Failed to update project", {
         description: "There was an error updating your project. Please try again.",
       });
     } finally {

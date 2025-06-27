@@ -21,7 +21,7 @@ import useStore from "@/store/useStore";
 import { db, FinancialModel, Project, getActualsForProject } from "@/lib/db";
 import { storageService } from "@/lib/hybrid-storage";
 import { ActualsPeriodEntry } from "@/types/models";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useProject, useModelsForProject, useDeleteProject } from "@/hooks/useProjects";
 import {
   Table,
@@ -78,9 +78,7 @@ const ProjectDetail = () => {
     
     if (projectError) {
       console.error('Error fetching project details:', projectError);
-      toast({
-        variant: "destructive",
-        title: "Project not found",
+      toast.error("Project not found", {
         description: "The requested project could not be found.",
       });
       navigate("/projects", { replace: true });
@@ -105,17 +103,14 @@ const ProjectDetail = () => {
     
     deleteProjectMutation.mutate(project.id, {
       onSuccess: () => {
-        toast({
-          title: "Project deleted",
+        toast.success("Project deleted", {
           description: "The project has been successfully deleted.",
         });
         navigate("/projects");
       },
       onError: (error) => {
         console.error("Error deleting project:", error);
-        toast({
-          variant: "destructive",
-          title: "Failed to delete project",
+        toast.error("Failed to delete project", {
           description: "There was an error deleting the project. Please try again.",
         });
       }

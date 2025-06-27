@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, Trash2, FileText, FileSpreadsheet, Presentation } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { getProjects, db } from "@/lib/db";
 import { exportToExcel, exportToPDF } from "@/lib/export";
 import { exportEnhancedExcel } from "@/lib/enhanced-excel-export";
@@ -71,17 +71,14 @@ const Settings = () => {
         models: testModels
       });
       
-      toast({
-        title: "Test export completed",
+      toast.success("Test export completed", {
         description: "Test Excel file has been downloaded to verify export functionality.",
       });
       
     } catch (error) {
       console.error('Test export error:', error);
-      toast({
-        title: "Test export failed",
+      toast.error("Test export failed", {
         description: `Error: ${error.message}`,
-        variant: "destructive",
       });
     } finally {
       setIsExporting(false);
@@ -93,10 +90,8 @@ const Settings = () => {
       setIsExporting(true);
       
       if (projectsArray.length === 0) {
-        toast({
-          title: "No data to export",
+        toast.error("No data to export", {
           description: "Create some projects and financial models first.",
-          variant: "destructive",
         });
         return;
       }
@@ -117,17 +112,14 @@ const Settings = () => {
         models
       });
       
-      toast({
-        title: "Excel export completed",
+      toast.success("Excel export completed", {
         description: "Your project data has been exported to Excel successfully.",
       });
       
     } catch (error) {
       console.error('Export error:', error);
-      toast({
-        title: "Export failed",
+      toast.error("Export failed", {
         description: `Error: ${error.message}. Please try again or check the console for details.`,
-        variant: "destructive",
       });
     } finally {
       setIsExporting(false);
@@ -139,10 +131,8 @@ const Settings = () => {
       setIsExporting(true);
       
       if (projectsArray.length === 0) {
-        toast({
-          title: "No data to export",
+        toast.error("No data to export", {
           description: "Create some projects and financial models first.",
-          variant: "destructive",
         });
         return;
       }
@@ -159,17 +149,14 @@ const Settings = () => {
         models
       });
       
-      toast({
-        title: "PDF export completed",
+      toast.success("PDF export completed", {
         description: "Your project report has been exported to PDF successfully.",
       });
       
     } catch (error) {
       console.error('Export error:', error);
-      toast({
-        title: "Export failed",
+      toast.error("Export failed", {
         description: `Error: ${error.message}. Please try again or check the console for details.`,
-        variant: "destructive",
       });
     } finally {
       setIsExporting(false);
@@ -181,10 +168,8 @@ const Settings = () => {
       setIsExporting(true);
       
       if (projectsArray.length === 0) {
-        toast({
-          title: "No data to export",
+        toast.error("No data to export", {
           description: "Create some projects and financial models first.",
-          variant: "destructive",
         });
         return;
       }
@@ -196,10 +181,8 @@ const Settings = () => {
         .toArray();
       
       if (models.length === 0) {
-        toast({
-          title: "No financial models found",
+        toast.error("No financial models found", {
           description: "Create at least one financial model to generate a board-ready report.",
-          variant: "destructive",
         });
         return;
       }
@@ -209,8 +192,7 @@ const Settings = () => {
         const reportData = await prepareBoardReadyData(firstProject, models, 36, 0.1);
         await exportBoardReadyPDF(reportData);
         
-        toast({
-          title: "Executive report generated",
+        toast.success("Executive report generated", {
           description: "Your board-ready executive financial report has been exported successfully.",
         });
       } catch (boardError) {
@@ -226,18 +208,15 @@ const Settings = () => {
           discountRate: 0.1
         });
         
-        toast({
-          title: "Enhanced Excel report generated",
+        toast.success("Enhanced Excel report generated", {
           description: "Board-ready PDF had issues, but your comprehensive Excel analysis has been exported.",
         });
       }
       
     } catch (error) {
       console.error('Board-ready export error:', error);
-      toast({
-        title: "Export failed",
+      toast.error("Export failed", {
         description: `Error: ${error.message}. Please try basic exports instead.`,
-        variant: "destructive",
       });
     } finally {
       setIsExporting(false);
@@ -258,16 +237,13 @@ const Settings = () => {
       // Refresh the store
       window.location.reload();
       
-      toast({
-        title: "Data cleared",
+      toast.success("Data cleared", {
         description: "All application data has been cleared successfully.",
       });
     } catch (error) {
       console.error('Clear data error:', error);
-      toast({
-        title: "Clear failed",
+      toast.error("Clear failed", {
         description: "There was an error clearing your data. Please try again.",
-        variant: "destructive",
       });
     }
   };

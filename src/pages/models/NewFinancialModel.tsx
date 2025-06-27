@@ -26,7 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RevenueAssumption, CostAssumption } from "@/lib/db";
 import { useProject } from "@/hooks/useProjects";
 import { useCreateModel } from "@/hooks/useModels";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import EventModelForm from "./components/EventModelForm";
 
 // Default revenue assumption
@@ -101,9 +101,7 @@ const NewFinancialModel = () => {
 
   const onSubmit = async (data: FormValues) => {
     if (!projectId || projectLoading || !currentProject || !currentProject.id) {
-      toast({
-        variant: "destructive",
-        title: "Project not loaded",
+      toast.error("Project not loaded", {
         description: "Could not create a model because the project data is missing.",
       });
       return;
@@ -126,9 +124,7 @@ const NewFinancialModel = () => {
             .filter((factor) => !isNaN(factor));
         } catch (error) {
           console.error("Error parsing seasonal factors:", error);
-          toast({
-            variant: "destructive",
-            title: "Invalid seasonal factors",
+          toast.error("Invalid seasonal factors", {
             description:
               "Please enter valid numbers separated by commas (e.g., 1.1, 0.9, 1.2, 0.8).",
           });
@@ -156,9 +152,7 @@ const NewFinancialModel = () => {
       navigate(`/projects/${projectId}`);
     } catch (error) {
       console.error("Error creating financial model:", error);
-      toast({
-        variant: "destructive",
-        title: "Failed to create model",
+      toast.error("Failed to create model", {
         description: "There was an error creating the financial model.",
       });
     }

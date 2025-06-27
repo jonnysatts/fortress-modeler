@@ -14,7 +14,7 @@ import { ArrowLeft, CalendarIcon, Check } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import useStore from "@/store/useStore";
 import { Label } from "@/components/ui/label";
 import { useImageUpload } from "@/hooks/useImageUpload";
@@ -62,8 +62,7 @@ const NewProject = () => {
         avatarImage: avatarDataUrl,
       });
       
-      toast({
-        title: "Project created!",
+      toast.success("Project created!", {
         description: `${data.name} has been created successfully.`,
       });
       
@@ -75,9 +74,7 @@ const NewProject = () => {
       }
     } catch (error) {
       console.error("Error creating project:", error);
-      toast({
-        variant: "destructive",
-        title: "Failed to create project",
+      toast.error("Failed to create project", {
         description: "There was an error creating your project. Please try again.",
       });
     } finally {
