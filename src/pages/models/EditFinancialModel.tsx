@@ -1,88 +1,52 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { FinancialModel } from "@/lib/db";
-import useStore from "@/store/useStore";
 import EventModelForm from "./components/EventModelForm";
-import { storageService } from "@/lib/hybrid-storage";
+import { useProject } from "@/hooks/useProjects";
+import { useModel } from "@/hooks/useModels";
 
 const EditFinancialModel = () => {
   const { projectId, modelId } = useParams<{ projectId: string; modelId: string }>();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
   const [model, setModel] = useState<FinancialModel | null>(null);
   const [projectName, setProjectName] = useState<string>("");
 
+  const { data: project, isLoading: projectLoading } = useProject(projectId);
+  const { data: fetchedModel, isLoading: modelLoading } = useModel(modelId);
+
   useEffect(() => {
-    const loadData = async () => {
-      if (!projectId || !modelId) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Missing project or model ID",
-        });
-        navigate("/projects");
-        return;
-      }
+    if (project) {
+      setProjectName(project.name);
+    }
+  }, [project]);
 
-      setLoading(true);
-      try {
-        // Fetch project directly to get its name, avoiding Zustand dependency
-        const project = await storageService.getProject(projectId);
-        if (!project) throw new Error("Project not found");
-        setProjectName(project.name);
-
-        // Load the financial model
-        const financialModel = await storageService.getModel(modelId);
-        if (financialModel) {
-          // Ensure proper formatting of model metadata
-          if (financialModel.assumptions.metadata?.type === "WeeklyEvent") {
-            // Ensure costs object exists
-            if (!financialModel.assumptions.metadata.costs) {
-              financialModel.assumptions.metadata.costs = {
-                setupCosts: 0,
-                spreadSetupCosts: false,
-                fbCOGSPercent: 30,
-                staffCount: 0,
-                staffCostPerPerson: 0,
-                managementCosts: 0
-              };
-            }
-            
-            // Ensure spreadSetupCosts is a boolean
-            financialModel.assumptions.metadata.costs.spreadSetupCosts = 
-              !!financialModel.assumptions.metadata.costs.spreadSetupCosts;
-          }
-          
-          setModel(financialModel);
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Model not found",
-            description: "The requested financial model could not be found.",
-          });
-          navigate(`/projects/${projectId}`);
+  useEffect(() => {
+    if (fetchedModel) {
+      const fm = { ...fetchedModel };
+      if (fm.assumptions.metadata?.type === "WeeklyEvent") {
+        if (!fm.assumptions.metadata.costs) {
+          fm.assumptions.metadata.costs = {
+            setupCosts: 0,
+            spreadSetupCosts: false,
+            fbCOGSPercent: 30,
+            staffCount: 0,
+            staffCostPerPerson: 0,
+            managementCosts: 0,
+          };
         }
-      } catch (error) {
-        console.error("Error loading financial model:", error);
-        toast({
-          variant: "destructive",
-          title: "Error loading model",
-          description: "There was an error loading the financial model.",
-        });
-        navigate(`/projects/${projectId}`);
-      } finally {
-        setLoading(false);
+        fm.assumptions.metadata.costs.spreadSetupCosts = !!fm.assumptions.metadata.costs.spreadSetupCosts;
       }
-    };
+      setModel(fm);
+    }
+  }, [fetchedModel]);
 
-    loadData();
-  }, [projectId, modelId, navigate]);
+  const loading = projectLoading || modelLoading || !model;
 
-  if (loading || !model) {
+  if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="h-10 w-10 border-4 border-fortress-emerald border-t-transparent rounded-full animate-spin"></div>

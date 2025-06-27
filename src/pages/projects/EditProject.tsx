@@ -15,9 +15,8 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
-import useStore from "@/store/useStore";
 import { Label } from "@/components/ui/label";
-import { storageService } from "@/lib/hybrid-storage";
+import { useProject, useUpdateProject } from "@/hooks/useProjects";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { productTypes } from "@/lib/constants";
 
@@ -35,9 +34,10 @@ type FormValues = z.infer<typeof formSchema>;
 const EditProject = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { preview: avatarPreview, dataUrl: avatarDataUrl, handleImageChange, removeImage, setInitialImage } = useImageUpload();
+  const { data: project, isLoading: projectLoading } = useProject(projectId);
+  const updateProjectMutation = useUpdateProject();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -52,66 +52,40 @@ const EditProject = () => {
 
   // Load existing project data
   useEffect(() => {
-    if (!projectId) {
-      navigate("/projects");
-      return;
+    if (!project) return;
+    form.reset({
+      name: project.name,
+      description: project.description || "",
+      productType: project.productType,
+      targetAudience: project.targetAudience || "",
+      startDate: project.timeline?.startDate ? new Date(project.timeline.startDate) : new Date(),
+      endDate: project.timeline?.endDate ? new Date(project.timeline.endDate) : undefined,
+    });
+    if (project.avatarImage) {
+      setInitialImage(project.avatarImage);
     }
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        // Use storageService to handle both UUID and integer IDs
-        const project = await storageService.getProject(projectId);
-        if (project) {
-          form.reset({
-            name: project.name,
-            description: project.description || "",
-            productType: project.productType,
-            targetAudience: project.targetAudience || "",
-            startDate: project.timeline?.startDate ? new Date(project.timeline.startDate) : new Date(),
-            endDate: project.timeline?.endDate ? new Date(project.timeline.endDate) : undefined,
-          });
-          if (project.avatarImage) {
-            setInitialImage(project.avatarImage);
-          }
-        } else {
-          toast({ variant: "destructive", title: "Project not found" });
-          navigate("/projects");
-        }
-      } catch (err) {
-        toast({ variant: "destructive", title: "Error loading project" });
-        navigate("/projects");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadData();
-  // setInitialImage is stable and doesn't need to be in the dependency array
-  }, [projectId, navigate, form.reset, setInitialImage]);
+  }, [project, form.reset, setInitialImage]);
 
   // Submit handler (uses updateProject)
   const onSubmit = async (data: FormValues) => {
     if (!projectId) return;
     setIsSubmitting(true);
     try {
-      // Use storageService to handle updates for both local and cloud
-      // Note: You may need to implement `storageService.updateProject`
-      // For now, we assume it exists and can delegate.
-      await storageService.updateProject(projectId, {
-        name: data.name,
-        description: data.description,
-        productType: data.productType,
-        targetAudience: data.targetAudience,
-        timeline: {
-          startDate: data.startDate,
-          endDate: data.endDate,
+      await updateProjectMutation.mutateAsync({
+        id: projectId,
+        data: {
+          name: data.name,
+          description: data.description,
+          productType: data.productType,
+          targetAudience: data.targetAudience,
+          timeline: {
+            startDate: data.startDate,
+            endDate: data.endDate,
+          },
+          avatarImage: avatarDataUrl,
         },
-        avatarImage: avatarDataUrl, // Include avatar data
       });
-      toast({
-        title: "Project updated!",
-        description: `${data.name} has been updated successfully.`,
-      });
-      navigate(`/projects/${projectId}`); // Navigate back to project detail
+      navigate(`/projects/${projectId}`);
     } catch (error) {
       console.error("Error updating project:", error);
       toast({
@@ -124,7 +98,7 @@ const EditProject = () => {
     }
   };
 
-  if (isLoading) {
+  if (projectLoading) {
     return <div className="flex justify-center items-center min-h-[60vh]">
              <div className="h-10 w-10 border-4 border-fortress-emerald border-t-transparent rounded-full animate-spin"></div>
            </div>;

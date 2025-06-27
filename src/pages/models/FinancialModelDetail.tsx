@@ -17,8 +17,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { FinancialModel, db } from "@/lib/db";
-import useStore from "@/store/useStore";
-import { storageService } from "@/lib/hybrid-storage";
+import { useProject } from "@/hooks/useProjects";
+import { useModel, useDeleteModel } from "@/hooks/useModels";
 import { toast } from "@/hooks/use-toast";
 import ModelProjections from "@/components/models/ModelProjections";
 import RevenueTrends from "@/components/models/RevenueTrends";
@@ -37,14 +37,17 @@ const FinancialModelDetail = () => {
   const { projectId, modelId } = useParams<{ projectId: string; modelId: string }>();
   const navigate = useNavigate();
   
-  // --- Call ALL hooks at the top level --- 
-  const [loading, setLoading] = useState(true);
+  // --- Call ALL hooks at the top level ---
   const [model, setModel] = useState<FinancialModel | null>(null);
   // Note: Not using any Zustand store functions to avoid infinite loops
   const [revenueData, setRevenueData] = useState<TrendDataPoint[]>([]);
   const [costData, setCostData] = useState<TrendDataPoint[]>([]);
   const [combinedFinancialData, setCombinedFinancialData] = useState<TrendDataPoint[]>([]);
   const [isFinancialDataReady, setIsFinancialDataReady] = useState<boolean>(false);
+
+  const { data: project, isLoading: projectLoading } = useProject(projectId);
+  const { data: fetchedModel, isLoading: modelLoading } = useModel(modelId);
+  const deleteModel = useDeleteModel();
   
   // Memoize assumption props (call unconditionally)
   const assumptions = model?.assumptions;
@@ -154,97 +157,37 @@ const FinancialModelDetail = () => {
   }, [revenueData, costData]);
 
   const handleDeleteModel = useCallback(async () => {
-    // Ensure modelId is defined before attempting delete
-    if (!modelId) {
-        toast({ variant: "destructive", title: "Error", description: "Model ID is missing, cannot delete." });
-        return;
+    if (!modelId || !projectId) {
+      toast({ variant: "destructive", title: "Error", description: "Model ID is missing, cannot delete." });
+      return;
     }
     try {
-      // Use storageService to handle deletion from cloud or local
-      await storageService.deleteModel(modelId);
-      toast({ title: "Model deleted", description: "The financial model has been successfully deleted." });
+      await deleteModel.mutateAsync({ modelId, projectId });
       navigate(`/projects/${projectId}`);
     } catch (error) {
       console.error("Error deleting model:", error);
-      toast({ 
-        variant: "destructive", 
-        title: "Error deleting model", 
-        description: error instanceof Error ? error.message : "An unknown error occurred." 
+      toast({
+        variant: "destructive",
+        title: "Error deleting model",
+        description: error instanceof Error ? error.message : "An unknown error occurred."
       });
     }
-  }, [modelId, projectId, navigate]);
+  }, [modelId, projectId, navigate, deleteModel]);
 
   // Effects (call unconditionally)
   useEffect(() => {
-    const controller = new AbortController();
-    const { signal } = controller;
-    const loadModelData = async () => {
-      if (!projectId || !modelId) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Missing project or model ID",
-        });
-        navigate("/projects");
-        return;
-      }
-
-      setLoading(true);
-      try {
-        // Load project directly without using Zustand store to avoid infinite loops
-        const project = await storageService.getProject(projectId); // This should ideally accept a signal
-        if (!project) {
-          toast({
-            variant: "destructive",
-            title: "Project not found",
-            description: "The requested project could not be found.",
-          });
-          navigate("/projects");
-          return;
-        }
-
-        if (signal.aborted) return;
-
-        // Use storageService to get model from cloud or local
-        const financialModel = await storageService.getModel(modelId);
-        if (signal.aborted) return;
-
-        if (financialModel) {
-          setModel(financialModel);
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Model not found",
-            description: "The requested financial model could not be found.",
-          });
-          navigate(`/projects/${projectId}`);
-        }
-      } catch (error) {
-        if (!signal.aborted) {
-          console.error("Error loading financial model:", error);
-          toast({
-            variant: "destructive",
-            title: "Error loading model",
-            description: "There was an error loading the financial model.",
-          });
-          navigate(`/projects/${projectId}`);
-        }
-      } finally {
-        if (!signal.aborted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadModelData();
-    return () => { controller.abort(); }; // Cleanup function
-  }, [projectId, modelId, navigate]); // Dependencies
+    if (fetchedModel) {
+      setModel(fetchedModel);
+    }
+  }, [fetchedModel]);
 
   useEffect(() => {
     if (revenueData.length > 0 && costData.length > 0) {
       combineFinancialData();
     }
   }, [revenueData, costData, combineFinancialData]);
+
+  const loading = projectLoading || modelLoading || !model;
 
   // --- Conditional Returns (AFTER all hooks) --- 
   if (loading) { // Only check loading state

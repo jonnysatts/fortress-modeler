@@ -123,6 +123,14 @@ class ApiService {
     return normalizeModel(newModel);
   }
 
+  async updateModel(modelId: string, modelData: Partial<FinancialModel>): Promise<FinancialModel> {
+    const updatedModel = await this.request<FinancialModel>(`/api/models/${modelId}`, {
+      method: 'PUT',
+      body: JSON.stringify(modelData)
+    });
+    return normalizeModel(updatedModel);
+  }
+
   async deleteModel(modelId: string): Promise<void> {
     await this.request<void>(`/api/models/${modelId}`, { method: 'DELETE' });
   }
