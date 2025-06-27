@@ -47,7 +47,23 @@ class ApiService {
   }
 
   async getProjects(): Promise<Project[]> {
-    const projects = await this.request<Project[]>(`/api/projects`);
+    const response = await this.request<any>(`/api/projects`);
+    console.log('🔍 API getProjects response:', response);
+    
+    // Handle different response formats
+    let projects: any[];
+    if (Array.isArray(response)) {
+      projects = response;
+    } else if (response && Array.isArray(response.projects)) {
+      projects = response.projects;
+    } else if (response && Array.isArray(response.data)) {
+      projects = response.data;
+    } else {
+      console.error('❌ Unexpected API response format:', response);
+      throw new Error('Invalid projects response format');
+    }
+    
+    console.log('📊 Processing', projects.length, 'projects from API');
     return projects.map(normalizeProject);
   }
 

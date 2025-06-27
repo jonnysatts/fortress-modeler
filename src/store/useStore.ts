@@ -111,11 +111,23 @@ const useStore = create<AppState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const createdProject = await storageService.createProject(newProject);
+      console.log('🏪 Store: received created project:', { id: createdProject?.id, name: createdProject?.name });
+      
       if (createdProject && createdProject.id) {
-        set(state => ({
-          projects: { ...state.projects, [createdProject.id!.toString()]: createdProject },
-          isLoading: false
-        }));
+        const projectKey = createdProject.id.toString();
+        console.log('🏪 Store: adding project to state with key:', projectKey);
+        
+        set(state => {
+          const newProjects = { ...state.projects, [projectKey]: createdProject };
+          console.log('🏪 Store: new projects state has', Object.keys(newProjects).length, 'projects');
+          return {
+            projects: newProjects,
+            isLoading: false
+          };
+        });
+      } else {
+        console.warn('⚠️ Store: created project missing id:', createdProject);
+        set({ isLoading: false });
       }
       return createdProject;
     } catch (error) {
