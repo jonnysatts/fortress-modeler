@@ -1,27 +1,20 @@
 
-import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, PlusCircle, TrendingUp, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import useStore from "@/store/useStore";
 import { config } from "@/lib/config";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from "recharts";
+import { useMyProjects } from "@/hooks/useProjects";
 
 const Dashboard = () => {
-  const { projects, loadProjects } = useStore();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    loadProjects();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { data: projects = [], isLoading } = useMyProjects();
 
   // Filter out UUID projects if cloud sync is disabled
-  const projectsArray = Object.values(projects);
   const availableProjects = config.useCloudSync 
-    ? projectsArray 
-    : projectsArray.filter(project => typeof project.id === 'number');
+    ? projects 
+    : projects.filter(project => typeof project.id === 'number');
 
   // Calculate real metrics from actual project data
   const calculateTotalRevenue = () => {
@@ -90,6 +83,24 @@ const Dashboard = () => {
   const riskData = generateRiskData();
 
   const COLORS = ['#1A2942', '#3E5C89', '#10B981', '#334155'];
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-fortress-blue">Dashboard</h1>
+        </div>
+        <div className="animate-pulse space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-muted rounded h-32" />
+            ))}
+          </div>
+          <div className="bg-muted rounded h-64" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
