@@ -3,14 +3,9 @@ import { Project, FinancialModel } from '@/lib/db';
 import { storageService } from '@/lib/hybrid-storage';
 import { getErrorMessage, logError } from '@/lib/errors';
 
-// Synchronous, module-level lock to prevent race conditions during project loading
-const projectLoadLocks = new Set<string>();
 
 interface AppState {
   // State
-  projects: Record<string, Project>;
-  // NOTE: The StorageService does not support separate fetching for shared/public projects.
-  // This functionality will need to be re-evaluated. For now, all projects are in one list.
   currentProject: Project | null;
   currentModel: FinancialModel | null;
   isLoading: boolean;
@@ -21,11 +16,6 @@ interface AppState {
   activeView: 'summary' | 'parameters' | 'scenarios' | 'charts';
 
   // Actions
-  loadProjects: () => Promise<void>;
-  loadProjectById: (id: string | null | undefined) => Promise<Project | null>;
-  createProject: (newProject: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Project | null>;
-  updateProject: (id: string, updatedProject: Partial<Project>) => Promise<void>;
-  deleteProject: (id: string) => Promise<void>;
   setCurrentProject: (project: Project | null) => void;
 
   // Model Actions
@@ -47,7 +37,6 @@ interface AppState {
 
 const useStore = create<AppState>((set, get) => ({
   // Initial State
-  projects: {},
   currentProject: null,
   currentModel: null,
   isLoading: false,
@@ -58,140 +47,6 @@ const useStore = create<AppState>((set, get) => ({
   activeView: 'summary',
 
   // Actions
-  loadProjects: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const projectsArray = await storageService.getAllProjects();
-      const projects = projectsArray.reduce((acc, p) => {
-        if (p.id) acc[p.id.toString()] = p; // Ensure key is string
-        return acc;
-      }, {} as Record<string, Project>);
-      
-      console.log('🏪 Store: setting projects in state:', Object.keys(projects).length, 'projects');
-      console.log('🏪 Store: first few project keys:', Object.keys(projects).slice(0, 3));
-      
-      set({ projects, isLoading: false });
-    } catch (error) {
-      const errorMessage = getErrorMessage(error);
-      logError(error, 'Failed to load projects');
-      set({ error: errorMessage, isLoading: false });
-    }
-  },
-
-  loadProjectById: async (id: string | null | undefined): Promise<Project | null> => {
-    console.log('🔍 loadProjectById called with:', id, 'timestamp:', Date.now());
-    if (!id || projectLoadLocks.has(id)) {
-      console.log('⚠️ Skipping load - either no ID or already loading:', { id, isLocked: projectLoadLocks.has(id || '') });
-      return null;
-    }
-
-    try {
-      projectLoadLocks.add(id);
-      console.log('🔒 Added lock for project:', id);
-      set({ isLoading: true, error: null });
-
-      const project = await storageService.getProject(id);
-      console.log('📦 Retrieved project:', project?.id, project?.name);
-      if (project && project.id) {
-        set(state => ({
-          projects: { ...state.projects, [project.id!.toString()]: project },
-        }));
-        return project;
-      }
-      return null;
-    } catch (error) {
-      const errorMessage = getErrorMessage(error);
-      logError(error, `Failed to load project ${id}`);
-      set({ error: errorMessage });
-      return null;
-    } finally {
-      projectLoadLocks.delete(id);
-      console.log('🔓 Released lock for project:', id);
-      set({ isLoading: false });
-    }
-  },
-
-  createProject: async (newProject) => {
-    set({ isLoading: true, error: null });
-    try {
-      const createdProject = await storageService.createProject(newProject);
-      console.log('🏪 Store: received created project:', createdProject);
-      console.log('🏪 Store: project properties:', Object.keys(createdProject || {}));
-      
-      // Log the actual property names and values to debug
-      if (createdProject) {
-        Object.keys(createdProject).forEach(key => {
-          console.log(`🏪 Store: property "${key}":`, createdProject[key]);
-        });
-      }
-      
-      // Check for different ID field names
-      const projectId = createdProject?.id || createdProject?.uuid || createdProject?.projectId;
-      console.log('🏪 Store: extracted project ID:', projectId);
-      
-      if (createdProject && projectId) {
-        // Ensure the project has the correct id field for the store
-        const normalizedProject = { ...createdProject, id: projectId };
-        const projectKey = projectId.toString();
-        console.log('🏪 Store: adding project to state with key:', projectKey);
-        
-        set(state => {
-          const newProjects = { ...state.projects, [projectKey]: normalizedProject };
-          console.log('🏪 Store: new projects state has', Object.keys(newProjects).length, 'projects');
-          return {
-            projects: newProjects,
-            isLoading: false
-          };
-        });
-      } else {
-        console.warn('⚠️ Store: created project missing id:', createdProject);
-        set({ isLoading: false });
-      }
-      return createdProject;
-    } catch (error) {
-      const errorMessage = getErrorMessage(error);
-      logError(error, 'Failed to create project');
-      set({ error: errorMessage, isLoading: false });
-      return null;
-    }
-  },
-
-  updateProject: async (id, updatedProject) => {
-    set({ isLoading: true, error: null });
-    try {
-      const returnedProject = await storageService.updateProject(id, updatedProject);
-      set(state => ({
-        projects: { ...state.projects, [id]: returnedProject },
-        currentProject: state.currentProject?.id?.toString() === id ? returnedProject : state.currentProject,
-        isLoading: false
-      }));
-    } catch (error) {
-      const errorMessage = getErrorMessage(error);
-      logError(error, `Failed to update project ${id}`);
-      set({ error: errorMessage, isLoading: false });
-    }
-  },
-
-  deleteProject: async (id: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      await storageService.deleteProject(id);
-      set(state => {
-        const newProjects = { ...state.projects };
-        delete newProjects[id];
-        return {
-          projects: newProjects,
-          currentProject: state.currentProject?.id?.toString() === id ? null : state.currentProject,
-          isLoading: false
-        };
-      });
-    } catch (error) {
-      const errorMessage = getErrorMessage(error);
-      logError(error, `Failed to delete project ${id}`);
-      set({ error: errorMessage, isLoading: false });
-    }
-  },
-
   setCurrentProject: (project) => set({ currentProject: project, currentModel: null }),
 
   createModelForCurrentProject: async (newModel) => {
@@ -232,13 +87,6 @@ const useStore = create<AppState>((set, get) => ({
             if (syncedProject && syncedProject.id) {
               console.log('🔄 Updating project with backend version:', syncedProject.id);
               set({ currentProject: syncedProject });
-              // Also update in the projects store
-              set(state => ({
-                projects: { 
-                  ...state.projects, 
-                  [syncedProject.id!.toString()]: syncedProject 
-                },
-              }));
             }
           }
         } catch (syncError: any) {

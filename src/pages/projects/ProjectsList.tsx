@@ -1,99 +1,40 @@
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { PlusCircle, Search, Globe, Users, User, Folder as FolderIcon } from "lucide-react";
 import useStore from "@/store/useStore";
 import { Input } from "@/components/ui/input";
 import { config } from "@/lib/config";
 import { ShareProjectDialog } from "@/components/ShareProjectDialog";
-import { apiService } from "@/lib/api";
 import { Project } from "@/lib/db";
 import { toast } from "sonner";
 import { ProjectCard } from "./ProjectCard";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useMyProjects, useSharedProjects, usePublicProjects } from "@/hooks/useProjects";
+import { useQueryClient } from "@tanstack/react-query";
 
 const ProjectsList = () => {
   const navigate = useNavigate();
-  const { projects, loadProjects, setCurrentProject } = useStore();
-  const [sharedProjects, setSharedProjects] = useState<Project[]>([]);
-  const [publicProjects, setPublicProjects] = useState<Project[]>([]);
+  const { setCurrentProject } = useStore();
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [activeTab, setActiveTab] = useState('my-projects');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Helper function to check if user is authenticated
-  const isAuthenticated = () => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      const userData = localStorage.getItem('user_data');
-      return !!(token && userData);
-    } catch (error) {
-      console.error("Could not get auth data from localStorage", error);
-    }
-    return false;
-  };
+  const queryClient = useQueryClient();
 
-  const loadSharedProjects = useCallback(async () => {
-    if (!isAuthenticated()) {
-      console.log('Not authenticated, skipping shared projects load');
-      return;
-    }
-    try {
-      const response = await apiService.getSharedWithMeProjects();
-      setSharedProjects(response.projects);
-    } catch (error) {
-      console.error('Failed to load shared projects:', error);
-      // If we get a 401, clear the shared projects array
-      if (error instanceof Error && error.message.includes('401')) {
-        setSharedProjects([]);
-      }
-    }
-  }, []);
-
-  const loadPublicProjects = useCallback(async () => {
-    if (!isAuthenticated()) {
-      console.log('Not authenticated, skipping public projects load');
-      return;
-    }
-    try {
-      const response = await apiService.getPublicProjects();
-      setPublicProjects(response.projects);
-    } catch (error) {
-      console.error('Failed to load public projects:', error);
-      // If we get a 401, clear the public projects array
-      if (error instanceof Error && error.message.includes('401')) {
-        setPublicProjects([]);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    loadProjects();
-    if (config.useCloudSync && isAuthenticated()) {
-      loadSharedProjects();
-      loadPublicProjects();
-    }
-  }, [loadProjects, loadSharedProjects, loadPublicProjects]);
+  const { data: myProjects = [], isLoading: isLoadingMyProjects, error: myProjectsError } = useMyProjects();
+  const { data: sharedProjects = [], isLoading: isLoadingSharedProjects, error: sharedProjectsError } = useSharedProjects();
+  const { data: publicProjects = [], isLoading: isLoadingPublicProjects, error: publicProjectsError } = usePublicProjects();
 
   // Filter out UUID projects if cloud sync is disabled
-  const projectsArray = Object.values(projects);
   const availableProjects = config.useCloudSync 
-    ? projectsArray 
-    : projectsArray.filter(project => typeof project.id === 'number');
+    ? myProjects 
+    : myProjects.filter(project => typeof project.id === 'number');
   
-  // Simple inline filtering to avoid function hoisting issues
-  const filteredAvailableProjects = React.useMemo(() => {
+  const filteredAvailableProjects = useMemo(() => {
     if (!searchTerm) return availableProjects;
     
     return availableProjects.filter(project => {
@@ -104,7 +45,7 @@ const ProjectsList = () => {
     });
   }, [availableProjects, searchTerm]);
 
-  const filteredSharedProjects = React.useMemo(() => {
+  const filteredSharedProjects = useMemo(() => {
     if (!searchTerm) return sharedProjects;
     return sharedProjects.filter(project => {
       if (!project?.name) return false;
@@ -114,7 +55,7 @@ const ProjectsList = () => {
     });
   }, [sharedProjects, searchTerm]);
 
-  const filteredPublicProjects = React.useMemo(() => {
+  const filteredPublicProjects = useMemo(() => {
     if (!searchTerm) return publicProjects;
     return publicProjects.filter(project => {
       if (!project?.name) return false;
@@ -131,10 +72,10 @@ const ProjectsList = () => {
   }
 
   const handleToggleVisibility = async (project: Project, isPublic: boolean) => {
-    // Refresh the lists after visibility change
-    await loadProjects();
+    // Invalidate relevant queries to refetch data
+    queryClient.invalidateQueries({ queryKey: ['projects', 'my'] });
     if (isPublic) {
-      await loadPublicProjects();
+      queryClient.invalidateQueries({ queryKey: ['projects', 'public'] });
     }
   };
 
@@ -168,20 +109,24 @@ const ProjectsList = () => {
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="my-projects" className="flex items-center gap-2">
                 <User className="h-4 w-4" />
-                My Projects ({filteredAvailableProjects.length})
+                My Projects ({isLoadingMyProjects ? '...' : filteredAvailableProjects.length})
               </TabsTrigger>
               <TabsTrigger value="shared" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
-                Shared with Me ({filteredSharedProjects.length})
+                Shared with Me ({isLoadingSharedProjects ? '...' : filteredSharedProjects.length})
               </TabsTrigger>
               <TabsTrigger value="public" className="flex items-center gap-2">
                 <Globe className="h-4 w-4" />
-                Public ({filteredPublicProjects.length})
+                Public ({isLoadingPublicProjects ? '...' : filteredPublicProjects.length})
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="my-projects" className="space-y-4">
-              {filteredAvailableProjects.length === 0 ? (
+              {isLoadingMyProjects ? (
+                <div>Loading my projects...</div>
+              ) : myProjectsError ? (
+                <div className="text-red-500">Error loading my projects: {myProjectsError.message}</div>
+              ) : filteredAvailableProjects.length === 0 ? (
                 <EmptyState
                   icon={FolderIcon}
                   title="No projects found"
@@ -210,7 +155,11 @@ const ProjectsList = () => {
             </TabsContent>
 
             <TabsContent value="shared" className="space-y-4">
-              {filteredSharedProjects.length === 0 ? (
+              {isLoadingSharedProjects ? (
+                <div>Loading shared projects...</div>
+              ) : sharedProjectsError ? (
+                <div className="text-red-500">Error loading shared projects: {sharedProjectsError.message}</div>
+              ) : filteredSharedProjects.length === 0 ? (
                 <EmptyState
                   icon={Users}
                   title="No shared projects"
@@ -232,7 +181,11 @@ const ProjectsList = () => {
             </TabsContent>
 
             <TabsContent value="public" className="space-y-4">
-              {filteredPublicProjects.length === 0 ? (
+              {isLoadingPublicProjects ? (
+                <div>Loading public projects...</div>
+              ) : publicProjectsError ? (
+                <div className="text-red-500">Error loading public projects: {publicProjectsError.message}</div>
+              ) : filteredPublicProjects.length === 0 ? (
                 <EmptyState
                   icon={Globe}
                   title="No public projects"
@@ -255,7 +208,11 @@ const ProjectsList = () => {
         ) : (
           // Non-cloud sync fallback
           <>
-            {filteredAvailableProjects.length === 0 ? (
+            {isLoadingMyProjects ? (
+              <div>Loading my projects...</div>
+            ) : myProjectsError ? (
+              <div className="text-red-500">Error loading my projects: {myProjectsError.message}</div>
+            ) : filteredAvailableProjects.length === 0 ? (
               <EmptyState
                 icon={FolderIcon}
                 title="No projects found"
@@ -293,7 +250,7 @@ const ProjectsList = () => {
           projectId={selectedProject.id!.toString()}
           projectName={selectedProject.name}
           onShareSuccess={() => {
-            loadSharedProjects();
+            queryClient.invalidateQueries({ queryKey: ['projects', 'shared'] });
             toast.success('Project sharing updated');
           }}
         />
