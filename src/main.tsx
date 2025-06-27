@@ -4,8 +4,6 @@ import ErrorBoundary from './components/ErrorBoundary.tsx'
 import './index.css'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-console.log('main.tsx starting...');
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -25,11 +23,8 @@ if (!rootElement) {
   throw new Error("Root element not found. Please ensure the HTML file contains a div with id='root'.");
 }
 
-console.log('Root element found, creating React root...');
-
 // Start React immediately - the App component will handle loading states
 const root = createRoot(rootElement);
-console.log('React root created, rendering app...');
 
 root.render(
   <QueryClientProvider client={queryClient}>
@@ -38,5 +33,3 @@ root.render(
     </ErrorBoundary>
   </QueryClientProvider>
 );
-
-console.log('App rendered!');

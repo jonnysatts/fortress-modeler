@@ -41,7 +41,6 @@ import { formatDate } from "@/lib/utils";
 
 const ProjectDetail = () => {
     const { projectId } = useParams<{ projectId: string }>();
-    console.log('🎨 ProjectDetail render - projectId:', projectId, 'timestamp:', Date.now());
 
   const navigate = useNavigate();
 

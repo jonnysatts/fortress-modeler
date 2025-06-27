@@ -1,4 +1,5 @@
 import { config } from './config';
+import { devLog } from './devLog';
 
 export interface User {
   id: string;
@@ -75,7 +76,7 @@ class AuthService {
   async handleCallback(code: string): Promise<{ token: string; user: User }> {
     // If there's already a pending callback, return it
     if (this.pendingCallback) {
-      console.log('Returning existing callback promise');
+      devLog('Returning existing callback promise');
       return this.pendingCallback;
     }
 
