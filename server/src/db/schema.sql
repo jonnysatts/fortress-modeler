@@ -77,6 +77,22 @@ CREATE TABLE IF NOT EXISTS sync_events (
     resolved BOOLEAN DEFAULT false
 );
 
+-- Pending sync conflicts awaiting user resolution
+CREATE TABLE IF NOT EXISTS sync_conflicts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id UUID,
+    local_entity_id INTEGER,
+    local_data JSONB,
+    server_data JSONB,
+    local_timestamp TIMESTAMPTZ,
+    server_timestamp TIMESTAMPTZ,
+    resolution VARCHAR(20) DEFAULT 'pending', -- use_server, use_client, merge
+    resolved_data JSONB,
+    resolved_at TIMESTAMPTZ
+);
+
 -- Project sharing (for Phase 5, but create table now)
 CREATE TABLE IF NOT EXISTS project_shares (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -98,6 +114,8 @@ CREATE INDEX IF NOT EXISTS idx_financial_models_local_id ON financial_models(loc
 CREATE INDEX IF NOT EXISTS idx_sync_events_user_id ON sync_events(user_id);
 CREATE INDEX IF NOT EXISTS idx_sync_events_entity ON sync_events(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_sync_events_timestamp ON sync_events(timestamp_server);
+CREATE INDEX IF NOT EXISTS idx_sync_conflicts_user_id ON sync_conflicts(user_id);
+CREATE INDEX IF NOT EXISTS idx_sync_conflicts_entity ON sync_conflicts(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_project_shares_project_id ON project_shares(project_id);
 CREATE INDEX IF NOT EXISTS idx_project_shares_email ON project_shares(shared_with_email);
 
