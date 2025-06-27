@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,9 +23,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { db, RevenueAssumption, CostAssumption } from "@/lib/db";
-import useStore from "@/store/useStore";
-import { storageService } from "@/lib/hybrid-storage";
+import { RevenueAssumption, CostAssumption } from "@/lib/db";
+import { useProject } from "@/hooks/useProjects";
+import { useCreateModel } from "@/hooks/useModels";
 import { toast } from "@/hooks/use-toast";
 import EventModelForm from "./components/EventModelForm";
 
@@ -75,23 +74,8 @@ type FormValues = z.infer<typeof formSchema>;
 const NewFinancialModel = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { createModelForCurrentProject, currentProject, setCurrentProject } = useStore();
-
-  // Load project if not already loaded. Avoid using unstable store functions in
-  // the dependency array to prevent unnecessary re-renders.
-  useEffect(() => {
-    if (projectId && (!currentProject || currentProject.id?.toString() !== projectId)) {
-      const fetchProject = async () => {
-        const project = await storageService.getProject(projectId);
-        if (project) {
-          // eslint-disable-next-line react-hooks/exhaustive-deps
-          setCurrentProject(project);
-        }
-      };
-      fetchProject();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, currentProject]);
+  const { data: currentProject, isLoading: projectLoading } = useProject(projectId);
+  const createModel = useCreateModel();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -116,7 +100,7 @@ const NewFinancialModel = () => {
   });
 
   const onSubmit = async (data: FormValues) => {
-    if (!projectId || !currentProject || !currentProject.id) {
+    if (!projectId || projectLoading || !currentProject || !currentProject.id) {
       toast({
         variant: "destructive",
         title: "Project not loaded",
@@ -159,23 +143,14 @@ const NewFinancialModel = () => {
         seasonalFactors: seasonalFactorsArray,
       };
 
-      // Create new financial model using the store method which handles cloud sync
-      const createdModel = await createModelForCurrentProject({
+      await createModel.mutateAsync({
+        projectId: currentProject.id,
         name: data.name,
         assumptions: {
           revenue: data.revenueAssumptions,
           costs: data.costAssumptions,
           growthModel,
         },
-      });
-      
-      if (!createdModel) {
-        throw new Error('Failed to create model');
-      }
-
-      toast({
-        title: "Financial model created",
-        description: `Successfully created "${data.name}" model.`,
       });
 
       navigate(`/projects/${projectId}`);
@@ -189,7 +164,7 @@ const NewFinancialModel = () => {
     }
   };
 
-  if (!currentProject) {
+  if (projectLoading || !currentProject) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="h-10 w-10 border-4 border-fortress-emerald border-t-transparent rounded-full animate-spin"></div>
