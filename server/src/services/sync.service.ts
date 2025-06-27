@@ -231,14 +231,31 @@ export class SyncService {
           ...data,
           id: conflict.entity_id,
           local_id: conflict.local_entity_id,
-          updated_at: new Date()
+          updated_at: data.updated_at ? new Date(data.updated_at) : new Date()
         });
       } else if (conflict.entity_type === 'model') {
         await FinancialModelService.upsertModel(userId, {
           ...data,
           id: conflict.entity_id,
           local_id: conflict.local_entity_id,
-          updated_at: new Date()
+          updated_at: data.updated_at ? new Date(data.updated_at) : new Date()
+        });
+      }
+    } else if (resolution === 'use_server') {
+      const data = conflict.server_data;
+      if (conflict.entity_type === 'project') {
+        await ProjectService.upsertProject(userId, {
+          ...data,
+          id: conflict.entity_id,
+          local_id: conflict.local_entity_id,
+          updated_at: data.updated_at ? new Date(data.updated_at) : new Date()
+        });
+      } else if (conflict.entity_type === 'model') {
+        await FinancialModelService.upsertModel(userId, {
+          ...data,
+          id: conflict.entity_id,
+          local_id: conflict.local_entity_id,
+          updated_at: data.updated_at ? new Date(data.updated_at) : new Date()
         });
       }
     }
@@ -265,7 +282,7 @@ export class SyncService {
       resolution_needed: 'manual',
       resolution: row.resolution,
       resolved_data: row.resolved_data,
-      resolved_at: row.resolved_at ? row.resolved_at.toISOString() : undefined
+      resolved_at: row.resolved_at ? row.resolved_at.toISOString() : null
     } as StoredConflict;
   }
   
@@ -292,7 +309,11 @@ export class SyncService {
 
             if (changeResult.conflict) {
               conflicts.push(changeResult.conflict);
-              await this.storeConflict(userId, changeResult.conflict);
+              try {
+                await this.storeConflict(userId, changeResult.conflict);
+              } catch (e) {
+                console.error("Failed to store conflict", e);
+              }
             } else if (changeResult.serverChange) {
               processedChanges.push(changeResult.serverChange);
             }
