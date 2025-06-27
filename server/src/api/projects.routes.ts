@@ -355,6 +355,34 @@ router.post('/:id/models', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// GET /projects/:id/actuals - Get project actuals data
+router.get('/:id/actuals', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    // Verify project exists and user has access
+    const project = await ProjectService.getProjectById(req.userId, id);
+    if (!project) {
+      res.status(404).json({
+        error: 'Project not found',
+        code: 'PROJECT_NOT_FOUND'
+      });
+      return;
+    }
+    
+    // For now, return empty array as actuals functionality is not implemented
+    // TODO: Implement actuals service when needed
+    res.json([]);
+    
+  } catch (error) {
+    console.error('Get project actuals error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch project actuals',
+      code: 'FETCH_ERROR'
+    });
+  }
+});
+
 // GET /projects/stats - Get detailed project statistics
 router.get('/stats/detailed', async (req: AuthRequest, res: Response) => {
   try {
