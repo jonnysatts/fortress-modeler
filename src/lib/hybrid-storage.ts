@@ -73,6 +73,51 @@ class HybridStorageService {
   async getActualsForProjectLocal(projectId: string | number): Promise<ActualsPeriodEntry[]> {
     return getActualsForProject(Number(projectId));
   }
+
+  // --- Backward Compatibility Aliases ---
+  async getProject(projectId: string | number): Promise<Project | undefined> {
+    return this.getProjectLocal(projectId);
+  }
+
+  async getAllProjects(): Promise<Project[]> {
+    return this.getAllProjectsLocal();
+  }
+
+  async createProject(projectData: Partial<Project>): Promise<Project> {
+    return this.createProjectLocal(projectData);
+  }
+
+  async updateProject(projectId: string | number, projectData: Partial<Project>): Promise<Project> {
+    return this.updateProjectLocal(projectId, projectData);
+  }
+
+  async deleteProject(projectId: string | number): Promise<void> {
+    return this.deleteProjectLocal(projectId);
+  }
+
+  async getModelsForProject(projectId: string | number): Promise<FinancialModel[]> {
+    return this.getModelsForProjectLocal(projectId);
+  }
+
+  async getModel(modelId: string | number): Promise<FinancialModel | undefined> {
+    return this.getModelLocal(modelId);
+  }
+
+  async createModel(modelData: Partial<FinancialModel>): Promise<FinancialModel> {
+    return this.createModelLocal(modelData);
+  }
+
+  async updateModel(modelId: string | number, modelData: Partial<FinancialModel>): Promise<FinancialModel> {
+    return this.updateModelLocal(modelId, modelData);
+  }
+
+  async deleteModel(modelId: string | number): Promise<void> {
+    return this.deleteModelLocal(modelId);
+  }
+
+  async getActualsForProject(projectId: string | number): Promise<ActualsPeriodEntry[]> {
+    return this.getActualsForProjectLocal(projectId);
+  }
 }
 
 export const storageService = new HybridStorageService();
