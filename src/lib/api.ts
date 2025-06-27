@@ -68,8 +68,21 @@ class ApiService {
   }
 
   async createProject(projectData: Partial<Project>): Promise<Project> {
-    const newProject = await this.request<Project>('/api/projects', { method: 'POST', body: JSON.stringify(projectData) });
-    return normalizeProject(newProject);
+    const response = await this.request<any>('/api/projects', { method: 'POST', body: JSON.stringify(projectData) });
+    console.log('🔍 API createProject response:', response);
+    
+    // Handle wrapped response format
+    let project: any;
+    if (response && response.project) {
+      project = response.project;
+    } else if (Array.isArray(response)) {
+      project = response[0]; // In case it's an array
+    } else {
+      project = response; // Direct project object
+    }
+    
+    console.log('📦 Extracted project from response:', project);
+    return normalizeProject(project);
   }
 
   async updateProject(projectId: string, projectData: Partial<Project>): Promise<Project> {
