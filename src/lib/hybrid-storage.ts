@@ -4,10 +4,19 @@ import { config } from './config';
 import useStore from '@/store/useStore';
 import { ActualsPeriodEntry } from '@/types/models';
 
+// Cache authentication status for 1 second to prevent excessive checks
+let authCache: { value: boolean; timestamp: number } | null = null;
+const AUTH_CACHE_DURATION = 1000; // 1 second
+
 const isCloudEnabled = () => {
   if (!config.useCloudSync) {
-    console.log('🔒 Cloud sync disabled in config');
     return false;
+  }
+  
+  // Check cache first
+  const now = Date.now();
+  if (authCache && (now - authCache.timestamp) < AUTH_CACHE_DURATION) {
+    return authCache.value;
   }
   
   // Check if user is authenticated by looking for auth_token in localStorage
@@ -17,17 +26,15 @@ const isCloudEnabled = () => {
     
     const hasToken = !!token;
     const hasUserData = !!userData;
+    const isAuthenticated = hasToken && hasUserData;
     
-    console.log('🔑 Authentication check:', { 
-      hasToken, 
-      hasUserData,
-      tokenLength: token?.length || 0,
-      userEmail: userData ? JSON.parse(userData)?.email : 'none'
-    });
+    // Update cache
+    authCache = { value: isAuthenticated, timestamp: now };
     
-    return hasToken && hasUserData;
+    return isAuthenticated;
   } catch (error) {
     console.error("Could not parse auth data from localStorage", error);
+    authCache = { value: false, timestamp: now };
   }
   return false;
 };

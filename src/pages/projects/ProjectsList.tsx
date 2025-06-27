@@ -94,7 +94,6 @@ const ProjectsList = () => {
   
   // Simple inline filtering to avoid function hoisting issues
   const filteredAvailableProjects = React.useMemo(() => {
-    console.log('🔍 filtering availableProjects:', availableProjects.length, 'searchTerm:', searchTerm);
     if (!searchTerm) return availableProjects;
     
     return availableProjects.filter(project => {
@@ -124,13 +123,6 @@ const ProjectsList = () => {
              (project.productType && project.productType.toLowerCase().includes(searchTerm.toLowerCase()));
     });
   }, [publicProjects, searchTerm]);
-  
-  console.log('🔍 ProjectsList: availableProjects:', availableProjects.map(p => ({ id: p.id, name: p.name, idType: typeof p.id })));
-  console.log('🔍 ProjectsList: first few projects:', availableProjects.slice(0, 3).map(p => ({ id: p.id, name: p.name, productType: p.productType })));
-  console.log('🔍 ProjectsList: searchTerm:', searchTerm);
-  console.log('🔍 ProjectsList: filtered projects count:', filteredAvailableProjects.length);
-  console.log('🔍 ProjectsList: projects object from store:', Object.keys(projects).length, 'keys');
-  console.log('🔍 ProjectsList: config.useCloudSync:', config.useCloudSync);
 
   function handleShareClick(project: Project, e: React.MouseEvent) {
     e.stopPropagation();
