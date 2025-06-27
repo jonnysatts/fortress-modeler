@@ -22,6 +22,7 @@ import { db, FinancialModel, Project, getActualsForProject } from "@/lib/db";
 import { storageService } from "@/lib/hybrid-storage";
 import { ActualsPeriodEntry } from "@/types/models";
 import { toast } from "@/hooks/use-toast";
+import { useProject, useModelsForProject, useDeleteProject } from "@/hooks/useProjects";
 import {
   Table,
   TableBody,
@@ -44,12 +45,12 @@ const ProjectDetail = () => {
 
   const navigate = useNavigate();
 
-  const [loading, setLoading] = useState(true);
-  const [project, setProject] = useState<Project | null>(null);
-  const [financialModels, setFinancialModels] = useState<FinancialModel[]>([]);
-  const loadedProjectIdRef = useRef<string | null>(null);
-  const deleteProject = useStore((state) => state.deleteProject); // Use selector for better performance
+  const { data: project, isLoading: projectLoading, error: projectError } = useProject(projectId);
+  const { data: financialModels = [], isLoading: modelsLoading } = useModelsForProject(projectId);
+  const deleteProjectMutation = useDeleteProject();
   const [activeTab, setActiveTab] = useState("overview");
+  
+  const loading = projectLoading || modelsLoading;
 
   const [actualsData, setActualsData] = useState<ActualsPeriodEntry[]>([]);
   const fetchActualsData = useCallback(async () => {
@@ -66,71 +67,32 @@ const ProjectDetail = () => {
     }
   }, [projectId]);
 
+  // Handle project not found error
   useEffect(() => {
-    const fetchProjectAndRelatedData = async () => {
-      // More robust check for invalid projectId from URL params
-      if (!projectId || projectId === 'undefined' || projectId === 'null') {
-        console.error('Rendered with invalid projectId, redirecting.');
-        navigate('/projects', { replace: true });
-        return;
-      }
+    if (!projectId || projectId === 'undefined' || projectId === 'null') {
+      console.error('Rendered with invalid projectId, redirecting.');
+      navigate('/projects', { replace: true });
+      return;
+    }
+    
+    if (projectError) {
+      console.error('Error fetching project details:', projectError);
+      toast({
+        variant: "destructive",
+        title: "Project not found",
+        description: "The requested project could not be found.",
+      });
+      navigate("/projects", { replace: true });
+    }
+  }, [projectId, projectError, navigate]);
 
-      // Prevent re-fetching if the component re-mounts with the same ID.
-      // The effect itself won't re-run unless projectId changes, but this
-      // handles the case of a parent causing a remount.
-      if (loadedProjectIdRef.current === projectId) {
-        console.log('📋 Project already loaded, skipping fetch on remount.');
-        return;
-      }
+  // Load actuals data when project changes
+  useEffect(() => {
+    if (project) {
+      fetchActualsData();
+    }
+  }, [project, fetchActualsData]);
 
-      setLoading(true);
-      setProject(null); // Clear old project data
-      setFinancialModels([]);
-      setActualsData([]);
-
-      try {
-        // Use the storageService to abstract away the local/cloud logic.
-        const projectData = await storageService.getProject(projectId);
-
-        if (!projectData) {
-          toast({
-            variant: "destructive",
-            title: "Project not found",
-            description: "The requested project could not be found.",
-          });
-          navigate("/projects", { replace: true });
-          return;
-        }
-
-        // Fetch models and actuals in parallel for efficiency
-        const [modelsData, actuals] = await Promise.all([
-          storageService.getModelsForProject(projectId),
-          storageService.getActualsForProject(projectId)
-        ]);
-
-        // Set all state at once to minimize re-renders
-        setProject(projectData);
-        setFinancialModels(modelsData);
-        setActualsData(actuals);
-        loadedProjectIdRef.current = projectId;
-
-      } catch (error) {
-        console.error("Error fetching project details:", error);
-        toast({
-          variant: "destructive",
-          title: "Error Loading Project",
-          description: error instanceof Error ? error.message : "An unknown error occurred.",
-        });
-        navigate("/projects", { replace: true });
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProjectAndRelatedData();
-    // This effect should ONLY run when the projectId from the URL changes.
-    // `navigate` is stable. We removed the dependency on `fetchActualsData`
-    // by including its logic directly in this effect.
-  }, [projectId, navigate]);
 
   const handleActualsSaved = () => {
     fetchActualsData();
@@ -139,21 +101,23 @@ const ProjectDetail = () => {
   const handleDeleteProject = async () => {
     if (!project?.id) return;
     
-    try {
-      await deleteProject(project.id);
-      toast({
-        title: "Project deleted",
-        description: "The project has been successfully deleted.",
-      });
-      navigate("/projects");
-    } catch (error) {
-      console.error("Error deleting project:", error);
-      toast({
-        variant: "destructive",
-        title: "Failed to delete project",
-        description: "There was an error deleting the project. Please try again.",
-      });
-    }
+    deleteProjectMutation.mutate(project.id, {
+      onSuccess: () => {
+        toast({
+          title: "Project deleted",
+          description: "The project has been successfully deleted.",
+        });
+        navigate("/projects");
+      },
+      onError: (error) => {
+        console.error("Error deleting project:", error);
+        toast({
+          variant: "destructive",
+          title: "Failed to delete project",
+          description: "There was an error deleting the project. Please try again.",
+        });
+      }
+    });
   };
 
   if (loading || !project) {
