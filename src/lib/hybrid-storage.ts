@@ -4,7 +4,21 @@ import { config } from './config';
 import useStore from '@/store/useStore';
 import { ActualsPeriodEntry } from '@/types/models';
 
-const isCloudEnabled = () => config.useCloudSync && useStore.getState().isAuthenticated;
+const isCloudEnabled = () => {
+  if (!config.useCloudSync) return false;
+  
+  // Check if user is authenticated by looking for a valid token
+  try {
+    const authData = localStorage.getItem('auth-storage');
+    if (authData) {
+      const { state } = JSON.parse(authData);
+      return !!state.token;
+    }
+  } catch (error) {
+    console.error("Could not parse auth token from localStorage", error);
+  }
+  return false;
+};
 const isUUID = (id: string | number): id is string => 
   typeof id === 'string' && id.includes('-') && id.length === 36;
 
