@@ -12,6 +12,9 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
+  // Check if user has chosen offline mode
+  const isOfflineMode = localStorage.getItem('fortress_offline_mode') === 'true';
+
   // Show loading spinner while checking auth status
   if (isLoading) {
     return (
@@ -24,8 +27,8 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  // If cloud sync is disabled, allow access without authentication
-  if (!config.useCloudSync) {
+  // If cloud sync is disabled OR user chose offline mode, allow access without authentication
+  if (!config.useCloudSync || isOfflineMode) {
     return <>{children}</>;
   }
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink } from "react-router-dom";
-import { Home, FolderKanban, LineChart, ShieldAlert, Settings, ChevronsLeft, ChevronsRight, Cloud, CloudOff, User, LogOut, RefreshCw } from "lucide-react";
+import { Home, FolderKanban, LineChart, ShieldAlert, Settings, ChevronsLeft, ChevronsRight, Cloud, CloudOff, User, LogOut, RefreshCw, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -92,29 +92,67 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
             <div className={cn("flex items-center", isCollapsed ? "justify-center" : "justify-between")}>
               {!isCollapsed && (
                 <div className="flex items-center space-x-2">
-                  {isAuthenticated ? (
-                    <Cloud className="h-4 w-4 text-green-400" />
-                  ) : (
-                    <CloudOff className="h-4 w-4 text-red-400" />
-                  )}
-                  <span className="text-xs text-gray-400">
-                    {isAuthenticated ? 'Cloud Connected' : 'Offline Mode'}
-                  </span>
+                  {(() => {
+                    const isOfflineMode = localStorage.getItem('fortress_offline_mode') === 'true';
+                    if (isOfflineMode) {
+                      return (
+                        <>
+                          <Database className="h-4 w-4 text-yellow-400" />
+                          <span className="text-xs text-gray-400">Offline Mode</span>
+                        </>
+                      );
+                    } else if (isAuthenticated) {
+                      return (
+                        <>
+                          <Cloud className="h-4 w-4 text-green-400" />
+                          <span className="text-xs text-gray-400">Cloud Connected</span>
+                        </>
+                      );
+                    } else {
+                      return (
+                        <>
+                          <CloudOff className="h-4 w-4 text-red-400" />
+                          <span className="text-xs text-gray-400">Offline Mode</span>
+                        </>
+                      );
+                    }
+                  })()}
                 </div>
               )}
               
-              {isAuthenticated && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleSync}
-                  disabled={isSyncing}
-                  className="text-gray-300 hover:bg-gray-700 hover:text-white p-1"
-                >
-                  <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
-                  {!isCollapsed && <span className="ml-1 text-xs">Sync</span>}
-                </Button>
-              )}
+              {(() => {
+                const isOfflineMode = localStorage.getItem('fortress_offline_mode') === 'true';
+                if (isOfflineMode) {
+                  return (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        localStorage.removeItem('fortress_offline_mode');
+                        window.location.href = '/login?force=true';
+                      }}
+                      className="text-gray-300 hover:bg-gray-700 hover:text-white p-1"
+                    >
+                      <Cloud className="h-4 w-4" />
+                      {!isCollapsed && <span className="ml-1 text-xs">Enable Cloud</span>}
+                    </Button>
+                  );
+                } else if (isAuthenticated) {
+                  return (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleSync}
+                      disabled={isSyncing}
+                      className="text-gray-300 hover:bg-gray-700 hover:text-white p-1"
+                    >
+                      <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
+                      {!isCollapsed && <span className="ml-1 text-xs">Sync</span>}
+                    </Button>
+                  );
+                }
+                return null;
+              })()}
             </div>
 
             {/* User Info */}

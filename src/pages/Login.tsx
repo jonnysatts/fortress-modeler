@@ -12,15 +12,32 @@ export default function Login() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Check if user has chosen offline mode
+  const isOfflineMode = localStorage.getItem('fortress_offline_mode') === 'true';
+
   // If user is already authenticated, redirect to dashboard
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // If not using cloud sync, redirect to dashboard (local mode)
+  // If not using cloud sync, redirect to dashboard (local mode)  
   if (!config.useCloudSync) {
     return <Navigate to="/dashboard" replace />;
   }
+
+  // If user is in offline mode, redirect to dashboard unless they came here intentionally
+  // (we'll detect intentional visits by checking if they have the offline flag but are not authenticated)
+  if (isOfflineMode && !window.location.search.includes('force')) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Special case: if user manually navigated to login while in offline mode
+  // Don't auto-redirect, let them choose to enable cloud mode
+  const handleEnableCloudMode = () => {
+    localStorage.removeItem('fortress_offline_mode');
+    // Stay on login page to allow cloud authentication
+    window.location.reload();
+  };
 
   const handleLogin = async () => {
     try {
@@ -34,6 +51,9 @@ export default function Login() {
   };
 
   const handleLocalMode = () => {
+    // Set offline mode flag in localStorage
+    localStorage.setItem('fortress_offline_mode', 'true');
+    
     // Navigate to dashboard without authentication (local mode)
     window.location.href = '/dashboard';
   };
@@ -133,6 +153,26 @@ export default function Login() {
               )}
             </ul>
           </div>
+
+          {/* Show cloud mode option if user is in offline mode */}
+          {isOfflineMode && (
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <div className="text-center space-y-3">
+                <p className="text-sm text-gray-600">
+                  You're currently in offline mode
+                </p>
+                <Button
+                  onClick={handleEnableCloudMode}
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                >
+                  <Cloud className="h-4 w-4 mr-2" />
+                  Switch to Cloud Mode
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
