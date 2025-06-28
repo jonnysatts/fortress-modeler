@@ -9,8 +9,8 @@ echo "================================================"
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-# Change to the project directory
-cd "$SCRIPT_DIR"
+# Change to the project directory (parent of scripts directory)
+cd "$SCRIPT_DIR/.."
 
 # Check if Node.js is installed
 if ! command -v node &> /dev/null; then

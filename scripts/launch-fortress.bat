@@ -6,8 +6,8 @@ echo 🏰 Starting Fortress Financial Modeler...
 echo ================================================
 echo.
 
-REM Change to the directory where this batch file is located
-cd /d "%~dp0"
+REM Change to the directory where this batch file is located, then move to project root
+cd /d "%~dp0\.."
 
 REM Check if Node.js is installed
 node --version >nul 2>&1
