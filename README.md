@@ -4,6 +4,27 @@
 
 **URL**: https://lovable.dev/projects/083af2d7-5a91-4d42-8248-1c36fd24e935
 
+## 📁 Project Structure
+
+```
+fortress-modeler/
+├── src/                    # Frontend source code
+├── server/                 # Backend API server
+├── docs/                   # 📚 Documentation (organized by category)
+│   ├── deployment/         # Deployment guides
+│   ├── architecture/       # System architecture
+│   ├── phases/            # Development phases
+│   └── user-guides/       # User documentation
+├── scripts/               # 🚀 Launch scripts & utilities
+├── deployment/            # 🔧 Deployment configurations
+│   ├── cloud/            # Cloud deployment files
+│   ├── docker/           # Docker configurations
+│   └── nginx/            # Web server configs
+├── config/               # ⚙️ Application configurations
+├── public/               # Static assets
+└── [config files]       # Build & development configs
+```
+
 ## How can I edit this code?
 
 There are several ways of editing your application.
