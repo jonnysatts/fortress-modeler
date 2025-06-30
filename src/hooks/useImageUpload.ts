@@ -9,9 +9,11 @@ export const useImageUpload = () => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        const result = reader.result as string;
-        setPreview(result);
-        setDataUrl(result);
+        const result = reader.result;
+        if (typeof result === 'string') {
+          setPreview(result);
+          setDataUrl(result);
+        }
       };
       reader.readAsDataURL(file);
     }

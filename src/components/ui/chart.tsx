@@ -2,6 +2,7 @@ import * as React from "react"
 import * as RechartsPrimitive from "recharts"
 
 import { cn } from "@/lib/utils"
+import { sanitizeTextInput } from "@/lib/security"
 
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" } as const
@@ -86,7 +87,12 @@ ${colorConfig
     const color =
       itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
       itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
+    // Sanitize color value to prevent CSS injection
+    const sanitizedColor = color && typeof color === 'string' ? sanitizeTextInput(color) : color
+    // Only allow valid CSS color values (hex, rgb, hsl, named colors)
+    const colorRegex = /^(#[0-9a-f]{3,8}|rgb\([^)]+\)|hsl\([^)]+\)|[a-z]+)$/i
+    const safeColor = sanitizedColor && colorRegex.test(sanitizedColor) ? sanitizedColor : null
+    return safeColor ? `  --color-${key}: ${safeColor};` : null
   })
   .join("\n")}
 }

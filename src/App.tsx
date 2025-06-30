@@ -20,8 +20,6 @@ const FinancialModelDetail = lazy(() => import("./pages/models/FinancialModelDet
 const EditFinancialModel = lazy(() => import("./pages/models/EditFinancialModel"));
 const Settings = lazy(() => import("./pages/Settings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const Login = lazy(() => import("./pages/Login"));
-const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 
 // Loading component for Suspense
 const PageLoader = () => (
@@ -55,11 +53,7 @@ const App = () => {
         <BrowserRouter>
           <Suspense fallback={<PageLoader />}>
             <Routes>
-              {/* Public routes */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
-              
-              {/* Protected routes */}
+              {/* All routes are public in local-only mode */}
               <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
                 <Route index element={<Dashboard />} />
                 <Route path="dashboard" element={<Dashboard />} />

@@ -7,8 +7,7 @@ import { isUUID } from './utils';
 
 // Define interfaces for our database tables
 export interface Project {
-  id?: number; // Auto-incrementing primary key
-  uuid: string; // Universal unique identifier
+  id: string; // UUID primary key
   name: string;
   description?: string;
   productType: string;
@@ -29,9 +28,8 @@ export interface Project {
 }
 
 export interface FinancialModel {
-  id?: number;
-  uuid?: string; // Add a UUID for unique identification across systems
-  projectId: number | string; // Support both numeric IDs (local) and UUID strings (cloud)
+  id: string; // UUID primary key
+  projectId: string; // Project UUID reference
   name: string;
   assumptions: {
     revenue: RevenueAssumption[];
@@ -68,8 +66,8 @@ export interface GrowthModel {
 }
 
 export interface ActualPerformance {
-  id?: number;
-  projectId: number | string; // Support both numeric IDs (local) and UUID strings (cloud)
+  id: string; // UUID primary key
+  projectId: string; // Project UUID reference
   date: Date;
   metrics: {
     [key: string]: number;
@@ -78,8 +76,8 @@ export interface ActualPerformance {
 }
 
 export interface Risk {
-  id?: number;
-  projectId: number | string; // Support both numeric IDs (local) and UUID strings (cloud)
+  id: string; // UUID primary key
+  projectId: string; // Project UUID reference
   name: string;
   type: 'financial' | 'operational' | 'strategic' | 'regulatory' | 'other';
   likelihood: 'low' | 'medium' | 'high';
@@ -91,9 +89,9 @@ export interface Risk {
 }
 
 export interface Scenario {
-  id?: number;
-  projectId: number | string; // Support both numeric IDs (local) and UUID strings (cloud)
-  modelId: number;
+  id: string; // UUID primary key
+  projectId: string; // Project UUID reference
+  modelId: string; // Model UUID reference
   name: string;
   description?: string;
   assumptions: {
@@ -105,12 +103,12 @@ export interface Scenario {
 }
 
 export class FortressDB extends Dexie {
-  projects!: Table<Project, number>;
-  financialModels!: Table<FinancialModel, number>;
-  actualPerformance!: Table<ActualPerformance, number>;
-  risks!: Table<Risk, number>;
-  scenarios!: Table<Scenario, number>;
-  actuals!: Table<ActualsPeriodEntry, number>;
+  projects!: Table<Project, string>;
+  financialModels!: Table<FinancialModel, string>;
+  actualPerformance!: Table<ActualPerformance, string>;
+  risks!: Table<Risk, string>;
+  scenarios!: Table<Scenario, string>;
+  actuals!: Table<ActualsPeriodEntry, string>;
 
   constructor() {
     super('FortressDB');
@@ -122,6 +120,109 @@ export class FortressDB extends Dexie {
       risks: '++id, projectId, type, likelihood, impact, status',
       scenarios: '++id, projectId, modelId, name, createdAt',
       actuals: '++id, &[projectId+period], projectId, period'
+    });
+
+    this.version(6).stores({
+      projects: '++id, &uuid, name, productType, createdAt, updatedAt',
+      financialModels: '++id, &uuid, projectId, name, createdAt, updatedAt',
+      actualPerformance: '++id, projectId, date',
+      risks: '++id, projectId, type, likelihood, impact, status',
+      scenarios: '++id, projectId, modelId, name, createdAt',
+      actuals: '++id, &[projectId+period], projectId, period'
+    }).upgrade(async tx => {
+      console.log('🔧 Upgrading to version 6: Ensuring UUID consistency');
+      
+      // Fix any projects missing UUID field
+      const projectsToFix = await tx.table('projects').toArray();
+      for (const project of projectsToFix) {
+        if (!project.uuid) {
+          await tx.table('projects').update(project.id!, {
+            uuid: crypto.randomUUID()
+          });
+        }
+      }
+      
+      // Fix any models missing UUID field
+      const modelsToFix = await tx.table('financialModels').toArray();
+      for (const model of modelsToFix) {
+        if (!model.uuid) {
+          await tx.table('financialModels').update(model.id!, {
+            uuid: crypto.randomUUID()
+          });
+        }
+      }
+    });
+
+    this.version(7).stores({
+      projects: '&id, name, productType, createdAt, updatedAt',
+      financialModels: '&id, projectId, name, createdAt, updatedAt',
+      actualPerformance: '&id, projectId, date',
+      risks: '&id, projectId, type, likelihood, impact, status',
+      scenarios: '&id, projectId, modelId, name, createdAt',
+      actuals: '&id, &[projectId+period], projectId, period'
+    }).upgrade(async tx => {
+      console.log('🔧 Upgrading to version 7: Converting to UUID-only primary keys');
+      
+      try {
+        // Migrate projects: use uuid as new id
+        const projects = await tx.table('projects').toArray();
+        await tx.table('projects').clear();
+        
+        for (const project of projects) {
+          const newProject = {
+            ...project,
+            id: project.uuid || crypto.randomUUID()
+          };
+          delete newProject.uuid; // Remove old uuid field
+          await tx.table('projects').add(newProject);
+        }
+        
+        // Migrate financial models: use uuid as new id, update projectId references
+        const models = await tx.table('financialModels').toArray();
+        await tx.table('financialModels').clear();
+        
+        for (const model of models) {
+          // Find the project this model belongs to
+          const project = projects.find(p => p.id === model.projectId);
+          const newModel = {
+            ...model,
+            id: model.uuid || crypto.randomUUID(),
+            projectId: project?.uuid || project?.id || model.projectId
+          };
+          delete newModel.uuid; // Remove old uuid field
+          await tx.table('financialModels').add(newModel);
+        }
+        
+        // Migrate other tables - generate UUIDs for all records
+        const tables = ['actualPerformance', 'risks', 'scenarios', 'actuals'];
+        for (const tableName of tables) {
+          const records = await tx.table(tableName).toArray();
+          await tx.table(tableName).clear();
+          
+          for (const record of records) {
+            // Find the project this record belongs to
+            const project = projects.find(p => p.id === record.projectId);
+            const newRecord = {
+              ...record,
+              id: crypto.randomUUID(),
+              projectId: project?.uuid || project?.id || record.projectId
+            };
+            
+            // Update modelId for scenarios if it exists
+            if (tableName === 'scenarios' && record.modelId) {
+              const model = models.find(m => m.id === record.modelId);
+              newRecord.modelId = model?.uuid || model?.id || record.modelId;
+            }
+            
+            await tx.table(tableName).add(newRecord);
+          }
+        }
+        
+        console.log('✅ Successfully migrated to UUID-only schema');
+      } catch (error) {
+        console.error('❌ Migration failed:', error);
+        throw error;
+      }
     });
 
     this.version(4).stores({
@@ -166,30 +267,21 @@ export const getProjects = async (): Promise<Project[]> => {
 };
 
 export const getProject = async (
-  id: number | string,
+  id: string,
 ): Promise<Project | undefined> => {
   try {
-    if (typeof id === 'number') {
-      return db.projects.get(id);
-    }
-
-    if (isUUID(id)) {
-      const projectByUuid = await db.projects.where('uuid').equals(id).first();
-      if (projectByUuid) return projectByUuid;
-    }
-
-    if (/^\d+$/.test(id)) {
-      return db.projects.get(parseInt(id, 10));
-    }
-
-    return undefined;
+    console.log('🔧 getProject called with UUID:', id);
+    
+    const result = await db.projects.get(id);
+    console.log('🔧 Found project:', result);
+    return result;
   } catch (error) {
     logError(error, 'getProject');
     throw new DatabaseError(`Failed to fetch project with ID ${id}`, error);
   }
 };
 
-export const createProject = async (project: Omit<Project, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>): Promise<number> => {
+export const createProject = async (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
   try {
     if (!project.name?.trim()) {
       throw new ValidationError('Project name is required');
@@ -199,14 +291,19 @@ export const createProject = async (project: Omit<Project, 'id' | 'uuid' | 'crea
     }
     
     const timestamp = new Date();
-    const projectId = await db.projects.add({
+    const id = crypto.randomUUID();
+    
+    console.log('🔧 Creating project with UUID:', id);
+    
+    await db.projects.add({
       ...project,
-      uuid: crypto.randomUUID(), // Standard browser API for generating UUIDs
+      id, // UUID as primary key
       createdAt: timestamp,
       updatedAt: timestamp
     });
     
-    return projectId;
+    console.log('🔧 Project created with UUID:', id);
+    return id;
   } catch (error) {
     if (error instanceof ValidationError) throw error;
     logError(error, 'createProject');
@@ -214,20 +311,20 @@ export const createProject = async (project: Omit<Project, 'id' | 'uuid' | 'crea
   }
 };
 
-export const updateProject = async (id: number | string, projectData: Partial<Omit<Project, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>>): Promise<number> => {
+export const updateProject = async (id: string, projectData: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>): Promise<string> => {
   try {
     const existingProject = await getProject(id);
     if (!existingProject || !existingProject.id) {
       throw new NotFoundError(`Project with ID ${id} not found`);
     }
-    const idNum = existingProject.id;
+    const projectId = existingProject.id;
 
-    const updatedCount = await db.projects.update(idNum, { ...projectData, updatedAt: new Date() });
+    const updatedCount = await db.projects.update(projectId, { ...projectData, updatedAt: new Date() });
     if (updatedCount === 0) {
       // No error, but can be useful to know no changes were made.
     }
 
-    return idNum;
+    return projectId;
   } catch (error) {
     if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
     logError(error, 'updateProject');
@@ -235,22 +332,22 @@ export const updateProject = async (id: number | string, projectData: Partial<Om
   }
 };
 
-export const deleteProject = async (id: number | string): Promise<void> => {
+export const deleteProject = async (id: string): Promise<void> => {
   try {
     const existingProject = await getProject(id);
     if (!existingProject || !existingProject.id) {
       throw new NotFoundError(`Project with ID ${id} not found`);
     }
-    const idNum = existingProject.id;
+    const projectId = existingProject.id;
 
     // Use transaction for atomicity
     await db.transaction('rw', [db.projects, db.financialModels, db.actualPerformance, db.risks, db.scenarios, db.actuals], async () => {
-      await db.projects.delete(idNum);
-      await db.financialModels.where('projectId').equals(idNum).delete();
-      await db.actualPerformance.where('projectId').equals(idNum).delete();
-      await db.risks.where('projectId').equals(idNum).delete();
-      await db.scenarios.where('projectId').equals(idNum).delete();
-      await db.actuals.where('projectId').equals(idNum).delete();
+      await db.projects.delete(projectId);
+      await db.financialModels.where('projectId').equals(projectId).delete();
+      await db.actualPerformance.where('projectId').equals(projectId).delete();
+      await db.risks.where('projectId').equals(projectId).delete();
+      await db.scenarios.where('projectId').equals(projectId).delete();
+      await db.actuals.where('projectId').equals(projectId).delete();
     });
   } catch (error) {
     if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
@@ -259,34 +356,43 @@ export const deleteProject = async (id: number | string): Promise<void> => {
   }
 };
 
-export const getModelsForProject = async (projectId: number | string): Promise<FinancialModel[]> => {
+export const getModelsForProject = async (projectId: string): Promise<FinancialModel[]> => {
   try {
+    console.log('🔧 getModelsForProject called with:', projectId, 'type:', typeof projectId);
+    
+    // First, get the project to understand its actual stored ID
     const project = await getProject(projectId);
     if (!project) {
-      throw new NotFoundError(`Project with ID ${projectId} not found`);
+      console.log('🔧 Project not found:', projectId);
+      return [];
     }
-
-    const searchId = project.id ?? projectId;
-    return db.financialModels.where('projectId').equals(searchId as any).toArray();
+    
+    console.log('🔧 Found project:', project.id);
+    
+    // Search models by the project's ID
+    const models = await db.financialModels.where('projectId').equals(project.id).toArray();
+    
+    console.log('🔧 Models found:', models.length);
+    
+    return models;
   } catch (error) {
-    if (error instanceof NotFoundError) throw error;
     logError(error, 'getModelsForProject');
     throw new DatabaseError(`Failed to get models for project ${projectId}`, error);
   }
 };
 
-export const getActualsForProject = async (projectId: number | string): Promise<ActualsPeriodEntry[]> => {
+export const getActualsForProject = async (projectId: string): Promise<ActualsPeriodEntry[]> => {
   const project = await getProject(projectId);
   const searchId = project?.id ?? projectId;
-  return db.actuals.where({ projectId: searchId as any }).toArray();
+  return db.actuals.where({ projectId: searchId }).toArray();
 };
 
-export const upsertActualsPeriod = async (actualEntry: Omit<ActualsPeriodEntry, 'id'>): Promise<number> => {
+export const upsertActualsPeriod = async (actualEntry: Omit<ActualsPeriodEntry, 'id'>): Promise<string> => {
   const project = await getProject(actualEntry.projectId);
   const searchId = project?.id ?? actualEntry.projectId;
 
   const existing = await db.actuals.get({
-    projectId: searchId as any,
+    projectId: searchId,
     period: actualEntry.period
   });
 
@@ -294,32 +400,22 @@ export const upsertActualsPeriod = async (actualEntry: Omit<ActualsPeriodEntry, 
     await db.actuals.update(existing.id, { ...actualEntry, projectId: searchId });
     return existing.id;
   } else {
-    return db.actuals.add({ ...actualEntry, projectId: searchId } as ActualsPeriodEntry);
+    const id = crypto.randomUUID();
+    await db.actuals.add({ ...actualEntry, id, projectId: searchId } as ActualsPeriodEntry);
+    return id;
   }
 };
 
 // Financial Model operations
 export const getModelById = async (
-  id: number | string,
+  id: string,
 ): Promise<FinancialModel | undefined> => {
   try {
-    if (typeof id === 'number') {
-      if (isNaN(id) || id <= 0) {
-        throw new ValidationError('Invalid model ID provided');
-      }
-      return db.financialModels.get(id);
+    if (!id?.trim()) {
+      throw new ValidationError('Invalid model ID provided');
     }
-
-    if (isUUID(id)) {
-      const modelByUuid = await db.financialModels.where('uuid').equals(id).first();
-      if (modelByUuid) return modelByUuid;
-    }
-
-    if (/^\d+$/.test(id)) {
-      return db.financialModels.get(parseInt(id, 10));
-    }
-
-    return undefined;
+    
+    return await db.financialModels.get(id);
   } catch (error) {
     if (error instanceof ValidationError) throw error;
     logError(error, 'getModelById');
@@ -327,33 +423,27 @@ export const getModelById = async (
   }
 };
 
-export const addFinancialModel = async (model: Omit<FinancialModel, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>): Promise<number> => {
+export const addFinancialModel = async (model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
   try {
-    // Validate project ID - support both numeric IDs (local) and UUID strings (cloud)
-    if (!model.projectId) {
+    // Validate project ID
+    if (!model.projectId?.trim()) {
       throw new ValidationError('Project ID is required');
-    }
-    // For numeric IDs, validate they are positive numbers
-    if (typeof model.projectId === 'number' && (isNaN(model.projectId) || model.projectId <= 0)) {
-      throw new ValidationError('Invalid numeric project ID provided');
-    }
-    // For string IDs (UUIDs), validate they are not empty
-    if (typeof model.projectId === 'string' && !model.projectId.trim()) {
-      throw new ValidationError('Invalid string project ID provided');
     }
     if (!model.name?.trim()) {
       throw new ValidationError('Model name is required');
     }
 
     const timestamp = new Date();
-    const modelId = await db.financialModels.add({
+    const id = crypto.randomUUID();
+    
+    await db.financialModels.add({
       ...model,
-      uuid: crypto.randomUUID(),
+      id,
       createdAt: timestamp,
       updatedAt: timestamp,
     });
 
-    return modelId;
+    return id;
   } catch (error) {
     if (error instanceof ValidationError) throw error;
     logError(error, 'addFinancialModel');
@@ -362,9 +452,9 @@ export const addFinancialModel = async (model: Omit<FinancialModel, 'id' | 'uuid
 };
 
 export const updateFinancialModel = async (
-  id: number | string,
-  updates: Partial<Omit<FinancialModel, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>>,
-): Promise<number> => {
+  id: string,
+  updates: Partial<Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>>,
+): Promise<string> => {
   try {
     const model = await getModelById(id);
     if (!model || !model.id) {
@@ -387,7 +477,7 @@ export const updateFinancialModel = async (
   }
 };
 
-export const deleteFinancialModel = async (id: number | string): Promise<void> => {
+export const deleteFinancialModel = async (id: string): Promise<void> => {
   try {
     const model = await getModelById(id);
     if (!model || !model.id) {

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { ArrowLeft, Edit, Trash2, PlusCircle, BarChart3, AlertTriangle, Building } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,12 +17,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import useStore from "@/store/useStore";
-import { db, FinancialModel, Project, getActualsForProject } from "@/lib/db";
-import { storageService } from "@/lib/hybrid-storage";
-import { ActualsPeriodEntry } from "@/types/models";
+import { FinancialModel, Project } from "@/lib/db";
 import { toast } from "sonner";
-import { useProject, useModelsForProject, useDeleteProject } from "@/hooks/useProjects";
+import { useProject, useDeleteProject } from "@/hooks/useProjects";
+import { useModelsForProject } from "@/hooks/useModels";
+import { useActualsForProject } from "@/hooks/useActuals";
 import {
   Table,
   TableBody,
@@ -35,7 +34,6 @@ import { ActualsInputForm } from "@/components/models/ActualsInputForm";
 import ModelOverview from "@/components/models/ModelOverview";
 import { ActualsDisplayTable } from "@/components/models/ActualsDisplayTable";
 import { PerformanceAnalysis } from "@/components/models/PerformanceAnalysis";
-import { config } from "@/lib/config";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDate } from "@/lib/utils";
 
@@ -46,27 +44,11 @@ const ProjectDetail = () => {
 
   const { data: project, isLoading: projectLoading, error: projectError } = useProject(projectId);
   const { data: financialModels = [], isLoading: modelsLoading } = useModelsForProject(projectId);
+  const { data: actualsData = [], isLoading: actualsLoading } = useActualsForProject(projectId);
   const deleteProjectMutation = useDeleteProject();
   const [activeTab, setActiveTab] = useState("overview");
   
-  const loading = projectLoading || modelsLoading;
-
-  const [actualsData, setActualsData] = useState<ActualsPeriodEntry[]>([]);
-  const fetchActualsData = useCallback(async () => {
-    if (!projectId) return;
-    try {
-      // Hybrid storage service will handle fetching from cloud or local based on ID type
-      const data = await storageService.getActualsForProject(projectId);
-      setActualsData(data);
-    } catch (error) {
-      console.error("Error fetching actuals data:", error);
-      // Silently handle errors for actuals data - not critical for app functionality
-      setActualsData([]);
-    }
-  }, [projectId]);
-
-  // Track if actuals have already been loaded to avoid refetching
-  const actualsLoadedRef = useRef(false);
+  const loading = projectLoading || modelsLoading || actualsLoading;
 
   // Handle project not found error
   useEffect(() => {
@@ -85,18 +67,8 @@ const ProjectDetail = () => {
     }
   }, [projectId, projectError, navigate]);
 
-  // Load actuals data once when a valid project ID is available
-  useEffect(() => {
-    const id = projectId ?? project?.id;
-    if (!id || actualsLoadedRef.current) return;
-    fetchActualsData();
-    actualsLoadedRef.current = true;
-  }, [projectId, project?.id]);
 
-
-  const handleActualsSaved = () => {
-    fetchActualsData();
-  };
+  // Actuals cache invalidation is now handled by React Query mutations
 
   const handleDeleteProject = async () => {
     if (!project?.id) return;
@@ -321,7 +293,6 @@ const ProjectDetail = () => {
                <ActualsInputForm 
                   model={financialModels[0]} 
                   existingActuals={actualsData} 
-                  onActualsSaved={handleActualsSaved} 
                />
                <ActualsDisplayTable 
                   model={financialModels[0]}

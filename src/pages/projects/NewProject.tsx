@@ -15,10 +15,10 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import useStore from "@/store/useStore";
 import { Label } from "@/components/ui/label";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { productTypes } from "@/lib/constants";
+import { useCreateProject } from "@/hooks/useProjects";
 
 const formSchema = z.object({
   name: z.string().min(3, "Project name must be at least 3 characters"),
@@ -33,7 +33,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 const NewProject = () => {
   const navigate = useNavigate();
-  const { createProject } = useStore();
+  const createProjectMutation = useCreateProject();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { preview: avatarPreview, dataUrl: avatarDataUrl, handleImageChange, removeImage } = useImageUpload();
   const form = useForm<FormValues>({
@@ -50,7 +50,7 @@ const NewProject = () => {
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
     try {
-      const createdProject = await createProject({
+      const createdProject = await createProjectMutation.mutateAsync({
         name: data.name,
         description: data.description,
         productType: data.productType,
@@ -62,10 +62,6 @@ const NewProject = () => {
         avatarImage: avatarDataUrl,
       });
       
-      toast.success("Project created!", {
-        description: `${data.name} has been created successfully.`,
-      });
-      
       if (createdProject && createdProject.id) {
         navigate(`/projects/${createdProject.id}`);
       } else {
@@ -74,9 +70,12 @@ const NewProject = () => {
       }
     } catch (error) {
       console.error("Error creating project:", error);
-      toast.error("Failed to create project", {
-        description: "There was an error creating your project. Please try again.",
-      });
+      // The useCreateProject hook already shows toast messages, but we'll add a fallback
+      if (!createProjectMutation.isError) {
+        toast.error("Failed to create project", {
+          description: "There was an error creating your project. Please try again.",
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -304,10 +303,10 @@ const NewProject = () => {
                 </Button>
                 <Button 
                   type="submit" 
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || createProjectMutation.isPending}
                   className="bg-fortress-emerald hover:bg-fortress-emerald/90"
                 >
-                  {isSubmitting ? (
+                  {(isSubmitting || createProjectMutation.isPending) ? (
                     <span className="flex items-center gap-1">
                       <span className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                       Creating...

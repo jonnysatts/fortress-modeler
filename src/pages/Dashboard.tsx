@@ -11,10 +11,8 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { data: projects = [], isLoading } = useMyProjects();
 
-  // Filter out UUID projects if cloud sync is disabled
-  const availableProjects = config.useCloudSync 
-    ? projects 
-    : projects.filter(project => typeof project.id === 'number');
+  // Use all projects in local-only mode
+  const availableProjects = projects;
 
   // Calculate real metrics from actual project data
   const calculateTotalRevenue = () => {

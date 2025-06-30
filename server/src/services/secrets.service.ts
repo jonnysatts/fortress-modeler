@@ -93,13 +93,13 @@ export class SecretsService {
 
   static async getGoogleClientId(): Promise<string> {
     const secrets = await this.getSecrets();
-    console.log('Getting Google Client ID:', secrets.googleClientId ? 'Found' : 'Not found');
+    // Remove logging of secret availability for security
     return secrets.googleClientId;
   }
 
   static async getGoogleClientSecret(): Promise<string> {
     const secrets = await this.getSecrets();
-    console.log('Getting Google Client Secret:', secrets.googleClientSecret ? 'Found' : 'Not found');
+    // Remove logging of secret availability for security
     return secrets.googleClientSecret;
   }
 
@@ -110,7 +110,7 @@ export class SecretsService {
 
   static async getClientUrl(): Promise<string> {
     const secrets = await this.getSecrets();
-    console.log('Getting Client URL:', secrets.clientUrl);
+    // Client URL is not sensitive, but remove logging for consistency
     return secrets.clientUrl;
   }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, memo } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
   AreaChart,
@@ -247,4 +247,4 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
   );
 };
 
-export default RevenueTrends;
+export default memo(RevenueTrends);

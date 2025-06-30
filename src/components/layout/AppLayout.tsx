@@ -15,10 +15,8 @@ const AppLayout = () => {
   useEffect(() => {
     const init = async () => {
       try {
-        // Only add demo data if not using cloud sync or user is not authenticated
-        if (!config.useCloudSync || !user) {
-          await addDemoData(); // Add demo data if the database is empty
-        }
+        // Add demo data if the database is empty (local-only mode)
+        await addDemoData();
         // No need to load projects here - components will load their own data via React Query
       } catch (error) {
         console.error("Error initializing app:", error);

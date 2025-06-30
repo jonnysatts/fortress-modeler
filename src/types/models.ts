@@ -13,7 +13,7 @@ export interface CostCategory {
 }
 
 export interface GrowthModel {
-  type: string;
+  type: 'linear' | 'exponential' | 'seasonal' | 'custom';
   rate: number;
   seasonalFactors?: number[];
   individualRates?: {
@@ -22,7 +22,7 @@ export interface GrowthModel {
 }
 
 export interface ModelMetadata {
-  type?: string;
+  type?: 'WeeklyEvent' | 'MonthlySubscription' | 'OneTime' | 'Custom';
   weeks?: number;
   months?: number;
   initialWeeklyAttendance?: number;
@@ -76,7 +76,7 @@ export interface ModelAssumptions {
 }
 
 export interface Model {
-  id?: string | number;
+  id: string; // UUID primary key
   name: string;
   description?: string;
   createdAt?: string | Date;
@@ -86,8 +86,8 @@ export interface Model {
 
 // --- NEW: Actuals Data Interface ---
 export interface ActualsPeriodEntry {
-  id?: number; // Auto-incrementing primary key from Dexie
-  projectId: number; // Changed from modelId to projectId
+  id: string; // UUID primary key
+  projectId: string; // Project UUID reference
   period: number; // Week or Month number
   periodType: 'Week' | 'Month'; // Type of period
   // Use Record<string, number> for flexibility

@@ -1,29 +1,24 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FinancialModel } from '@/lib/db';
-import { apiService } from '@/lib/api';
-import { storageService } from '@/lib/hybrid-storage';
-import { toast } from 'sonner';
+import { useStorageService, useErrorService, useLogService } from '@/services';
 
-const isCloudEnabled = () => {
-  try {
-    const token = localStorage.getItem('auth_token');
-    const userData = localStorage.getItem('user_data');
-    return !!(token && userData);
-  } catch (error) {
-    console.error('Could not get auth data from localStorage', error);
-  }
-  return false;
-};
+// Local-only mode - cloud sync is disabled
+const isCloudEnabled = () => false;
 
-export const useModelsForProject = (projectId: string | number | undefined) => {
+export const useModelsForProject = (projectId: string | undefined) => {
+  const storageService = useStorageService();
+  const logService = useLogService();
+  
+  // No normalization needed - projectId is already a string
   return useQuery<FinancialModel[], Error>({
     queryKey: ['models', projectId],
     queryFn: async () => {
+      logService.debug('useModelsForProject queryFn called', { projectId, type: typeof projectId });
       if (!projectId) return [];
-      if (typeof projectId === 'string' && projectId.includes('-') && isCloudEnabled()) {
-        return apiService.getModelsForProject(projectId);
-      }
-      return storageService.getModelsForProjectLocal(Number(projectId));
+      // Local-only mode - always use local storage
+      const models = await storageService.getModelsForProject(projectId);
+      logService.debug('useModelsForProject found models', { projectId, count: models.length });
+      return models;
     },
     enabled: !!projectId,
     staleTime: 5 * 60 * 1000,
@@ -33,14 +28,14 @@ export const useModelsForProject = (projectId: string | number | undefined) => {
 };
 
 export const useModel = (modelId: string | undefined) => {
+  const storageService = useStorageService();
+  
   return useQuery<FinancialModel, Error>({
     queryKey: ['models', modelId],
     queryFn: async () => {
       if (!modelId) throw new Error('Model ID is required');
-      if (modelId.includes('-') && isCloudEnabled()) {
-        return apiService.getModel(modelId);
-      }
-      return storageService.getModelLocal(modelId);
+      // Local-only mode - always use local storage
+      return storageService.getModel(modelId);
     },
     enabled: !!modelId,
     staleTime: 5 * 60 * 1000,
@@ -53,49 +48,58 @@ export const useCreateModel = () => {
   const queryClient = useQueryClient();
   return useMutation<FinancialModel, Error, Partial<FinancialModel>>({
     mutationFn: async (newModelData) => {
-      if (
-        isCloudEnabled() &&
-        typeof newModelData.projectId === 'string' &&
-        newModelData.projectId.includes('-')
-      ) {
-        return apiService.createModel(newModelData);
+      // Local-only mode - always use local storage
+      console.log('🔧 Creating model with data:', newModelData);
+      try {
+        const result = await storageService.createModel(newModelData);
+        console.log('✅ Model created successfully:', result);
+        return result;
+      } catch (error) {
+        console.error('❌ Model creation failed:', error);
+        throw error;
       }
-      return storageService.createModelLocal(newModelData);
     },
-    onMutate: async (newModelData) => {
-      await queryClient.cancelQueries({ queryKey: ['models', newModelData.projectId] });
-      const previousModels = queryClient.getQueryData<FinancialModel[]>(['models', newModelData.projectId]);
-      if (previousModels) {
-        queryClient.setQueryData(['models', newModelData.projectId], [
-          ...previousModels,
-          { ...(newModelData as FinancialModel), id: Date.now() } as FinancialModel,
-        ]);
-      }
-      return { previousModels };
-    },
+    // Temporarily disabled optimistic update to debug
+    // onMutate: async (newModelData) => {
+    //   await queryClient.cancelQueries({ queryKey: ['models', newModelData.projectId] });
+    //   const previousModels = queryClient.getQueryData<FinancialModel[]>(['models', newModelData.projectId]);
+    //   if (previousModels) {
+    //     queryClient.setQueryData(['models', newModelData.projectId], [
+    //       ...previousModels,
+    //       { ...(newModelData as FinancialModel), id: Date.now() } as FinancialModel,
+    //     ]);
+    //   }
+    //   return { previousModels };
+    // },
     onError: (err, variables, context) => {
       if (context?.previousModels) {
         queryClient.setQueryData(['models', variables.projectId], context.previousModels);
       }
       toast.error(`Failed to create model: ${err.message}`);
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      console.log('🔧 onSuccess - Created model:', data);
       toast.success('Model created successfully!');
-    },
-    onSettled: (_, __, variables) => {
+      // Invalidate cache for this project's models
       queryClient.invalidateQueries({ queryKey: ['models', variables.projectId] });
+      // Force immediate refetch
+      queryClient.refetchQueries({ queryKey: ['models', variables.projectId] });
+      console.log('🔧 onSuccess - Query invalidation and refetch completed for project:', variables.projectId);
+    },
+    onSettled: (data, error, variables) => {
+      console.log('🔧 onSettled - Invalidating queries for projectId:', variables.projectId);
+      queryClient.invalidateQueries({ queryKey: ['models', variables.projectId] });
+      console.log('🔧 onSettled - Query invalidation completed');
     },
   });
 };
 
 export const useUpdateModel = () => {
   const queryClient = useQueryClient();
-  return useMutation<FinancialModel, Error, { id: string | number; projectId: string | number; data: Partial<FinancialModel> }>({
+  return useMutation<FinancialModel, Error, { id: string; projectId: string; data: Partial<FinancialModel> }>({
     mutationFn: async ({ id, projectId, data }) => {
-      if (typeof id === 'string' && id.includes('-') && isCloudEnabled()) {
-        return apiService.updateModel(id, data);
-      }
-      return storageService.updateModelLocal(id, data);
+      // Local-only mode - always use local storage
+      return storageService.updateModel(id, data);
     },
     onMutate: async ({ id, projectId, data }) => {
       await Promise.all([
@@ -136,13 +140,10 @@ export const useUpdateModel = () => {
 
 export const useDeleteModel = () => {
   const queryClient = useQueryClient();
-  return useMutation<void, Error, { modelId: string | number; projectId: string | number }>({
+  return useMutation<void, Error, { modelId: string; projectId: string }>({
     mutationFn: async ({ modelId }) => {
-      if (typeof modelId === 'string' && modelId.includes('-') && isCloudEnabled()) {
-        await apiService.deleteModel(modelId);
-      } else {
-        await storageService.deleteModelLocal(Number(modelId));
-      }
+      // Local-only mode - always use local storage
+      await storageService.deleteModel(modelId);
     },
     onMutate: async ({ modelId, projectId }) => {
       await Promise.all([

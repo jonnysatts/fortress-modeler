@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
+import { visualizer } from "rollup-plugin-visualizer";
 import path from "path";
 
 // https://vitejs.dev/config/
@@ -10,6 +11,13 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
+    // Bundle analyzer - generates bundle-analysis.html
+    visualizer({
+      filename: 'dist/bundle-analysis.html',
+      open: false,
+      gzipSize: true,
+      brotliSize: true,
+    }),
   ],
   resolve: {
     alias: {
@@ -19,38 +27,56 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Vendor libraries
-          vendor: ['react', 'react-dom'],
-          router: ['react-router-dom'],
+        manualChunks: (id) => {
+          // Third-party vendor libraries
+          if (id.includes('node_modules')) {
+            // Large libraries get their own chunks
+            if (id.includes('recharts')) return 'charts';
+            if (id.includes('react-router-dom')) return 'router';
+            if (id.includes('dexie')) return 'database';
+            if (id.includes('@tanstack/react-query')) return 'react-query';
+            if (id.includes('zustand')) return 'state';
+            
+            // Group Radix UI components
+            if (id.includes('@radix-ui')) return 'radix-ui';
+            
+            // Form libraries
+            if (id.includes('react-hook-form') || id.includes('@hookform') || id.includes('zod')) {
+              return 'forms';
+            }
+            
+            // Core React libraries
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'react-vendor';
+            }
+            
+            // Utility libraries
+            if (id.includes('date-fns') || id.includes('lucide-react') || 
+                id.includes('clsx') || id.includes('tailwind-merge')) {
+              return 'utils';
+            }
+            
+            // Everything else goes to vendor
+            return 'vendor';
+          }
           
-          // UI libraries
-          ui: [
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-select',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-accordion',
-            '@radix-ui/react-alert-dialog',
-            '@radix-ui/react-toast'
-          ],
-          
-          // Chart libraries
-          charts: ['recharts'],
-          
-          // Database and state
-          database: ['dexie'],
-          state: ['zustand', '@tanstack/react-query'],
-          
-          // Form handling
-          forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
-          
-          // Utilities
-          utils: ['date-fns', 'lucide-react', 'clsx', 'tailwind-merge']
-        }
+          // Application code chunking
+          if (id.includes('src/components/ui/')) return 'ui-components';
+          if (id.includes('src/components/models/')) return 'model-components';
+          if (id.includes('src/pages/')) return 'pages';
+          if (id.includes('src/hooks/')) return 'hooks';
+          if (id.includes('src/lib/')) return 'lib';
+          if (id.includes('src/services/')) return 'services';
+        },
+        // Optimize chunk naming for better caching
+        chunkFileNames: mode === 'production' ? 'assets/[name]-[hash].js' : 'assets/[name].js',
+        entryFileNames: mode === 'production' ? 'assets/[name]-[hash].js' : 'assets/[name].js',
+        assetFileNames: mode === 'production' ? 'assets/[name]-[hash][extname]' : 'assets/[name][extname]',
       }
     },
-    chunkSizeWarningLimit: 1000,
-    sourcemap: mode === 'development'
+    chunkSizeWarningLimit: 800,
+    sourcemap: mode === 'development',
+    minify: mode === 'production' ? 'esbuild' : false,
+    target: 'es2020'
   }
 }));

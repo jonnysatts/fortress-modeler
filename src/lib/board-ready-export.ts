@@ -12,12 +12,24 @@ import {
 } from './financial-calculations';
 import { formatCurrency } from './utils';
 
+export interface RevenueProjection {
+  period: number;
+  amount: number;
+  source: string;
+}
+
+export interface CostBreakdown {
+  category: string;
+  amount: number;
+  percentage: number;
+}
+
 export interface ProductReportData {
   project: Project;
   models: FinancialModel[];
   productSummary: ProductSummary;
-  revenueProjections: any[];
-  costBreakdown: any[];
+  revenueProjections: RevenueProjection[];
+  costBreakdown: CostBreakdown[];
 }
 
 export interface ProductSummary {

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, memo } from "react";
 import { FinancialModel } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
 import { TrendDataPoint } from "@/types/trends";
@@ -330,4 +330,4 @@ const FinancialMatrix = ({
   );
 };
 
-export default FinancialMatrix;
+export default memo(FinancialMatrix);
