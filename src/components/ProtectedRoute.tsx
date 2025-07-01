@@ -9,18 +9,15 @@ interface ProtectedRouteProps {
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading } = useSupabaseAuth();
   
-  // TEMPORARY: Bypass authentication check but still provide auth context
-  // TODO: Re-enable authentication once OAuth is working
-  console.log('🚧 [TEMP] Authentication check bypassed for testing');
-  
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    </div>;
   }
   
-  // Bypass the user check for now
-  // if (!user) {
-  //   return <Navigate to="/login" replace />;
-  // }
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
   
   return <>{children}</>;
 }

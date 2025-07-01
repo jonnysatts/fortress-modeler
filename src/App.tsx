@@ -8,6 +8,7 @@ import AppLoader from "./components/AppLoader";
 import { useAppLoader } from "./hooks/useAppLoader";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { PerformanceMonitorWidget } from "./components/PerformanceMonitor";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 // Lazy load components for code splitting
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -52,9 +53,10 @@ const App = () => {
     <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
+        <ErrorBoundary context="App">
+          <BrowserRouter>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
               {/* Auth routes - must be outside protected routes */}
               <Route path="login" element={<Login />} />
               <Route path="auth/callback" element={<AuthCallback />} />
@@ -77,9 +79,10 @@ const App = () => {
                 <Route path="migration" element={<Migration />} />
               </Route>
               <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </ErrorBoundary>
         <PerformanceMonitorWidget />
     </TooltipProvider>
   );

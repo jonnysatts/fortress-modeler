@@ -1,18 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useStorageService } from '@/services';
+import { getActualsForProject, upsertActualsPeriod } from '@/lib/db';
 import { ActualsPeriodEntry } from '@/types/models';
+import { toast } from 'sonner';
 
 /**
  * Hook for managing actuals data for projects
  */
 export const useActualsForProject = (projectId: string | undefined) => {
-  const storageService = useStorageService();
-  
   return useQuery<ActualsPeriodEntry[], Error>({
     queryKey: ['actuals', projectId],
     queryFn: async () => {
       if (!projectId) return [];
-      return storageService.getActualsForProject(projectId);
+      return getActualsForProject(projectId);
     },
     enabled: !!projectId,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -26,11 +25,10 @@ export const useActualsForProject = (projectId: string | undefined) => {
  */
 export const useSaveActuals = () => {
   const queryClient = useQueryClient();
-  const storageService = useStorageService();
 
   return useMutation<ActualsPeriodEntry, Error, ActualsPeriodEntry>({
     mutationFn: async (actualsData) => {
-      return storageService.upsertActualsPeriod(actualsData);
+      return upsertActualsPeriod(actualsData);
     },
     onSuccess: (data) => {
       // Invalidate and refetch actuals for this project

@@ -1,23 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FinancialModel } from '@/lib/db';
-import { useStorageService, useErrorService, useLogService } from '@/services';
+import { FinancialModel, db, getModelsForProject, getModelById, addFinancialModel, updateFinancialModel, deleteFinancialModel } from '@/lib/db';
+import { toast } from 'sonner';
 
 // Local-only mode - cloud sync is disabled
 const isCloudEnabled = () => false;
 
 export const useModelsForProject = (projectId: string | undefined) => {
-  const storageService = useStorageService();
-  const logService = useLogService();
-  
   // No normalization needed - projectId is already a string
   return useQuery<FinancialModel[], Error>({
     queryKey: ['models', projectId],
     queryFn: async () => {
-      logService.debug('useModelsForProject queryFn called', { projectId, type: typeof projectId });
+      console.log('useModelsForProject queryFn called', { projectId, type: typeof projectId });
       if (!projectId) return [];
-      // Local-only mode - always use local storage
-      const models = await storageService.getModelsForProject(projectId);
-      logService.debug('useModelsForProject found models', { projectId, count: models.length });
+      // Direct database access
+      const models = await getModelsForProject(projectId);
+      console.log('useModelsForProject found models', { projectId, count: models.length });
       return models;
     },
     enabled: !!projectId,
@@ -28,14 +25,12 @@ export const useModelsForProject = (projectId: string | undefined) => {
 };
 
 export const useModel = (modelId: string | undefined) => {
-  const storageService = useStorageService();
-  
   return useQuery<FinancialModel, Error>({
     queryKey: ['models', modelId],
     queryFn: async () => {
       if (!modelId) throw new Error('Model ID is required');
-      // Local-only mode - always use local storage
-      return storageService.getModel(modelId);
+      // Direct database access
+      return getModelById(modelId);
     },
     enabled: !!modelId,
     staleTime: 5 * 60 * 1000,
@@ -50,7 +45,7 @@ export const useCreateModel = () => {
     mutationFn: async (newModelData) => {
       // Local-only mode - always use local storage
       try {
-        const result = await storageService.createModel(newModelData);
+        const result = await addFinancialModel(newModelData);
         return result;
       } catch (error) {
         console.error('❌ Model creation failed:', error);
@@ -93,7 +88,7 @@ export const useUpdateModel = () => {
   return useMutation<FinancialModel, Error, { id: string; projectId: string; data: Partial<FinancialModel> }>({
     mutationFn: async ({ id, projectId, data }) => {
       // Local-only mode - always use local storage
-      return storageService.updateModel(id, data);
+      return updateFinancialModel(id, data);
     },
     onMutate: async ({ id, projectId, data }) => {
       await Promise.all([
@@ -137,7 +132,7 @@ export const useDeleteModel = () => {
   return useMutation<void, Error, { modelId: string; projectId: string }>({
     mutationFn: async ({ modelId }) => {
       // Local-only mode - always use local storage
-      await storageService.deleteModel(modelId);
+      await deleteFinancialModel(modelId);
     },
     onMutate: async ({ modelId, projectId }) => {
       await Promise.all([

@@ -2,8 +2,6 @@ import { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { serviceContainer, SERVICE_TOKENS } from '@/services/container/ServiceContainer';
-import { IErrorService } from '@/services/interfaces/IErrorService';
 
 interface Props {
   children: ReactNode;
@@ -21,7 +19,6 @@ interface State {
 }
 
 class ErrorBoundary extends Component<Props, State> {
-  private errorService: IErrorService | null = null;
   private maxRetries = 3;
 
   public state: State = {
@@ -30,18 +27,6 @@ class ErrorBoundary extends Component<Props, State> {
     errorInfo: null,
     retryCount: 0
   };
-
-  constructor(props: Props) {
-    super(props);
-    // Safely resolve error service without throwing
-    try {
-      this.errorService = serviceContainer.resolve<IErrorService>(SERVICE_TOKENS.ERROR_SERVICE);
-    } catch (error) {
-      console.error('❌ Failed to resolve ErrorService in ErrorBoundary:', error);
-      // Continue without error service rather than crashing
-      this.errorService = null;
-    }
-  }
 
   public static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error, errorInfo: null, retryCount: 0 };
@@ -53,28 +38,13 @@ class ErrorBoundary extends Component<Props, State> {
       errorInfo
     });
 
-    // Use the error service for logging if available
-    if (this.errorService) {
-      this.errorService.logError(
-        error,
-        this.props.context || 'ErrorBoundary',
-        'runtime',
-        'high',
-        {
-          componentStack: errorInfo.componentStack,
-          errorBoundary: true,
-          retryCount: this.state.retryCount,
-        }
-      );
-    } else {
-      // Fallback logging when error service is not available
-      console.error('ErrorBoundary caught error:', {
-        error,
-        context: this.props.context || 'ErrorBoundary',
-        componentStack: errorInfo.componentStack,
-        retryCount: this.state.retryCount,
-      });
-    }
+    // Simple console logging without service dependencies
+    console.error('ErrorBoundary caught error:', {
+      error,
+      context: this.props.context || 'ErrorBoundary',
+      componentStack: errorInfo.componentStack,
+      retryCount: this.state.retryCount,
+    });
 
     // Call custom error handler if provided
     if (this.props.onError) {
