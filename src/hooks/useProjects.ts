@@ -2,8 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Project, FinancialModel } from '@/lib/db';
 import { useStorageService, useErrorService } from '@/services';
 
-// Local-only mode - cloud sync is disabled
-const isCloudEnabled = () => false;
+// Check if cloud sync is enabled via environment variable
+const isCloudEnabled = () => import.meta.env.VITE_USE_SUPABASE_BACKEND === 'true';
 
 // --- Projects --- //
 
@@ -76,7 +76,6 @@ export const useCreateProject = () => {
   
   return useMutation<Project, Error, Partial<Project>>({
     mutationFn: async (newProjectData) => {
-      // Local-only mode - always use local storage
       return storageService.createProject(newProjectData);
     },
     onSuccess: () => {

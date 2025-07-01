@@ -6,7 +6,6 @@ import { lazy, Suspense } from "react";
 import AppLayout from "./components/layout/AppLayout";
 import AppLoader from "./components/AppLoader";
 import { useAppLoader } from "./hooks/useAppLoader";
-import { AuthProvider } from "./hooks/useAuth";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { PerformanceMonitorWidget } from "./components/PerformanceMonitor";
 
@@ -20,6 +19,9 @@ const NewFinancialModel = lazy(() => import("./pages/models/NewFinancialModel"))
 const FinancialModelDetail = lazy(() => import("./pages/models/FinancialModelDetail"));
 const EditFinancialModel = lazy(() => import("./pages/models/EditFinancialModel"));
 const Settings = lazy(() => import("./pages/Settings"));
+const Migration = lazy(() => import("./pages/Migration"));
+const AuthCallback = lazy(() => import("./pages/auth/AuthCallback"));
+const Login = lazy(() => import("./pages/Login").then(module => ({ default: module.Login })));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Loading component for Suspense
@@ -48,13 +50,16 @@ const App = () => {
 
   return (
     <TooltipProvider>
-      <AuthProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
           <Suspense fallback={<PageLoader />}>
             <Routes>
-              {/* All routes are public in local-only mode */}
+              {/* Auth routes - must be outside protected routes */}
+              <Route path="login" element={<Login />} />
+              <Route path="auth/callback" element={<AuthCallback />} />
+              
+              {/* Protected routes */}
               <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
                 <Route index element={<Dashboard />} />
                 <Route path="dashboard" element={<Dashboard />} />
@@ -69,13 +74,13 @@ const App = () => {
                 <Route path="performance" element={<Dashboard />} />
                 <Route path="risks" element={<Dashboard />} />
                 <Route path="settings" element={<Settings />} />
+                <Route path="migration" element={<Migration />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
         </BrowserRouter>
         <PerformanceMonitorWidget />
-      </AuthProvider>
     </TooltipProvider>
   );
 };

@@ -67,6 +67,7 @@ export const SERVICE_TOKENS = {
   ERROR_SERVICE: 'IErrorService',
   LOG_SERVICE: 'ILogService',
   CONFIG_SERVICE: 'IConfigService',
+  REALTIME_SERVICE: 'IRealtimeService',
 } as const;
 
 // Global container instance

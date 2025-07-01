@@ -19,7 +19,8 @@
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "vitest run --config vitest.e2e.config.ts"
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -50,6 +51,7 @@
     "@radix-ui/react-toggle": "^1.1.0",
     "@radix-ui/react-toggle-group": "^1.1.0",
     "@radix-ui/react-tooltip": "^1.1.4",
+    "@supabase/supabase-js": "^2.39.0",
     "@tanstack/react-query": "^5.56.2",
     "@types/uuid": "^10.0.0",
     "@types/xlsx": "^0.0.35",
@@ -67,6 +69,7 @@
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
+    "openai": "^5.8.2",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
@@ -110,6 +113,7 @@
     "rollup-plugin-visualizer": "^6.0.3",
     "tailwindcss": "^3.4.17",
     "ts-unused-exports": "^11.0.1",
+    "tsx": "^4.6.2",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
     "vite": "^5.4.1",

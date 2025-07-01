@@ -14,59 +14,69 @@ export interface RecoveryStrategy {
  * Provides automatic and manual recovery options for different error types
  */
 export class ErrorRecoveryService {
-  private errorService: IErrorService;
-  private logService: ILogService;
+  private errorService: IErrorService | null = null;
+  private logService: ILogService | null = null;
   private recoveryStrategies: RecoveryStrategy[] = [];
+  private initialized = false;
 
   constructor() {
-    this.errorService = serviceContainer.resolve<IErrorService>(SERVICE_TOKENS.ERROR_SERVICE);
-    this.logService = serviceContainer.resolve<ILogService>(SERVICE_TOKENS.LOG_SERVICE);
-    this.setupDefaultStrategies();
+    // Don't resolve services in constructor
+  }
+
+  private ensureInitialized(): void {
+    if (!this.initialized) {
+      this.errorService = serviceContainer.resolve<IErrorService>(SERVICE_TOKENS.ERROR_SERVICE);
+      this.logService = serviceContainer.resolve<ILogService>(SERVICE_TOKENS.LOG_SERVICE);
+      this.setupDefaultStrategies();
+      this.initialized = true;
+    }
   }
 
   /**
    * Register a new recovery strategy
    */
   public registerStrategy(strategy: RecoveryStrategy): void {
+    this.ensureInitialized();
     this.recoveryStrategies.push(strategy);
-    this.logService.debug('Recovery strategy registered', { name: strategy.name });
+    this.logService?.debug('Recovery strategy registered', { name: strategy.name });
   }
 
   /**
    * Attempt to recover from an error automatically
    */
   public async attemptAutoRecovery(error: Error | unknown, context?: string): Promise<boolean> {
+    this.ensureInitialized();
     const applicableStrategies = this.recoveryStrategies.filter(strategy => 
       strategy.canRecover(error)
     );
 
     if (applicableStrategies.length === 0) {
-      this.logService.warn('No recovery strategies found for error', { context, error });
+      this.logService?.warn('No recovery strategies found for error', { context, error });
       return false;
     }
 
     for (const strategy of applicableStrategies) {
       try {
-        this.logService.info('Attempting recovery strategy', { 
+        this.logService?.info('Attempting recovery strategy', { 
           strategy: strategy.name, 
           context 
         });
         
         await strategy.recover();
         
-        this.logService.info('Recovery strategy succeeded', { 
+        this.logService?.info('Recovery strategy succeeded', { 
           strategy: strategy.name, 
           context 
         });
         
-        this.errorService.showSuccessToUser(
+        this.errorService?.showSuccessToUser(
           'Recovered from Error',
           `Successfully recovered using: ${strategy.description}`
         );
         
         return true;
       } catch (recoveryError) {
-        this.logService.warn('Recovery strategy failed', { 
+        this.logService?.warn('Recovery strategy failed', { 
           strategy: strategy.name, 
           context,
           recoveryError 
@@ -81,6 +91,7 @@ export class ErrorRecoveryService {
    * Get available recovery options for manual recovery
    */
   public getRecoveryOptions(error: Error | unknown): RecoveryStrategy[] {
+    this.ensureInitialized();
     return this.recoveryStrategies.filter(strategy => strategy.canRecover(error));
   }
 
@@ -88,6 +99,7 @@ export class ErrorRecoveryService {
    * Execute a specific recovery strategy manually
    */
   public async executeRecovery(strategyName: string, error: Error | unknown): Promise<void> {
+    this.ensureInitialized();
     const strategy = this.recoveryStrategies.find(s => s.name === strategyName);
     
     if (!strategy) {
@@ -100,8 +112,8 @@ export class ErrorRecoveryService {
 
     await strategy.recover();
     
-    this.logService.info('Manual recovery executed', { strategy: strategyName });
-    this.errorService.showSuccessToUser(
+    this.logService?.info('Manual recovery executed', { strategy: strategyName });
+    this.errorService?.showSuccessToUser(
       'Recovery Completed',
       strategy.description
     );
@@ -116,7 +128,7 @@ export class ErrorRecoveryService {
       name: 'page-reload',
       description: 'Reload the current page',
       canRecover: (error) => {
-        const message = this.errorService.getErrorMessage(error).toLowerCase();
+        const message = this.errorService?.getErrorMessage(error).toLowerCase() || '';
         return message.includes('chunk') || message.includes('module') || message.includes('script');
       },
       recover: async () => {
@@ -130,7 +142,7 @@ export class ErrorRecoveryService {
       name: 'clear-storage',
       description: 'Clear local storage and refresh',
       canRecover: (error) => {
-        const message = this.errorService.getErrorMessage(error).toLowerCase();
+        const message = this.errorService?.getErrorMessage(error).toLowerCase() || '';
         return message.includes('storage') || message.includes('quota') || message.includes('database');
       },
       recover: async () => {
@@ -151,7 +163,7 @@ export class ErrorRecoveryService {
       name: 'navigate-home',
       description: 'Return to the home page',
       canRecover: (error) => {
-        const message = this.errorService.getErrorMessage(error).toLowerCase();
+        const message = this.errorService?.getErrorMessage(error).toLowerCase() || '';
         return message.includes('route') || message.includes('navigation') || message.includes('not found');
       },
       recover: async () => {
@@ -164,7 +176,7 @@ export class ErrorRecoveryService {
       name: 'retry-network',
       description: 'Wait and retry the network operation',
       canRecover: (error) => {
-        return this.errorService.shouldRetry(error);
+        return this.errorService?.shouldRetry(error) || false;
       },
       recover: async () => {
         // This is a placeholder - actual retry would need to be implemented
@@ -174,7 +186,7 @@ export class ErrorRecoveryService {
       }
     });
 
-    this.logService.info('Default recovery strategies initialized', { 
+    this.logService?.info('Default recovery strategies initialized', { 
       count: this.recoveryStrategies.length 
     });
   }

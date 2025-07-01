@@ -1,61 +1,69 @@
 import { createRoot } from 'react-dom/client'
-import App from './App.tsx'
-import ErrorBoundary from './components/ErrorBoundary.tsx'
 import './index.css'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { bootstrapServices, ServiceProvider, serviceContainer, SERVICE_TOKENS } from './services';
-import { globalErrorHandler } from './services/implementations/GlobalErrorHandler';
+import { SupabaseAuthProvider, useSupabaseAuth } from './hooks/useSupabaseAuth';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthCallback } from './pages/AuthCallback';
+import { Login } from './pages/Login';
 
-// Bootstrap dependency injection services
-bootstrapServices();
+// Import the real dashboard component
+import Dashboard from './pages/Dashboard';
 
-// Initialize global error handlers
-globalErrorHandler.initialize();
-
-// Create QueryClient with error handling integration
+// Create QueryClient 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: (failureCount, error) => {
-        const errorService = serviceContainer.resolve(SERVICE_TOKENS.ERROR_SERVICE);
-        // Use our error service to determine if we should retry
-        return failureCount < 3 && errorService.shouldRetry(error);
-      },
+      retry: 3,
       staleTime: 5 * 60 * 1000, // 5 minutes
       refetchOnWindowFocus: false,
-      onError: (error) => {
-        const errorService = serviceContainer.resolve(SERVICE_TOKENS.ERROR_SERVICE);
-        errorService.logError(error, 'React Query', 'network', 'medium');
-      },
     },
     mutations: {
-      retry: (failureCount, error) => {
-        const errorService = serviceContainer.resolve(SERVICE_TOKENS.ERROR_SERVICE);
-        return failureCount < 2 && errorService.shouldRetry(error);
-      },
-      onError: (error) => {
-        const errorService = serviceContainer.resolve(SERVICE_TOKENS.ERROR_SERVICE);
-        errorService.logError(error, 'React Query Mutation', 'network', 'medium');
-      },
+      retry: 2,
     },
   },
 });
 
-const rootElement = document.getElementById("root");
-if (!rootElement) {
-  console.error("Root element not found!");
-  throw new Error("Root element not found. Please ensure the HTML file contains a div with id='root'.");
+// Simple wrapper to handle authentication routing
+function AppWrapper() {
+  const { isAuthenticated, isLoading } = useSupabaseAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route 
+          path="/" 
+          element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />} 
+        />
+        <Route 
+          path="*" 
+          element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />} 
+        />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-// Start React immediately - the App component will handle loading states
+const rootElement = document.getElementById("root");
+if (!rootElement) {
+  throw new Error("Root element not found");
+}
+
 const root = createRoot(rootElement);
 
 root.render(
-  <ServiceProvider>
+  <SupabaseAuthProvider>
     <QueryClientProvider client={queryClient}>
-      <ErrorBoundary>
-        <App />
-      </ErrorBoundary>
+      <AppWrapper />
     </QueryClientProvider>
-  </ServiceProvider>
+  </SupabaseAuthProvider>
 );

@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from "react-router-dom";
-import { Home, FolderKanban, LineChart, Settings, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Home, FolderKanban, LineChart, Settings, Database, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +14,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
   const navItems = [
     { name: "Dashboard", path: "/", icon: Home },
     { name: "Projects", path: "/projects", icon: FolderKanban },
+    { name: "Migration", path: "/migration", icon: Database },
     { name: "Settings", path: "/settings", icon: Settings },
   ];
 

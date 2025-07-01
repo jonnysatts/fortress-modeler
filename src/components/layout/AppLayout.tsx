@@ -4,7 +4,7 @@ import Sidebar from "./Sidebar";
 import { Toaster } from "@/components/ui/toaster";
 import { addDemoData } from "@/lib/db";
 import { config } from "@/lib/config";
-import { useAuth } from "@/hooks/useAuth";
+import { useSupabaseAuth as useAuth } from "@/hooks/useSupabaseAuth";
 
 const AppLayout = () => {
   const [initializing, setInitializing] = useState(true);

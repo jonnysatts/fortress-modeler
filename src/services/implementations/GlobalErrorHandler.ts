@@ -7,13 +7,12 @@ import { ILogService } from '../interfaces/ILogService';
  * Integrates with the error service for consistent error handling
  */
 export class GlobalErrorHandler {
-  private errorService: IErrorService;
-  private logService: ILogService;
+  private errorService: IErrorService | null = null;
+  private logService: ILogService | null = null;
   private isInitialized = false;
 
   constructor() {
-    this.errorService = serviceContainer.resolve<IErrorService>(SERVICE_TOKENS.ERROR_SERVICE);
-    this.logService = serviceContainer.resolve<ILogService>(SERVICE_TOKENS.LOG_SERVICE);
+    // Don't resolve services in constructor - wait for initialize()
   }
 
   /**
@@ -25,12 +24,28 @@ export class GlobalErrorHandler {
       return;
     }
 
+    // Safely resolve services when initialize is called
+    try {
+      this.errorService = serviceContainer.resolve<IErrorService>(SERVICE_TOKENS.ERROR_SERVICE);
+      this.logService = serviceContainer.resolve<ILogService>(SERVICE_TOKENS.LOG_SERVICE);
+    } catch (error) {
+      console.error('❌ Failed to resolve services in GlobalErrorHandler:', error);
+      // Continue without services rather than failing completely
+      this.errorService = null;
+      this.logService = null;
+    }
+
     this.setupWindowErrorHandler();
     this.setupUnhandledPromiseRejectionHandler();
     this.setupConsoleErrorInterceptor();
     
     this.isInitialized = true;
-    this.logService.info('Global error handlers initialized');
+    
+    if (this.logService) {
+      this.logService.info('Global error handlers initialized');
+    } else {
+      console.log('✅ Global error handlers initialized (without service integration)');
+    }
   }
 
   /**
@@ -79,7 +94,7 @@ export class GlobalErrorHandler {
           typeof arg === 'string' ? arg : JSON.stringify(arg)
         ).join(' ');
         
-        this.errorService.logError(
+        this.errorService?.logError(
           new Error(errorMessage),
           'console.error',
           'runtime',
@@ -93,18 +108,27 @@ export class GlobalErrorHandler {
   private handleWindowError = (event: ErrorEvent): void => {
     const error = event.error || new Error(event.message);
     
-    this.errorService.logError(
-      error,
-      'window.onerror',
-      'runtime',
-      'high',
-      {
+    if (this.errorService) {
+      this.errorService.logError(
+        error,
+        'window.onerror',
+        'runtime',
+        'high',
+        {
+          filename: event.filename,
+          lineno: event.lineno,
+          colno: event.colno,
+          type: 'uncaught-exception',
+        }
+      );
+    } else {
+      console.error('Global Window Error:', error, {
         filename: event.filename,
         lineno: event.lineno,
         colno: event.colno,
         type: 'uncaught-exception',
-      }
-    );
+      });
+    }
 
     // Don't prevent default behavior - let the browser handle it too
     return false;
@@ -115,16 +139,23 @@ export class GlobalErrorHandler {
       ? event.reason 
       : new Error(String(event.reason));
 
-    this.errorService.logError(
-      error,
-      'unhandledrejection',
-      'runtime',
-      'high',
-      {
+    if (this.errorService) {
+      this.errorService.logError(
+        error,
+        'unhandledrejection',
+        'runtime',
+        'high',
+        {
+          type: 'unhandled-promise-rejection',
+          reason: event.reason,
+        }
+      );
+    } else {
+      console.error('Global Unhandled Promise Rejection:', error, {
         type: 'unhandled-promise-rejection',
         reason: event.reason,
-      }
-    );
+      });
+    }
 
     // Prevent the default browser behavior (logging to console)
     // since we're handling it ourselves
@@ -132,5 +163,18 @@ export class GlobalErrorHandler {
   };
 }
 
-// Export singleton instance
-export const globalErrorHandler = new GlobalErrorHandler();
+// Export singleton instance - will be created after services are bootstrapped
+let _globalErrorHandler: GlobalErrorHandler | null = null;
+
+export const getGlobalErrorHandler = (): GlobalErrorHandler => {
+  if (!_globalErrorHandler) {
+    _globalErrorHandler = new GlobalErrorHandler();
+  }
+  return _globalErrorHandler;
+};
+
+// For backward compatibility
+export const globalErrorHandler = {
+  initialize: () => getGlobalErrorHandler().initialize(),
+  cleanup: () => getGlobalErrorHandler().cleanup(),
+};

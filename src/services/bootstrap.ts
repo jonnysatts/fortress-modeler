@@ -1,5 +1,7 @@
 import { serviceContainer, SERVICE_TOKENS } from './container/ServiceContainer';
 import { DexieStorageService } from './implementations/DexieStorageService';
+import { SupabaseStorageService } from './implementations/SupabaseStorageService';
+import { SupabaseRealtimeService } from './implementations/SupabaseRealtimeService';
 import { ErrorService } from './implementations/ErrorService';
 import { LogService } from './implementations/LogService';
 import { ConfigService } from './implementations/ConfigService';
@@ -28,17 +30,45 @@ export function bootstrapServices(): void {
     true
   );
 
-  // Register storage service
-  serviceContainer.register(
-    SERVICE_TOKENS.STORAGE_SERVICE,
-    () => new DexieStorageService(),
-    true
-  );
+  // Register storage service based on environment configuration
+  const useSupabase = import.meta.env.VITE_USE_SUPABASE_BACKEND === 'true' || 
+                     configService.get('USE_SUPABASE_BACKEND', false);
+
+  const logService = serviceContainer.resolve(SERVICE_TOKENS.LOG_SERVICE);
+
+  if (useSupabase) {
+    // Register Supabase implementation
+    serviceContainer.register(
+      SERVICE_TOKENS.STORAGE_SERVICE,
+      () => new SupabaseStorageService(),
+      true
+    );
+    logService.info('Using Supabase backend for storage');
+  } else {
+    // Register Dexie implementation (current default)
+    serviceContainer.register(
+      SERVICE_TOKENS.STORAGE_SERVICE,
+      () => new DexieStorageService(),
+      true
+    );
+    logService.info('Using Dexie (local) backend for storage');
+  }
+
+  // Register real-time service (only available with Supabase)
+  if (useSupabase) {
+    serviceContainer.register(
+      SERVICE_TOKENS.REALTIME_SERVICE,
+      () => new SupabaseRealtimeService(),
+      true
+    );
+    logService.info('Real-time service registered');
+  }
 
   // Log successful bootstrap
-  const logService = serviceContainer.resolve(SERVICE_TOKENS.LOG_SERVICE);
   logService.info('Application services bootstrapped successfully', {
     environment: configService.getEnvironment(),
+    storageBackend: useSupabase ? 'supabase' : 'dexie',
+    realtimeEnabled: useSupabase,
     services: Object.values(SERVICE_TOKENS),
   });
 }
