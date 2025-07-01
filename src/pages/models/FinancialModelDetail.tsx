@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, lazy, Suspense } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, BarChart3, ChartLine, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,18 +20,37 @@ import { FinancialModel, db } from "@/lib/db";
 import { useProject } from "@/hooks/useProjects";
 import { useModel, useDeleteModel } from "@/hooks/useModels";
 import { toast } from "sonner";
-import ModelProjections from "@/components/models/ModelProjections";
-import RevenueTrends from "@/components/models/RevenueTrends";
-import CostTrends from "@/components/models/CostTrends";
-import CategoryBreakdown from "@/components/models/CategoryBreakdown";
-import FinancialMatrix from "@/components/models/FinancialMatrix";
-import FinancialAnalysis from "@/components/models/FinancialAnalysis";
+
+// Lazy load heavy chart components
+const ModelProjections = lazy(() => import("@/components/models/ModelProjections"));
+const RevenueTrends = lazy(() => import("@/components/models/RevenueTrends"));
+const CostTrends = lazy(() => import("@/components/models/CostTrends"));
+const CategoryBreakdown = lazy(() => import("@/components/models/CategoryBreakdown"));
+const FinancialMatrix = lazy(() => import("@/components/models/FinancialMatrix"));
+const FinancialAnalysis = lazy(() => import("@/components/models/FinancialAnalysis"));
 
 import ModelOverview from "@/components/models/ModelOverview";
 import { MarketingChannelsForm } from "@/components/models/MarketingChannelsForm";
 import { ModelAssumptions } from "@/types/models";
 import { TrendDataPoint } from "@/types/trends";
 import { formatDate } from "@/lib/utils";
+
+// Loading component for lazy-loaded components
+const ComponentLoader = ({ message = "Loading..." }: { message?: string }) => (
+  <div className="min-h-[200px] flex items-center justify-center">
+    <div className="animate-pulse space-y-4 w-full">
+      <div className="h-4 bg-muted rounded w-48" />
+      <div className="space-y-2">
+        <div className="h-32 bg-muted rounded" />
+        <div className="grid grid-cols-3 gap-4">
+          <div className="h-20 bg-muted rounded" />
+          <div className="h-20 bg-muted rounded" />
+          <div className="h-20 bg-muted rounded" />
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 const FinancialModelDetail = () => {
   const { projectId, modelId } = useParams<{ projectId: string; modelId: string }>();
@@ -263,7 +282,9 @@ const FinancialModelDetail = () => {
          </TabsContent>
 
          <TabsContent value="analysis" className="space-y-4">
-           <FinancialAnalysis model={model} isWeekly={isWeeklyEvent} />
+           <Suspense fallback={<ComponentLoader message="Loading financial analysis..." />}>
+             <FinancialAnalysis model={model} isWeekly={isWeeklyEvent} />
+           </Suspense>
          </TabsContent>
 
          <TabsContent value="marketing">
@@ -280,11 +301,13 @@ const FinancialModelDetail = () => {
                <CardHeader><CardTitle className="flex items-center"><BarChart3 className="mr-2 h-5 w-5" />Combined Financial Matrix</CardTitle></CardHeader>
                <CardContent>
                   {isFinancialDataReady ? (
-                     <FinancialMatrix 
-                       model={model} 
-                       trendData={combinedFinancialData} 
-                       combinedView={true}
-                     />
+                     <Suspense fallback={<ComponentLoader message="Loading financial matrix..." />}>
+                       <FinancialMatrix 
+                         model={model} 
+                         trendData={combinedFinancialData} 
+                         combinedView={true}
+                       />
+                     </Suspense>
                   ) : (
                      <div className="text-center py-10 text-muted-foreground">Loading financial data...</div> 
                   )}
@@ -297,20 +320,24 @@ const FinancialModelDetail = () => {
              <Card>
                 <CardHeader><CardTitle className="flex items-center"><ChartLine className="mr-2 h-5 w-5" />Revenue Trends Over Time</CardTitle></CardHeader>
                 <CardContent>
-                   <RevenueTrends model={model} setCombinedData={setRevenueData} />
+                   <Suspense fallback={<ComponentLoader message="Loading revenue trends..." />}>
+                     <RevenueTrends model={model} setCombinedData={setRevenueData} />
+                   </Suspense>
                 </CardContent>
              </Card>
              <Card>
                 <CardHeader><CardTitle className="flex items-center"><ChartLine className="mr-2 h-5 w-5" />Cost Trends Over Time</CardTitle></CardHeader>
                 <CardContent>
-                   <CostTrends 
-                      costs={memoizedCosts}
-                      marketingSetup={memoizedMarketingSetup}
-                      metadata={memoizedMetadata}
-                      growthModel={memoizedGrowthModel}
-                      model={model} 
-                      onUpdateCostData={setCostData} 
-                   />
+                   <Suspense fallback={<ComponentLoader message="Loading cost trends..." />}>
+                     <CostTrends 
+                        costs={memoizedCosts}
+                        marketingSetup={memoizedMarketingSetup}
+                        metadata={memoizedMetadata}
+                        growthModel={memoizedGrowthModel}
+                        model={model} 
+                        onUpdateCostData={setCostData} 
+                     />
+                   </Suspense>
                 </CardContent>
              </Card>
            </div>
@@ -321,11 +348,13 @@ const FinancialModelDetail = () => {
                <CardHeader><CardTitle>Category Breakdown</CardTitle></CardHeader>
                <CardContent>
                   {isFinancialDataReady ? (
-                     <CategoryBreakdown 
-                        model={model} 
-                        revenueTrendData={revenueData}
-                        costTrendData={costData}
-                     />
+                     <Suspense fallback={<ComponentLoader message="Loading category breakdown..." />}>
+                       <CategoryBreakdown 
+                          model={model} 
+                          revenueTrendData={revenueData}
+                          costTrendData={costData}
+                       />
+                     </Suspense>
                   ) : (
                      <div className="text-center py-10 text-muted-foreground">Loading breakdown data...</div> 
                   )}
@@ -337,7 +366,9 @@ const FinancialModelDetail = () => {
              <Card>
                <CardHeader><CardTitle>Financial Projections</CardTitle></CardHeader>
                <CardContent>
-                  <ModelProjections model={model} />
+                  <Suspense fallback={<ComponentLoader message="Loading projections..." />}>
+                    <ModelProjections model={model} />
+                  </Suspense>
                </CardContent>
              </Card>
          </TabsContent>

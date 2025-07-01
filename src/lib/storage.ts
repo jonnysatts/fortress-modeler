@@ -15,25 +15,61 @@ import {
   upsertActualsPeriod,
 } from './db';
 import { ActualsPeriodEntry } from '@/types/models';
+import { cache, cacheKeys, cacheHelpers } from './cache';
+import { performanceMonitor } from './performance';
 
 class StorageService {
   // --- Project Methods ---
   async getProject(projectId: string): Promise<Project | undefined> {
-    return getProject(projectId);
+    const cacheKey = cacheKeys.project(projectId);
+    const cached = cache.get<Project>(cacheKey);
+    
+    if (cached) {
+      return cached;
+    }
+    
+    const project = await getProject(projectId);
+    if (project) {
+      cache.set(cacheKey, project, 10 * 60 * 1000); // Cache for 10 minutes
+    }
+    
+    return project;
   }
 
   async getAllProjects(): Promise<Project[]> {
-    return db.projects.toArray();
+    const cacheKey = 'projects:all';
+    const cached = cache.get<Project[]>(cacheKey);
+    
+    if (cached) {
+      return cached;
+    }
+    
+    const projects = await performanceMonitor.measureDatabaseQuery(
+      'getAllProjects',
+      () => db.projects.toArray()
+    );
+    cache.set(cacheKey, projects, 5 * 60 * 1000); // Cache for 5 minutes
+    
+    return projects;
   }
 
   async createProject(projectData: Partial<Project>): Promise<Project> {
-    // Use the proper createProject function that sets UUID, createdAt, and updatedAt
-    const newProjectId = await createProject(projectData as Omit<Project, 'id' | 'createdAt' | 'updatedAt'>);
-    const createdProject = await db.projects.get(newProjectId);
-    if (!createdProject) {
-      throw new Error(`Failed to retrieve created project with ID: ${newProjectId}`);
-    }
-    return createdProject;
+    return performanceMonitor.measureDatabaseQuery(
+      'createProject',
+      async () => {
+        // Use the proper createProject function that sets UUID, createdAt, and updatedAt
+        const newProjectId = await createProject(projectData as Omit<Project, 'id' | 'createdAt' | 'updatedAt'>);
+        const createdProject = await db.projects.get(newProjectId);
+        if (!createdProject) {
+          throw new Error(`Failed to retrieve created project with ID: ${newProjectId}`);
+        }
+        
+        // Invalidate projects cache
+        cache.delete('projects:all');
+        
+        return createdProject;
+      }
+    );
   }
 
   async updateProject(projectId: string, projectData: Partial<Project>): Promise<Project> {
@@ -42,46 +78,74 @@ class StorageService {
     if (!updated) {
       throw new Error(`Failed to retrieve updated project with ID: ${projectId}`);
     }
+    
+    // Invalidate caches
+    cacheHelpers.invalidateProject(projectId);
+    cache.delete('projects:all');
+    
     return updated;
   }
 
   async deleteProject(projectId: string): Promise<void> {
     await deleteProject(projectId);
+    
+    // Invalidate caches
+    cacheHelpers.invalidateProject(projectId);
+    cache.delete('projects:all');
   }
 
   // --- Model Methods ---
   async getModelsForProject(projectId: string): Promise<FinancialModel[]> {
-    console.log('🔧 StorageService.getModelsForProject called with projectId:', projectId, 'typeof:', typeof projectId);
-    const models = await getModelsForProject(projectId);
-    console.log('🔧 StorageService.getModelsForProject found models:', models);
+    const cacheKey = cacheKeys.projectModels(projectId);
+    const cached = cache.get<FinancialModel[]>(cacheKey);
     
-    // Debug: Also get ALL models to see what's actually stored
-    const allModels = await db.financialModels.toArray();
-    console.log('🔧 ALL models in database:', allModels);
-    console.log('🔧 Project IDs in database:', allModels.map(m => `${m.projectId} (${typeof m.projectId})`));
+    if (cached) {
+      return cached;
+    }
+    
+    const models = await performanceMonitor.measureDatabaseQuery(
+      `getModelsForProject:${projectId}`,
+      () => getModelsForProject(projectId)
+    );
+    cache.set(cacheKey, models, 5 * 60 * 1000); // Cache for 5 minutes
     
     return models;
   }
 
   async getModel(modelId: string): Promise<FinancialModel | undefined> {
-    return getModelById(modelId);
+    const cacheKey = cacheKeys.model(modelId);
+    const cached = cache.get<FinancialModel>(cacheKey);
+    
+    if (cached) {
+      return cached;
+    }
+    
+    const model = await getModelById(modelId);
+    if (model) {
+      cache.set(cacheKey, model, 10 * 60 * 1000); // Cache for 10 minutes
+    }
+    
+    return model;
   }
 
   async createModel(modelData: Partial<FinancialModel>): Promise<FinancialModel> {
-    console.log('🔧 StorageService.createModel called with:', modelData);
-    try {
-      const newModelId = await addFinancialModel(modelData as Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>);
-      console.log('🔧 addFinancialModel returned ID:', newModelId);
-      const createdModel = await db.financialModels.get(newModelId);
-      console.log('🔧 Retrieved created model:', createdModel);
-      if (!createdModel) {
-        throw new Error(`Failed to retrieve created model with ID: ${newModelId}`);
+    return performanceMonitor.measureDatabaseQuery(
+      'createModel',
+      async () => {
+        const newModelId = await addFinancialModel(modelData as Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>);
+        const createdModel = await db.financialModels.get(newModelId);
+        if (!createdModel) {
+          throw new Error(`Failed to retrieve created model with ID: ${newModelId}`);
+        }
+        
+        // Invalidate caches
+        if (createdModel.projectId) {
+          cache.delete(cacheKeys.projectModels(createdModel.projectId));
+        }
+        
+        return createdModel;
       }
-      return createdModel;
-    } catch (error) {
-      console.error('❌ StorageService.createModel failed:', error);
-      throw error;
-    }
+    );
   }
 
   async updateModel(modelId: string, modelData: Partial<FinancialModel>): Promise<FinancialModel> {
@@ -90,11 +154,23 @@ class StorageService {
     if (!updated) {
       throw new Error(`Failed to retrieve updated model with ID: ${modelId}`);
     }
+    
+    // Invalidate caches
+    cacheHelpers.invalidateModel(modelId, updated.projectId);
+    
     return updated;
   }
 
   async deleteModel(modelId: string): Promise<void> {
+    // Get model first to know which project to invalidate
+    const model = await getModelById(modelId);
+    
     await deleteFinancialModel(modelId);
+    
+    // Invalidate caches
+    if (model) {
+      cacheHelpers.invalidateModel(modelId, model.projectId);
+    }
   }
 
   // --- Actuals Methods ---

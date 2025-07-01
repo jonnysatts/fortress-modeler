@@ -155,7 +155,7 @@ export class ErrorService implements IErrorService {
         environment: import.meta.env.MODE,
       };
 
-      // TODO: Integrate with error reporting service (e.g., Sentry)
+      // Error reporting service integration would go here in production
       console.log('Error report prepared:', errorReport);
       
       // Simulate API call delay

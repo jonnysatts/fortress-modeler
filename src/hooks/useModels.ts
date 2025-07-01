@@ -49,10 +49,8 @@ export const useCreateModel = () => {
   return useMutation<FinancialModel, Error, Partial<FinancialModel>>({
     mutationFn: async (newModelData) => {
       // Local-only mode - always use local storage
-      console.log('🔧 Creating model with data:', newModelData);
       try {
         const result = await storageService.createModel(newModelData);
-        console.log('✅ Model created successfully:', result);
         return result;
       } catch (error) {
         console.error('❌ Model creation failed:', error);
@@ -78,18 +76,14 @@ export const useCreateModel = () => {
       toast.error(`Failed to create model: ${err.message}`);
     },
     onSuccess: (data, variables) => {
-      console.log('🔧 onSuccess - Created model:', data);
       toast.success('Model created successfully!');
       // Invalidate cache for this project's models
       queryClient.invalidateQueries({ queryKey: ['models', variables.projectId] });
       // Force immediate refetch
       queryClient.refetchQueries({ queryKey: ['models', variables.projectId] });
-      console.log('🔧 onSuccess - Query invalidation and refetch completed for project:', variables.projectId);
     },
     onSettled: (data, error, variables) => {
-      console.log('🔧 onSettled - Invalidating queries for projectId:', variables.projectId);
       queryClient.invalidateQueries({ queryKey: ['models', variables.projectId] });
-      console.log('🔧 onSettled - Query invalidation completed');
     },
   });
 };

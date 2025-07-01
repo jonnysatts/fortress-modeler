@@ -8,6 +8,7 @@ import AppLoader from "./components/AppLoader";
 import { useAppLoader } from "./hooks/useAppLoader";
 import { AuthProvider } from "./hooks/useAuth";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { PerformanceMonitorWidget } from "./components/PerformanceMonitor";
 
 // Lazy load components for code splitting
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -73,6 +74,7 @@ const App = () => {
             </Routes>
           </Suspense>
         </BrowserRouter>
+        <PerformanceMonitorWidget />
       </AuthProvider>
     </TooltipProvider>
   );

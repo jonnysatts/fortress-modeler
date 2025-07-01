@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { ArrowLeft, Edit, Trash2, PlusCircle, BarChart3, AlertTriangle, Building } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,12 +30,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ActualsInputForm } from "@/components/models/ActualsInputForm";
 import ModelOverview from "@/components/models/ModelOverview";
 import { ActualsDisplayTable } from "@/components/models/ActualsDisplayTable";
-import { PerformanceAnalysis } from "@/components/models/PerformanceAnalysis";
+// Lazy load heavy components
+const PerformanceAnalysis = lazy(() => import("@/components/models/PerformanceAnalysis").then(m => ({ default: m.PerformanceAnalysis })));
+const ActualsInputForm = lazy(() => import("@/components/models/ActualsInputForm").then(m => ({ default: m.ActualsInputForm })));
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDate } from "@/lib/utils";
+
+// Loading component for lazy-loaded components
+const ComponentLoader = ({ message = "Loading..." }: { message?: string }) => (
+  <div className="min-h-[200px] flex items-center justify-center">
+    <div className="animate-pulse space-y-4 w-full">
+      <div className="h-4 bg-muted rounded w-48" />
+      <div className="space-y-2">
+        <div className="h-32 bg-muted rounded" />
+        <div className="grid grid-cols-3 gap-4">
+          <div className="h-20 bg-muted rounded" />
+          <div className="h-20 bg-muted rounded" />
+          <div className="h-20 bg-muted rounded" />
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 const ProjectDetail = () => {
     const { projectId } = useParams<{ projectId: string }>();
@@ -290,10 +308,12 @@ const ProjectDetail = () => {
         <TabsContent value="performance" className="space-y-4">
           {financialModels.length > 0 ? (
             <>
-               <ActualsInputForm 
-                  model={financialModels[0]} 
-                  existingActuals={actualsData} 
-               />
+               <Suspense fallback={<ComponentLoader message="Loading actuals form..." />}>
+                 <ActualsInputForm 
+                    model={financialModels[0]} 
+                    existingActuals={actualsData} 
+                 />
+               </Suspense>
                <ActualsDisplayTable 
                   model={financialModels[0]}
                   actualsData={actualsData} 
@@ -308,11 +328,13 @@ const ProjectDetail = () => {
         </TabsContent>
         
         <TabsContent value="analysis" className="space-y-4">
-           <PerformanceAnalysis 
-              financialModels={financialModels} 
-              actualsData={actualsData} 
-              projectId={projectId} 
-           />
+           <Suspense fallback={<ComponentLoader message="Loading performance analysis..." />}>
+             <PerformanceAnalysis 
+                financialModels={financialModels} 
+                actualsData={actualsData} 
+                projectId={projectId} 
+             />
+           </Suspense>
         </TabsContent>
         
         <TabsContent value="risks" className="space-y-4">
