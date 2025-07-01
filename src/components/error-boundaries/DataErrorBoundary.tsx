@@ -2,8 +2,6 @@ import { Component, ErrorInfo, ReactNode } from 'react';
 import { Database, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { serviceContainer, SERVICE_TOKENS } from '@/services/container/ServiceContainer';
-import { IErrorService } from '@/services/interfaces/IErrorService';
 
 interface Props {
   children: ReactNode;
@@ -22,7 +20,6 @@ interface State {
  * Provides data-specific error handling and recovery options
  */
 export class DataErrorBoundary extends Component<Props, State> {
-  private errorService: IErrorService;
   private maxRetries = 2;
 
   public state: State = {
@@ -31,11 +28,6 @@ export class DataErrorBoundary extends Component<Props, State> {
     retryCount: 0
   };
 
-  constructor(props: Props) {
-    super(props);
-    this.errorService = serviceContainer.resolve<IErrorService>(SERVICE_TOKENS.ERROR_SERVICE);
-  }
-
   public static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error, retryCount: 0 };
   }
@@ -43,17 +35,12 @@ export class DataErrorBoundary extends Component<Props, State> {
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({ error });
 
-    // Log as database error with medium severity
-    this.errorService.logError(
+    // Simple console logging for data errors
+    console.error(`DataErrorBoundary (${this.props.context || 'Data loading'}):`, {
       error,
-      `DataErrorBoundary: ${this.props.context || 'Data loading'}`,
-      'database',
-      'medium',
-      {
-        componentStack: errorInfo.componentStack,
-        retryCount: this.state.retryCount,
-      }
-    );
+      componentStack: errorInfo.componentStack,
+      retryCount: this.state.retryCount,
+    });
   }
 
   private handleRetry = () => {

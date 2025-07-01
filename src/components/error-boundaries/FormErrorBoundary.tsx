@@ -2,8 +2,6 @@ import { Component, ErrorInfo, ReactNode } from 'react';
 import { RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { serviceContainer, SERVICE_TOKENS } from '@/services/container/ServiceContainer';
-import { IErrorService } from '@/services/interfaces/IErrorService';
 
 interface Props {
   children: ReactNode;
@@ -21,17 +19,11 @@ interface State {
  * Provides form-specific error handling without breaking the entire page
  */
 export class FormErrorBoundary extends Component<Props, State> {
-  private errorService: IErrorService;
-
   public state: State = {
     hasError: false,
     error: null
   };
 
-  constructor(props: Props) {
-    super(props);
-    this.errorService = serviceContainer.resolve<IErrorService>(SERVICE_TOKENS.ERROR_SERVICE);
-  }
 
   public static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
@@ -40,17 +32,12 @@ export class FormErrorBoundary extends Component<Props, State> {
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({ error });
 
-    // Log as validation error with low severity since forms are usually recoverable
-    this.errorService.logError(
+    // Simple console logging for form errors
+    console.error(`FormErrorBoundary (${this.props.formName || 'Form'}):`, {
       error,
-      `FormErrorBoundary: ${this.props.formName || 'Form'}`,
-      'validation',
-      'low',
-      {
-        componentStack: errorInfo.componentStack,
-        formName: this.props.formName,
-      }
-    );
+      componentStack: errorInfo.componentStack,
+      formName: this.props.formName,
+    });
   }
 
   private handleReset = () => {
