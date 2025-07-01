@@ -86,8 +86,23 @@ export default function Migration() {
         </Card>
       )}
       
-      {/* Migration Wizard - Always show (it has its own auth logic) */}
-      <MigrationWizard />
+      {/* Migration Wizard - Temporarily disabled due to service dependencies */}
+      {isAuthenticated && (
+        <Card className="max-w-2xl mx-auto">
+          <CardHeader>
+            <CardTitle className="text-center">Migration Wizard</CardTitle>
+            <CardDescription className="text-center">
+              Migration functionality is temporarily under maintenance
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-muted-foreground">
+              The migration wizard is being updated to work with the new architecture. 
+              Please check back soon.
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
