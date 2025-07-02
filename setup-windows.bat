@@ -57,16 +57,32 @@ if %errorlevel% neq 0 (
 REM Check if .env exists
 if not exist ".env" (
     echo.
-    echo WARNING: No .env file found. Creating from template...
-    copy .env.example .env >nul
-    echo SUCCESS: Created .env file from template
+    echo WARNING: No .env file found.
     echo.
-    echo IMPORTANT: Edit the .env file with your actual Supabase credentials:
-    echo    - VITE_SUPABASE_URL
-    echo    - VITE_SUPABASE_ANON_KEY
-    echo    - VITE_GOOGLE_CLIENT_ID for OAuth
+    echo Choose setup option:
+    echo 1. Interactive configuration ^(recommended^)
+    echo 2. Copy from production template
+    echo 3. Copy from example template
     echo.
-    echo Make sure VITE_USE_SUPABASE_BACKEND=true for cloud mode!
+    set /p env_choice="Enter choice (1-3): "
+    
+    if "%env_choice%"=="1" (
+        echo Running interactive configuration...
+        call scripts\configure-env.bat
+    ) else if "%env_choice%"=="2" (
+        if exist ".env.production" (
+            copy .env.production .env >nul
+            echo SUCCESS: Copied production configuration
+        ) else (
+            echo ERROR: .env.production not found, falling back to example
+            copy .env.example .env >nul
+            echo WARNING: Using example template, manual configuration required
+        )
+    ) else (
+        copy .env.example .env >nul
+        echo WARNING: Using example template
+        echo MANUAL SETUP REQUIRED: Edit .env with your actual credentials
+    )
 ) else (
     echo SUCCESS: .env file already exists
 )
