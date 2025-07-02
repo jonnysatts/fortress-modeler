@@ -35,7 +35,13 @@
     "dist:win": "npm run build && electron-builder --win --publish=never",
     "release": "npm run build && electron-builder --publish=always",
     "setup:electron": "npm install electron electron-builder electron-updater concurrently wait-on --save-dev && node scripts/create-icons.cjs",
-    "icons:create": "node scripts/create-icons.cjs"
+    "icons:create": "node scripts/create-icons.cjs",
+    "dev:any-port": "node scripts/find-port.cjs && npm run dev",
+    "dev:3000": "npm run dev -- --port 3000",
+    "dev:5173": "npm run dev -- --port 5173",
+    "dev:8080": "npm run dev -- --port 8080",
+    "diagnose": "node scripts/diagnose-port.cjs",
+    "fix-port": "node scripts/fix-oauth-port.cjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

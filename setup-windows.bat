@@ -95,9 +95,15 @@ if not exist ".env" (
 echo.
 echo Setup complete! To start the development server:
 echo.
-echo    npm run dev
+echo RECOMMENDED: start-app-any-port.bat ^(finds available port automatically^)
+echo ALTERNATIVE: npm run dev ^(uses port 8081^)
 echo.
-echo The app will be available at: http://localhost:8081/
+echo If port 8081 doesn't work:
+echo   1. Run: scripts\diagnose-port.bat
+echo   2. Use: start-app-any-port.bat
+echo   3. Read: docs\PORT_TROUBLESHOOTING.md
+echo.
+echo The app will be available at: http://localhost:8081/ ^(or alternative port^)
 echo.
 echo See INSTALLATION_GUIDE.md for detailed setup instructions
 echo.
