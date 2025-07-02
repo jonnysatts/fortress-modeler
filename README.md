@@ -2,6 +2,47 @@
 
 A comprehensive financial modeling and business analysis platform built with React, TypeScript, and modern web technologies.
 
+## 🚀 Quick Start
+
+### Option 1: One-Click Setup (Recommended)
+
+**Mac/Linux:**
+```bash
+git clone https://github.com/jonnysatts/fortress-modeler.git
+cd fortress-modeler
+./setup.sh
+```
+
+**Windows:**
+```bash
+git clone https://github.com/jonnysatts/fortress-modeler.git
+cd fortress-modeler
+setup.bat
+```
+
+### Option 2: Manual Setup
+
+1. **Install Node.js v18+** from https://nodejs.org/
+2. **Clone and install:**
+   ```bash
+   git clone https://github.com/jonnysatts/fortress-modeler.git
+   cd fortress-modeler
+   npm install
+   ```
+3. **Configure environment:**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your Supabase credentials
+   ```
+4. **Start the app:**
+   ```bash
+   npm run dev
+   ```
+
+🌐 **App runs at:** http://localhost:8081/
+
+📖 **Detailed setup:** See [INSTALLATION_GUIDE.md](./INSTALLATION_GUIDE.md)
+
 ## 🏗️ Project Overview
 
 Fortress Modeler Cloud is a sophisticated financial modeling application that enables users to create, analyze, and manage financial projections for various business scenarios. The platform features advanced visualization, real-time calculations, and comprehensive data management capabilities.

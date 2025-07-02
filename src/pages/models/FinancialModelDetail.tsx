@@ -17,6 +17,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { FinancialModel, db } from "@/lib/db";
+import { SupabaseStorageService } from "@/services/implementations/SupabaseStorageService";
 import { useProject } from "@/hooks/useProjects";
 import { useModel, useDeleteModel } from "@/hooks/useModels";
 import { toast } from "sonner";
@@ -95,16 +96,32 @@ const FinancialModelDetail = () => {
         },
       };
 
-      // Perform the database update
-      db.financialModels.update(prevModel.id, {
-        assumptions: newAssumptions,
-        updatedAt: new Date()
-      }).then(() => {
-        toast.success("Assumptions Updated", { description: "Your changes have been saved." });
-      }).catch(error => {
-        console.error("[FinancialModelDetail] Error saving assumptions:", error);
-        toast.error("Error Saving", { description: "Could not save your changes." });
-      });
+      // Perform the database update using cloud/local switching
+      const saveAssumptions = async () => {
+        const isCloudEnabled = () => import.meta.env.VITE_USE_SUPABASE_BACKEND === 'true';
+        
+        try {
+          if (isCloudEnabled()) {
+            console.log('🌤️ Updating model assumptions in Supabase');
+            const supabaseStorage = new SupabaseStorageService();
+            await supabaseStorage.updateModel(prevModel.id, {
+              assumptions: newAssumptions
+            });
+          } else {
+            console.log('💾 Updating model assumptions in IndexedDB');
+            await db.financialModels.update(prevModel.id, {
+              assumptions: newAssumptions,
+              updatedAt: new Date()
+            });
+          }
+          toast.success("Assumptions Updated", { description: "Your changes have been saved." });
+        } catch (error) {
+          console.error("[FinancialModelDetail] Error saving assumptions:", error);
+          toast.error("Error Saving", { description: "Could not save your changes." });
+        }
+      };
+      
+      saveAssumptions();
 
       // Return the new state immediately for a responsive UI
       return { ...prevModel, assumptions: newAssumptions, updatedAt: new Date() };
