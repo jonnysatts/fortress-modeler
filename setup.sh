@@ -42,6 +42,17 @@ fi
 
 echo "✅ Dependencies installed successfully"
 
+# Run requirements verification
+echo ""
+echo "🔍 Verifying requirements..."
+npm run verify
+
+if [ $? -ne 0 ]; then
+    echo "❌ Requirements verification failed"
+    echo "Please check the errors above before continuing"
+    exit 1
+fi
+
 # Check if .env exists
 if [ ! -f ".env" ]; then
     echo ""

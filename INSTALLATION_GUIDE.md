@@ -6,6 +6,10 @@ This guide helps you install and run the Fortress Financial Modeler on any PC/Ma
 
 ## Prerequisites
 
+📋 **See [REQUIREMENTS.md](./REQUIREMENTS.md) for complete system requirements and dependencies**
+
+### Quick Prerequisites Check:
+
 1. **Node.js** (v18 or higher)
    - Download from: https://nodejs.org/
    - Verify installation: `node --version`
@@ -13,6 +17,9 @@ This guide helps you install and run the Fortress Financial Modeler on any PC/Ma
 2. **Git**
    - Download from: https://git-scm.com/
    - Verify installation: `git --version`
+
+3. **Modern Web Browser**
+   - Chrome 90+, Firefox 88+, Safari 14+, or Edge 90+
 
 ## Installation Steps
 
@@ -139,6 +146,9 @@ If switching from local to cloud mode, clear browser data:
 # Install dependencies
 npm install
 
+# Verify all requirements are met
+npm run verify
+
 # Start development server
 npm run dev
 
@@ -151,6 +161,21 @@ npm run preview
 # Run tests
 npm test
 ```
+
+### Requirements Verification
+
+After installation, run the requirements check:
+
+```bash
+npm run verify
+```
+
+This will verify:
+- ✅ Node.js version (v18+)
+- ✅ All dependencies installed
+- ✅ Environment variables configured
+- ✅ Port 8081 availability
+- ✅ Required project files present
 
 ## Production Deployment
 

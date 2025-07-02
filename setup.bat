@@ -40,6 +40,18 @@ if %errorlevel% neq 0 (
 
 echo ✅ Dependencies installed successfully
 
+REM Run requirements verification
+echo.
+echo 🔍 Verifying requirements...
+call npm run verify
+
+if %errorlevel% neq 0 (
+    echo ❌ Requirements verification failed
+    echo Please check the errors above before continuing
+    pause
+    exit /b 1
+)
+
 REM Check if .env exists
 if not exist ".env" (
     echo.
