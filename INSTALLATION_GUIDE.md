@@ -62,6 +62,8 @@ npm run dev
 
 The app will be available at: `http://localhost:8081/`
 
+**🚨 IMPORTANT:** The app MUST run on port 8081 for OAuth authentication to work! The Google OAuth redirect URI is configured for this specific port.
+
 ## Configuration Details
 
 ### Supabase Credentials
@@ -74,8 +76,10 @@ Your Supabase credentials are:
 ### OAuth Setup
 
 The app uses Google OAuth for authentication. Make sure your Google OAuth client has these redirect URIs:
-- `http://localhost:8081/auth/callback`
+- `http://localhost:8081/auth/callback` (**Port 8081 is required!**)
 - `https://your-domain.com/auth/callback` (for production)
+
+**Critical:** If you try to run on a different port (like 8080), OAuth will fail with a redirect URI mismatch error.
 
 ## Operating Modes
 
