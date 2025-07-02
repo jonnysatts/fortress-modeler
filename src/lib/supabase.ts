@@ -10,10 +10,11 @@ console.log('🔧 Supabase client init:', {
   url: supabaseUrl,
   keyStart: supabaseAnonKey?.substring(0, 20) + '...',
   fromEnv: !!import.meta.env.VITE_SUPABASE_URL,
-  allEnvKeys: Object.keys(import.meta.env),
   viteMode: import.meta.env.MODE,
   viteDev: import.meta.env.DEV,
-  supabaseBackend: import.meta.env.VITE_USE_SUPABASE_BACKEND
+  supabaseBackend: import.meta.env.VITE_USE_SUPABASE_BACKEND,
+  currentUrl: window.location.href,
+  origin: window.location.origin
 });
 
 if (!supabaseUrl || !supabaseAnonKey) {
@@ -29,6 +30,8 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: true,
+      storage: window.localStorage,
+      storageKey: 'sb-vplafscpcsxdxbyoxfhq-auth-token',
     },
     realtime: {
       params: {
@@ -103,16 +106,40 @@ export const auth = {
     if (error) throw error;
   },
 
-  // Get current session
+  // Get current session with debugging
   async getSession() {
+    console.log('🔍 [getSession] Fetching current session...');
     const { data: { session }, error } = await supabase.auth.getSession();
+    
+    console.log('🔍 [getSession] Result:', {
+      hasSession: !!session,
+      hasUser: !!session?.user,
+      userId: session?.user?.id,
+      userEmail: session?.user?.email,
+      expiresAt: session?.expires_at,
+      accessToken: session?.access_token ? session.access_token.substring(0, 20) + '...' : null,
+      refreshToken: session?.refresh_token ? 'present' : 'missing',
+      error: error?.message
+    });
+    
     if (error) throw error;
     return session;
   },
 
-  // Get current user
+  // Get current user with debugging
   async getUser() {
+    console.log('🔍 [getUser] Fetching current user...');
     const { data: { user }, error } = await supabase.auth.getUser();
+    
+    console.log('🔍 [getUser] Result:', {
+      hasUser: !!user,
+      userId: user?.id,
+      userEmail: user?.email,
+      userMetadata: user?.user_metadata,
+      appMetadata: user?.app_metadata,
+      error: error?.message
+    });
+    
     if (error) throw error;
     return user;
   },

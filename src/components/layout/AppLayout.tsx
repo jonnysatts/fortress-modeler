@@ -15,8 +15,16 @@ const AppLayout = () => {
   useEffect(() => {
     const init = async () => {
       try {
-        // Add demo data if the database is empty (local-only mode)
-        await addDemoData();
+        // Only initialize IndexedDB in local mode
+        const isCloudMode = import.meta.env.VITE_USE_SUPABASE_BACKEND === 'true';
+        
+        if (!isCloudMode) {
+          console.log('💾 Initializing IndexedDB for local mode');
+          // Add demo data if the database is empty (local-only mode)
+          await addDemoData();
+        } else {
+          console.log('🌤️ Cloud mode enabled, skipping IndexedDB initialization');
+        }
         // No need to load projects here - components will load their own data via React Query
       } catch (error) {
         console.error("Error initializing app:", error);

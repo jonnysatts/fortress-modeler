@@ -38,10 +38,27 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // Add timeout to prevent infinite loading - reduced to 5 seconds
+    const timeoutId = setTimeout(() => {
+      console.log('⏰ [SupabaseAuth] Session check timeout (5s), stopping loading...');
+      setIsLoading(false);
+    }, 5000); // 5-second timeout
+
     // Get initial session
     const getInitialSession = async () => {
       try {
+        console.log('🔍 [SupabaseAuth] Getting initial session...');
+        
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        
+        console.log('🔍 [SupabaseAuth] Initial session result:', {
+          hasSession: !!initialSession,
+          hasUser: !!initialSession?.user,
+          userId: initialSession?.user?.id,
+          userEmail: initialSession?.user?.email,
+          expiresAt: initialSession?.expires_at,
+          error: error?.message
+        });
         
         if (error) {
           logService.error('Failed to get initial session', error);
@@ -51,13 +68,18 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
           setUser(initialSession?.user ?? null);
           
           if (initialSession?.user) {
+            console.log('👤 [SupabaseAuth] User found, loading profile...');
             await loadUserProfile(initialSession.user.id);
+          } else {
+            console.log('👤 [SupabaseAuth] No user found in session');
           }
         }
       } catch (error) {
         logService.error('Error during initial session setup', error);
         errorService.logError(error, 'SupabaseAuth.initialSetup', 'auth', 'high');
       } finally {
+        console.log('✅ [SupabaseAuth] Initial session setup complete, clearing timeout and stopping loading');
+        clearTimeout(timeoutId);
         setIsLoading(false);
       }
     };
@@ -94,14 +116,75 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const ensureUserProfile = async (user: any) => {
+    try {
+      console.log('🔍 [ensureUserProfile] Ensuring profile exists for user:', user.id);
+      
+      // Try to get existing profile
+      const { data: existingProfile, error: getError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      if (existingProfile) {
+        console.log('✅ [ensureUserProfile] Profile already exists');
+        return existingProfile;
+      }
+      
+      if (getError && getError.code !== 'PGRST116') {
+        // Error other than "not found"
+        console.error('❌ [ensureUserProfile] Error checking for profile:', getError);
+        throw getError;
+      }
+      
+      // Profile doesn't exist, create it
+      console.log('🔧 [ensureUserProfile] Creating new profile for user');
+      const newProfile = {
+        id: user.id,
+        email: user.email || '',
+        name: user.user_metadata?.full_name || user.user_metadata?.name || user.email || '',
+        picture: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
+        company_domain: user.user_metadata?.custom_claims?.hd || null,
+        preferences: {}
+      };
+      
+      const { data: createdProfile, error: createError } = await supabase
+        .from('profiles')
+        .insert(newProfile)
+        .select()
+        .single();
+      
+      if (createError) {
+        console.error('❌ [ensureUserProfile] Failed to create profile:', createError);
+        throw createError;
+      }
+      
+      console.log('✅ [ensureUserProfile] Profile created successfully:', createdProfile.id);
+      return createdProfile;
+    } catch (error) {
+      console.error('❌ [ensureUserProfile] Profile setup failed:', error);
+      // Don't throw - we want auth to continue even if profile creation fails
+    }
+  };
+
   const loadUserProfile = async (userId: string) => {
     try {
-      const profileData = await db.getProfile(userId);
+      console.log('🔍 [loadUserProfile] Loading profile for user:', userId);
+      
+      // Add timeout to profile loading to prevent hanging
+      const profilePromise = db.getProfile(userId);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile load timeout')), 5000)
+      );
+      
+      const profileData = await Promise.race([profilePromise, timeoutPromise]);
       setProfile(profileData);
-      logService.debug('User profile loaded', { userId, hasProfile: !!profileData });
+      console.log('✅ [loadUserProfile] Profile loaded successfully:', { userId, hasProfile: !!profileData });
     } catch (error) {
-      logService.warn('Failed to load user profile', { userId, error });
-      // Don't throw error here - profile might not exist yet
+      console.log('⚠️ [loadUserProfile] Failed to load profile (continuing anyway):', { userId, error: error?.message });
+      // Don't throw error here - profile might not exist yet, continue without it
+      setProfile(null);
     }
   };
 

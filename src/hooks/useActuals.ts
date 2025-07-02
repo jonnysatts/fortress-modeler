@@ -1,7 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getActualsForProject, upsertActualsPeriod } from '@/lib/db';
+import { SupabaseStorageService } from '@/services/implementations/SupabaseStorageService';
 import { ActualsPeriodEntry } from '@/types/models';
 import { toast } from 'sonner';
+
+// Check if cloud sync is enabled via environment variable
+const isCloudEnabled = () => import.meta.env.VITE_USE_SUPABASE_BACKEND === 'true';
 
 /**
  * Hook for managing actuals data for projects
@@ -11,7 +15,17 @@ export const useActualsForProject = (projectId: string | undefined) => {
     queryKey: ['actuals', projectId],
     queryFn: async () => {
       if (!projectId) return [];
-      return getActualsForProject(projectId);
+      
+      if (isCloudEnabled()) {
+        // Use Supabase for cloud storage
+        console.log('🌤️ Getting actuals from Supabase');
+        const supabaseStorage = new SupabaseStorageService();
+        return await supabaseStorage.getActualsForProject(projectId);
+      } else {
+        // Use IndexedDB for local storage
+        console.log('💾 Getting actuals from IndexedDB');
+        return getActualsForProject(projectId);
+      }
     },
     enabled: !!projectId,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -28,7 +42,23 @@ export const useSaveActuals = () => {
 
   return useMutation<ActualsPeriodEntry, Error, ActualsPeriodEntry>({
     mutationFn: async (actualsData) => {
-      return upsertActualsPeriod(actualsData);
+      try {
+        if (isCloudEnabled()) {
+          // Use Supabase for cloud storage
+          console.log('🌤️ Saving actuals to Supabase');
+          const supabaseStorage = new SupabaseStorageService();
+          const result = await supabaseStorage.upsertActualsPeriod(actualsData);
+          console.log('✅ Actuals saved to Supabase:', result.id);
+          return result;
+        } else {
+          // Use IndexedDB for local storage
+          console.log('💾 Saving actuals to IndexedDB');
+          return upsertActualsPeriod(actualsData);
+        }
+      } catch (error) {
+        console.error('❌ Actuals save failed:', error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
       // Invalidate and refetch actuals for this project

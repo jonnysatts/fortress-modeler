@@ -4,10 +4,6 @@ import { ActualsPeriodEntry } from '@/types/models';
 import { supabase, handleSupabaseError } from '@/lib/supabase';
 import { Database } from '@/lib/database.types';
 import { DatabaseError, NotFoundError, ValidationError } from '@/lib/errors';
-import { serviceContainer, SERVICE_TOKENS } from '../container/ServiceContainer';
-import { IErrorService } from '../interfaces/IErrorService';
-import { ILogService } from '../interfaces/ILogService';
-
 type SupabaseProject = Database['public']['Tables']['projects']['Row'];
 type SupabaseModel = Database['public']['Tables']['financial_models']['Row'];
 type SupabaseActualEntry = Database['public']['Tables']['actuals_period_entries']['Row'];
@@ -18,31 +14,8 @@ type SupabaseActualEntry = Database['public']['Tables']['actuals_period_entries'
  * while maintaining the exact same interface as DexieStorageService
  */
 export class SupabaseStorageService implements IStorageService {
-  private errorService: IErrorService | null = null;
-  private logService: ILogService | null = null;
-  private initialized = false;
-
   constructor() {
-    // Don't resolve services in constructor to avoid circular dependencies
     console.log('SupabaseStorageService constructor called');
-  }
-
-  /**
-   * Lazy initialization of services to prevent circular dependencies
-   */
-  private ensureInitialized(): void {
-    if (this.initialized) return;
-
-    try {
-      this.errorService = serviceContainer.resolve(SERVICE_TOKENS.ERROR_SERVICE);
-      this.logService = serviceContainer.resolve(SERVICE_TOKENS.LOG_SERVICE);
-      this.logService?.info('SupabaseStorageService initialized successfully');
-      this.initialized = true;
-    } catch (error) {
-      console.error('Failed to initialize SupabaseStorageService:', error);
-      // Continue without services rather than failing completely
-      this.initialized = true;
-    }
   }
 
   // ==================================================
@@ -50,9 +23,8 @@ export class SupabaseStorageService implements IStorageService {
   // ==================================================
 
   async getProject(projectId: string): Promise<Project | undefined> {
-    this.ensureInitialized();
     try {
-      this.logService?.debug(`Fetching project ${projectId} from Supabase`);
+      console.log(`Fetching project ${projectId} from Supabase`);
 
       if (!projectId?.trim()) {
         throw new ValidationError('Project ID is required');
@@ -75,38 +47,62 @@ export class SupabaseStorageService implements IStorageService {
       return this.mapSupabaseProjectToProject(data);
     } catch (error) {
       if (error instanceof ValidationError) throw error;
-      this.errorService?.logError(error, 'SupabaseStorageService.getProject', 'database', 'high');
+      console.error('SupabaseStorageService.getProject error:', error);
       throw new DatabaseError(`Failed to fetch project with ID ${projectId}`, error);
     }
   }
 
   async getAllProjects(): Promise<Project[]> {
-    this.ensureInitialized();
     try {
-      this.logService?.debug('Fetching all projects from Supabase');
+      console.log('🔍 [SupabaseStorageService] Fetching all projects from Supabase');
 
+      // Check current user first
+      const user = await this.getCurrentUser();
+      console.log('🔍 [SupabaseStorageService] Current user for project fetch:', {
+        id: user.id,
+        email: user.email
+      });
+
+      // Test direct query with explicit session check
+      console.log('🔍 [SupabaseStorageService] About to query projects table...');
       const { data, error } = await supabase
         .from('projects')
         .select('*')
         .is('deleted_at', null)
         .order('updated_at', { ascending: false });
 
+      console.log('🔍 [SupabaseStorageService] Project fetch result:', {
+        dataCount: data?.length || 0,
+        error: error?.message,
+        errorCode: error?.code,
+        errorDetails: error?.details,
+        errorHint: error?.hint
+      });
+
       if (error) {
+        console.error('❌ [SupabaseStorageService] Detailed error:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          stack: error.stack
+        });
         throw handleSupabaseError(error);
       }
 
-      return (data || []).map(this.mapSupabaseProjectToProject);
+      const projects = (data || []).map((project) => this.mapSupabaseProjectToProject(project));
+      console.log('✅ [SupabaseStorageService] Successfully mapped projects:', projects.length);
+      return projects;
     } catch (error) {
-      this.errorService?.logError(error, 'SupabaseStorageService.getAllProjects', 'database', 'high');
+      console.error('❌ [SupabaseStorageService] getAllProjects error:', error);
       throw new DatabaseError('Failed to fetch projects', error);
     }
   }
 
   async createProject(projectData: Partial<Project>): Promise<Project> {
     console.log('🚀 [SupabaseStorageService] createProject called with:', projectData);
-    this.ensureInitialized();
     try {
-      this.logService?.debug('Creating project in Supabase', { projectData });
+      console.log('🚀 [SupabaseStorageService] Step 1: Validating project data');
 
       if (!projectData.name?.trim()) {
         throw new ValidationError('Project name is required');
@@ -115,11 +111,14 @@ export class SupabaseStorageService implements IStorageService {
         throw new ValidationError('Product type is required');
       }
 
-      // Get current user
-      console.log('🚀 [SupabaseStorageService] Getting current user...');
+      console.log('🚀 [SupabaseStorageService] Step 2: Getting current user...');
       const user = await this.getCurrentUser();
-      console.log('🚀 [SupabaseStorageService] Current user received:', user?.id || 'null');
+      console.log('🚀 [SupabaseStorageService] Step 3: Current user received:', user?.id || 'null');
+      
+      console.log('🚀 [SupabaseStorageService] Step 3.5: Ensuring user profile exists...');
+      await this.ensureProfileExists(user);
 
+      console.log('🚀 [SupabaseStorageService] Step 4: Building project object...');
       const newProject = {
         user_id: user.id,
         name: projectData.name,
@@ -134,30 +133,32 @@ export class SupabaseStorageService implements IStorageService {
         share_count: 0,
       };
 
+      console.log('🚀 [SupabaseStorageService] Step 5: Inserting project into Supabase...');
       const { data, error } = await supabase
         .from('projects')
         .insert(newProject)
         .select()
         .single();
 
+      console.log('🚀 [SupabaseStorageService] Step 6: Supabase insert completed');
+
       if (error) {
         throw handleSupabaseError(error);
       }
 
       const createdProject = this.mapSupabaseProjectToProject(data);
-      this.logService?.info('Project created successfully', { projectId: createdProject.id });
+      console.log('Project created successfully:', createdProject.id);
       return createdProject;
     } catch (error) {
       if (error instanceof ValidationError) throw error;
-      this.errorService?.logError(error, 'SupabaseStorageService.createProject', 'database', 'high');
+      console.error('SupabaseStorageService.createProject error:', error);
       throw new DatabaseError('Failed to create project', error);
     }
   }
 
   async updateProject(projectId: string, projectData: Partial<Project>): Promise<Project> {
-    this.ensureInitialized();
     try {
-      this.logService?.debug(`Updating project ${projectId}`, { projectData });
+      console.log(`Updating project ${projectId}`, { projectData });
 
       const existingProject = await this.getProject(projectId);
       if (!existingProject) {
@@ -191,19 +192,18 @@ export class SupabaseStorageService implements IStorageService {
       }
 
       const updatedProject = this.mapSupabaseProjectToProject(data);
-      this.logService?.info('Project updated successfully', { projectId });
+      console.log('Project updated successfully', { projectId });
       return updatedProject;
     } catch (error) {
       if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
-      this.errorService?.logError(error, 'SupabaseStorageService.updateProject', 'database', 'high');
+      console.error('SupabaseStorageService.updateProjecterror:', error);
       throw new DatabaseError(`Failed to update project with ID ${projectId}`, error);
     }
   }
 
   async deleteProject(projectId: string): Promise<void> {
-    this.ensureInitialized();
     try {
-      this.logService?.debug(`Deleting project ${projectId}`);
+      console.log(`Deleting project ${projectId}`);
 
       const existingProject = await this.getProject(projectId);
       if (!existingProject) {
@@ -220,10 +220,10 @@ export class SupabaseStorageService implements IStorageService {
         throw handleSupabaseError(error);
       }
 
-      this.logService?.info('Project deleted successfully', { projectId });
+      console.log('Project deleted successfully', { projectId });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
-      this.errorService?.logError(error, 'SupabaseStorageService.deleteProject', 'database', 'high');
+      console.error('SupabaseStorageService.deleteProjecterror:', error);
       throw new DatabaseError(`Failed to delete project with ID ${projectId}`, error);
     }
   }
@@ -233,9 +233,8 @@ export class SupabaseStorageService implements IStorageService {
   // ==================================================
 
   async getModelsForProject(projectId: string): Promise<FinancialModel[]> {
-    this.ensureInitialized();
     try {
-      this.logService?.debug(`Fetching models for project ${projectId}`);
+      console.log(`Fetching models for project ${projectId}`);
 
       if (!projectId?.trim()) {
         throw new ValidationError('Project ID is required');
@@ -252,18 +251,17 @@ export class SupabaseStorageService implements IStorageService {
         throw handleSupabaseError(error);
       }
 
-      return (data || []).map(this.mapSupabaseModelToModel);
+      return (data || []).map((model) => this.mapSupabaseModelToModel(model));
     } catch (error) {
       if (error instanceof ValidationError) throw error;
-      this.errorService?.logError(error, 'SupabaseStorageService.getModelsForProject', 'database', 'high');
+      console.error('SupabaseStorageService.getModelsForProjecterror:', error);
       throw new DatabaseError(`Failed to get models for project ${projectId}`, error);
     }
   }
 
   async getModel(modelId: string): Promise<FinancialModel | undefined> {
-    this.ensureInitialized();
     try {
-      this.logService?.debug(`Fetching model ${modelId}`);
+      console.log(`Fetching model ${modelId}`);
 
       if (!modelId?.trim()) {
         throw new ValidationError('Model ID is required');
@@ -286,15 +284,14 @@ export class SupabaseStorageService implements IStorageService {
       return this.mapSupabaseModelToModel(data);
     } catch (error) {
       if (error instanceof ValidationError) throw error;
-      this.errorService?.logError(error, 'SupabaseStorageService.getModel', 'database', 'high');
+      console.error('SupabaseStorageService.getModelerror:', error);
       throw new DatabaseError(`Failed to fetch model with ID ${modelId}`, error);
     }
   }
 
   async createModel(modelData: Partial<FinancialModel>): Promise<FinancialModel> {
-    this.ensureInitialized();
     try {
-      this.logService?.debug('Creating financial model in Supabase', { modelData });
+      console.log('Creating financial model in Supabase', { modelData });
 
       if (!modelData.projectId?.trim()) {
         throw new ValidationError('Project ID is required');
@@ -325,19 +322,18 @@ export class SupabaseStorageService implements IStorageService {
       }
 
       const createdModel = this.mapSupabaseModelToModel(data);
-      this.logService?.info('Financial model created successfully', { modelId: createdModel.id });
+      console.log('Financial model created successfully', { modelId: createdModel.id });
       return createdModel;
     } catch (error) {
       if (error instanceof ValidationError) throw error;
-      this.errorService?.logError(error, 'SupabaseStorageService.createModel', 'database', 'high');
+      console.error('SupabaseStorageService.createModelerror:', error);
       throw new DatabaseError('Failed to create financial model', error);
     }
   }
 
   async updateModel(modelId: string, modelData: Partial<FinancialModel>): Promise<FinancialModel> {
-    this.ensureInitialized();
     try {
-      this.logService?.debug(`Updating model ${modelId}`, { modelData });
+      console.log(`Updating model ${modelId}`, { modelData });
 
       const existingModel = await this.getModel(modelId);
       if (!existingModel) {
@@ -361,19 +357,18 @@ export class SupabaseStorageService implements IStorageService {
       }
 
       const updatedModel = this.mapSupabaseModelToModel(data);
-      this.logService?.info('Financial model updated successfully', { modelId });
+      console.log('Financial model updated successfully', { modelId });
       return updatedModel;
     } catch (error) {
       if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
-      this.errorService?.logError(error, 'SupabaseStorageService.updateModel', 'database', 'high');
+      console.error('SupabaseStorageService.updateModelerror:', error);
       throw new DatabaseError(`Failed to update financial model with ID ${modelId}`, error);
     }
   }
 
   async deleteModel(modelId: string): Promise<void> {
-    this.ensureInitialized();
     try {
-      this.logService?.debug(`Deleting model ${modelId}`);
+      console.log(`Deleting model ${modelId}`);
 
       const existingModel = await this.getModel(modelId);
       if (!existingModel) {
@@ -390,10 +385,10 @@ export class SupabaseStorageService implements IStorageService {
         throw handleSupabaseError(error);
       }
 
-      this.logService?.info('Financial model deleted successfully', { modelId });
+      console.log('Financial model deleted successfully', { modelId });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
-      this.errorService?.logError(error, 'SupabaseStorageService.deleteModel', 'database', 'high');
+      console.error('SupabaseStorageService.deleteModelerror:', error);
       throw new DatabaseError(`Failed to delete financial model with ID ${modelId}`, error);
     }
   }
@@ -403,9 +398,8 @@ export class SupabaseStorageService implements IStorageService {
   // ==================================================
 
   async getActualsForProject(projectId: string): Promise<ActualsPeriodEntry[]> {
-    this.ensureInitialized();
     try {
-      this.logService?.debug(`Fetching actuals for project ${projectId}`);
+      console.log(`Fetching actuals for project ${projectId}`);
 
       if (!projectId?.trim()) {
         throw new ValidationError('Project ID is required');
@@ -421,18 +415,17 @@ export class SupabaseStorageService implements IStorageService {
         throw handleSupabaseError(error);
       }
 
-      return (data || []).map(this.mapSupabaseActualToActual);
+      return (data || []).map((actual) => this.mapSupabaseActualToActual(actual));
     } catch (error) {
       if (error instanceof ValidationError) throw error;
-      this.errorService?.logError(error, 'SupabaseStorageService.getActualsForProject', 'database', 'high');
+      console.error('SupabaseStorageService.getActualsForProjecterror:', error);
       throw new DatabaseError(`Failed to get actuals for project ${projectId}`, error);
     }
   }
 
   async upsertActualsPeriod(actualData: Omit<ActualsPeriodEntry, 'id'>): Promise<ActualsPeriodEntry> {
-    this.ensureInitialized();
     try {
-      this.logService?.debug('Upserting actuals period', { actualData });
+      console.log('Upserting actuals period', { actualData });
 
       if (!actualData.projectId?.trim()) {
         throw new ValidationError('Project ID is required');
@@ -462,11 +455,11 @@ export class SupabaseStorageService implements IStorageService {
       }
 
       const result = this.mapSupabaseActualToActual(data);
-      this.logService?.info('Actuals period upserted successfully', { period: actualData.period });
+      console.log('Actuals period upserted successfully', { period: actualData.period });
       return result;
     } catch (error) {
       if (error instanceof ValidationError) throw error;
-      this.errorService?.logError(error, 'SupabaseStorageService.upsertActualsPeriod', 'database', 'high');
+      console.error('SupabaseStorageService.upsertActualsPerioderror:', error);
       throw new DatabaseError('Failed to upsert actuals period', error);
     }
   }
@@ -475,118 +468,102 @@ export class SupabaseStorageService implements IStorageService {
   // UTILITY METHODS
   // ==================================================
 
+
   /**
-   * Wait for authentication to be ready before proceeding
+   * Ensure a profile exists for the user (create if missing)
    */
-  private async waitForAuthReady(): Promise<void> {
-    console.log('🚀 [SupabaseStorageService] waitForAuthReady started');
-    const maxWaitTime = 30000; // 30 seconds max wait
-    const checkInterval = 500; // Check every 500ms
-    const startTime = Date.now();
-
-    return new Promise((resolve, reject) => {
-      const checkAuth = async () => {
-        try {
-          console.log('🚀 [SupabaseStorageService] Checking auth session...');
-          // Quick auth check without hanging
-          const { data: { session } } = await supabase.auth.getSession();
-          console.log('🚀 [SupabaseStorageService] Session check result:', {
-            hasSession: !!session,
-            hasUser: !!session?.user,
-            userId: session?.user?.id
-          });
-          if (session && session.user) {
-            this.logService?.info('Auth ready - session found');
-            console.log('✅ [SupabaseStorageService] Auth ready - session found!');
-            resolve();
-            return;
-          }
-
-          // Check if we've exceeded max wait time
-          const elapsedTime = Date.now() - startTime;
-          console.log(`🕰️ [SupabaseStorageService] Auth not ready, elapsed: ${elapsedTime}ms / ${maxWaitTime}ms`);
-          if (elapsedTime > maxWaitTime) {
-            console.error('❌ [SupabaseStorageService] TIMEOUT waiting for authentication!');
-            reject(new Error('Timeout waiting for authentication to be ready'));
-            return;
-          }
-
-          // Continue checking
-          console.log('🔄 [SupabaseStorageService] Retrying auth check in 500ms...');
-          setTimeout(checkAuth, checkInterval);
-        } catch (error) {
-          console.error('❌ [SupabaseStorageService] Error checking auth session:', error);
-          // If session check fails, wait a bit and try again
-          const elapsedTime = Date.now() - startTime;
-          if (elapsedTime > maxWaitTime) {
-            console.error('❌ [SupabaseStorageService] TIMEOUT after error in auth check!');
-            reject(new Error('Timeout waiting for authentication to be ready'));
-            return;
-          }
-          console.log('🔄 [SupabaseStorageService] Retrying after error in 500ms...');
-          setTimeout(checkAuth, checkInterval);
-        }
+  private async ensureProfileExists(user: any): Promise<void> {
+    try {
+      console.log('🔍 [ensureProfileExists] Checking if profile exists for user:', user.id);
+      
+      // Check if profile already exists
+      const { data: existingProfile, error: getError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .single();
+      
+      if (existingProfile) {
+        console.log('✅ [ensureProfileExists] Profile already exists');
+        return;
+      }
+      
+      if (getError && getError.code !== 'PGRST116') {
+        console.error('❌ [ensureProfileExists] Error checking profile:', getError);
+        throw getError;
+      }
+      
+      // Create profile
+      console.log('🔧 [ensureProfileExists] Creating profile for user');
+      const newProfile = {
+        id: user.id,
+        email: user.email || '',
+        name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+        picture: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
+        company_domain: user.user_metadata?.custom_claims?.hd || null,
+        preferences: {}
       };
-
-      checkAuth();
-    });
+      
+      const { error: createError } = await supabase
+        .from('profiles')
+        .insert(newProfile);
+      
+      if (createError) {
+        console.error('❌ [ensureProfileExists] Failed to create profile:', createError);
+        throw createError;
+      }
+      
+      console.log('✅ [ensureProfileExists] Profile created successfully');
+    } catch (error) {
+      console.error('❌ [ensureProfileExists] Profile creation failed:', error);
+      throw error; // Throw so project creation fails if we can't create profile
+    }
   }
 
   /**
-   * Get the current authenticated user with timeout protection and retry logic
+   * Get the current authenticated user with enhanced debugging
    */
-  private async getCurrentUser(retryCount: number = 0): Promise<any> {
-    console.log(`🚀 [SupabaseStorageService] getCurrentUser called (attempt ${retryCount + 1})`);
-    const maxRetries = 3;
-    const timeoutMs = 10000; // 10 second timeout
-    const retryDelayMs = 1000 * Math.pow(2, retryCount); // Exponential backoff
-
+  private async getCurrentUser(): Promise<any> {
+    console.log('🚀 [SupabaseStorageService] getCurrentUser called');
+    
     try {
-      // Wait for auth to be ready before proceeding (only on first attempt)
-      if (retryCount === 0) {
-        console.log('🚀 [SupabaseStorageService] Waiting for auth to be ready...');
-        await this.waitForAuthReady();
-        console.log('🚀 [SupabaseStorageService] Auth ready check completed');
-      }
-
-      // Create timeout promise
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => {
-          reject(new Error(`getCurrentUser timeout after ${timeoutMs}ms (attempt ${retryCount + 1})`));
-        }, timeoutMs);
-      });
-
-      // Race the auth call against timeout
-      const authPromise = supabase.auth.getUser();
-      const { data: { user }, error } = await Promise.race([authPromise, timeoutPromise]) as any;
-
-      if (error) {
-        throw new ValidationError('Failed to get current user: ' + error.message);
-      }
-      if (!user) {
-        throw new ValidationError('User must be authenticated');
-      }
+      // First check the session
+      console.log('🔍 [SupabaseStorageService] Checking session first...');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      this.logService?.info('Successfully retrieved current user', { userId: user.id });
-      return user;
-    } catch (error) {
-      this.logService?.error('getCurrentUser failed', { 
-        attempt: retryCount + 1, 
-        maxRetries,
-        error: error instanceof Error ? error.message : 'Unknown error'
+      console.log('🔍 [SupabaseStorageService] Session check:', {
+        hasSession: !!session,
+        hasUser: !!session?.user,
+        userId: session?.user?.id,
+        userEmail: session?.user?.email,
+        expiresAt: session?.expires_at,
+        sessionError: sessionError?.message,
+        isExpired: session?.expires_at ? new Date(session.expires_at * 1000) < new Date() : 'unknown'
       });
 
-      // Retry with exponential backoff if we haven't exceeded max retries
-      if (retryCount < maxRetries && (error instanceof Error && error.message.includes('timeout'))) {
-        this.logService?.info(`Retrying getCurrentUser in ${retryDelayMs}ms...`);
-        await new Promise(resolve => setTimeout(resolve, retryDelayMs));
-        return this.getCurrentUser(retryCount + 1);
+      if (sessionError) {
+        console.error('❌ [SupabaseStorageService] Session error:', sessionError);
+        throw new ValidationError('Session error: ' + sessionError.message);
       }
 
-      // If all retries failed or it's a non-timeout error, throw
-      if (error instanceof Error && error.message.includes('timeout')) {
-        throw new ValidationError(`Authentication timeout after ${maxRetries + 1} attempts. Please refresh the page and try again.`);
+      if (!session) {
+        console.error('❌ [SupabaseStorageService] No active session found');
+        throw new ValidationError('No active authentication session. Please log in first.');
       }
+
+      if (!session.user) {
+        console.error('❌ [SupabaseStorageService] Session exists but no user found');
+        throw new ValidationError('Invalid session: no user data found');
+      }
+
+      console.log('✅ [SupabaseStorageService] Successfully retrieved current user:', {
+        id: session.user.id,
+        email: session.user.email
+      });
+      
+      return session.user;
+    } catch (error) {
+      console.error('❌ [SupabaseStorageService] getCurrentUser failed:', error);
       throw error;
     }
   }
@@ -625,7 +602,6 @@ export class SupabaseStorageService implements IStorageService {
    * Test the connection to Supabase
    */
   public async testConnection(): Promise<boolean> {
-    this.ensureInitialized();
     try {
       const { data, error } = await supabase.from('projects').select('count').limit(1);
       return !error;

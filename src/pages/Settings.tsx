@@ -14,6 +14,8 @@ import { exportBoardReadyPDF, prepareBoardReadyData } from "@/lib/board-ready-ex
 import { exportSimpleExcel, exportSimplePDF } from "@/lib/simple-export";
 import { performFinancialAnalysis, generateCashFlowProjections } from "@/lib/financial-calculations";
 import { useMyProjects } from "@/hooks/useProjects";
+import { useModelsForProject } from "@/hooks/useModels";
+import { SupabaseStorageService } from "@/services/implementations/SupabaseStorageService";
 import { devLog } from "@/lib/devLog";
 
 const Settings = () => {
@@ -23,6 +25,23 @@ const Settings = () => {
   const [isExporting, setIsExporting] = useState(false);
 
   const { data: projects = [], isLoading } = useMyProjects();
+  
+  // Helper function to get models for a project using cloud/local switching
+  const getModelsForProject = async (projectId: string | number) => {
+    const isCloudEnabled = () => import.meta.env.VITE_USE_SUPABASE_BACKEND === 'true';
+    
+    if (isCloudEnabled()) {
+      console.log('🌤️ Getting models from Supabase for export');
+      const supabaseStorage = new SupabaseStorageService();
+      return await supabaseStorage.getModelsForProject(String(projectId));
+    } else {
+      console.log('💾 Getting models from IndexedDB for export');
+      return await db.financialModels
+        .where('projectId')
+        .equals(projectId)
+        .toArray();
+    }
+  };
 
   // Debug: log projects on component mount
   useEffect(() => {
@@ -99,10 +118,7 @@ const Settings = () => {
       const firstProject = projectsArray[0];
       devLog('Exporting project:', firstProject);
       
-      const models = await db.financialModels
-        .where('projectId')
-        .equals(firstProject.id!)
-        .toArray();
+      const models = await getModelsForProject(firstProject.id!);
 
       devLog('Found models:', models);
       
@@ -138,10 +154,7 @@ const Settings = () => {
       }
       
       const firstProject = projectsArray[0];
-      const models = await db.financialModels
-        .where('projectId')
-        .equals(firstProject.id!)
-        .toArray();
+      const models = await getModelsForProject(firstProject.id!);
       
       // Use simple, reliable PDF export
       await exportSimplePDF({
@@ -175,10 +188,7 @@ const Settings = () => {
       }
       
       const firstProject = projectsArray[0];
-      const models = await db.financialModels
-        .where('projectId')
-        .equals(firstProject.id!)
-        .toArray();
+      const models = await getModelsForProject(firstProject.id!);
       
       if (models.length === 0) {
         toast.error("No financial models found", {
@@ -225,7 +235,16 @@ const Settings = () => {
   
   const handleClearAllData = async () => {
     try {
-      // Clear all tables
+      const isCloudEnabled = () => import.meta.env.VITE_USE_SUPABASE_BACKEND === 'true';
+      
+      if (isCloudEnabled()) {
+        toast.error("Clear not available", {
+          description: "Data clearing is not available in cloud mode. Use the Supabase dashboard to manage your data.",
+        });
+        return;
+      }
+      
+      // Clear all tables (local mode only)
       await db.transaction('rw', [db.projects, db.financialModels, db.actualPerformance, db.risks, db.scenarios], async () => {
         await db.projects.clear();
         await db.financialModels.clear();

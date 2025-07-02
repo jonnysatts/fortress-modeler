@@ -1,21 +1,33 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FinancialModel, db, getModelsForProject, getModelById, addFinancialModel, updateFinancialModel, deleteFinancialModel } from '@/lib/db';
+import { SupabaseStorageService } from '@/services/implementations/SupabaseStorageService';
 import { toast } from 'sonner';
 
-// Local-only mode - cloud sync is disabled
-const isCloudEnabled = () => false;
+// Check if cloud sync is enabled via environment variable
+const isCloudEnabled = () => import.meta.env.VITE_USE_SUPABASE_BACKEND === 'true';
 
 export const useModelsForProject = (projectId: string | undefined) => {
   // No normalization needed - projectId is already a string
   return useQuery<FinancialModel[], Error>({
     queryKey: ['models', projectId],
     queryFn: async () => {
-      console.log('useModelsForProject queryFn called', { projectId, type: typeof projectId });
+      console.log('useModelsForProject queryFn called', { projectId, type: typeof projectId, cloudEnabled: isCloudEnabled() });
       if (!projectId) return [];
-      // Direct database access
-      const models = await getModelsForProject(projectId);
-      console.log('useModelsForProject found models', { projectId, count: models.length });
-      return models;
+      
+      if (isCloudEnabled()) {
+        // Use Supabase for cloud storage
+        console.log('🌤️ Getting models from Supabase');
+        const supabaseStorage = new SupabaseStorageService();
+        const models = await supabaseStorage.getModelsForProject(projectId);
+        console.log('useModelsForProject found models in Supabase', { projectId, count: models.length });
+        return models;
+      } else {
+        // Use IndexedDB for local storage
+        console.log('💾 Getting models from IndexedDB');
+        const models = await getModelsForProject(projectId);
+        console.log('useModelsForProject found models in IndexedDB', { projectId, count: models.length });
+        return models;
+      }
     },
     enabled: !!projectId,
     staleTime: 5 * 60 * 1000,
@@ -29,8 +41,19 @@ export const useModel = (modelId: string | undefined) => {
     queryKey: ['models', modelId],
     queryFn: async () => {
       if (!modelId) throw new Error('Model ID is required');
-      // Direct database access
-      return getModelById(modelId);
+      
+      if (isCloudEnabled()) {
+        // Use Supabase for cloud storage
+        console.log('🌤️ Getting model from Supabase');
+        const supabaseStorage = new SupabaseStorageService();
+        const model = await supabaseStorage.getModel(modelId);
+        if (!model) throw new Error(`Model with ID ${modelId} not found`);
+        return model;
+      } else {
+        // Use IndexedDB for local storage
+        console.log('💾 Getting model from IndexedDB');
+        return getModelById(modelId);
+      }
     },
     enabled: !!modelId,
     staleTime: 5 * 60 * 1000,
@@ -43,10 +66,20 @@ export const useCreateModel = () => {
   const queryClient = useQueryClient();
   return useMutation<FinancialModel, Error, Partial<FinancialModel>>({
     mutationFn: async (newModelData) => {
-      // Local-only mode - always use local storage
       try {
-        const result = await addFinancialModel(newModelData);
-        return result;
+        if (isCloudEnabled()) {
+          // Use Supabase for cloud storage
+          console.log('🌤️ Creating model in Supabase');
+          const supabaseStorage = new SupabaseStorageService();
+          const result = await supabaseStorage.createModel(newModelData);
+          console.log('✅ Model created in Supabase:', result.id);
+          return result;
+        } else {
+          // Use IndexedDB for local storage
+          console.log('💾 Creating model in IndexedDB');
+          const result = await addFinancialModel(newModelData);
+          return result;
+        }
       } catch (error) {
         console.error('❌ Model creation failed:', error);
         throw error;
@@ -87,8 +120,23 @@ export const useUpdateModel = () => {
   const queryClient = useQueryClient();
   return useMutation<FinancialModel, Error, { id: string; projectId: string; data: Partial<FinancialModel> }>({
     mutationFn: async ({ id, projectId, data }) => {
-      // Local-only mode - always use local storage
-      return updateFinancialModel(id, data);
+      try {
+        if (isCloudEnabled()) {
+          // Use Supabase for cloud storage
+          console.log('🌤️ Updating model in Supabase');
+          const supabaseStorage = new SupabaseStorageService();
+          const result = await supabaseStorage.updateModel(id, data);
+          console.log('✅ Model updated in Supabase:', result.id);
+          return result;
+        } else {
+          // Use IndexedDB for local storage
+          console.log('💾 Updating model in IndexedDB');
+          return updateFinancialModel(id, data);
+        }
+      } catch (error) {
+        console.error('❌ Model update failed:', error);
+        throw error;
+      }
     },
     onMutate: async ({ id, projectId, data }) => {
       await Promise.all([
@@ -131,8 +179,22 @@ export const useDeleteModel = () => {
   const queryClient = useQueryClient();
   return useMutation<void, Error, { modelId: string; projectId: string }>({
     mutationFn: async ({ modelId }) => {
-      // Local-only mode - always use local storage
-      await deleteFinancialModel(modelId);
+      try {
+        if (isCloudEnabled()) {
+          // Use Supabase for cloud storage
+          console.log('🌤️ Deleting model in Supabase');
+          const supabaseStorage = new SupabaseStorageService();
+          await supabaseStorage.deleteModel(modelId);
+          console.log('✅ Model deleted in Supabase:', modelId);
+        } else {
+          // Use IndexedDB for local storage
+          console.log('💾 Deleting model in IndexedDB');
+          await deleteFinancialModel(modelId);
+        }
+      } catch (error) {
+        console.error('❌ Model deletion failed:', error);
+        throw error;
+      }
     },
     onMutate: async ({ modelId, projectId }) => {
       await Promise.all([

@@ -2,7 +2,13 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SupabaseAuthProvider } from './hooks/useSupabaseAuth';
+import { bootstrapServices } from './services/bootstrap';
 import App from './App';
+
+// 🚨 CRITICAL FIX: Initialize service layer
+console.log('🔧 Initializing service layer...');
+bootstrapServices();
+console.log('✅ Service layer initialized');
 
 // Create QueryClient 
 const queryClient = new QueryClient({
