@@ -2,19 +2,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FinancialModel, db, getModelsForProject, getModelById, addFinancialModel, updateFinancialModel, deleteFinancialModel } from '@/lib/db';
 import { SupabaseStorageService } from '@/services/implementations/SupabaseStorageService';
 import { toast } from 'sonner';
-
-// Check if cloud sync is enabled via environment variable
-const isCloudEnabled = () => import.meta.env.VITE_USE_SUPABASE_BACKEND === 'true';
+import { isCloudModeEnabled } from '@/config/app.config';
 
 export const useModelsForProject = (projectId: string | undefined) => {
   // No normalization needed - projectId is already a string
   return useQuery<FinancialModel[], Error>({
     queryKey: ['models', projectId],
     queryFn: async () => {
-      console.log('useModelsForProject queryFn called', { projectId, type: typeof projectId, cloudEnabled: isCloudEnabled() });
+      console.log('useModelsForProject queryFn called', { projectId, type: typeof projectId, cloudEnabled: isCloudModeEnabled() });
       if (!projectId) return [];
       
-      if (isCloudEnabled()) {
+      if (isCloudModeEnabled()) {
         // Use Supabase for cloud storage
         console.log('🌤️ Getting models from Supabase');
         const supabaseStorage = new SupabaseStorageService();
@@ -42,7 +40,7 @@ export const useModel = (modelId: string | undefined) => {
     queryFn: async () => {
       if (!modelId) throw new Error('Model ID is required');
       
-      if (isCloudEnabled()) {
+      if (isCloudModeEnabled()) {
         // Use Supabase for cloud storage
         console.log('🌤️ Getting model from Supabase');
         const supabaseStorage = new SupabaseStorageService();
@@ -67,7 +65,7 @@ export const useCreateModel = () => {
   return useMutation<FinancialModel, Error, Partial<FinancialModel>>({
     mutationFn: async (newModelData) => {
       try {
-        if (isCloudEnabled()) {
+        if (isCloudModeEnabled()) {
           // Use Supabase for cloud storage
           console.log('🌤️ Creating model in Supabase');
           const supabaseStorage = new SupabaseStorageService();
@@ -121,7 +119,7 @@ export const useUpdateModel = () => {
   return useMutation<FinancialModel, Error, { id: string; projectId: string; data: Partial<FinancialModel> }>({
     mutationFn: async ({ id, projectId, data }) => {
       try {
-        if (isCloudEnabled()) {
+        if (isCloudModeEnabled()) {
           // Use Supabase for cloud storage
           console.log('🌤️ Updating model in Supabase');
           const supabaseStorage = new SupabaseStorageService();
@@ -180,7 +178,7 @@ export const useDeleteModel = () => {
   return useMutation<void, Error, { modelId: string; projectId: string }>({
     mutationFn: async ({ modelId }) => {
       try {
-        if (isCloudEnabled()) {
+        if (isCloudModeEnabled()) {
           // Use Supabase for cloud storage
           console.log('🌤️ Deleting model in Supabase');
           const supabaseStorage = new SupabaseStorageService();

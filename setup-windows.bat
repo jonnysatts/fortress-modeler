@@ -54,22 +54,27 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-REM Check if .env exists
+REM Check if .env exists (optional with built-in config)
 if not exist ".env" (
     echo.
-    echo WARNING: No .env file found.
+    echo NOTE: No .env file found.
+    echo The app includes built-in configuration and will work without .env files.
     echo.
-    echo Choose setup option:
-    echo 1. Interactive configuration ^(recommended^)
-    echo 2. Copy from production template
-    echo 3. Copy from example template
+    echo Optional setup:
+    echo 1. Use built-in configuration ^(recommended - no setup required^)
+    echo 2. Interactive configuration ^(for custom settings^)
+    echo 3. Copy from production template
+    echo 4. Copy from example template
     echo.
-    set /p env_choice="Enter choice (1-3): "
+    set /p env_choice="Enter choice (1-4, or press Enter for option 1): "
     
+    if "%env_choice%"=="" set env_choice=1
     if "%env_choice%"=="1" (
+        echo SUCCESS: Using built-in configuration - no .env file needed
+    ) else if "%env_choice%"=="2" (
         echo Running interactive configuration...
         call scripts\configure-env.bat
-    ) else if "%env_choice%"=="2" (
+    ) else if "%env_choice%"=="3" (
         if exist ".env.production" (
             copy .env.production .env >nul
             echo SUCCESS: Copied production configuration

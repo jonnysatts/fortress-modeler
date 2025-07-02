@@ -3,9 +3,7 @@ import { getActualsForProject, upsertActualsPeriod } from '@/lib/db';
 import { SupabaseStorageService } from '@/services/implementations/SupabaseStorageService';
 import { ActualsPeriodEntry } from '@/types/models';
 import { toast } from 'sonner';
-
-// Check if cloud sync is enabled via environment variable
-const isCloudEnabled = () => import.meta.env.VITE_USE_SUPABASE_BACKEND === 'true';
+import { isCloudModeEnabled } from '@/config/app.config';
 
 /**
  * Hook for managing actuals data for projects
@@ -16,7 +14,7 @@ export const useActualsForProject = (projectId: string | undefined) => {
     queryFn: async () => {
       if (!projectId) return [];
       
-      if (isCloudEnabled()) {
+      if (isCloudModeEnabled()) {
         // Use Supabase for cloud storage
         console.log('🌤️ Getting actuals from Supabase');
         const supabaseStorage = new SupabaseStorageService();
@@ -43,7 +41,7 @@ export const useSaveActuals = () => {
   return useMutation<ActualsPeriodEntry, Error, ActualsPeriodEntry>({
     mutationFn: async (actualsData) => {
       try {
-        if (isCloudEnabled()) {
+        if (isCloudModeEnabled()) {
           // Use Supabase for cloud storage
           console.log('🌤️ Saving actuals to Supabase');
           const supabaseStorage = new SupabaseStorageService();

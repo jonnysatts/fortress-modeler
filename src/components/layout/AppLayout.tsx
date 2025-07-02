@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { addDemoData } from "@/lib/db";
 import { config } from "@/lib/config";
 import { useSupabaseAuth as useAuth } from "@/hooks/useSupabaseAuth";
+import { isCloudModeEnabled } from "@/config/app.config";
 
 const AppLayout = () => {
   const [initializing, setInitializing] = useState(true);
@@ -16,7 +17,7 @@ const AppLayout = () => {
     const init = async () => {
       try {
         // Only initialize IndexedDB in local mode
-        const isCloudMode = import.meta.env.VITE_USE_SUPABASE_BACKEND === 'true';
+        const isCloudMode = isCloudModeEnabled();
         
         if (!isCloudMode) {
           console.log('💾 Initializing IndexedDB for local mode');

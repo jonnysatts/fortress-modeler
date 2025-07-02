@@ -14,6 +14,7 @@ import { Edit, Download, Share2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { SupabaseStorageService } from "@/services/implementations/SupabaseStorageService";
 import { db, getProject } from "@/lib/db";
+import { isCloudModeEnabled } from "@/config/app.config";
 
 interface ModelOverviewProps {
   model: Model;
@@ -390,9 +391,8 @@ const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverviewProp
     try {
       // Get project data using cloud/local switching
       let project;
-      const isCloudEnabled = () => import.meta.env.VITE_USE_SUPABASE_BACKEND === 'true';
       
-      if (isCloudEnabled()) {
+      if (isCloudModeEnabled()) {
         console.log('🌤️ Getting project from Supabase for download');
         const supabaseStorage = new SupabaseStorageService();
         project = await supabaseStorage.getProject(projectId);

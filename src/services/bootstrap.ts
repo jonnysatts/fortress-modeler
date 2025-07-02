@@ -5,6 +5,7 @@ import { SupabaseRealtimeService } from './implementations/SupabaseRealtimeServi
 import { ErrorService } from './implementations/ErrorService';
 import { LogService } from './implementations/LogService';
 import { ConfigService } from './implementations/ConfigService';
+import { isCloudModeEnabled } from '@/config/app.config';
 
 /**
  * Bootstrap and configure all application services
@@ -30,9 +31,8 @@ export function bootstrapServices(): void {
     true
   );
 
-  // Register storage service based on environment configuration
-  const useSupabase = import.meta.env.VITE_USE_SUPABASE_BACKEND === 'true' || 
-                     configService.get('USE_SUPABASE_BACKEND', false);
+  // Register storage service based on configuration
+  const useSupabase = isCloudModeEnabled();
 
   const logService = serviceContainer.resolve(SERVICE_TOKENS.LOG_SERVICE);
 

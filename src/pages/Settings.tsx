@@ -13,6 +13,7 @@ import { exportEnhancedExcel } from "@/lib/enhanced-excel-export";
 import { exportBoardReadyPDF, prepareBoardReadyData } from "@/lib/board-ready-export";
 import { exportSimpleExcel, exportSimplePDF } from "@/lib/simple-export";
 import { performFinancialAnalysis, generateCashFlowProjections } from "@/lib/financial-calculations";
+import { isCloudModeEnabled } from "@/config/app.config";
 import { useMyProjects } from "@/hooks/useProjects";
 import { useModelsForProject } from "@/hooks/useModels";
 import { SupabaseStorageService } from "@/services/implementations/SupabaseStorageService";
@@ -28,9 +29,8 @@ const Settings = () => {
   
   // Helper function to get models for a project using cloud/local switching
   const getModelsForProject = async (projectId: string | number) => {
-    const isCloudEnabled = () => import.meta.env.VITE_USE_SUPABASE_BACKEND === 'true';
     
-    if (isCloudEnabled()) {
+    if (isCloudModeEnabled()) {
       console.log('🌤️ Getting models from Supabase for export');
       const supabaseStorage = new SupabaseStorageService();
       return await supabaseStorage.getModelsForProject(String(projectId));
@@ -235,9 +235,8 @@ const Settings = () => {
   
   const handleClearAllData = async () => {
     try {
-      const isCloudEnabled = () => import.meta.env.VITE_USE_SUPABASE_BACKEND === 'true';
-      
-      if (isCloudEnabled()) {
+        
+      if (isCloudModeEnabled()) {
         toast.error("Clear not available", {
           description: "Data clearing is not available in cloud mode. Use the Supabase dashboard to manage your data.",
         });

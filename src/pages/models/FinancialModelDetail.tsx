@@ -21,6 +21,7 @@ import { SupabaseStorageService } from "@/services/implementations/SupabaseStora
 import { useProject } from "@/hooks/useProjects";
 import { useModel, useDeleteModel } from "@/hooks/useModels";
 import { toast } from "sonner";
+import { isCloudModeEnabled } from "@/config/app.config";
 
 // Lazy load heavy chart components
 const ModelProjections = lazy(() => import("@/components/models/ModelProjections"));
@@ -98,10 +99,9 @@ const FinancialModelDetail = () => {
 
       // Perform the database update using cloud/local switching
       const saveAssumptions = async () => {
-        const isCloudEnabled = () => import.meta.env.VITE_USE_SUPABASE_BACKEND === 'true';
         
         try {
-          if (isCloudEnabled()) {
+          if (isCloudModeEnabled()) {
             console.log('🌤️ Updating model assumptions in Supabase');
             const supabaseStorage = new SupabaseStorageService();
             await supabaseStorage.updateModel(prevModel.id, {

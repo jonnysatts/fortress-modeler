@@ -1,9 +1,10 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Database } from './database.types';
+import { appConfig } from '@/config/app.config';
 
-// Supabase client configuration - MUST use environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Use built-in config with fallback to env vars for development flexibility
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || appConfig.supabase.url;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || appConfig.supabase.anonKey;
 
 // Debug environment variables
 console.log('🔧 Supabase client init:', {
@@ -12,13 +13,13 @@ console.log('🔧 Supabase client init:', {
   fromEnv: !!import.meta.env.VITE_SUPABASE_URL,
   viteMode: import.meta.env.MODE,
   viteDev: import.meta.env.DEV,
-  supabaseBackend: import.meta.env.VITE_USE_SUPABASE_BACKEND,
+  cloudModeEnabled: appConfig.features.useSupabaseBackend,
   currentUrl: window.location.href,
   origin: window.location.origin
 });
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Please check your .env file.');
+  throw new Error('Missing Supabase configuration. Built-in config should provide defaults.');
 }
 
 // Create Supabase client with full type safety

@@ -2,9 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Project, FinancialModel, db, getProject, createProject, updateProject, deleteProject } from '@/lib/db';
 import { SupabaseStorageService } from '@/services/implementations/SupabaseStorageService';
 import { toast } from 'sonner';
-
-// Check if cloud sync is enabled via environment variable
-const isCloudEnabled = () => import.meta.env.VITE_USE_SUPABASE_BACKEND === 'true';
+import { isCloudModeEnabled } from '@/config/app.config';
 
 // --- Projects --- //
 
@@ -12,11 +10,10 @@ export const useMyProjects = () => {
   return useQuery<Project[], Error>({
     queryKey: ['projects', 'my'],
     queryFn: async () => {
-      const cloudEnabled = isCloudEnabled();
+      const cloudEnabled = isCloudModeEnabled();
       console.log('🔍 Environment check:', {
-        VITE_USE_SUPABASE_BACKEND: import.meta.env.VITE_USE_SUPABASE_BACKEND,
         cloudEnabled,
-        envType: typeof import.meta.env.VITE_USE_SUPABASE_BACKEND
+        configSource: 'app.config.ts'
       });
       
       if (cloudEnabled) {
@@ -84,7 +81,7 @@ export const useProject = (projectId: string | undefined) => {
     queryFn: async () => {
       if (!projectId) throw new Error('Project ID is required');
       
-      if (isCloudEnabled()) {
+      if (isCloudModeEnabled()) {
         // Use Supabase for cloud storage - create service when auth is ready
         console.log('🌤️ Getting project from Supabase');
         const supabaseStorage = new SupabaseStorageService();
@@ -111,9 +108,9 @@ export const useCreateProject = () => {
   
   return useMutation<Project, Error, Partial<Project>>({
     mutationFn: async (newProjectData) => {
-      console.log('🚀 useCreateProject started with cloud mode:', isCloudEnabled());
+      console.log('🚀 useCreateProject started with cloud mode:', isCloudModeEnabled());
       
-      if (isCloudEnabled()) {
+      if (isCloudModeEnabled()) {
         try {
           // Use Supabase for cloud storage - create service when auth is ready
           console.log('🌤️ Attempting to create project in Supabase');
@@ -166,7 +163,7 @@ export const useUpdateProject = () => {
   
   return useMutation<Project, Error, { id: string; data: Partial<Project> }>({
     mutationFn: async ({ id, data }) => {
-      if (isCloudEnabled()) {
+      if (isCloudModeEnabled()) {
         // Use Supabase for cloud storage - create service when auth is ready
         console.log('🌤️ Updating project in Supabase');
         const supabaseStorage = new SupabaseStorageService();
@@ -201,7 +198,7 @@ export const useDeleteProject = () => {
   
   return useMutation<void, Error, string>({
     mutationFn: async (id) => {
-      if (isCloudEnabled()) {
+      if (isCloudModeEnabled()) {
         // Use Supabase for cloud storage - create service when auth is ready
         console.log('🌤️ Deleting project in Supabase');
         const supabaseStorage = new SupabaseStorageService();
