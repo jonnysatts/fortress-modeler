@@ -1,12 +1,12 @@
 # ⚡ Quick Fixes for Port 8081 Issues
 
-## 🚨 Port 8081 Won't Work? Try These (In Order):
+## 🚨 IMPORTANT: Port 8081 is REQUIRED (OAuth won't work on other ports)
 
-### **1. Use the Smart Launcher (EASIEST)**
+### **1. Use the Port 8081 Fixer (BEST SOLUTION)**
 ```bash
-start-app-any-port.bat
+fix-port-8081.bat
 ```
-This automatically finds a working port and starts the app.
+This specifically fixes port 8081 conflicts and starts the app.
 
 ### **2. Kill Node Processes**
 ```bash
@@ -14,12 +14,8 @@ taskkill /F /IM node.exe
 npm run dev
 ```
 
-### **3. Try Alternative Ports**
-```bash
-npm run dev:3000    # Port 3000
-npm run dev:5173    # Port 5173
-npm run dev:8080    # Port 8080
-```
+### **3. Nuclear Option (Restart Computer)**
+Sometimes the simplest solution - restart your PC and run `npm run dev`
 
 ### **4. Diagnose the Issue**
 ```bash
@@ -54,15 +50,13 @@ npm run dev
 3. **Restart computer** then `npm run dev`
 4. **Use port 3000:** `npm run dev:3000`
 
-## ⚠️ OAuth Warning
+## ⚠️ CRITICAL: Only Port 8081 Works
 
-- **Port 8081**: OAuth works ✅
-- **Other ports**: OAuth needs configuration ⚠️
+- **Port 8081**: OAuth works ✅ (REQUIRED)
+- **Other ports**: OAuth completely broken ❌
 
-If using a different port, run:
-```bash
-node scripts/fix-oauth-port.cjs [PORT_NUMBER]
-```
+**Do not use alternative ports** - they break authentication.
+**Fix port 8081 instead** using `fix-port-8081.bat`
 
 ## 📞 Still Not Working?
 
