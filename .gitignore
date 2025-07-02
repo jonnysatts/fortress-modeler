@@ -36,3 +36,8 @@ server/.env.bak
 deploy-frontend.md
 DEPLOYMENT_GUIDE.md
 OAUTH_DEBUGGING.md
+
+# Temporary development files
+temp-files/
+*.tmp
+*.temp
