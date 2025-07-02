@@ -28,7 +28,7 @@ if not exist "node_modules\" (
 REM Install Electron dependencies if not present
 if not exist "node_modules\electron\" (
     echo Installing Electron dependencies...
-    call npm install electron electron-builder electron-updater concurrently wait-on --save-dev
+    call npm install electron electron-builder electron-updater concurrently wait-on open --save-dev
     if %errorlevel% neq 0 (
         echo ERROR: Failed to install Electron dependencies
         pause

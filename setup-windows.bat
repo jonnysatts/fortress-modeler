@@ -93,16 +93,17 @@ if not exist ".env" (
 )
 
 echo.
-echo Setup complete! To start the development server:
+echo Setup complete! To start the application:
 echo.
-echo REQUIRED: npm run dev ^(MUST use port 8081 for OAuth^)
+echo RECOMMENDED: start-app.bat ^(handles port conflicts automatically^)
+echo ALTERNATIVE: npm run dev ^(requires manual port 8081 fixing^)
 echo.
 echo ⚠️  IMPORTANT: This app requires port 8081 for authentication
-echo   Other ports will break OAuth login functionality
+echo   The launcher will automatically fix port conflicts
 echo.
-echo If port 8081 doesn't work:
-echo   1. Run: fix-port-8081.bat ^(RECOMMENDED^)
-echo   2. Run: scripts\diagnose-port.bat
+echo If you encounter issues:
+echo   1. Run: fix-port-8081.bat
+echo   2. Run: scripts\diagnose-port.bat  
 echo   3. Read: docs\WHY_PORT_8081.md
 echo.
 echo The app will be available at: http://localhost:8081/

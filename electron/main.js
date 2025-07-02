@@ -1,10 +1,139 @@
-const { app, BrowserWindow, shell, Menu } = require('electron');
+const { app, BrowserWindow, shell, Menu, dialog } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
+const { spawn, exec } = require('child_process');
+const net = require('net');
 const isDev = process.env.NODE_ENV === 'development';
 
 // Keep a global reference of the window object
 let mainWindow;
+let viteProcess = null;
+
+// Port conflict resolution functions
+async function isPortAvailable(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.listen(port, (err) => {
+      if (err) {
+        resolve(false);
+      } else {
+        server.close(() => {
+          resolve(true);
+        });
+      }
+    });
+    server.on('error', () => {
+      resolve(false);
+    });
+  });
+}
+
+async function killProcessOnPort(port) {
+  return new Promise((resolve) => {
+    if (process.platform === 'win32') {
+      exec(`netstat -ano | findstr :${port}`, (error, stdout) => {
+        if (stdout) {
+          const lines = stdout.trim().split('\n');
+          const pids = lines.map(line => {
+            const parts = line.trim().split(/\s+/);
+            return parts[parts.length - 1];
+          }).filter(pid => pid && !isNaN(pid));
+          
+          if (pids.length > 0) {
+            exec(`taskkill /F ${pids.map(pid => `/PID ${pid}`).join(' ')}`, (killError) => {
+              console.log(`Killed processes on port ${port}:`, pids);
+              resolve(true);
+            });
+          } else {
+            resolve(false);
+          }
+        } else {
+          resolve(false);
+        }
+      });
+    } else {
+      // macOS/Linux
+      exec(`lsof -ti:${port}`, (error, stdout) => {
+        if (stdout) {
+          const pids = stdout.trim().split('\n').filter(pid => pid);
+          if (pids.length > 0) {
+            exec(`kill -9 ${pids.join(' ')}`, (killError) => {
+              console.log(`Killed processes on port ${port}:`, pids);
+              resolve(true);
+            });
+          } else {
+            resolve(false);
+          }
+        } else {
+          resolve(false);
+        }
+      });
+    }
+  });
+}
+
+async function ensurePort8081() {
+  console.log('🔍 Checking if port 8081 is available...');
+  
+  if (await isPortAvailable(8081)) {
+    console.log('✅ Port 8081 is available');
+    return true;
+  }
+  
+  console.log('❌ Port 8081 is in use, attempting to free it...');
+  
+  // Show dialog to user
+  const response = await dialog.showMessageBox(mainWindow, {
+    type: 'warning',
+    title: 'Port 8081 Conflict',
+    message: 'Port 8081 is required for Fortress Financial Modeler but is currently in use.',
+    detail: 'The app can attempt to free the port by closing conflicting processes. This is safe and necessary for OAuth authentication to work.',
+    buttons: ['Free Port 8081', 'Exit'],
+    defaultId: 0,
+    cancelId: 1
+  });
+  
+  if (response.response === 1) {
+    console.log('User chose to exit');
+    app.quit();
+    return false;
+  }
+  
+  // Attempt to kill processes using port 8081
+  const killed = await killProcessOnPort(8081);
+  
+  // Wait a moment for processes to close
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  if (await isPortAvailable(8081)) {
+    console.log('✅ Successfully freed port 8081');
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Port 8081 Ready',
+      message: 'Port 8081 has been successfully freed and is ready for use.',
+      buttons: ['Continue']
+    });
+    return true;
+  } else {
+    console.log('❌ Failed to free port 8081');
+    const retryResponse = await dialog.showMessageBox(mainWindow, {
+      type: 'error',
+      title: 'Port 8081 Still Unavailable',
+      message: 'Unable to free port 8081. This will prevent OAuth authentication from working.',
+      detail: 'You may need to manually close other applications using this port, or restart your computer.',
+      buttons: ['Continue Anyway', 'Exit'],
+      defaultId: 1,
+      cancelId: 1
+    });
+    
+    if (retryResponse.response === 1) {
+      app.quit();
+      return false;
+    }
+    
+    return false;
+  }
+}
 
 function createWindow() {
   // Create the browser window
@@ -117,8 +246,16 @@ function createWindow() {
 }
 
 // App event handlers
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   createWindow();
+  
+  // Ensure port 8081 is available before starting the app
+  if (!isDev) {
+    const portReady = await ensurePort8081();
+    if (!portReady) {
+      console.log('Port 8081 not available, app may not function correctly');
+    }
+  }
 
   app.on('activate', () => {
     // On macOS, re-create a window when the dock icon is clicked
