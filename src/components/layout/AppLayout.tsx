@@ -5,12 +5,16 @@ import { Toaster } from "@/components/ui/toaster";
 import { addDemoData } from "@/lib/db";
 import { config } from "@/lib/config";
 import { useSupabaseAuth as useAuth } from "@/hooks/useSupabaseAuth";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { isCloudModeEnabled } from "@/config/app.config";
 
 const AppLayout = () => {
   const [initializing, setInitializing] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { user } = useAuth();
+  
+  // Enable keyboard shortcuts
+  useKeyboardShortcuts();
 
   // Initialize the database
   useEffect(() => {

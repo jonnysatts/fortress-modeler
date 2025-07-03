@@ -40,6 +40,9 @@ import {
 import { Label } from "@/components/ui/label";
 import { ProjectOverview } from "@/components/projects/ProjectOverview";
 import { ActualsDisplayTable } from "@/components/models/ActualsDisplayTable";
+import { ModelComparison } from "@/components/models/ModelComparison";
+import { Breadcrumb } from "@/components/navigation/Breadcrumb";
+import { useBreadcrumbs } from "@/hooks/useBreadcrumbs";
 // Lazy load heavy components
 const PerformanceAnalysis = lazy(() => import("@/components/models/PerformanceAnalysis").then(m => ({ default: m.PerformanceAnalysis })));
 const ActualsInputForm = lazy(() => import("@/components/models/ActualsInputForm").then(m => ({ default: m.ActualsInputForm })));
@@ -83,6 +86,13 @@ const ProjectDetail = () => {
 
   const selectedModel = financialModels.find(m => m.id === selectedModelId) || financialModels[0];
   const [activeTab, setActiveTab] = useState("overview");
+  
+  // Breadcrumb navigation
+  const breadcrumbs = useBreadcrumbs({
+    projectId: projectId,
+    projectName: project?.name,
+    activeTab: activeTab,
+  });
   
   const loading = projectLoading || modelsLoading || actualsLoading;
 
@@ -135,6 +145,9 @@ const ProjectDetail = () => {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb Navigation */}
+      <Breadcrumb items={breadcrumbs} />
+      
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-start gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate("/projects")}>
@@ -305,6 +318,12 @@ const ProjectDetail = () => {
               )}
             </CardContent>
           </Card>
+          
+          {/* Model Comparison */}
+          <ModelComparison
+            models={financialModels}
+            onViewModel={(modelId) => navigate(`/projects/${projectId}/models/${modelId}`)}
+          />
         </TabsContent>
         
         <TabsContent value="performance" className="space-y-4">

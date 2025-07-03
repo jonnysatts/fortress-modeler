@@ -40,6 +40,8 @@ const FinancialAnalysis = lazy(() => import("@/components/models/FinancialAnalys
 
 import ModelOverview from "@/components/models/ModelOverview";
 import { MarketingChannelsForm } from "@/components/models/MarketingChannelsForm";
+import { Breadcrumb } from "@/components/navigation/Breadcrumb";
+import { useBreadcrumbs } from "@/hooks/useBreadcrumbs";
 import { ModelAssumptions } from "@/types/models";
 import { TrendDataPoint } from "@/types/trends";
 import { formatDate } from "@/lib/utils";
@@ -85,6 +87,14 @@ const FinancialModelDetail = () => {
   const memoizedMetadata = useMemo(() => assumptions?.metadata, [assumptions?.metadata]);
   const memoizedGrowthModel = useMemo(() => assumptions?.growthModel, [assumptions?.growthModel]);
   const isWeeklyEvent = useMemo(() => memoizedMetadata?.type === "WeeklyEvent", [memoizedMetadata]);
+
+  // Breadcrumb navigation
+  const breadcrumbs = useBreadcrumbs({
+    projectId: projectId,
+    projectName: project?.name,
+    modelId: modelId,
+    modelName: model?.name,
+  });
 
   // Callbacks (call unconditionally)
   const updateModelAssumptions = useCallback(async (updatedFields: Partial<ModelAssumptions>) => {
@@ -262,6 +272,9 @@ const FinancialModelDetail = () => {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb Navigation */}
+      <Breadcrumb items={breadcrumbs} />
+      
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
          <div className="flex items-start gap-4">
             <Button variant="ghost" size="icon" onClick={() => navigate(`/projects/${projectId}`)}>
