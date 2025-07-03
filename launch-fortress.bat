@@ -39,8 +39,15 @@ echo.
 
 REM Check if node_modules exists
 if not exist "node_modules" (
-    echo 📦 Installing dependencies...
-    npm install
+    echo 📦 Installing dependencies (this may take several minutes)...
+    call npm install
+    if %errorlevel% neq 0 (
+        echo ❌ Failed to install dependencies!
+        echo Please check your internet connection and try again.
+        pause
+        exit /b 1
+    )
+    echo ✅ Dependencies installed successfully!
     echo.
 )
 
@@ -54,8 +61,17 @@ echo ❌ To stop the server, press Ctrl+C in this terminal
 echo ================================================
 echo.
 
+REM Kill any process using port 8081
+echo 🔍 Checking port 8081...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8081" 2^>nul') do (
+    echo Found process %%a using port 8081, terminating...
+    taskkill /PID %%a /F >nul 2>&1
+)
+echo ✅ Port 8081 is ready!
+echo.
+
 REM Start the development server
-npm run dev
+call npm run dev
 
 REM Keep terminal open if there's an error
 echo.
