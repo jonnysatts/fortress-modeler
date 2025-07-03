@@ -7,8 +7,13 @@ import App from './App';
 
 // 🚨 CRITICAL FIX: Initialize service layer
 console.log('🔧 Initializing service layer...');
-bootstrapServices();
-console.log('✅ Service layer initialized');
+try {
+  bootstrapServices();
+  console.log('✅ Service layer initialized');
+} catch (error) {
+  console.error('❌ Service layer initialization failed:', error);
+  // Continue anyway to show the app
+}
 
 // Create QueryClient 
 const queryClient = new QueryClient({
@@ -31,10 +36,23 @@ if (!rootElement) {
 
 const root = createRoot(rootElement);
 
-root.render(
-  <SupabaseAuthProvider>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </SupabaseAuthProvider>
-);
+try {
+  root.render(
+    <SupabaseAuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </SupabaseAuthProvider>
+  );
+  console.log('✅ React app rendered successfully');
+} catch (error) {
+  console.error('❌ React rendering failed:', error);
+  // Show a basic error message
+  rootElement.innerHTML = `
+    <div style="padding: 20px; font-family: Arial; color: red;">
+      <h1>App Loading Error</h1>
+      <p>The application failed to load. Check the browser console for details.</p>
+      <pre>${error.message}</pre>
+    </div>
+  `;
+}

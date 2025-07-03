@@ -430,8 +430,8 @@ export class SupabaseStorageService implements IStorageService {
       if (!actualData.projectId?.trim()) {
         throw new ValidationError('Project ID is required');
       }
-      if (!actualData.period?.trim()) {
-        throw new ValidationError('Period is required');
+      if (!actualData.period || actualData.period <= 0) {
+        throw new ValidationError('Period is required and must be a positive number');
       }
 
       // Get current user

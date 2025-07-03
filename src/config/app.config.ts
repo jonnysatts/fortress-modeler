@@ -21,7 +21,7 @@ export const appConfig = {
   
   // OAuth Configuration (Optional - can be added later)
   oauth: {
-    googleClientId: process.env.VITE_GOOGLE_CLIENT_ID || undefined
+    googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || undefined
   },
   
   // Application Settings

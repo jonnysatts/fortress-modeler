@@ -39,7 +39,15 @@ export function sanitizeNumericInput(
   min: number = 0, 
   max: number = Number.MAX_SAFE_INTEGER
 ): number {
-  const num = typeof input === 'string' ? parseFloat(input) : input;
+  // If input is already a number, use it directly
+  if (typeof input === 'number') {
+    if (isNaN(input) || !isFinite(input)) return 0;
+    return Math.max(min, Math.min(max, input));
+  }
+  
+  // For strings, remove spaces (thousand separators) before parsing
+  const cleanedInput = input.replace(/\s+/g, '');
+  const num = parseFloat(cleanedInput);
   
   // Check if number is valid
   if (isNaN(num) || !isFinite(num)) return 0;

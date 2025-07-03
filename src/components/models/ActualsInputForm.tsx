@@ -86,7 +86,25 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
       key: string,
       value: string
   ) => {
-    // Sanitize numeric input with reasonable bounds
+    // Allow raw input during typing for natural UX
+    if (type === 'attendance') {
+        form.setValue('attendanceActual', value, { shouldValidate: true, shouldDirty: true });
+    } else {
+        const currentData = form.getValues();
+        const fieldName = type === 'revenue' ? 'revenueActuals' : 'costActuals';
+        form.setValue(fieldName, {
+          ...currentData[fieldName],
+          [key]: value
+        }, { shouldValidate: true, shouldDirty: true });
+    }
+  };
+
+  const handleInputBlur = (
+      type: 'revenue' | 'cost' | 'attendance',
+      key: string,
+      value: string
+  ) => {
+    // Sanitize numeric input only when field loses focus
     const maxValue = type === 'attendance' ? 1000000 : 1000000000; // 1M for attendance, 1B for money
     const sanitizedValue = sanitizeNumericInput(value, 0, maxValue);
 
@@ -103,9 +121,8 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
   };
 
   const handleNotesChange = (value: string) => {
-    // Sanitize text input to prevent XSS
-    const sanitizedNotes = sanitizeTextInput(value);
-    form.setValue('notes', sanitizedNotes, { shouldValidate: true, shouldDirty: true });
+    // Allow raw input during typing for natural UX - sanitize only on submit
+    form.setValue('notes', value, { shouldValidate: true, shouldDirty: true });
   };
 
   const onSubmit = async (data: ActualsFormData) => {
@@ -117,14 +134,32 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
         return;
     }
     
+    // Sanitize all numeric values before submission
+    const sanitizedRevenueActuals: Record<string, number> = {};
+    Object.entries(data.revenueActuals || {}).forEach(([key, value]) => {
+        sanitizedRevenueActuals[key] = sanitizeNumericInput(value, 0, 1000000000);
+    });
+
+    const sanitizedCostActuals: Record<string, number> = {};
+    Object.entries(data.costActuals || {}).forEach(([key, value]) => {
+        sanitizedCostActuals[key] = sanitizeNumericInput(value, 0, 1000000000);
+    });
+
+    const sanitizedAttendance = data.attendanceActual 
+        ? sanitizeNumericInput(data.attendanceActual, 0, 1000000)
+        : undefined;
+
+    // Sanitize notes only on submission
+    const sanitizedNotes = data.notes ? sanitizeTextInput(data.notes) : '';
+    
     const actualEntry: Omit<ActualsPeriodEntry, 'id'> = {
         projectId: projectId,
         period: selectedPeriod,
         periodType: timeUnit,
-        revenueActuals: data.revenueActuals,
-        costActuals: data.costActuals,
-        attendanceActual: data.attendanceActual,
-        notes: data.notes
+        revenueActuals: sanitizedRevenueActuals,
+        costActuals: sanitizedCostActuals,
+        attendanceActual: sanitizedAttendance,
+        notes: sanitizedNotes
     };
 
     upsertActualsMutation.mutate(actualEntry, {
@@ -181,12 +216,11 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
                         </Label>
                         <Input 
                             id={`rev-${item.name}`}
-                            type="number"
-                            min="0"
-                            step="0.01"
+                            type="text"
                             className="col-span-2 h-8"
                             value={form.watch('revenueActuals')[item.name] || ''} // Use empty string for visual 0
                             onChange={(e) => handleInputChange('revenue', item.name, e.target.value)}
+                            onBlur={(e) => handleInputBlur('revenue', item.name, e.target.value)}
                             placeholder="0"
                         />
                     </div>
@@ -203,12 +237,11 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
                         </Label>
                         <Input 
                             id={`cost-${item.name}`}
-                            type="number"
-                            min="0"
-                            step="0.01"
+                            type="text"
                             className="col-span-2 h-8"
                             value={form.watch('costActuals')[item.name] || ''}
                             onChange={(e) => handleInputChange('cost', item.name, e.target.value)}
+                            onBlur={(e) => handleInputBlur('cost', item.name, e.target.value)}
                             placeholder="0"
                         />
                     </div>
@@ -221,12 +254,11 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
                         </Label>
                         <Input 
                             id="cost-MarketingBudget"
-                            type="number"
-                            min="0"
-                            step="0.01"
+                            type="text"
                             className="col-span-2 h-8"
                             value={form.watch('costActuals')["Marketing Budget"] || ''}
                             onChange={(e) => handleInputChange('cost', "Marketing Budget", e.target.value)}
+                            onBlur={(e) => handleInputBlur('cost', "Marketing Budget", e.target.value)}
                             placeholder="0"
                         />
                     </div>
@@ -243,12 +275,11 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
                         </Label>
                         <Input 
                             id="attendanceActual"
-                            type="number"
-                            min="0"
-                            step="1"
+                            type="text"
                             className="col-span-2 h-8"
                             value={form.watch('attendanceActual') ?? ''} // Use empty string for visual 0/undefined
                             onChange={(e) => handleInputChange('attendance', 'value', e.target.value)}
+                            onBlur={(e) => handleInputBlur('attendance', 'value', e.target.value)}
                             placeholder="0"
                         />
                     </div>
