@@ -4,10 +4,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { FinancialModel } from '@/lib/db';
 import { ActualsPeriodEntry, RevenueStream, CostCategory } from '@/types/models';
+import { calculateFbCOGS, calculateExpectedMarketingSpend } from '@/lib/weekly-revenue-calculator';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -31,6 +33,8 @@ const actualsFormSchema = z.object({
   costActuals: z.record(z.string(), z.number().min(0, "Cost must be non-negative")),
   attendanceActual: z.number().min(0, "Attendance must be non-negative").optional(),
   notes: z.string().max(500, "Notes must be 500 characters or less").optional(),
+  useFbCogsPercentage: z.boolean().default(false),
+  useMarketingPlan: z.boolean().default(false),
 });
 
 type ActualsFormData = z.infer<typeof actualsFormSchema>;
@@ -45,6 +49,8 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
   const duration = isWeekly ? model.assumptions.metadata?.weeks || 12 : 12; // Use model duration
   
   const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
+  const [useFbCogsPercentage, setUseFbCogsPercentage] = useState<boolean>(false);
+  const [useMarketingPlan, setUseMarketingPlan] = useState<boolean>(false);
 
   const revenueItems: RevenueStream[] = model.assumptions.revenue || [];
   const costItems: CostCategory[] = model.assumptions.costs || [];
@@ -56,6 +62,8 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
       costActuals: {},
       attendanceActual: undefined,
       notes: '',
+      useFbCogsPercentage: false,
+      useMarketingPlan: false,
     },
   });
   // Determine if MarketingBudget exists as a calculated cost
@@ -69,6 +77,50 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
       }
   }, [model.assumptions.marketing]);
 
+  // Get F&B COGS percentage and F&B revenue from model for percentage calculation
+  const fbCogsPercentage = useMemo(() => {
+    return model.assumptions.metadata?.costs?.fbCOGSPercent || 30;
+  }, [model.assumptions.metadata?.costs?.fbCOGSPercent]);
+
+  const fbRevenue = useMemo(() => {
+    return form.watch('revenueActuals')['F&B Sales'] || 0;
+  }, [form.watch('revenueActuals')['F&B Sales']]);
+
+  const calculatedFbCogs = useMemo(() => {
+    return calculateFbCOGS(fbRevenue, fbCogsPercentage);
+  }, [fbRevenue, fbCogsPercentage]);
+
+  // Get expected marketing spend for current week
+  const expectedMarketingSpend = useMemo(() => {
+    return calculateExpectedMarketingSpend(
+      model.assumptions.marketing,
+      selectedPeriod,
+      duration
+    );
+  }, [model.assumptions.marketing, selectedPeriod, duration]);
+
+  // Auto-update F&B COGS when using percentage mode and F&B revenue changes
+  useEffect(() => {
+    if (useFbCogsPercentage && fbRevenue >= 0) {
+      const calculatedValue = Math.round(calculatedFbCogs);
+      form.setValue('costActuals', {
+        ...form.getValues('costActuals'),
+        'F&B COGS': calculatedValue
+      }, { shouldValidate: true, shouldDirty: true });
+    }
+  }, [fbRevenue, useFbCogsPercentage, calculatedFbCogs, form]);
+
+  // Auto-update Marketing Budget when using plan mode
+  useEffect(() => {
+    if (useMarketingPlan && expectedMarketingSpend >= 0) {
+      const roundedValue = Math.round(expectedMarketingSpend);
+      form.setValue('costActuals', {
+        ...form.getValues('costActuals'),
+        'Marketing Budget': roundedValue
+      }, { shouldValidate: true, shouldDirty: true });
+    }
+  }, [useMarketingPlan, expectedMarketingSpend, form]);
+
   // Load data for the selected period when it changes
   useEffect(() => {
     const currentActual = existingActuals.find(a => a.period === selectedPeriod);
@@ -76,9 +128,13 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
         revenueActuals: currentActual?.revenueActuals || {},
         costActuals: currentActual?.costActuals || {},
         attendanceActual: currentActual?.attendanceActual,
-        notes: currentActual?.notes || ''
+        notes: currentActual?.notes || '',
+        useFbCogsPercentage: currentActual?.useFbCogsPercentage || false,
+        useMarketingPlan: currentActual?.useMarketingPlan || false
     };
     form.reset(initialValues);
+    setUseFbCogsPercentage(currentActual?.useFbCogsPercentage || false);
+    setUseMarketingPlan(currentActual?.useMarketingPlan || false);
   }, [selectedPeriod, existingActuals, form]);
 
   const handleInputChange = (
@@ -159,7 +215,9 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
         revenueActuals: sanitizedRevenueActuals,
         costActuals: sanitizedCostActuals,
         attendanceActual: sanitizedAttendance,
-        notes: sanitizedNotes
+        notes: sanitizedNotes,
+        useFbCogsPercentage: useFbCogsPercentage,
+        useMarketingPlan: useMarketingPlan
     };
 
     upsertActualsMutation.mutate(actualEntry, {
@@ -230,37 +288,121 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
             {/* Cost Actuals Section */}
             <div className="space-y-3">
                 <h4 className="font-semibold border-b pb-1">Cost Actuals</h4>
-                {costItems.map(item => (
-                     <div key={`cost-${item.name}`} className="grid grid-cols-3 items-center gap-2">
-                        <Label htmlFor={`cost-${item.name}`} className="col-span-1 text-sm">
+                {costItems.map(item => {
+                  // Special handling for F&B COGS
+                  if (item.name === 'F&B COGS') {
+                    return (
+                      <div key={`cost-${item.name}`} className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`use-percentage-${item.name}`}
+                            checked={useFbCogsPercentage}
+                            onCheckedChange={(checked) => {
+                              setUseFbCogsPercentage(checked as boolean);
+                              form.setValue('useFbCogsPercentage', checked as boolean);
+                              // When switching to percentage, calculate and set the value
+                              if (checked) {
+                                const calculatedValue = Math.round(calculatedFbCogs);
+                                form.setValue('costActuals', {
+                                  ...form.getValues('costActuals'),
+                                  [item.name]: calculatedValue
+                                });
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`use-percentage-${item.name}`} className="text-sm">
+                            Use {fbCogsPercentage}% from model
+                          </Label>
+                        </div>
+                        <div className="grid grid-cols-3 items-center gap-2">
+                          <Label htmlFor={`cost-${item.name}`} className="col-span-1 text-sm">
                             {item.name}
-                        </Label>
-                        <Input 
+                          </Label>
+                          <Input 
                             id={`cost-${item.name}`}
                             type="text"
                             className="col-span-2 h-8"
-                            value={form.watch('costActuals')[item.name] || ''}
-                            onChange={(e) => handleInputChange('cost', item.name, e.target.value)}
-                            onBlur={(e) => handleInputBlur('cost', item.name, e.target.value)}
+                            value={useFbCogsPercentage ? Math.round(calculatedFbCogs).toString() : (form.watch('costActuals')[item.name] || '')}
+                            onChange={(e) => !useFbCogsPercentage && handleInputChange('cost', item.name, e.target.value)}
+                            onBlur={(e) => !useFbCogsPercentage && handleInputBlur('cost', item.name, e.target.value)}
                             placeholder="0"
-                        />
+                            disabled={useFbCogsPercentage}
+                          />
+                        </div>
+                        {useFbCogsPercentage && (
+                          <p className="text-xs text-muted-foreground ml-1">
+                            Calculated: {fbCogsPercentage}% of F&B Revenue (${Math.round(fbRevenue)})
+                          </p>
+                        )}
+                      </div>
+                    );
+                  }
+                  
+                  // Regular cost items
+                  return (
+                    <div key={`cost-${item.name}`} className="grid grid-cols-3 items-center gap-2">
+                      <Label htmlFor={`cost-${item.name}`} className="col-span-1 text-sm">
+                        {item.name}
+                      </Label>
+                      <Input 
+                        id={`cost-${item.name}`}
+                        type="text"
+                        className="col-span-2 h-8"
+                        value={form.watch('costActuals')[item.name] || ''}
+                        onChange={(e) => handleInputChange('cost', item.name, e.target.value)}
+                        onBlur={(e) => handleInputBlur('cost', item.name, e.target.value)}
+                        placeholder="0"
+                      />
                     </div>
-                ))}
-                 {/* Add input for Marketing Budget if applicable */}
+                  );
+                })}
+                 {/* Smart Marketing Budget input */}
                  {hasMarketingBudget && (
-                    <div key="cost-MarketingBudget" className="grid grid-cols-3 items-center gap-2">
-                        <Label htmlFor="cost-MarketingBudget" className="col-span-1 text-sm">
-                            Marketing Budget
-                        </Label>
-                        <Input 
-                            id="cost-MarketingBudget"
-                            type="text"
-                            className="col-span-2 h-8"
-                            value={form.watch('costActuals')["Marketing Budget"] || ''}
-                            onChange={(e) => handleInputChange('cost', "Marketing Budget", e.target.value)}
-                            onBlur={(e) => handleInputBlur('cost', "Marketing Budget", e.target.value)}
-                            placeholder="0"
-                        />
+                    <div key="cost-MarketingBudget" className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id="use-marketing-plan"
+                            checked={useMarketingPlan}
+                            onCheckedChange={(checked) => {
+                              setUseMarketingPlan(checked as boolean);
+                              form.setValue('useMarketingPlan', checked as boolean);
+                              // When switching to plan mode, calculate and set the value
+                              if (checked) {
+                                const calculatedValue = Math.round(expectedMarketingSpend);
+                                form.setValue('costActuals', {
+                                  ...form.getValues('costActuals'),
+                                  'Marketing Budget': calculatedValue
+                                });
+                              }
+                            }}
+                          />
+                          <Label htmlFor="use-marketing-plan" className="text-sm">
+                            Use planned amount (${Math.round(expectedMarketingSpend)} for {timeUnit} {selectedPeriod})
+                          </Label>
+                        </div>
+                        <div className="grid grid-cols-3 items-center gap-2">
+                            <Label htmlFor="cost-MarketingBudget" className="col-span-1 text-sm">
+                                Marketing Budget
+                            </Label>
+                            <Input 
+                                id="cost-MarketingBudget"
+                                type="text"
+                                className="col-span-2 h-8"
+                                value={useMarketingPlan ? Math.round(expectedMarketingSpend).toString() : (form.watch('costActuals')["Marketing Budget"] || '')}
+                                onChange={(e) => !useMarketingPlan && handleInputChange('cost', "Marketing Budget", e.target.value)}
+                                onBlur={(e) => !useMarketingPlan && handleInputBlur('cost', "Marketing Budget", e.target.value)}
+                                placeholder="0"
+                                disabled={useMarketingPlan}
+                            />
+                        </div>
+                        {useMarketingPlan && (
+                          <p className="text-xs text-muted-foreground ml-1">
+                            {model.assumptions.marketing?.allocationMode === 'channels' 
+                              ? `Sum of all channel weekly budgets`
+                              : `${model.assumptions.marketing?.budgetApplication || 'spreadEvenly'} allocation from total budget`
+                            }
+                          </p>
+                        )}
                     </div>
                  )}
             </div>

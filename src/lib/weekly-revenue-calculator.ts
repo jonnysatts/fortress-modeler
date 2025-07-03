@@ -113,3 +113,47 @@ export function calculateProjectedRevenue(
 
   return projections;
 }
+
+/**
+ * Calculate expected marketing spend for a specific week based on marketing setup
+ */
+export function calculateExpectedMarketingSpend(
+  marketingSetup: any, // MarketingSetup type
+  weekNumber: number,
+  modelDuration: number
+): number {
+  if (!marketingSetup) return 0;
+
+  // Handle channels mode - sum all weekly budgets
+  if (marketingSetup.allocationMode === 'channels') {
+    return marketingSetup.channels.reduce((sum: number, channel: any) => {
+      return sum + (channel.weeklyBudget || 0);
+    }, 0);
+  }
+
+  // Handle high-level mode
+  if (marketingSetup.allocationMode === 'highLevel' && marketingSetup.totalBudget) {
+    const totalBudget = marketingSetup.totalBudget;
+    const application = marketingSetup.budgetApplication || 'spreadEvenly';
+
+    switch (application) {
+      case 'upfront':
+        return weekNumber === 1 ? totalBudget : 0;
+
+      case 'spreadEvenly':
+        return totalBudget / modelDuration;
+
+      case 'spreadCustom':
+        if (marketingSetup.spreadDuration && marketingSetup.spreadDuration > 0) {
+          const spreadDuration = marketingSetup.spreadDuration;
+          return weekNumber <= spreadDuration ? totalBudget / spreadDuration : 0;
+        }
+        return 0;
+
+      default:
+        return 0;
+    }
+  }
+
+  return 0;
+}

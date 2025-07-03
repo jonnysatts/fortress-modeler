@@ -95,5 +95,7 @@ export interface ActualsPeriodEntry {
   costActuals: Record<string, number>; 
   attendanceActual?: number; // NEW: Actual attendance for the period
   notes?: string;
+  useFbCogsPercentage?: boolean; // NEW: Whether to use model percentage for F&B COGS
+  useMarketingPlan?: boolean; // NEW: Whether to use planned marketing spend from model
 }
 // --- End NEW --- 
