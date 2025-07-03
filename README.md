@@ -17,8 +17,16 @@ cd fortress-modeler
 ```bash
 git clone https://github.com/jonnysatts/fortress-modeler.git
 cd fortress-modeler
-setup.bat
+scripts\setup\setup.bat
 ```
+
+### 🖥️ Windows Quick Launch
+
+For Windows users, we provide several helper scripts:
+- **Launch App**: `scripts\windows\launch-fortress.bat`
+- **PowerShell Launch**: Right-click `scripts\windows\Launch-Fortress.ps1` → Run with PowerShell
+- **Diagnose Issues**: `scripts\windows\diagnose-pc.bat`
+- **Fix Port Issues**: `scripts\windows\fix-port-8081.bat`
 
 ### Option 2: Manual Setup
 
@@ -41,7 +49,7 @@ setup.bat
 
 🌐 **App runs at:** http://localhost:8081/
 
-📖 **Detailed setup:** See [INSTALLATION_GUIDE.md](./INSTALLATION_GUIDE.md)
+📖 **Detailed setup:** See [INSTALLATION_GUIDE.md](./docs/INSTALLATION_GUIDE.md)
 
 ## 🏗️ Project Overview
 
@@ -120,6 +128,38 @@ npm install
 npm run dev
 ```
 
+## 📁 Project Structure
+
+```
+fortress-modeler-cloud/
+├── src/                    # Source code
+│   ├── components/         # React components
+│   ├── pages/             # Page components
+│   ├── hooks/             # Custom React hooks
+│   ├── lib/               # Utilities and libraries
+│   ├── services/          # Business logic and API
+│   └── types/             # TypeScript type definitions
+├── scripts/               # Utility scripts
+│   ├── windows/           # Windows-specific scripts
+│   │   ├── launch-fortress.bat
+│   │   ├── Launch-Fortress.ps1
+│   │   ├── diagnose-pc.bat
+│   │   └── fix-port-8081.bat
+│   └── setup/             # Setup and installation scripts
+│       ├── setup.bat
+│       ├── setup-windows.bat
+│       └── build-installer.bat
+├── docs/                  # Documentation
+│   ├── INSTALLATION_GUIDE.md
+│   ├── REQUIREMENTS.md
+│   ├── WINDOWS_INSTALLER.md
+│   └── PORT_TROUBLESHOOTING.md
+├── electron/              # Electron desktop app
+├── public/                # Static assets
+├── dist/                  # Build output
+└── tests/                 # Test files
+```
+
 ### Available Scripts
 
 ```bash
@@ -148,22 +188,52 @@ npm run type-check  # Run TypeScript compiler check
 - **Performance Analysis** - Track actual vs. projected performance
 - **Data Visualization** - Interactive charts and dashboards
 
-### Key Components
+### Project Structure
 
 ```
-src/
-├── components/          # Reusable UI components
-│   ├── ui/             # Base UI components (shadcn/ui)
-│   ├── layout/         # Layout components
-│   └── models/         # Financial modeling components
-├── pages/              # Application pages/routes
-├── hooks/              # Custom React hooks
-├── lib/                # Utility libraries
-│   ├── db.ts          # Database schema and operations
-│   ├── cache.ts       # Caching layer
-│   └── performance.ts # Performance monitoring
-├── services/           # Business logic services
-└── types/              # TypeScript type definitions
+fortress-modeler-cloud/
+├── src/                 # Source code
+│   ├── components/      # Reusable UI components
+│   │   ├── ui/         # Base UI components (shadcn/ui)
+│   │   ├── layout/     # Layout components
+│   │   └── models/     # Financial modeling components
+│   ├── pages/          # Application pages/routes
+│   ├── hooks/          # Custom React hooks
+│   ├── lib/            # Utility libraries
+│   │   ├── db.ts      # Database schema and operations
+│   │   ├── cache.ts   # Caching layer
+│   │   └── performance.ts # Performance monitoring
+│   ├── services/       # Business logic services
+│   └── types/          # TypeScript type definitions
+├── docs/               # Documentation
+│   ├── INSTALLATION_GUIDE.md
+│   ├── QUICK_FIXES.md
+│   ├── REQUIREMENTS.md
+│   ├── PORT_TROUBLESHOOTING.md
+│   ├── WHY_PORT_8081.md
+│   ├── WINDOWS_INSTALLER.md
+│   └── INSTALLER_SUMMARY.md
+├── scripts/            # Build and utility scripts
+│   ├── windows/        # Windows-specific scripts
+│   │   ├── launch-fortress.bat
+│   │   ├── launch-fortress-windows.bat
+│   │   ├── Launch-Fortress.ps1
+│   │   ├── fix-port-8081.bat
+│   │   ├── start-app.bat
+│   │   ├── start-app-any-port.bat
+│   │   └── diagnose-pc.bat
+│   ├── setup/          # Setup and installation scripts
+│   │   ├── setup.bat
+│   │   ├── setup-windows.bat
+│   │   ├── setup-electron.bat
+│   │   └── build-installer.bat
+│   ├── configure-env.bat
+│   └── diagnose-port.bat
+├── server/             # Backend server code
+├── temp-files/         # Temporary and test files
+│   ├── tests/          # Test HTML and JS files
+│   └── sql/            # SQL scripts
+└── public/             # Static assets
 ```
 
 ## 🎯 Key Features Deep Dive
