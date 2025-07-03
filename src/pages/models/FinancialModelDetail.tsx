@@ -19,7 +19,14 @@ import {
 import { FinancialModel, db } from "@/lib/db";
 import { SupabaseStorageService } from "@/services/implementations/SupabaseStorageService";
 import { useProject } from "@/hooks/useProjects";
-import { useModel, useDeleteModel } from "@/hooks/useModels";
+import { useModel, useDeleteModel, useModelsForProject } from "@/hooks/useModels";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { isCloudModeEnabled } from "@/config/app.config";
 
@@ -68,6 +75,7 @@ const FinancialModelDetail = () => {
 
   const { data: project, isLoading: projectLoading } = useProject(projectId);
   const { data: fetchedModel, isLoading: modelLoading } = useModel(modelId);
+  const { data: allModels = [] } = useModelsForProject(projectId);
   const deleteModel = useDeleteModel();
   
   // Memoize assumption props (call unconditionally)
@@ -255,10 +263,34 @@ const FinancialModelDetail = () => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-         <div className="flex items-start gap-2">
-            <Button variant="ghost" size="icon" onClick={() => navigate(`/projects/${projectId}`)}><ArrowLeft className="h-4 w-4" /></Button>
-            <div>
-               <h1 className="text-3xl font-bold text-fortress-blue">{model.name}</h1>
+         <div className="flex items-start gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate(`/projects/${projectId}`)}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex-1">
+               <div className="flex items-center gap-4 mb-2">
+                 <h1 className="text-3xl font-bold text-fortress-blue">{model.name}</h1>
+                 {allModels.length > 1 && (
+                   <div className="flex items-center gap-2">
+                     <span className="text-sm text-muted-foreground">Model:</span>
+                     <Select 
+                       value={modelId} 
+                       onValueChange={(newModelId) => navigate(`/projects/${projectId}/models/${newModelId}`)}
+                     >
+                       <SelectTrigger className="w-48">
+                         <SelectValue />
+                       </SelectTrigger>
+                       <SelectContent>
+                         {allModels.map((m) => (
+                           <SelectItem key={m.id} value={m.id}>
+                             {m.name}
+                           </SelectItem>
+                         ))}
+                       </SelectContent>
+                     </Select>
+                   </div>
+                 )}
+               </div>
                <p className="text-muted-foreground">
                  Created on {formatDate(model.createdAt)} • Last updated on{" "}
                  {formatDate(model.updatedAt)}
@@ -286,108 +318,163 @@ const FinancialModelDetail = () => {
       <Tabs defaultValue="overview" className="space-y-4">
          <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="analysis">Financial Analysis</TabsTrigger>
-            <TabsTrigger value="marketing">Marketing</TabsTrigger>
-            <TabsTrigger value="financial-matrix">Financial Matrix</TabsTrigger>
-            <TabsTrigger value="trends">Trends</TabsTrigger>
-            <TabsTrigger value="breakdown">Breakdown</TabsTrigger>
+            <TabsTrigger value="setup">Setup</TabsTrigger>
             <TabsTrigger value="projections">Projections</TabsTrigger>
+            <TabsTrigger value="analysis">Analysis</TabsTrigger>
+            <TabsTrigger value="track-actuals">Track Actuals</TabsTrigger>
          </TabsList>
 
          <TabsContent value="overview" className="space-y-4">
            <ModelOverview model={model} projectId={projectId} /> 
          </TabsContent>
 
-         <TabsContent value="analysis" className="space-y-4">
-           <Suspense fallback={<ComponentLoader message="Loading financial analysis..." />}>
-             <FinancialAnalysis model={model} isWeekly={isWeeklyEvent} />
-           </Suspense>
+         <TabsContent value="setup" className="space-y-4">
+           <Card>
+             <CardHeader>
+               <CardTitle>Model Setup & Assumptions</CardTitle>
+             </CardHeader>
+             <CardContent>
+               <div className="space-y-6">
+                 <div>
+                   <h3 className="text-lg font-semibold mb-4">Marketing Configuration</h3>
+                   <MarketingChannelsForm
+                     marketingSetup={memoizedMarketingSetup}
+                     updateAssumptions={updateModelAssumptions}
+                     modelTimeUnit={isWeeklyEvent ? 'Week' : 'Month'}
+                     metadata={memoizedMetadata}
+                   />
+                 </div>
+                 {/* Future: Add other assumption forms here */}
+               </div>
+             </CardContent>
+           </Card>
          </TabsContent>
 
-         <TabsContent value="marketing">
-           <MarketingChannelsForm
-             marketingSetup={memoizedMarketingSetup}
-             updateAssumptions={updateModelAssumptions}
-             modelTimeUnit={isWeeklyEvent ? 'Week' : 'Month'}
-             metadata={memoizedMetadata}
-           />
+         <TabsContent value="projections" className="space-y-6">
+           <Card>
+             <CardHeader>
+               <CardTitle className="flex items-center">
+                 <BarChart3 className="mr-2 h-5 w-5" />
+                 Financial Matrix
+               </CardTitle>
+             </CardHeader>
+             <CardContent>
+               {isFinancialDataReady ? (
+                 <Suspense fallback={<ComponentLoader message="Loading financial matrix..." />}>
+                   <FinancialMatrix 
+                     model={model} 
+                     trendData={combinedFinancialData} 
+                     combinedView={true}
+                   />
+                 </Suspense>
+               ) : (
+                 <div className="text-center py-10 text-muted-foreground">Loading financial data...</div> 
+               )}
+             </CardContent>
+           </Card>
+           
+           <Card>
+             <CardHeader>
+               <CardTitle>Financial Projections</CardTitle>
+             </CardHeader>
+             <CardContent>
+               <Suspense fallback={<ComponentLoader message="Loading projections..." />}>
+                 <ModelProjections model={model} />
+               </Suspense>
+             </CardContent>
+           </Card>
          </TabsContent>
 
-         <TabsContent value="financial-matrix">
+         <TabsContent value="analysis" className="space-y-6">
+           <Card>
+             <CardHeader>
+               <CardTitle>Financial Analysis</CardTitle>
+             </CardHeader>
+             <CardContent>
+               <Suspense fallback={<ComponentLoader message="Loading financial analysis..." />}>
+                 <FinancialAnalysis model={model} isWeekly={isWeeklyEvent} />
+               </Suspense>
+             </CardContent>
+           </Card>
+           
+           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
              <Card>
-               <CardHeader><CardTitle className="flex items-center"><BarChart3 className="mr-2 h-5 w-5" />Combined Financial Matrix</CardTitle></CardHeader>
+               <CardHeader>
+                 <CardTitle className="flex items-center">
+                   <ChartLine className="mr-2 h-5 w-5" />
+                   Revenue Trends
+                 </CardTitle>
+               </CardHeader>
                <CardContent>
-                  {isFinancialDataReady ? (
-                     <Suspense fallback={<ComponentLoader message="Loading financial matrix..." />}>
-                       <FinancialMatrix 
-                         model={model} 
-                         trendData={combinedFinancialData} 
-                         combinedView={true}
-                       />
-                     </Suspense>
-                  ) : (
-                     <div className="text-center py-10 text-muted-foreground">Loading financial data...</div> 
-                  )}
+                 <Suspense fallback={<ComponentLoader message="Loading revenue trends..." />}>
+                   <RevenueTrends model={model} setCombinedData={setRevenueData} />
+                 </Suspense>
                </CardContent>
              </Card>
-         </TabsContent>
-
-         <TabsContent value="trends">
-           <div className="space-y-8">
+             
              <Card>
-                <CardHeader><CardTitle className="flex items-center"><ChartLine className="mr-2 h-5 w-5" />Revenue Trends Over Time</CardTitle></CardHeader>
-                <CardContent>
-                   <Suspense fallback={<ComponentLoader message="Loading revenue trends..." />}>
-                     <RevenueTrends model={model} setCombinedData={setRevenueData} />
-                   </Suspense>
-                </CardContent>
-             </Card>
-             <Card>
-                <CardHeader><CardTitle className="flex items-center"><ChartLine className="mr-2 h-5 w-5" />Cost Trends Over Time</CardTitle></CardHeader>
-                <CardContent>
-                   <Suspense fallback={<ComponentLoader message="Loading cost trends..." />}>
-                     <CostTrends 
-                        costs={memoizedCosts}
-                        marketingSetup={memoizedMarketingSetup}
-                        metadata={memoizedMetadata}
-                        growthModel={memoizedGrowthModel}
-                        model={model} 
-                        onUpdateCostData={setCostData} 
-                     />
-                   </Suspense>
-                </CardContent>
+               <CardHeader>
+                 <CardTitle className="flex items-center">
+                   <ChartLine className="mr-2 h-5 w-5" />
+                   Cost Trends
+                 </CardTitle>
+               </CardHeader>
+               <CardContent>
+                 <Suspense fallback={<ComponentLoader message="Loading cost trends..." />}>
+                   <CostTrends 
+                     costs={memoizedCosts}
+                     marketingSetup={memoizedMarketingSetup}
+                     metadata={memoizedMetadata}
+                     growthModel={memoizedGrowthModel}
+                     model={model} 
+                     onUpdateCostData={setCostData} 
+                   />
+                 </Suspense>
+               </CardContent>
              </Card>
            </div>
+           
+           <Card>
+             <CardHeader>
+               <CardTitle>Category Breakdown</CardTitle>
+             </CardHeader>
+             <CardContent>
+               {isFinancialDataReady ? (
+                 <Suspense fallback={<ComponentLoader message="Loading category breakdown..." />}>
+                   <CategoryBreakdown 
+                     model={model} 
+                     revenueTrendData={revenueData}
+                     costTrendData={costData}
+                   />
+                 </Suspense>
+               ) : (
+                 <div className="text-center py-10 text-muted-foreground">Loading breakdown data...</div> 
+               )}
+             </CardContent>
+           </Card>
          </TabsContent>
-
-          <TabsContent value="breakdown">
-             <Card>
-               <CardHeader><CardTitle>Category Breakdown</CardTitle></CardHeader>
-               <CardContent>
-                  {isFinancialDataReady ? (
-                     <Suspense fallback={<ComponentLoader message="Loading category breakdown..." />}>
-                       <CategoryBreakdown 
-                          model={model} 
-                          revenueTrendData={revenueData}
-                          costTrendData={costData}
-                       />
-                     </Suspense>
-                  ) : (
-                     <div className="text-center py-10 text-muted-foreground">Loading breakdown data...</div> 
-                  )}
-               </CardContent>
-             </Card>
-         </TabsContent>
-
-          <TabsContent value="projections">
-             <Card>
-               <CardHeader><CardTitle>Financial Projections</CardTitle></CardHeader>
-               <CardContent>
-                  <Suspense fallback={<ComponentLoader message="Loading projections..." />}>
-                    <ModelProjections model={model} />
-                  </Suspense>
-               </CardContent>
-             </Card>
+         
+         <TabsContent value="track-actuals" className="space-y-4">
+           <Card>
+             <CardHeader>
+               <CardTitle>Model Performance Tracking</CardTitle>
+             </CardHeader>
+             <CardContent>
+               <p className="text-muted-foreground mb-4">
+                 Track actual performance data for this specific model. For project-level performance tracking across all models, 
+                 <span className="text-fortress-blue cursor-pointer hover:underline" onClick={() => navigate(`/projects/${projectId}?tab=performance`)}>
+                   go to the project's Track Performance tab
+                 </span>.
+               </p>
+               <div className="text-center py-10 text-muted-foreground">
+                 <div className="mb-4">
+                   <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                 </div>
+                 <p>Model-specific actuals tracking coming soon...</p>
+                 <p className="text-sm mt-2">For now, use the project-level performance tracking.</p>
+               </div>
+             </CardContent>
+           </Card>
          </TabsContent>
       </Tabs>
     </div>

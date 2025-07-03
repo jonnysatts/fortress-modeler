@@ -30,7 +30,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import ModelOverview from "@/components/models/ModelOverview";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { ProjectOverview } from "@/components/projects/ProjectOverview";
 import { ActualsDisplayTable } from "@/components/models/ActualsDisplayTable";
 // Lazy load heavy components
 const PerformanceAnalysis = lazy(() => import("@/components/models/PerformanceAnalysis").then(m => ({ default: m.PerformanceAnalysis })));
@@ -57,6 +65,7 @@ const ComponentLoader = ({ message = "Loading..." }: { message?: string }) => (
 
 const ProjectDetail = () => {
     const { projectId } = useParams<{ projectId: string }>();
+    const [selectedModelId, setSelectedModelId] = useState<string>('');
 
   const navigate = useNavigate();
 
@@ -64,6 +73,15 @@ const ProjectDetail = () => {
   const { data: financialModels = [], isLoading: modelsLoading } = useModelsForProject(projectId);
   const { data: actualsData = [], isLoading: actualsLoading } = useActualsForProject(projectId);
   const deleteProjectMutation = useDeleteProject();
+
+  // Set default selected model when models load
+  useEffect(() => {
+    if (financialModels.length > 0 && !selectedModelId) {
+      setSelectedModelId(financialModels[0].id);
+    }
+  }, [financialModels, selectedModelId]);
+
+  const selectedModel = financialModels.find(m => m.id === selectedModelId) || financialModels[0];
   const [activeTab, setActiveTab] = useState("overview");
   
   const loading = projectLoading || modelsLoading || actualsLoading;
@@ -141,6 +159,14 @@ const ProjectDetail = () => {
           </div>
         </div>
         <div className="flex space-x-2 self-start sm:self-center">
+          <Button 
+            onClick={() => navigate(`/projects/${projectId}/models/new`)}
+            className="bg-fortress-emerald hover:bg-fortress-emerald/90"
+            size="sm"
+          >
+            <PlusCircle className="mr-1 h-4 w-4" />
+            New Model
+          </Button>
           <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/edit`)}>
             <Edit className="mr-1 h-4 w-4" />
             Edit
@@ -181,53 +207,29 @@ const ProjectDetail = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="models">Financial Models</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="analysis">Analysis</TabsTrigger>
+          <TabsTrigger value="models">Models</TabsTrigger>
+          <TabsTrigger value="performance">Track Performance</TabsTrigger>
+          <TabsTrigger value="analysis">Insights</TabsTrigger>
           <TabsTrigger value="risks">Risk Assessment</TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview" className="space-y-4">
-          {project && financialModels.length > 0 ? (
-             <ModelOverview 
-                model={financialModels[0]} // Pass directly, types should match now
-                projectId={projectId} 
-                actualsData={actualsData} 
-             />
-          ) : (
-            <Card>
-              <CardContent>
-                <EmptyState
-                  icon={BarChart3}
-                  title="No Financial Model"
-                  description="Create a financial model for this project to see an overview and start making projections."
-                  action={
-                    <Button onClick={() => navigate(`/projects/${projectId}/models/new`)} className="bg-fortress-emerald hover:bg-fortress-emerald/90">
-                      <PlusCircle className="mr-2 h-4 w-4" /> Create First Model
-                    </Button>
-                  }
-                />
-              </CardContent>
-            </Card>
-          )}
+          <ProjectOverview
+            project={project}
+            models={financialModels}
+            actualsData={actualsData}
+            onCreateModel={() => navigate(`/projects/${projectId}/models/new`)}
+            onViewModel={(modelId) => navigate(`/projects/${projectId}/models/${modelId}`)}
+          />
         </TabsContent>
         
         <TabsContent value="models" className="space-y-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Financial Models</CardTitle>
-                <CardDescription>
-                  Create and manage financial models for this project
-                </CardDescription>
-              </div>
-              <Button 
-                className="bg-fortress-emerald hover:bg-fortress-emerald/90"
-                onClick={() => navigate(`/projects/${projectId}/models/new`)}
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                New Model
-              </Button>
+            <CardHeader>
+              <CardTitle>Financial Models</CardTitle>
+              <CardDescription>
+                Compare and manage your financial models and projections for this project.
+              </CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
               {financialModels.length > 0 ? (
@@ -308,14 +310,46 @@ const ProjectDetail = () => {
         <TabsContent value="performance" className="space-y-4">
           {financialModels.length > 0 ? (
             <>
+              {/* Model Selector */}
+              {financialModels.length > 1 && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center space-x-4">
+                      <Label htmlFor="model-select" className="text-sm font-medium">
+                        Track performance for:
+                      </Label>
+                      <Select value={selectedModelId} onValueChange={setSelectedModelId}>
+                        <SelectTrigger id="model-select" className="w-64">
+                          <SelectValue placeholder="Select a model" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {financialModels.map((model) => (
+                            <SelectItem key={model.id} value={model.id}>
+                              {model.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/projects/${projectId}/models/${selectedModelId}`)}
+                      >
+                        <BarChart3 className="mr-2 h-4 w-4" />
+                        View Model Details
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
                <Suspense fallback={<ComponentLoader message="Loading actuals form..." />}>
                  <ActualsInputForm 
-                    model={financialModels[0]} 
+                    model={selectedModel} 
                     existingActuals={actualsData} 
                  />
                </Suspense>
                <ActualsDisplayTable 
-                  model={financialModels[0]}
+                  model={selectedModel}
                   actualsData={actualsData} 
                />
             </>
