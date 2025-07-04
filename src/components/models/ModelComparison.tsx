@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { HelpTooltip, helpContent } from '@/components/ui/HelpTooltip';
+import { generateModelSummaries } from '@/lib/project-aggregation';
 
 interface ModelComparisonProps {
   models: FinancialModel[];
@@ -36,23 +37,31 @@ export const ModelComparison: React.FC<ModelComparisonProps> = ({ models, onView
     models.slice(0, Math.min(3, models.length)).map(m => m.id)
   );
 
-  // Calculate metrics for each model
+  // Calculate metrics for each model using actual calculations
   const modelMetrics = useMemo(() => {
     const metrics = new Map<string, ModelMetrics>();
     
-    models.forEach(model => {
-      // Mock calculations - replace with actual financial calculations
-      const revenue = Math.random() * 1000000 + 500000;
-      const costs = revenue * (0.3 + Math.random() * 0.4);
-      const profit = revenue - costs;
-      const margin = (profit / revenue) * 100;
+    // Use the same calculation method as the project aggregation
+    const modelSummaries = generateModelSummaries(models, []);
+    
+    modelSummaries.forEach((summary, index) => {
+      const model = models[index];
+      const margin = summary.projectedRevenue > 0 
+        ? (summary.netProfit / summary.projectedRevenue) * 100 
+        : 0;
+      
+      // Calculate payback period (simplified - months to break even)
+      const monthlyProfit = summary.netProfit / 12;
+      const paybackPeriod = monthlyProfit > 0 
+        ? Math.abs(summary.projectedCosts / monthlyProfit)
+        : 24; // Default to 24 months if no profit
       
       metrics.set(model.id, {
-        totalRevenue: revenue,
-        totalCosts: costs,
-        netProfit: profit,
+        totalRevenue: summary.projectedRevenue,
+        totalCosts: summary.projectedCosts,
+        netProfit: summary.netProfit,
         profitMargin: margin,
-        paybackPeriod: Math.random() * 18 + 6,
+        paybackPeriod: Math.min(paybackPeriod, 24), // Cap at 24 months
         riskLevel: margin > 30 ? 'Low' : margin > 15 ? 'Medium' : 'High',
       });
     });

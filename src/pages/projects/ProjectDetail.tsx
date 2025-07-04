@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { ProjectOverview } from "@/components/projects/ProjectOverview";
+import { ScenarioOverview } from "@/components/projects/ScenarioOverview";
 import { ActualsDisplayTable } from "@/components/models/ActualsDisplayTable";
 import { ModelComparison } from "@/components/models/ModelComparison";
 import { Breadcrumb } from "@/components/navigation/Breadcrumb";
@@ -227,13 +228,24 @@ const ProjectDetail = () => {
         </TabsList>
         
         <TabsContent value="overview" className="space-y-4">
-          <ProjectOverview
-            project={project}
-            models={financialModels}
-            actualsData={actualsData}
-            onCreateModel={() => navigate(`/projects/${projectId}/models/new`)}
-            onViewModel={(modelId) => navigate(`/projects/${projectId}/models/${modelId}`)}
-          />
+          {/* Conditional rendering: Single model vs Multi-model scenarios */}
+          {financialModels.length <= 1 ? (
+            <ProjectOverview
+              project={project}
+              models={financialModels}
+              actualsData={actualsData}
+              onCreateModel={() => navigate(`/projects/${projectId}/models/new`)}
+              onViewModel={(modelId) => navigate(`/projects/${projectId}/models/${modelId}`)}
+            />
+          ) : (
+            <ScenarioOverview
+              project={project}
+              models={financialModels}
+              actualsData={actualsData}
+              onCreateModel={() => navigate(`/projects/${projectId}/models/new`)}
+              onViewModel={(modelId) => navigate(`/projects/${projectId}/models/${modelId}`)}
+            />
+          )}
         </TabsContent>
         
         <TabsContent value="models" className="space-y-4">
