@@ -14,6 +14,8 @@ export default function AuthCallback() {
       try {
         // Get the current URL hash which contains the auth tokens
         const hash = window.location.hash;
+        console.log('Auth callback - URL hash:', hash);
+        console.log('Auth callback - Full URL:', window.location.href);
         
         if (hash) {
           // Supabase will automatically handle the callback
