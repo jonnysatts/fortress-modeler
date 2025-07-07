@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, memo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useNavigate, useParams } from 'react-router-dom';
 import { FinancialModel } from '@/lib/db';
 import { ActualsPeriodEntry, RevenueStream, CostCategory } from '@/types/models';
 import { calculateFbCOGS, calculateExpectedMarketingSpend } from '@/lib/weekly-revenue-calculator';
@@ -21,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { toast } from "sonner";
 import { useUpsertActuals } from "@/hooks/useActuals";
 import { sanitizeTextInput, sanitizeNumericInput } from "@/lib/security";
+import { Settings } from 'lucide-react';
 
 interface ActualsInputFormProps {
   model: FinancialModel;
@@ -44,6 +46,8 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
     existingActuals
 }) => {
   const upsertActualsMutation = useUpsertActuals();
+  const navigate = useNavigate();
+  const { projectId } = useParams();
   const isWeekly = model.assumptions.metadata?.type === "WeeklyEvent";
   const timeUnit = isWeekly ? "Week" : "Month";
   const duration = isWeekly ? model.assumptions.metadata?.weeks || 12 : 12; // Use model duration
@@ -356,9 +360,13 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
                     </div>
                   );
                 })}
-                 {/* Smart Marketing Budget input */}
-                 {hasMarketingBudget && (
-                    <div key="cost-MarketingBudget" className="space-y-2">
+                 {/* Marketing Actuals - Always show with smart prompting */}
+                 <div key="cost-MarketingBudget" className="space-y-2">
+                    <Label className="text-sm font-medium">Marketing Actuals</Label>
+                    
+                    {hasMarketingBudget ? (
+                      // Show normal functionality when marketing budget is configured
+                      <div className="space-y-2">
                         <div className="flex items-center space-x-2">
                           <Checkbox 
                             id="use-marketing-plan"
@@ -403,8 +411,29 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
                             }
                           </p>
                         )}
-                    </div>
-                 )}
+                      </div>
+                    ) : (
+                      // Show smart prompt when no marketing budget configured
+                      <div className="border border-dashed border-gray-300 rounded-lg p-4 text-center bg-gray-50">
+                        <Settings className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600 mb-2">
+                          No marketing budget configured for this model
+                        </p>
+                        <p className="text-xs text-gray-500 mb-3">
+                          Set up marketing budget to track planned vs actual marketing spend
+                        </p>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => navigate(`/projects/${projectId}/models/${model.id}?tab=setup`)}
+                          className="text-sm"
+                        >
+                          <Settings className="h-4 w-4 mr-2" />
+                          Configure Marketing Budget
+                        </Button>
+                      </div>
+                    )}
+                 </div>
             </div>
 
             {/* NEW: Attendance Actual Input (only for Weekly Events) */}

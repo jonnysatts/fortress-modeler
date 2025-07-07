@@ -79,12 +79,15 @@
     "@types/xlsx": "^0.0.35",
     "chart.js": "^4.5.0",
     "chartjs-adapter-date-fns": "^3.0.0",
+    "chartjs-plugin-datalabels": "^2.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
+    "colord": "^2.9.3",
     "date-fns": "^3.6.0",
     "dexie": "^4.0.11",
     "embla-carousel-react": "^8.3.0",
+    "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
     "input-otp": "^1.2.4",
     "jspdf": "^3.0.1",
@@ -126,8 +129,6 @@
     "electron": "^28.2.0",
     "electron-builder": "^24.9.1",
     "electron-updater": "^6.1.8",
-    "open": "^10.1.0",
-    "wait-on": "^7.2.0",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
@@ -136,6 +137,7 @@
     "happy-dom": "^18.0.1",
     "jsdom": "^26.1.0",
     "msw": "^2.10.2",
+    "open": "^10.1.0",
     "postcss": "^8.4.47",
     "puppeteer": "^24.11.1",
     "rollup-plugin-visualizer": "^6.0.3",
@@ -146,6 +148,7 @@
     "typescript-eslint": "^8.0.1",
     "vite": "^5.4.1",
     "vite-plugin-compression": "^0.5.1",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "wait-on": "^7.2.0"
   }
 }

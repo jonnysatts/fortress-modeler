@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Edit, Download, Share2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { SupabaseStorageService } from "@/services/implementations/SupabaseStorageService";
+import { ExportModal } from './ExportModal';
+import { toast } from 'sonner';
 import { db, getProject } from "@/lib/db";
 import { isCloudModeEnabled } from "@/config/app.config";
 
@@ -381,12 +383,20 @@ const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverviewProp
     }
   }, [navigate, projectId, model.id]);
   
-  // Download report functionality
-  const handleDownload = useCallback(async () => {
+  // Export modal state
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportingOption, setExportingOption] = useState<string>();
+
+  // Export functionality
+  const handleExport = useCallback(async (optionId: string) => {
     if (!projectId || !model) {
-      alert("Missing project or model data.");
+      toast.error("Missing project or model data.");
       return;
     }
+
+    setIsExporting(true);
+    setExportingOption(optionId);
 
     try {
       // Get project data using cloud/local switching
@@ -402,14 +412,11 @@ const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverviewProp
       }
       
       if (!project) {
-        alert("Project not found.");
+        toast.error("Project not found.");
         return;
       }
 
-      // Show format selection with 3 options
-      const choice = prompt("Choose export format:\n1 = Rich PDF with Charts\n2 = Product Strategy PDF\n3 = Excel Report\n\nEnter 1, 2, or 3:");
-      
-      if (choice === "1") {
+      if (optionId === "rich-pdf") {
         // Export rich PDF with charts and financial data
         const { exportRichPDF } = await import("@/lib/rich-pdf-export");
         await exportRichPDF({
@@ -417,12 +424,14 @@ const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverviewProp
           model,
           simulationResults
         });
-      } else if (choice === "2") {
+        toast.success("Rich PDF report downloaded successfully!");
+      } else if (optionId === "board-pdf") {
         // Export product strategy PDF
         const { exportBoardReadyPDF, prepareBoardReadyData } = await import("@/lib/board-ready-export");
         const reportData = await prepareBoardReadyData(project, [model], 36, 0.1);
         await exportBoardReadyPDF(reportData);
-      } else if (choice === "3") {
+        toast.success("Executive summary downloaded successfully!");
+      } else if (optionId === "excel") {
         // Export Excel using enhanced export
         const { exportEnhancedExcel } = await import("@/lib/enhanced-excel-export");
         await exportEnhancedExcel({
@@ -433,14 +442,22 @@ const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverviewProp
           periods: 36,
           discountRate: 0.1
         });
-      } else {
-        return; // User cancelled or invalid choice
+        toast.success("Excel analysis downloaded successfully!");
       }
+      
+      setExportModalOpen(false);
     } catch (error) {
-      console.error('Download error:', error);
-      alert(`Download failed: ${error.message}`);
+      console.error('Export error:', error);
+      toast.error(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsExporting(false);
+      setExportingOption(undefined);
     }
   }, [projectId, model, simulationResults]);
+
+  const handleDownload = useCallback(() => {
+    setExportModalOpen(true);
+  }, []);
   
   const handleShare = useCallback(() => {
     alert("Share model functionality not implemented yet.");
@@ -700,6 +717,15 @@ const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverviewProp
            </div>
          </CardContent>
       </Card>
+
+      {/* Export Modal */}
+      <ExportModal
+        open={exportModalOpen}
+        onOpenChange={setExportModalOpen}
+        onExport={handleExport}
+        isExporting={isExporting}
+        exportingOption={exportingOption}
+      />
     </div>
   );
 };

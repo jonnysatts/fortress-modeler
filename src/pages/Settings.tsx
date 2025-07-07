@@ -51,58 +51,7 @@ const Settings = () => {
   const projectsArray = projects;
 
   // Test export function that works without projects
-  const handleTestExport = async () => {
-    try {
-      setIsExporting(true);
-      
-      // Create a test project for export
-      const testProject = {
-        id: 1,
-        name: "Test Export Project",
-        description: "This is a test export to verify functionality",
-        productType: "Test Product",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        targetAudience: "Test users"
-      };
-
-      const testModels = [{
-        id: 1,
-        projectId: 1,
-        name: "Test Financial Model",
-        assumptions: {
-          revenue: [
-            { name: "Primary Revenue Stream", value: 10000, type: "recurring", frequency: "monthly" },
-            { name: "Secondary Revenue", value: 5000, type: "variable", frequency: "monthly" }
-          ],
-          costs: [
-            { name: "Operating Costs", value: 3000, type: "fixed", category: "operations" },
-            { name: "Marketing Spend", value: 2000, type: "variable", category: "marketing" }
-          ],
-          growthModel: { type: "linear", rate: 0.05 }
-        },
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }];
-      
-      await exportSimpleExcel({
-        project: testProject,
-        models: testModels
-      });
-      
-      toast.success("Test export completed", {
-        description: "Test Excel file has been downloaded to verify export functionality.",
-      });
-      
-    } catch (error) {
-      console.error('Test export error:', error);
-      toast.error("Test export failed", {
-        description: `Error: ${error.message}`,
-      });
-    } finally {
-      setIsExporting(false);
-    }
-  };
+  // Removed test export function - users can test exports from model pages
   
   const handleExportExcel = async () => {
     try {
@@ -336,27 +285,26 @@ const Settings = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col space-y-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
+                <div className="bg-fortress-emerald/10 border border-fortress-emerald/20 rounded-lg p-4">
+                  <h4 className="font-medium text-fortress-emerald mb-2">📍 Where to Export Reports</h4>
+                  <div className="text-sm text-gray-700 space-y-1">
+                    <p><strong>Per-Model Exports:</strong> Go to any model's overview page and click "Download Report" for model-specific exports with 3 format options.</p>
+                    <p><strong>Bulk Exports:</strong> Use the buttons below to export all your project data at once.</p>
+                  </div>
+                </div>
+                
                 <p className="text-sm text-muted-foreground">
-                  All data is stored locally in your browser. Export your financial models and analysis in multiple formats:
+                  Available export formats for all your projects and financial models:
                 </p>
                 <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-                  <li>• <strong>Test Export:</strong> Download sample Excel file to verify export functionality works</li>
                   <li>• <strong>Excel:</strong> Comprehensive project and financial model data export</li>
                   <li>• <strong>Basic PDF:</strong> Professional project report with revenue and cost breakdowns</li>
-                  <li>• <strong>Executive Report:</strong> Advanced analysis with scenarios and metrics (Excel fallback if needed)</li>
+                  <li>• <strong>Executive Report:</strong> Advanced board-ready analysis with scenarios and metrics</li>
                 </ul>
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                <Button 
-                  onClick={handleTestExport}
-                  disabled={isExporting}
-                  className="bg-purple-600 hover:bg-purple-700"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  {isExporting ? "Testing..." : "Test Export"}
-                </Button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 
                 <Button 
                   onClick={handleExportExcel} 
