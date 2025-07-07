@@ -1,124 +1,29 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, PlusCircle, TrendingUp, AlertTriangle, Target } from "lucide-react";
+import { BarChart3, PlusCircle, TrendingUp, AlertTriangle, Target, DollarSign, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
-import { config } from "@/lib/config";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { usePortfolioAnalytics, usePerformanceChartData, useRiskAnalysis, useVarianceIndicators } from "@/hooks/usePortfolioAnalytics";
+import { KPICard, VarianceIndicator } from "@/components/dashboard/KPICard";
 import { useMyProjects } from "@/hooks/useProjects";
-import { useActualsForProject } from "@/hooks/useActuals";
-import { ActualsPeriodEntry } from "@/types/models";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { data: projects = [], isLoading } = useMyProjects();
+  const { data: projects = [], isLoading: projectsLoading } = useMyProjects();
+  
+  // Use enhanced analytics hooks
+  const { data: analytics, isLoading: analyticsLoading, error: analyticsError } = usePortfolioAnalytics();
+  const { data: chartData, isLoading: chartLoading } = usePerformanceChartData();
+  const { riskData, totalRisk, isLoading: riskLoading } = useRiskAnalysis();
+  const { indicators, dataCompleteness, projectsWithActuals, totalProjects } = useVarianceIndicators();
 
-  // Use all projects in local-only mode
-  const availableProjects = projects;
+  const isLoading = projectsLoading || analyticsLoading;
 
-  // Get actual data for all projects (safe approach - don't cause loading issues)
-  const getAllActualsData = () => {
-    const allActuals: Record<string, ActualsPeriodEntry[]> = {};
-    availableProjects.forEach(project => {
-      try {
-        // Use a simple approach that doesn't trigger React Query issues
-        allActuals[project.id] = []; // Will be populated by individual project hooks later
-      } catch (error) {
-        console.warn(`Failed to load actuals for project ${project.id}:`, error);
-        allActuals[project.id] = [];
-      }
-    });
-    return allActuals;
-  };
-
-  const allActualsData = getAllActualsData();
-
-  // Calculate real metrics from actual project data with actuals integration
-  const calculateTotalRevenue = () => {
-    if (availableProjects.length === 0) return { projected: 0, actual: 0, hasActuals: false };
-    
-    let totalProjected = 0;
-    let totalActual = 0;
-    let hasAnyActuals = false;
-    
-    availableProjects.forEach(project => {
-      // Sum up projected revenue from all financial models in the project
-      const projectProjected = project.financialModels?.reduce((projectTotal, model) => {
-        return projectTotal + (model.monthlyRevenue * 12 || 0);
-      }, 0) || 0;
-      totalProjected += projectProjected;
-      
-      // Check for actual data for this project (safe approach)
-      const projectActuals = allActualsData[project.id] || [];
-      if (projectActuals.length > 0) {
-        hasAnyActuals = true;
-        const projectActualRevenue = projectActuals.reduce((sum, actual) => {
-          return sum + (actual.actualRevenue || 0);
-        }, 0);
-        totalActual += projectActualRevenue;
-      }
-    });
-    
-    return { 
-      projected: totalProjected, 
-      actual: totalActual, 
-      hasActuals: hasAnyActuals 
-    };
-  };
-
-  const calculateActiveRisks = () => {
-    if (availableProjects.length === 0) return 0;
-    return availableProjects.reduce((total, project) => {
-      // Count financial models with high costs or low profit margins as risks
-      const projectRisks = project.financialModels?.filter(model => {
-        const profitMargin = model.monthlyRevenue ? 
-          ((model.monthlyRevenue - model.monthlyCosts) / model.monthlyRevenue) * 100 : 0;
-        return profitMargin < 20 || model.monthlyCosts > 10000;
-      }).length || 0;
-      return total + projectRisks;
-    }, 0);
-  };
-
-  const generatePerformanceData = () => {
-    const dataByMonth: { [key: string]: number } = {};
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-    availableProjects.forEach(project => {
-      const creationDate = new Date(project.createdAt);
-      const monthIndex = creationDate.getMonth();
-      const year = creationDate.getFullYear();
-      const key = `${monthNames[monthIndex]} ${year}`;
-
-      const projectRevenue = project.financialModels?.reduce((total, model) => total + (model.monthlyRevenue || 0), 0) || 0;
-
-      if (!dataByMonth[key]) {
-        dataByMonth[key] = 0;
-      }
-      dataByMonth[key] += projectRevenue;
-    });
-
-    // Return the last 6 months of data, sorted
-    return Object.entries(dataByMonth)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime())
-      .slice(-6);
-  };
-
-  const generateRiskData = () => {
-    const riskCounts: { [key: string]: number } = { Financial: 0, Operational: 0, Strategic: 0 };
-    availableProjects.forEach(project => {
-      project.financialModels?.forEach(model => {
-        if (model.monthlyCosts > 5000) riskCounts.Operational++;
-        if (model.monthlyRevenue > 0 && ((model.monthlyRevenue - model.monthlyCosts) / model.monthlyRevenue) < 0.2) riskCounts.Financial++;
-      });
-    });
-    return Object.entries(riskCounts).map(([name, value]) => ({ name, value })).filter(item => item.value > 0);
-  };
-
-  const revenueData = calculateTotalRevenue();
-  const activeRisks = calculateActiveRisks();
-  const performanceData = generatePerformanceData();
-  const riskData = generateRiskData();
+  // Get metrics from analytics service
+  const portfolioMetrics = analytics?.portfolioMetrics;
+  const hasActuals = (portfolioMetrics?.projectsWithActuals || 0) > 0;
 
   const COLORS = ['#1A2942', '#3E5C89', '#10B981', '#334155'];
 
@@ -145,10 +50,10 @@ const Dashboard = () => {
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-3">
           <h1 className="text-3xl font-bold text-fortress-blue">Dashboard</h1>
-          {revenueData.hasActuals && (
+          {hasActuals && (
             <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs font-medium">
               <Target className="h-3 w-3" />
-              Actual Data Available
+              Actual Data Available ({dataCompleteness?.toFixed(0)}% complete)
             </div>
           )}
         </div>
@@ -158,103 +63,136 @@ const Dashboard = () => {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Data Completeness Alert */}
+      {portfolioMetrics && dataCompleteness !== undefined && dataCompleteness < 50 && totalProjects > 0 && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Only {projectsWithActuals} of {totalProjects} projects have actual data. 
+            Add performance data to see variance insights and trends.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* Projects KPI */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Total Projects</CardTitle>
+            <CardTitle className="text-lg font-medium flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-fortress-emerald" />
+              Total Projects
+            </CardTitle>
             <CardDescription>Currently active projects</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-3xl font-bold">{availableProjects.length}</div>
-              <BarChart3 className="h-8 w-8 text-fortress-emerald" />
+              <div className="text-3xl font-bold">{projects.length}</div>
+              {hasActuals && (
+                <div className="text-xs text-green-600">
+                  {projectsWithActuals} with actuals
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">
-              {revenueData.hasActuals ? 'Actual vs Projected Revenue' : 'Total Revenue (YTD)'}
-            </CardTitle>
-            <CardDescription>
-              {revenueData.hasActuals ? 'Actual performance vs projections' : 'Across all projects'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {revenueData.hasActuals ? (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold text-fortress-emerald">
-                    ${revenueData.actual.toLocaleString()}
-                  </div>
-                  <Target className="h-8 w-8 text-fortress-emerald" />
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  Actual (vs ${revenueData.projected.toLocaleString()} projected)
-                </div>
-                {revenueData.projected > 0 && (
-                  <div className={`text-xs ${revenueData.actual >= revenueData.projected ? 'text-green-600' : 'text-amber-600'}`}>
-                    {revenueData.actual >= revenueData.projected ? '↗' : '↘'} 
-                    {((revenueData.actual / revenueData.projected - 1) * 100).toFixed(1)}% vs target
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center justify-between">
-                <div className="text-3xl font-bold">
-                  {revenueData.projected > 0 ? `$${revenueData.projected.toLocaleString()}` : '$0'}
-                </div>
-                <TrendingUp className="h-8 w-8 text-fortress-emerald" />
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Revenue KPI */}
+        {portfolioMetrics && (
+          <KPICard
+            title="Revenue"
+            description={hasActuals ? "Actual vs projected revenue" : "Projected revenue"}
+            value={hasActuals ? portfolioMetrics.totalActualRevenue : portfolioMetrics.totalProjectedRevenue}
+            projectedValue={portfolioMetrics.totalProjectedRevenue}
+            variance={portfolioMetrics.revenueVariance}
+            icon={<DollarSign className="h-8 w-8 text-fortress-emerald" />}
+            formatValue={(v) => `$${v.toLocaleString()}`}
+            hasActualData={hasActuals}
+          />
+        )}
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Active Risks</CardTitle>
-            <CardDescription>Identified risks across projects</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-3xl font-bold">{activeRisks}</div>
-              <AlertTriangle className="h-8 w-8 text-amber-500" />
-            </div>
-          </CardContent>
-        </Card>
+        {/* Costs KPI */}
+        {portfolioMetrics && (
+          <KPICard
+            title="Costs"
+            description={hasActuals ? "Actual vs projected costs" : "Projected costs"}
+            value={hasActuals ? portfolioMetrics.totalActualCosts : portfolioMetrics.totalProjectedCosts}
+            projectedValue={portfolioMetrics.totalProjectedCosts}
+            variance={portfolioMetrics.costVariance}
+            icon={<TrendingDown className="h-8 w-8 text-red-500" />}
+            formatValue={(v) => `$${v.toLocaleString()}`}
+            hasActualData={hasActuals}
+          />
+        )}
+
+        {/* Profit KPI */}
+        {portfolioMetrics && (
+          <KPICard
+            title="Profit"
+            description={hasActuals ? "Actual vs projected profit" : "Projected profit"}
+            value={hasActuals ? portfolioMetrics.totalActualProfit : portfolioMetrics.totalProjectedProfit}
+            projectedValue={portfolioMetrics.totalProjectedProfit}
+            variance={portfolioMetrics.profitVariance}
+            icon={<TrendingUp className="h-8 w-8 text-fortress-emerald" />}
+            formatValue={(v) => `$${v.toLocaleString()}`}
+            hasActualData={hasActuals}
+          />
+        )}
       </div>
+
+      {/* Variance Indicators Section */}
+      {hasActuals && indicators.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Performance vs Projections</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {indicators.map((indicator, index) => (
+              <VarianceIndicator
+                key={index}
+                metric={indicator.metric}
+                variance={indicator.variance}
+                actual={indicator.actual}
+                projected={indicator.projected}
+                status={indicator.status}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card className="col-span-1">
           <CardHeader>
-            <CardTitle>Recent Performance</CardTitle>
-            <CardDescription>Revenue over the last 6 months</CardDescription>
+            <CardTitle>Actual vs Projected Performance</CardTitle>
+            <CardDescription>Revenue comparison over time</CardDescription>
           </CardHeader>
           <CardContent className="h-80">
-            {performanceData.length > 0 && performanceData.some(d => d.value > 0) ? (
+            {chartData && chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={performanceData}>
+                <BarChart data={chartData}>
                   <XAxis dataKey="name" />
                   <YAxis />
                   <Tooltip 
-                    formatter={(value) => [`$${value}`, 'Revenue']} 
+                    formatter={(value, name) => [
+                      `$${value?.toLocaleString() || 0}`, 
+                      name === 'actual' ? 'Actual Revenue' : 'Projected Revenue'
+                    ]} 
                     contentStyle={{ 
                       backgroundColor: '#f8fafc', 
                       border: '1px solid #e2e8f0',
                       borderRadius: '6px'
                     }}
                   />
-                  <Bar dataKey="value" fill="#10B981" radius={[4, 4, 0, 0]} />
+                  <Legend />
+                  <Bar dataKey="projected" fill="#94A3B8" name="Projected" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="actual" fill="#10B981" name="Actual" radius={[2, 2, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-center">
                 <div>
                   <BarChart3 className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-muted-foreground">No revenue data yet</p>
+                  <p className="text-muted-foreground">No performance data yet</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Create projects with financial models to see performance charts
+                    Add actual performance data to see variance charts
                   </p>
                 </div>
               </div>
@@ -264,11 +202,11 @@ const Dashboard = () => {
 
         <Card className="col-span-1">
           <CardHeader>
-            <CardTitle>Risk Distribution</CardTitle>
-            <CardDescription>By category across all projects</CardDescription>
+            <CardTitle>Project Risk Analysis</CardTitle>
+            <CardDescription>Based on variance and performance trends</CardDescription>
           </CardHeader>
           <CardContent className="h-80">
-            {riskData.length > 0 && activeRisks > 0 ? (
+            {riskData && riskData.length > 0 ? (
               <div className="flex items-center justify-center h-full">
                 <div className="w-full h-full flex flex-col">
                   <div className="flex-1">
@@ -282,13 +220,14 @@ const Dashboard = () => {
                           outerRadius={80}
                           fill="#8884d8"
                           dataKey="value"
+                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                         >
                           {riskData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
                         <Tooltip 
-                          formatter={(value) => [`${value} risks`, '']} 
+                          formatter={(value) => [`${value} projects`, '']} 
                           contentStyle={{ 
                             backgroundColor: '#f8fafc', 
                             border: '1px solid #e2e8f0',
@@ -298,16 +237,10 @@ const Dashboard = () => {
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="flex justify-center gap-4 mt-4">
-                    {riskData.map((entry, index) => (
-                      <div key={`legend-${index}`} className="flex items-center">
-                        <div
-                          className="w-3 h-3 mr-1"
-                          style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                        ></div>
-                        <span className="text-xs">{entry.name}</span>
-                      </div>
-                    ))}
+                  <div className="text-center mt-2">
+                    <div className="text-sm text-muted-foreground">
+                      Average Risk Score: {totalRisk?.toFixed(1) || 0}/100
+                    </div>
                   </div>
                 </div>
               </div>
@@ -315,9 +248,9 @@ const Dashboard = () => {
               <div className="flex items-center justify-center h-full text-center">
                 <div>
                   <AlertTriangle className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-muted-foreground">No risks identified</p>
+                  <p className="text-muted-foreground">No risk data available</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Risk analysis will appear as you add financial models to your projects
+                    Risk analysis requires actual performance data
                   </p>
                 </div>
               </div>
@@ -326,35 +259,52 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Revenue Forecast</CardTitle>
-          <CardDescription>Projected vs actual revenue for the next 6 months</CardDescription>
-        </CardHeader>
-        <CardContent className="h-80">
-          {availableProjects.length > 0 && (revenueData.projected > 0 || revenueData.actual > 0) ? (
-            <div className="flex items-center justify-center h-full text-center">
-              <div>
-                <TrendingUp className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-muted-foreground">Forecasting coming soon</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Advanced forecasting features will be available based on your project data
-                </p>
-              </div>
+      {/* Project Performance Summary */}
+      {analytics?.projectPerformance && analytics.projectPerformance.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Project Performance Summary</CardTitle>
+            <CardDescription>Individual project metrics and variance analysis</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {analytics.projectPerformance.slice(0, 5).map((project) => (
+                <div 
+                  key={project.projectId}
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                  onClick={() => navigate(`/projects/${project.projectId}`)}
+                >
+                  <div className="flex-1">
+                    <h3 className="font-medium">{project.projectName}</h3>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span>Revenue: ${project.actualRevenue.toLocaleString()}</span>
+                      <span>Profit: ${project.actualProfit.toLocaleString()}</span>
+                      {project.hasActuals && (
+                        <span className={`font-medium ${project.revenueVariance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {project.revenueVariance >= 0 ? '+' : ''}{project.revenueVariance.toFixed(1)}% variance
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {project.hasActuals ? (
+                      <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs">
+                        <Target className="h-3 w-3" />
+                        {project.periodsWithData} periods
+                      </div>
+                    ) : (
+                      <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-100 text-amber-800 text-xs">
+                        <AlertTriangle className="h-3 w-3" />
+                        No actuals
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-          ) : (
-            <div className="flex items-center justify-center h-full text-center">
-              <div>
-                <TrendingUp className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-muted-foreground">No data for forecasting</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Create projects with financial models to enable revenue forecasting
-                </p>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
@@ -363,9 +313,9 @@ const Dashboard = () => {
             <CardDescription>Your most recently created projects</CardDescription>
           </CardHeader>
           <CardContent>
-            {availableProjects.length > 0 ? (
+            {projects.length > 0 ? (
               <ul className="space-y-2">
-                {availableProjects.slice(0, 5).map((project) => (
+                {projects.slice(0, 5).map((project) => (
                   <li 
                     key={project.id} 
                     className="p-3 border rounded-md hover:bg-gray-50 cursor-pointer"
@@ -400,24 +350,44 @@ const Dashboard = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Data Backup Reminder</CardTitle>
-            <CardDescription>It's important to regularly export your data</CardDescription>
+            <CardTitle>Analytics Status</CardTitle>
+            <CardDescription>Portfolio data quality and completeness</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="bg-amber-50 border border-amber-200 rounded-md p-4 mb-4">
-              <div className="flex items-start">
-                <AlertTriangle className="h-5 w-5 text-amber-500 mr-2 mt-0.5" />
-                <div>
-                  <h4 className="font-medium text-amber-800">Never backed up</h4>
-                  <p className="text-sm text-amber-700">
-                    You haven't exported your data yet. We recommend doing this regularly to prevent data loss.
-                  </p>
+            {portfolioMetrics ? (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Data Completeness</span>
+                  <span className="font-medium">{dataCompleteness?.toFixed(0)}%</span>
                 </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-fortress-emerald h-2 rounded-full" 
+                    style={{ width: `${dataCompleteness}%` }}
+                  ></div>
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{projectsWithActuals} projects with actual data</span>
+                  <span>{totalProjects} total projects</span>
+                </div>
+                {dataCompleteness && dataCompleteness < 50 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
+                    <div className="flex items-start">
+                      <AlertTriangle className="h-4 w-4 text-amber-500 mr-2 mt-0.5" />
+                      <div>
+                        <p className="text-sm text-amber-700">
+                          Add actual performance data to see variance insights and improved analytics.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-            <Button variant="outline" className="w-full">
-              Export All Data
-            </Button>
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-muted-foreground">Loading analytics...</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMyProjects } from '@/hooks/useProjects';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { ActualsPeriodEntry } from '@/types/models';
 import { DashboardAnalyticsService, PortfolioMetrics, PeriodPerformance, ProjectPerformance } from '@/services/DashboardAnalyticsService';
 import { SupabaseStorageService } from '@/services/implementations/SupabaseStorageService';
@@ -11,6 +12,7 @@ import { isCloudModeEnabled } from '@/config/app.config';
  */
 export const usePortfolioAnalytics = () => {
   const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useMyProjects();
+  const { isAuthenticated, isLoading: authLoading } = useSupabaseAuth();
 
   return useQuery({
     queryKey: ['portfolio-analytics', projects.map(p => p?.id).filter(Boolean)],
@@ -74,7 +76,7 @@ export const usePortfolioAnalytics = () => {
         projectPerformance
       };
     },
-    enabled: !projectsLoading && !projectsError && projects.length >= 0,
+    enabled: !authLoading && isAuthenticated && !projectsLoading && !projectsError && projects.length >= 0,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
     retry: 1,
