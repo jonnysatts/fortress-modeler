@@ -39,7 +39,50 @@ export default function AuthCallback() {
         if (hash || searchParams.has('code')) {
           console.log('Found auth data, getting session...');
           
-          // Supabase will automatically handle the callback
+          // Give Supabase a moment to process the callback tokens
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Check if we have auth tokens in the URL hash
+          if (hash) {
+            console.log('Processing hash params:', hash);
+            const hashParams = new URLSearchParams(hash.substring(1));
+            const accessToken = hashParams.get('access_token');
+            const refreshToken = hashParams.get('refresh_token');
+            
+            console.log('Hash tokens:', {
+              hasAccessToken: !!accessToken,
+              hasRefreshToken: !!refreshToken,
+              tokenType: hashParams.get('token_type'),
+              expiresIn: hashParams.get('expires_in')
+            });
+            
+            if (accessToken) {
+              // Manually set the session if we have tokens
+              const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken || ''
+              });
+              
+              console.log('Manual session set result:', { sessionData, sessionError });
+              
+              if (sessionError) {
+                throw sessionError;
+              }
+              
+              if (sessionData.session) {
+                console.log('Manual session established, redirecting...');
+                setStatus('success');
+                setMessage('Authentication successful! Redirecting...');
+                
+                setTimeout(() => {
+                  navigate('/migration');
+                }, 2000);
+                return;
+              }
+            }
+          }
+          
+          // Fallback: try to get session normally
           const { data, error } = await supabase.auth.getSession();
           
           console.log('Session data:', data);
@@ -54,7 +97,6 @@ export default function AuthCallback() {
             setStatus('success');
             setMessage('Authentication successful! Redirecting...');
             
-            // Wait a moment to show success, then redirect
             setTimeout(() => {
               navigate('/migration');
             }, 2000);
@@ -62,6 +104,19 @@ export default function AuthCallback() {
             throw new Error('No session found after callback');
           }
         } else {
+          // Enhanced debugging for no auth data case
+          console.log('No auth data found - detailed debug:', {
+            fullUrl: window.location.href,
+            hash: window.location.hash,
+            search: window.location.search,
+            pathname: window.location.pathname,
+            hashLength: window.location.hash.length,
+            searchLength: window.location.search.length,
+            hasCode: searchParams.has('code'),
+            hasAccessToken: window.location.hash.includes('access_token'),
+            hasError: searchParams.has('error')
+          });
+          
           throw new Error('No authentication data found in URL');
         }
       } catch (error) {
