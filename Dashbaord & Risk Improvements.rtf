@@ -1,0 +1,973 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fnil\fcharset0 Menlo-Regular;\f1\fnil\fcharset0 Menlo-BoldItalic;\f2\fnil\fcharset0 Menlo-Bold;
+\f3\fnil\fcharset0 Menlo-Italic;}
+{\colortbl;\red255\green255\blue255;\red255\green255\blue255;\red0\green0\blue0;\red86\green32\blue244;
+\red56\green185\blue199;\red202\green51\blue35;\red57\green192\blue38;}
+{\*\expandedcolortbl;;\cspthree\c100000\c100000\c100000;\csgray\c0;\cssrgb\c41681\c25958\c96648;
+\cssrgb\c25546\c77007\c82023;\cssrgb\c83899\c28663\c18026;\cssrgb\c25706\c77963\c19557;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
+
+\f0\fs22 \cf2 \CocoaLigature0 \uc0\u9210 \cf3  
+\f1\i\b \ul \uc0\u55356 \u57263  Integrated Dashboard Completion & Risk Management Plan
+\f0\i0\b0 \ulnone \
+\
+  
+\f2\b Executive Summary
+\f0\b0 \
+\
+  This plan completes the dashboard renovation while building a\
+  comprehensive, product manager-focused risk management system. Instead of\
+   treating these as separate initiatives, we'll integrate them to create a\
+   unified product management platform that combines performance analytics\
+  with proactive risk management.\
+\
+  
+\f2\b The Vision
+\f0\b0 : Product managers can see not just how their portfolio is\
+  performing, but also identify emerging risks before they impact\
+  performance, with actionable insights for mitigation.\
+\
+  ---\
+  
+\f2\b Current State Assessment
+\f0\b0 \
+\
+  
+\f2\b \uc0\u9989  Dashboard Achievements (Phase 1 Complete)
+\f0\b0 \
+\
+  - Actual vs projected analytics with variance indicators\
+  - Enhanced KPIs showing real performance data\
+  - Portfolio-wide metrics and data completeness tracking\
+  - Advanced charts with dual data series\
+  - Project performance summaries\
+\
+  
+\f2\b \uc0\u10060  Critical Gaps Remaining
+\f0\b0 \
+\
+  - 
+\f2\b Dashboard
+\f0\b0 : Missing forecast accuracy, trend analysis, project health\
+  scoring\
+  - 
+\f2\b Risk Management
+\f0\b0 : Completely placeholder - just variance-based\
+  categorization\
+  - 
+\f2\b Product Manager Intelligence
+\f0\b0 : No early warning systems or leading\
+  indicators\
+  - 
+\f2\b Integration
+\f0\b0 : Risk and performance data exist in isolation\
+\
+  ---\
+  
+\f2\b Integrated Development Plan - 4 Phases
+\f0\b0 \
+\
+  
+\f2\b Phase A: Advanced Dashboard Analytics (2-3 weeks)
+\f0\b0 \
+\
+  
+\f3\i Complete remaining dashboard features while building risk integration 
+\f0\i0 \
+  
+\f3\i foundation
+\f0\i0 \
+\
+  
+\f2\b A1: Forecast Accuracy Engine
+\f0\b0 \
+\
+  \cf4 interface\cf3  ForecastAccuracy \{\
+    \cf5 projectId\cf3 : \cf5 string\cf3 ;\
+    metric: \cf6 'revenue'\cf3  | \cf6 'costs'\cf3  | \cf6 'profit'\cf3 ;\
+    periods: ForecastPeriod[];\
+    overallMAPE: \cf5 number\cf3 ;          \cf7 // Mean Absolute Percentage Error\cf3 \
+    accuracyTrend: \cf6 'improving'\cf3  | \cf6 'stable'\cf3  | \cf6 'declining'\cf3 ;\
+    confidenceScore: \cf5 number\cf3 ;      \cf7 // 0-100\cf3 \
+    riskImplications: RiskFlag[]; \cf7 // Feeds into risk system\cf3 \
+  \}\
+\
+  \cf4 interface\cf3  ForecastPeriod \{\
+    \cf5 period\cf3 : \cf5 string\cf3 ;\
+    projected: \cf5 number\cf3 ;\
+    actual: \cf5 number\cf3 ;\
+    absoluteError: \cf5 number\cf3 ;\
+    percentageError: \cf5 number\cf3 ;\
+    accuracyGrade: \cf6 'A'\cf3  | \cf6 'B'\cf3  | \cf6 'C'\cf3  | \cf6 'D'\cf3  | \cf6 'F'\cf3 ;\
+  \}\
+\
+  
+\f2\b Technical Implementation:
+\f0\b0 \
+  \cf7 // New: src/services/ForecastAccuracyService.ts\cf3 \
+  \cf4 export\cf3  \cf4 class ForecastAccuracyService \cf3 \{\
+    \cf4 static\cf3  calculateMAPE(projections: \cf5 number\cf3 [], \cf5 actuals\cf3 : \cf5 number\cf3 []): \cf5 number\cf3 \
+    \cf4 static\cf3  getAccuracyTrend(periods: ForecastPeriod[]): AccuracyTrend\
+    \cf4 static\cf3  identifyAccuracyRisks(accuracy: ForecastAccuracy): RiskFlag[]\
+    \cf4 static\cf3  generateAccuracyInsights(projectAccuracy: ForecastAccuracy[]):\
+  AccuracyInsight[]\
+  \}\
+\
+  
+\f2\b UI Components:
+\f0\b0 \
+  - 
+\f2\b Forecast Accuracy Card
+\f0\b0 : Dashboard KPI showing portfolio-wide forecast\
+  quality\
+  - 
+\f2\b Accuracy Trend Chart
+\f0\b0 : Track forecast reliability over time\
+  - 
+\f2\b Project Accuracy Grid
+\f0\b0 : Detailed accuracy breakdown by project\
+  - 
+\f2\b Accuracy Alerts
+\f0\b0 : Highlight projects with declining forecast quality\
+\
+  
+\f2\b A2: Variance Trend Analysis
+\f0\b0 \
+\
+  \cf4 interface\cf3  VarianceTrend \{\
+    \cf5 projectId\cf3 : \cf5 string\cf3 ;\
+    metric: \cf5 string\cf3 ;\
+    timeSeriesData: VariancePoint[];\
+    trendDirection: \cf6 'improving'\cf3  | \cf6 'stable'\cf3  | \cf6 'worsening'\cf3 ;\
+    volatility: \cf5 number\cf3 ;\
+    seasonalPattern?: SeasonalPattern;\
+    anomalies: AnomalyPoint[];\
+  \}\
+\
+  \cf4 interface\cf3  VariancePoint \{\
+    \cf5 period\cf3 : \cf5 string\cf3 ;\
+    variance: \cf5 number\cf3 ;\
+    isAnomaly: \cf5 boolean\cf3 ;\
+    riskLevel: \cf6 'low'\cf3  | \cf6 'medium'\cf3  | \cf6 'high'\cf3 ;\
+  \}\
+\
+  
+\f2\b Features:
+\f0\b0 \
+  - 
+\f2\b Variance Timeline Charts
+\f0\b0 : Show how variance changes over time\
+  - 
+\f2\b Trend Detection
+\f0\b0 : Automatically identify improving/declining patterns\
+  - 
+\f2\b Anomaly Highlighting
+\f0\b0 : Flag unusual variance spikes\
+  - 
+\f2\b Seasonal Adjustment
+\f0\b0 : Account for predictable seasonal patterns\
+\
+  
+\f2\b A3: Project Health Scoring Foundation
+\f0\b0 \
+\
+  \cf4 interface\cf3  ProjectHealthScore \{\
+    \cf5 projectId\cf3 : \cf5 string\cf3 ;\
+    overallScore: \cf5 number\cf3 ;         \cf7 // 0-100 composite score\cf3 \
+    componentScores: \{\
+      \cf5 financialHealth\cf3 : \cf5 number\cf3 ;    \cf7 // Revenue/cost performance\cf3 \
+      forecastReliability: \cf5 number\cf3 ; \cf7 // Prediction accuracy\cf3 \
+      trendHealth: \cf5 number\cf3 ;        \cf7 // Growth trajectory\cf3 \
+      riskProfile: \cf5 number\cf3 ;        \cf7 // Risk assessment (links to Phase B)\cf3 \
+      dataQuality: \cf5 number\cf3 ;        \cf7 // Completeness and consistency\cf3 \
+    \};\
+    healthGrade: \cf6 'A'\cf3  | \cf6 'B'\cf3  | \cf6 'C'\cf3  | \cf6 'D'\cf3  | \cf6 'F'\cf3 ;\
+    healthTrend: \cf6 'improving'\cf3  | \cf6 'stable'\cf3  | \cf6 'declining'\cf3 ;\
+    riskFactors: \cf5 string\cf3 [];        \cf7 // Key concerns affecting health\cf3 \
+    recommendations: \cf5 string\cf3 [];    \cf7 // Actionable improvement suggestions\cf3 \
+  \}\
+\
+  ---\
+  
+\f2\b Phase B: Project-Level Risk Management (3-4 weeks)
+\f0\b0 \
+\
+  
+\f3\i Build comprehensive risk assessment and tracking at the project level
+\f0\i0 \
+\
+  
+\f2\b B1: Risk Data Model & Categories
+\f0\b0 \
+\
+  \cf4 interface\cf3  ProjectRisk \{\
+    \cf5 id\cf3 : \cf5 string\cf3 ;\
+    projectId: \cf5 string\cf3 ;\
+    category: RiskCategory;\
+    subcategory: \cf5 string\cf3 ;\
+    title: \cf5 string\cf3 ;\
+    description: \cf5 string\cf3 ;\
+\
+    \cf7 // Risk Assessment\cf3 \
+    probability: \cf5 number\cf3 ;          \cf7 // 1-5 scale\cf3 \
+    impact: \cf5 number\cf3 ;              \cf7 // 1-5 scale\cf3 \
+    riskScore: \cf5 number\cf3 ;           \cf7 // probability * impact\cf3 \
+    severity: \cf6 'low'\cf3  | \cf6 'medium'\cf3  | \cf6 'high'\cf3  | \cf6 'critical'\cf3 ;\
+\
+    \cf7 // Status & Tracking\cf3 \
+    status: \cf6 'identified'\cf3  | \cf6 'monitoring'\cf3  | \cf6 'mitigating'\cf3  | \cf6 'closed'\cf3 ;\
+    identifiedDate: \cf5 Date\cf3 ;\
+    targetResolutionDate?: \cf5 Date\cf3 ;\
+    actualResolutionDate?: \cf5 Date\cf3 ;\
+\
+    \cf7 // Mitigation\cf3 \
+    mitigationPlan?: \cf5 string\cf3 ;\
+    mitigationActions: MitigationAction[];\
+    assignedTo?: \cf5 string\cf3 ;\
+\
+    \cf7 // Automatic Indicators\cf3 \
+    automaticIndicators: AutomaticIndicator[];\
+    lastAutoUpdate: \cf5 Date\cf3 ;\
+\
+    \cf7 // History\cf3 \
+    riskHistory: RiskHistoryEntry[];\
+    lastReviewed: \cf5 Date\cf3 ;\
+    reviewedBy: \cf5 string\cf3 ;\
+  \}\
+\
+  \cf5 enum\cf3  RiskCategory \{\
+    MARKET_CUSTOMER = \cf6 'market_customer'\cf3 ,\
+    FINANCIAL_UNIT_ECONOMICS = \cf6 'financial_unit_economics'\cf3 ,\
+    EXECUTION_DELIVERY = \cf6 'execution_delivery'\cf3 ,\
+    STRATEGIC_SCALING = \cf6 'strategic_scaling'\cf3 ,\
+    OPERATIONAL = \cf6 'operational'\cf3 ,\
+    REGULATORY_COMPLIANCE = \cf6 'regulatory_compliance'\cf3 \
+  \}\
+\
+  \cf4 interface\cf3  AutomaticIndicator \{\
+    \cf5 metric\cf3 : \cf5 string\cf3 ;\
+    currentValue: \cf5 number\cf3 ;\
+    thresholdValue: \cf5 number\cf3 ;\
+    thresholdType: \cf6 'above'\cf3  | \cf6 'below'\cf3  | \cf6 'outside_range'\cf3 ;\
+    status: \cf6 'normal'\cf3  | \cf6 'warning'\cf3  | \cf6 'critical'\cf3 ;\
+    trend: \cf6 'improving'\cf3  | \cf6 'stable'\cf3  | \cf6 'worsening'\cf3 ;\
+    lastCalculated: \cf5 Date\cf3 ;\
+    dataSource: \cf5 string\cf3 ;\
+  \}\
+\
+  
+\f2\b B2: Risk Categories & Automatic Indicators
+\f0\b0 \
+\
+  
+\f2\b Market & Customer Risks:
+\f0\b0 \
+  - Customer Acquisition Cost (CAC) trending upward\
+  - Customer churn rate increases\
+  - Market penetration stagnation\
+  - Customer satisfaction scores declining\
+  - Competitive pricing pressure\
+  - Market size shrinkage indicators\
+\
+  
+\f2\b Financial & Unit Economics Risks:
+\f0\b0 \
+  - Unit economics deterioration (LTV/CAC ratio)\
+  - Burn rate acceleration\
+  - Revenue concentration (top 3 customers > 50%)\
+  - Gross margin compression\
+  - Cash flow timing mismatches\
+  - Payment default rate increases\
+\
+  
+\f2\b Execution & Delivery Risks:
+\f0\b0 \
+  - Sprint velocity declining trend\
+  - Bug rate increasing\
+  - Feature delivery delays (>20% behind schedule)\
+  - Team utilization < 70% or > 90%\
+  - Key person dependency (knowledge silos)\
+  - Technical debt accumulation\
+\
+  
+\f2\b Strategic & Scaling Risks:
+\f0\b0 \
+  - Product-market fit degradation signals\
+  - Scalability bottlenecks approaching\
+  - Technology stack obsolescence\
+  - Resource constraint projections\
+  - Market timing misalignment\
+  - Platform dependency risks\
+\
+  
+\f2\b Operational Risks:
+\f0\b0 \
+  - Infrastructure reliability < 99.5%\
+  - Vendor/supplier concentration\
+  - Data quality degradation\
+  - Process bottlenecks\
+  - Integration failure rates\
+  - Security vulnerability exposure\
+\
+  
+\f2\b Regulatory & Compliance Risks:
+\f0\b0 \
+  - Regulatory change impact\
+  - Compliance audit findings\
+  - Data privacy violations\
+  - Industry standard changes\
+  - Legal/IP risks\
+\
+  
+\f2\b B3: Project Risk Management UI
+\f0\b0 \
+\
+  
+\f2\b Risk Dashboard (Project Level):
+\f0\b0 \
+  \cf7 // src/pages/projects/ProjectRiskDashboard.tsx\cf3 \
+  - 
+\f2\b Risk Heat Map
+\f0\b0 : Visual grid of risks by probability/impact\
+  - 
+\f2\b Risk Category Breakdown
+\f0\b0 : Pie chart by risk category\
+  - 
+\f2\b Risk Trend Charts
+\f0\b0 : Track risk scores over time\
+  - 
+\f2\b Top Risks List
+\f0\b0 : Prioritized list of highest-scored risks\
+  - 
+\f2\b Automatic Alerts
+\f0\b0 : Real-time indicator violations\
+  - 
+\f2\b Mitigation Progress
+\f0\b0 : Track action completion\
+\
+  
+\f2\b Risk Assessment Form:
+\f0\b0 \
+  - 
+\f2\b Guided Risk Entry
+\f0\b0 : Category-specific templates\
+  - 
+\f2\b Automatic Calculation
+\f0\b0 : Risk score from probability/impact\
+  - 
+\f2\b Mitigation Planning
+\f0\b0 : Action items with owners and dates\
+  - 
+\f2\b Evidence Attachment
+\f0\b0 : Link to supporting data/documents\
+  - 
+\f2\b Approval Workflow
+\f0\b0 : Risk review and sign-off process\
+\
+  
+\f2\b Risk Monitoring View:
+\f0\b0 \
+  - 
+\f2\b Indicator Dashboard
+\f0\b0 : Real-time automatic risk indicators\
+  - 
+\f2\b Threshold Management
+\f0\b0 : Configure warning/critical levels\
+  - 
+\f2\b Alert Configuration
+\f0\b0 : Email/Slack notifications\
+  - 
+\f2\b Trend Analysis
+\f0\b0 : Historical indicator performance\
+  - 
+\f2\b Correlation Analysis
+\f0\b0 : Risk interaction effects\
+\
+  
+\f2\b B4: Automatic Risk Detection Engine
+\f0\b0 \
+\
+  \cf7 // src/services/RiskDetectionService.ts\cf3 \
+  \cf4 export\cf3  \cf4 class RiskDetectionService \cf3 \{\
+    \cf4 static\cf3  \cf4 async\cf3  detectFinancialRisks(project: Project, \cf5 actuals\cf3 :\
+  ActualsPeriodEntry[]): \cf5 Promise\cf3 <RiskFlag[]>\
+    \cf4 static\cf3  \cf4 async\cf3  detectPerformanceRisks(project: Project, \cf5 variance\cf3 :\
+  VarianceTrend[]): \cf5 Promise\cf3 <RiskFlag[]>\
+    \cf4 static\cf3  \cf4 async\cf3  detectMarketRisks(project: Project, \cf5 customerData\cf3 :\
+  CustomerMetric[]): \cf5 Promise\cf3 <RiskFlag[]>\
+    \cf4 static\cf3  \cf4 async\cf3  updateAutomaticIndicators(projectId: \cf5 string\cf3 ):\
+  \cf5 Promise\cf3 <AutomaticIndicator[]>\
+    \cf4 static\cf3  \cf4 async\cf3  generateRiskRecommendations(risks: ProjectRisk[]):\
+  \cf5 Promise\cf3 <RiskRecommendation[]>\
+  \}\
+\
+  \cf4 interface\cf3  RiskFlag \{\
+    \cf5 riskCategory\cf3 : RiskCategory;\
+    severity: \cf6 'low'\cf3  | \cf6 'medium'\cf3  | \cf6 'high'\cf3  | \cf6 'critical'\cf3 ;\
+    description: \cf5 string\cf3 ;\
+    suggestedAction: \cf5 string\cf3 ;\
+    dataSource: \cf5 string\cf3 ;\
+    confidence: \cf5 number\cf3 ; \cf7 // 0-100\cf3 \
+  \}\
+\
+  ---\
+  
+\f2\b Phase C: Portfolio Risk Dashboard (2-3 weeks)
+\f0\b0 \
+\
+  
+\f3\i Aggregate project risks into portfolio-level insights
+\f0\i0 \
+\
+  
+\f2\b C1: Portfolio Risk Aggregation
+\f0\b0 \
+\
+  \cf4 interface\cf3  PortfolioRiskMetrics \{\
+    \cf5 totalRisks\cf3 : \cf5 number\cf3 ;\
+    risksByCategory: Record<RiskCategory, \cf5 number\cf3 >;\
+    risksBySeverity: Record<\cf5 string\cf3 , \cf5 number\cf3 >;\
+    portfolioRiskScore: \cf5 number\cf3 ;    \cf7 // Weighted average\cf3 \
+    riskTrend: \cf6 'improving'\cf3  | \cf6 'stable'\cf3  | \cf6 'worsening'\cf3 ;\
+\
+    \cf7 // Risk Concentration\cf3 \
+    highRiskProjects: \cf5 string\cf3 [];    \cf7 // Projects with critical risks\cf3 \
+    riskConcentration: \cf5 number\cf3 ;     \cf7 // Percentage of portfolio at high risk\cf3 \
+\
+    \cf7 // Risk Correlation\cf3 \
+    correlatedRisks: RiskCorrelation[];\
+    systemicRisks: SystemicRisk[];  \cf7 // Risks affecting multiple projects\cf3 \
+\
+    \cf7 // Leading Indicators\cf3 \
+    earlyWarningSignals: EarlyWarning[];\
+    portfolioHealthScore: \cf5 number\cf3 ;\
+  \}\
+\
+  \cf4 interface\cf3  RiskCorrelation \{\
+    \cf5 riskType1\cf3 : \cf5 string\cf3 ;\
+    riskType2: \cf5 string\cf3 ;\
+    correlationStrength: \cf5 number\cf3 ;   \cf7 // -1 to 1\cf3 \
+    affectedProjects: \cf5 string\cf3 [];\
+  \}\
+\
+  \cf4 interface\cf3  SystemicRisk \{\
+    \cf5 description\cf3 : \cf5 string\cf3 ;\
+    affectedProjects: \cf5 string\cf3 [];\
+    potentialImpact: \cf5 number\cf3 ;\
+    mitigationStrategy: \cf5 string\cf3 ;\
+  \}\
+\
+  
+\f2\b C2: Enhanced Dashboard Risk Section
+\f0\b0 \
+\
+  Replace the current placeholder risk chart with:\
+\
+  
+\f2\b Portfolio Risk Heat Map:
+\f0\b0 \
+  - 
+\f2\b X-Axis
+\f0\b0 : Risk categories\
+  - 
+\f2\b Y-Axis
+\f0\b0 : Project names\
+  - 
+\f2\b Color Intensity
+\f0\b0 : Risk severity\
+  - 
+\f2\b Interactive
+\f0\b0 : Click through to project risk details\
+\
+  
+\f2\b Risk Trend Dashboard:
+\f0\b0 \
+  - 
+\f2\b Portfolio Risk Score Timeline
+\f0\b0 : Track overall portfolio risk\
+  - 
+\f2\b Risk Category Trends
+\f0\b0 : Show which risk types are increasing/decreasing\
+  - 
+\f2\b Early Warning Indicators
+\f0\b0 : Dashboard alerts for emerging risks\
+  - 
+\f2\b Risk Velocity
+\f0\b0 : How quickly risks are being identified/resolved\
+\
+  
+\f2\b Risk Summary Cards:
+\f0\b0 \
+  - 
+\f2\b Critical Risks
+\f0\b0 : Count and list of highest-priority risks\
+  - 
+\f2\b Risk Concentration
+\f0\b0 : Percentage of portfolio at high risk\
+  - 
+\f2\b Mitigation Progress
+\f0\b0 : Percentage of risks with active mitigation\
+  - 
+\f2\b Risk Resolution Rate
+\f0\b0 : Average time to risk resolution\
+\
+  
+\f2\b C3: Early Warning System
+\f0\b0 \
+\
+  \cf4 interface\cf3  EarlyWarningSystem \{\
+    \cf5 signals\cf3 : EarlyWarningSignal[];\
+    thresholds: RiskThreshold[];\
+    alertRules: AlertRule[];\
+    escalationMatrix: EscalationRule[];\
+  \}\
+\
+  \cf4 interface\cf3  EarlyWarningSignal \{\
+    \cf5 signalType\cf3 : \cf5 string\cf3 ;\
+    description: \cf5 string\cf3 ;\
+    currentValue: \cf5 number\cf3 ;\
+    thresholdValue: \cf5 number\cf3 ;\
+    severity: \cf6 'watch'\cf3  | \cf6 'warning'\cf3  | \cf6 'critical'\cf3 ;\
+    trend: \cf6 'improving'\cf3  | \cf6 'stable'\cf3  | \cf6 'worsening'\cf3 ;\
+    affectedProjects: \cf5 string\cf3 [];\
+    recommendedAction: \cf5 string\cf3 ;\
+  \}\
+\
+  
+\f2\b Alert Types:
+\f0\b0 \
+  - 
+\f2\b Performance Degradation
+\f0\b0 : Variance exceeding thresholds\
+  - 
+\f2\b Forecast Accuracy Decline
+\f0\b0 : Prediction reliability dropping\
+  - 
+\f2\b Financial Risk Escalation
+\f0\b0 : Unit economics deteriorating\
+  - 
+\f2\b Execution Risk Signals
+\f0\b0 : Delivery metrics declining\
+  - 
+\f2\b Market Risk Indicators
+\f0\b0 : Customer metrics worsening\
+\
+  ---\
+  
+\f2\b Phase D: Advanced Risk Analytics (3-4 weeks)
+\f0\b0 \
+\
+  
+\f3\i Predictive risk modeling and advanced analytics
+\f0\i0 \
+\
+  
+\f2\b D1: Predictive Risk Modeling
+\f0\b0 \
+\
+  \cf4 interface\cf3  RiskPredictionModel \{\
+    \cf5 projectId\cf3 : \cf5 string\cf3 ;\
+    predictedRisks: PredictedRisk[];\
+    riskProbabilityForecast: RiskForecast[];\
+    riskImpactProjection: ImpactProjection[];\
+    confidenceInterval: ConfidenceInterval;\
+    modelAccuracy: \cf5 number\cf3 ;\
+  \}\
+\
+  \cf4 interface\cf3  PredictedRisk \{\
+    \cf5 riskType\cf3 : \cf5 string\cf3 ;\
+    probability: \cf5 number\cf3 ;           \cf7 // Predicted probability in next \cf3 \
+  \cf7 30/60/90 days\cf3 \
+    timeToRealization: \cf5 number\cf3 ;     \cf7 // Estimated days until risk \cf3 \
+  \cf7 materializes\cf3 \
+    preventionActions: \cf5 string\cf3 [];   \cf7 // Suggested preventive measures\cf3 \
+    earlyIndicators: \cf5 string\cf3 [];     \cf7 // Metrics to monitor\cf3 \
+  \}\
+\
+  
+\f2\b D2: Risk Scenario Analysis
+\f0\b0 \
+\
+  \cf4 interface\cf3  ScenarioAnalysis \{\
+    \cf5 scenarioName\cf3 : \cf5 string\cf3 ;\
+    description: \cf5 string\cf3 ;\
+    riskModifiers: RiskModifier[];\
+    projectedImpact: ScenarioImpact;\
+    mitigation: ScenarioMitigation;\
+    probability: \cf5 number\cf3 ;\
+  \}\
+\
+  \cf4 interface\cf3  ScenarioImpact \{\
+    \cf5 portfolioRiskChange\cf3 : \cf5 number\cf3 ;\
+    affectedProjects: \cf5 string\cf3 [];\
+    financialImpact: \cf5 number\cf3 ;\
+    timelineImpact: \cf5 number\cf3 ;\
+    resourceImpact: \cf5 number\cf3 ;\
+  \}\
+\
+  
+\f2\b Scenario Types:
+\f0\b0 \
+  - 
+\f2\b Market Downturn
+\f0\b0 : How portfolio risk changes in recession\
+  - 
+\f2\b Key Person Loss
+\f0\b0 : Impact of losing critical team members\
+  - 
+\f2\b Technology Disruption
+\f0\b0 : Effect of new competitive technology\
+  - 
+\f2\b Regulatory Change
+\f0\b0 : Compliance risk impact\
+  - 
+\f2\b Economic Inflation
+\f0\b0 : Cost structure risk implications\
+\
+  
+\f2\b D3: Risk Intelligence Dashboard
+\f0\b0 \
+\
+  
+\f2\b Advanced Visualizations:
+\f0\b0 \
+  - 
+\f2\b Risk Network Graph
+\f0\b0 : Show risk interconnections and dependencies\
+  - 
+\f2\b Risk Timeline
+\f0\b0 : Gantt chart of risk evolution and mitigation\
+  - 
+\f2\b Risk Impact Simulation
+\f0\b0 : Monte Carlo simulation of portfolio outcomes\
+  - 
+\f2\b Risk Optimization
+\f0\b0 : Suggest portfolio rebalancing for optimal\
+  risk/return\
+\
+  
+\f2\b AI-Powered Insights:
+\f0\b0 \
+  - 
+\f2\b Risk Pattern Recognition
+\f0\b0 : Identify recurring risk patterns\
+  - 
+\f2\b Predictive Alerts
+\f0\b0 : AI-generated early warning signals\
+  - 
+\f2\b Mitigation Optimization
+\f0\b0 : Recommend most effective mitigation strategies\
+  - 
+\f2\b Risk Benchmarking
+\f0\b0 : Compare risk profiles against industry standards\
+\
+  ---\
+  
+\f2\b Technical Architecture
+\f0\b0 \
+\
+  
+\f2\b Data Layer Extensions
+\f0\b0 \
+\
+  \cf7 // New database tables/collections\cf3 \
+  \cf4 interface\cf3  RiskDataSchema \{\
+    \cf5 projects_risks\cf3 : ProjectRisk[];\
+    risk_indicators: AutomaticIndicator[];\
+    risk_history: RiskHistoryEntry[];\
+    mitigation_actions: MitigationAction[];\
+    risk_thresholds: RiskThreshold[];\
+    portfolio_risk_snapshots: PortfolioRiskSnapshot[];\
+  \}\
+\
+  
+\f2\b Service Layer Architecture
+\f0\b0 \
+\
+  \cf7 // Core risk services\cf3 \
+  src/services/risk/\
+  \uc0\u9500 \u9472 \u9472  RiskDetectionService.ts        \cf7 // Automatic risk identification\cf3 \
+  \uc0\u9500 \u9472 \u9472  RiskCalculationService.ts      \cf7 // Risk scoring and aggregation\cf3 \
+  \uc0\u9500 \u9472 \u9472  RiskPredictionService.ts       \cf7 // Predictive modeling\cf3 \
+  \uc0\u9500 \u9472 \u9472  RiskAlertService.ts            \cf7 // Alert and notification system\cf3 \
+  \uc0\u9500 \u9472 \u9472  RiskMitigationService.ts       \cf7 // Mitigation tracking\cf3 \
+  \uc0\u9492 \u9472 \u9472  PortfolioRiskService.ts        \cf7 // Portfolio-level analytics\cf3 \
+\
+  \cf7 // Integration services\cf3 \
+  src/services/integration/\
+  \uc0\u9500 \u9472 \u9472  PerformanceRiskIntegration.ts  \cf7 // Link performance data to risks\cf3 \
+  \uc0\u9500 \u9472 \u9472  ForecastRiskIntegration.ts     \cf7 // Link forecast accuracy to risks\cf3 \
+  \uc0\u9492 \u9472 \u9472  HealthScoreIntegration.ts      \cf7 // Integrate risk into health scoring\cf3 \
+\
+  
+\f2\b Component Architecture
+\f0\b0 \
+\
+  src/components/risk/\
+  \uc0\u9500 \u9472 \u9472  project-level/\
+  \uc0\u9474    \u9500 \u9472 \u9472  ProjectRiskDashboard.tsx\
+  \uc0\u9474    \u9500 \u9472 \u9472  RiskAssessmentForm.tsx\
+  \uc0\u9474    \u9500 \u9472 \u9472  RiskHeatMap.tsx\
+  \uc0\u9474    \u9500 \u9472 \u9472  MitigationTracker.tsx\
+  \uc0\u9474    \u9492 \u9472 \u9472  AutomaticIndicators.tsx\
+  \uc0\u9500 \u9472 \u9472  portfolio-level/\
+  \uc0\u9474    \u9500 \u9472 \u9472  PortfolioRiskOverview.tsx\
+  \uc0\u9474    \u9500 \u9472 \u9472  RiskTrendCharts.tsx\
+  \uc0\u9474    \u9500 \u9472 \u9472  EarlyWarningSystem.tsx\
+  \uc0\u9474    \u9492 \u9472 \u9472  RiskCorrelationMap.tsx\
+  \uc0\u9492 \u9472 \u9472  shared/\
+      \uc0\u9500 \u9472 \u9472  RiskCard.tsx\
+      \uc0\u9500 \u9472 \u9472  RiskStatusBadge.tsx\
+      \uc0\u9500 \u9472 \u9472  RiskScoreIndicator.tsx\
+      \uc0\u9492 \u9472 \u9472  RiskCategoryIcon.tsx\
+\
+  
+\f2\b Integration Points
+\f0\b0 \
+\
+  \cf7 // Enhanced Dashboard Integration\cf3 \
+  \cf4 interface\cf3  EnhancedDashboardData \{\
+    \cf5 portfolioMetrics\cf3 : PortfolioMetrics;           \cf7 // Existing\cf3 \
+    forecastAccuracy: ForecastAccuracy[];        \cf7 // New Phase A\cf3 \
+    varianceTrends: VarianceTrend[];             \cf7 // New Phase A\cf3 \
+    projectHealthScores: ProjectHealthScore[];   \cf7 // New Phase A\cf3 \
+    portfolioRiskMetrics: PortfolioRiskMetrics;  \cf7 // New Phase C\cf3 \
+    earlyWarningSignals: EarlyWarningSignal[];   \cf7 // New Phase C\cf3 \
+  \}\
+\
+  \cf7 // Project Detail Integration\cf3 \
+  \cf4 interface\cf3  EnhancedProjectData \{\
+    \cf5 project\cf3 : Project;                            \cf7 // Existing\cf3 \
+    actuals: ActualsPeriodEntry[];              \cf7 // Existing\cf3 \
+    analytics: ProjectAnalytics;                \cf7 // Existing\cf3 \
+    forecastAccuracy: ForecastAccuracy;         \cf7 // New Phase A\cf3 \
+    riskProfile: ProjectRiskProfile;            \cf7 // New Phase B\cf3 \
+    healthScore: ProjectHealthScore;            \cf7 // New Phase A\cf3 \
+  \}\
+\
+  ---\
+  
+\f2\b Implementation Timeline
+\f0\b0 \
+\
+  
+\f2\b Phase A: Advanced Dashboard Analytics (2-3 weeks)
+\f0\b0 \
+\
+  
+\f2\b Week 1:
+\f0\b0 \
+  - Forecast Accuracy Service implementation\
+  - MAPE calculation and accuracy trending\
+  - Dashboard forecast accuracy KPI cards\
+\
+  
+\f2\b Week 2:
+\f0\b0 \
+  - Variance trend analysis implementation\
+  - Trend detection algorithms\
+  - Variance timeline charts\
+\
+  
+\f2\b Week 3:
+\f0\b0 \
+  - Project health scoring foundation\
+  - Health score calculation engine\
+  - Dashboard health score integration\
+\
+  
+\f2\b Phase B: Project-Level Risk Management (3-4 weeks)
+\f0\b0 \
+\
+  
+\f2\b Week 1:
+\f0\b0 \
+  - Risk data model implementation\
+  - Database schema and API endpoints\
+  - Basic risk CRUD operations\
+\
+  
+\f2\b Week 2:
+\f0\b0 \
+  - Risk assessment UI components\
+  - Risk category templates\
+  - Automatic indicator framework\
+\
+  
+\f2\b Week 3:
+\f0\b0 \
+  - Risk detection algorithms\
+  - Automatic risk calculation\
+  - Risk monitoring dashboard\
+\
+  
+\f2\b Week 4:
+\f0\b0 \
+  - Mitigation tracking features\
+  - Risk workflow implementation\
+  - Project risk dashboard completion\
+\
+  
+\f2\b Phase C: Portfolio Risk Dashboard (2-3 weeks)
+\f0\b0 \
+\
+  
+\f2\b Week 1:
+\f0\b0 \
+  - Portfolio risk aggregation service\
+  - Risk correlation analysis\
+  - Enhanced dashboard risk section\
+\
+  
+\f2\b Week 2:
+\f0\b0 \
+  - Early warning system implementation\
+  - Risk alert framework\
+  - Portfolio risk visualization\
+\
+  
+\f2\b Week 3:
+\f0\b0 \
+  - Risk trend analysis\
+  - Dashboard integration testing\
+  - Risk reporting features\
+\
+  
+\f2\b Phase D: Advanced Risk Analytics (3-4 weeks)
+\f0\b0 \
+\
+  
+\f2\b Week 1:
+\f0\b0 \
+  - Risk prediction model foundation\
+  - Scenario analysis framework\
+  - Advanced risk algorithms\
+\
+  
+\f2\b Week 2:
+\f0\b0 \
+  - Risk intelligence dashboard\
+  - Advanced visualizations\
+  - Risk optimization features\
+\
+  
+\f2\b Week 3:
+\f0\b0 \
+  - AI-powered insights\
+  - Risk pattern recognition\
+  - Predictive alert system\
+\
+  
+\f2\b Week 4:
+\f0\b0 \
+  - Risk benchmarking\
+  - Advanced reporting\
+  - Performance optimization\
+\
+  ---\
+  
+\f2\b Success Criteria & Metrics
+\f0\b0 \
+\
+  
+\f2\b Phase A Success Criteria
+\f0\b0 \
+\
+  - \uc0\u9989  Forecast accuracy tracking with MAPE < 15% for stable projects\
+  - \uc0\u9989  Variance trend detection identifying 90%+ of declining projects\
+  - \uc0\u9989  Project health scores correlating with actual project outcomes\
+  - \uc0\u9989  Dashboard showing advanced analytics without performance degradation\
+\
+  
+\f2\b Phase B Success Criteria
+\f0\b0 \
+\
+  - \uc0\u9989  Risk management system adopted by 100% of active projects\
+  - \uc0\u9989  Automatic risk detection identifying 80%+ of actual issues\
+  - \uc0\u9989  Risk mitigation tracking showing measurable improvement\
+  - \uc0\u9989  Average risk resolution time < 30 days for medium-severity risks\
+\
+  
+\f2\b Phase C Success Criteria
+\f0\b0 \
+\
+  - \uc0\u9989  Portfolio risk dashboard providing actionable insights\
+  - \uc0\u9989  Early warning system preventing 70%+ of critical issues\
+  - \uc0\u9989  Risk correlation analysis identifying systemic risks\
+  - \uc0\u9989  Portfolio risk score predicting project outcomes\
+\
+  
+\f2\b Phase D Success Criteria
+\f0\b0 \
+\
+  - \uc0\u9989  Risk prediction model achieving 75%+ accuracy\
+  - \uc0\u9989  Scenario analysis supporting strategic planning decisions\
+  - \uc0\u9989  AI insights reducing manual risk assessment time by 60%\
+  - \uc0\u9989  Risk optimization improving portfolio risk/return ratio\
+\
+  ---\
+  
+\f2\b Value Proposition for Product Managers
+\f0\b0 \
+\
+  
+\f2\b Immediate Value (Phase A-B)
+\f0\b0 \
+\
+  - 
+\f2\b See Real Performance
+\f0\b0 : Actual vs projected data with forecast accuracy\
+  - 
+\f2\b Identify Problems Early
+\f0\b0 : Automatic risk detection from performance data\
+  - 
+\f2\b Track What Matters
+\f0\b0 : Risk categories relevant to product management\
+  - 
+\f2\b Save Time
+\f0\b0 : Automated risk calculation and monitoring\
+\
+  
+\f2\b Strategic Value (Phase C-D)
+\f0\b0 \
+\
+  - 
+\f2\b Portfolio Optimization
+\f0\b0 : Understand risk distribution across projects\
+  - 
+\f2\b Predictive Insights
+\f0\b0 : See problems before they impact performance\
+  - 
+\f2\b Data-Driven Decisions
+\f0\b0 : Risk-adjusted portfolio planning\
+  - 
+\f2\b Competitive Advantage
+\f0\b0 : Better risk management than manual processes\
+\
+  
+\f2\b ROI Justification
+\f0\b0 \
+\
+  - 
+\f2\b Problem Prevention
+\f0\b0 : Early risk detection prevents cost overruns\
+  - 
+\f2\b Resource Optimization
+\f0\b0 : Better allocation based on risk-adjusted returns\
+  - 
+\f2\b Decision Speed
+\f0\b0 : Faster go/no-go decisions with integrated risk data\
+  - 
+\f2\b Audit Trail
+\f0\b0 : Complete risk assessment history for stakeholder reporting\
+\
+  ---\
+  This integrated plan transforms the dashboard from a performance\
+  monitoring tool into a comprehensive product management platform that\
+  combines analytics with proactive risk management. The phased approach\
+  ensures we build on the solid foundation we've already created while\
+  adding the sophisticated risk management capabilities that product\
+  managers actually need.\
+\
+}

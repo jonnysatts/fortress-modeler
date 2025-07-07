@@ -79,10 +79,22 @@ export class DashboardAnalyticsService {
         });
       }
 
-      // Calculate projected annual revenue/costs for comparison
+      // Calculate projected annual revenue/costs from assumptions
       project.financialModels?.forEach(model => {
-        totalProjectedRevenue += (model.monthlyRevenue || 0) * 12;
-        totalProjectedCosts += (model.monthlyCosts || 0) * 12;
+        // Calculate monthly revenue from revenue streams
+        const monthlyRevenue = model.assumptions?.revenue?.reduce((total, stream) => {
+          const frequencyMultiplier = this.getFrequencyMultiplier(stream.frequency || 'monthly');
+          return total + (stream.value * frequencyMultiplier);
+        }, 0) || 0;
+        
+        // Calculate monthly costs from cost categories
+        const monthlyCosts = model.assumptions?.costs?.reduce((total, cost) => {
+          // Cost categories don't have frequency, assume monthly
+          return total + cost.value;
+        }, 0) || 0;
+        
+        totalProjectedRevenue += monthlyRevenue * 12;
+        totalProjectedCosts += monthlyCosts * 12;
       });
     });
 
@@ -168,9 +180,20 @@ export class DashboardAnalyticsService {
         // Add projected data for comparison (normalized to period)
         if (project?.financialModels) {
           project.financialModels.forEach(model => {
+            // Calculate monthly revenue from revenue streams
+            const monthlyRevenue = model.assumptions?.revenue?.reduce((total, stream) => {
+              const frequencyMultiplier = this.getFrequencyMultiplier(stream.frequency || 'monthly');
+              return total + (stream.value * frequencyMultiplier);
+            }, 0) || 0;
+            
+            // Calculate monthly costs from cost categories
+            const monthlyCosts = model.assumptions?.costs?.reduce((total, cost) => {
+              return total + cost.value;
+            }, 0) || 0;
+
             const periodMultiplier = actual.periodType === 'Week' ? 1/4 : 1; // Approximate weeks to months
-            periodData.projectedRevenue += (model.monthlyRevenue || 0) * periodMultiplier;
-            periodData.projectedCosts += (model.monthlyCosts || 0) * periodMultiplier;
+            periodData.projectedRevenue += monthlyRevenue * periodMultiplier;
+            periodData.projectedCosts += monthlyCosts * periodMultiplier;
           });
         }
 
@@ -241,13 +264,24 @@ export class DashboardAnalyticsService {
         lastActualPeriod = this.formatPeriodKey(latestActual.period, latestActual.periodType);
       }
 
-      // Calculate projected metrics
+      // Calculate projected metrics from assumptions
       let projectedRevenue = 0;
       let projectedCosts = 0;
       
       project.financialModels?.forEach(model => {
-        projectedRevenue += (model.monthlyRevenue || 0) * 12;
-        projectedCosts += (model.monthlyCosts || 0) * 12;
+        // Calculate monthly revenue from revenue streams
+        const monthlyRevenue = model.assumptions?.revenue?.reduce((total, stream) => {
+          const frequencyMultiplier = this.getFrequencyMultiplier(stream.frequency || 'monthly');
+          return total + (stream.value * frequencyMultiplier);
+        }, 0) || 0;
+        
+        // Calculate monthly costs from cost categories
+        const monthlyCosts = model.assumptions?.costs?.reduce((total, cost) => {
+          return total + cost.value;
+        }, 0) || 0;
+        
+        projectedRevenue += monthlyRevenue * 12;
+        projectedCosts += monthlyCosts * 12;
       });
 
       const actualProfit = actualRevenue - actualCosts;
@@ -277,6 +311,20 @@ export class DashboardAnalyticsService {
         periodsWithData: projectActuals.length
       };
     });
+  }
+
+  /**
+   * Get frequency multiplier to convert to monthly amounts
+   */
+  private static getFrequencyMultiplier(frequency: 'weekly' | 'monthly' | 'quarterly' | 'annually' | 'one-time'): number {
+    switch (frequency) {
+      case 'weekly': return 4.33; // ~4.33 weeks per month
+      case 'monthly': return 1;
+      case 'quarterly': return 1/3; // Quarterly to monthly
+      case 'annually': return 1/12; // Annual to monthly
+      case 'one-time': return 1/12; // Spread one-time over 12 months for annual calc
+      default: return 1;
+    }
   }
 
   /**

@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMyProjects } from '@/hooks/useProjects';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
-import { ActualsPeriodEntry } from '@/types/models';
+import { ActualsPeriodEntry, FinancialModel } from '@/types/models';
 import { DashboardAnalyticsService, PortfolioMetrics, PeriodPerformance, ProjectPerformance } from '@/services/DashboardAnalyticsService';
 import { SupabaseStorageService } from '@/services/implementations/SupabaseStorageService';
-import { getActualsForProject } from '@/lib/db';
+import { getActualsForProject, getModelsByProjectId } from '@/lib/db';
 import { isCloudModeEnabled } from '@/config/app.config';
 
 /**
@@ -38,37 +38,50 @@ export const usePortfolioAnalytics = () => {
         };
       }
 
-      // Fetch actuals data for all projects
-      const allActualsPromises = projects.map(async (project) => {
+      // Fetch both actuals and financial models for all projects
+      const allProjectDataPromises = projects.map(async (project) => {
         let actuals: ActualsPeriodEntry[] = [];
+        let financialModels: FinancialModel[] = [];
         
         try {
           if (isCloudModeEnabled()) {
             const supabaseStorage = new SupabaseStorageService();
             actuals = await supabaseStorage.getActualsForProject(project.id);
+            financialModels = await supabaseStorage.getModelsForProject(project.id);
           } else {
             actuals = await getActualsForProject(project.id);
+            financialModels = await getModelsByProjectId(project.id);
           }
         } catch (error) {
-          console.warn(`Failed to fetch actuals for project ${project.id}:`, error);
+          console.warn(`Failed to fetch data for project ${project.id}:`, error);
           actuals = [];
+          financialModels = [];
         }
 
-        return { projectId: project.id, actuals };
+        return { 
+          projectId: project.id, 
+          project,
+          actuals,
+          financialModels
+        };
       });
 
-      const actualsResults = await Promise.all(allActualsPromises);
+      const projectDataResults = await Promise.all(allProjectDataPromises);
       
       // Convert to Record format for the analytics service
       const allActuals: Record<string, ActualsPeriodEntry[]> = {};
-      actualsResults.forEach(({ projectId, actuals }) => {
+      const projectsWithModels = projectDataResults.map(({ project, financialModels, actuals, projectId }) => {
         allActuals[projectId] = actuals;
+        return {
+          ...project,
+          financialModels
+        };
       });
 
-      // Calculate analytics using the service
-      const portfolioMetrics = DashboardAnalyticsService.calculatePortfolioMetrics(projects, allActuals);
-      const periodPerformance = DashboardAnalyticsService.generatePeriodPerformance(projects, allActuals);
-      const projectPerformance = DashboardAnalyticsService.calculateProjectPerformance(projects, allActuals);
+      // Calculate analytics using the service with projects that include financial models
+      const portfolioMetrics = DashboardAnalyticsService.calculatePortfolioMetrics(projectsWithModels, allActuals);
+      const periodPerformance = DashboardAnalyticsService.generatePeriodPerformance(projectsWithModels, allActuals);
+      const projectPerformance = DashboardAnalyticsService.calculateProjectPerformance(projectsWithModels, allActuals);
 
       return {
         portfolioMetrics,
