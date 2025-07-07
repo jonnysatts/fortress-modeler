@@ -81,20 +81,32 @@ export class DashboardAnalyticsService {
 
       // Calculate projected annual revenue/costs from assumptions
       project.financialModels?.forEach(model => {
+        console.log('🔍 [Analytics Debug] Processing model:', model.name);
+        console.log('🔍 [Analytics Debug] Revenue streams:', model.assumptions?.revenue);
+        console.log('🔍 [Analytics Debug] Cost categories:', model.assumptions?.costs);
+        
         // Calculate monthly revenue from revenue streams
         const monthlyRevenue = model.assumptions?.revenue?.reduce((total, stream) => {
           const frequencyMultiplier = this.getFrequencyMultiplier(stream.frequency || 'monthly');
-          return total + (stream.value * frequencyMultiplier);
+          const streamMonthly = stream.value * frequencyMultiplier;
+          console.log(`🔍 [Analytics Debug] Revenue stream: ${stream.name} = $${stream.value} (${stream.frequency}) → $${streamMonthly}/month`);
+          return total + streamMonthly;
         }, 0) || 0;
         
         // Calculate monthly costs from cost categories
         const monthlyCosts = model.assumptions?.costs?.reduce((total, cost) => {
-          // Cost categories don't have frequency, assume monthly
+          console.log(`🔍 [Analytics Debug] Cost category: ${cost.name} = $${cost.value}/month`);
           return total + cost.value;
         }, 0) || 0;
         
-        totalProjectedRevenue += monthlyRevenue * 12;
-        totalProjectedCosts += monthlyCosts * 12;
+        const modelAnnualRevenue = monthlyRevenue * 12;
+        const modelAnnualCosts = monthlyCosts * 12;
+        
+        console.log(`🔍 [Analytics Debug] Model ${model.name}: Monthly Rev=$${monthlyRevenue}, Annual Rev=$${modelAnnualRevenue}`);
+        console.log(`🔍 [Analytics Debug] Model ${model.name}: Monthly Costs=$${monthlyCosts}, Annual Costs=$${modelAnnualCosts}`);
+        
+        totalProjectedRevenue += modelAnnualRevenue;
+        totalProjectedCosts += modelAnnualCosts;
       });
     });
 
@@ -117,6 +129,12 @@ export class DashboardAnalyticsService {
     const actualsDataCompleteness = projects.length > 0 
       ? (projectsWithActuals / projects.length) * 100 
       : 0;
+
+    console.log('🔍 [Analytics Debug] FINAL TOTALS:');
+    console.log(`🔍 [Analytics Debug] Total Projected Revenue: $${totalProjectedRevenue}`);
+    console.log(`🔍 [Analytics Debug] Total Projected Costs: $${totalProjectedCosts}`);
+    console.log(`🔍 [Analytics Debug] Total Actual Revenue: $${totalActualRevenue}`);
+    console.log(`🔍 [Analytics Debug] Total Actual Costs: $${totalActualCosts}`);
 
     return {
       totalActualRevenue,
