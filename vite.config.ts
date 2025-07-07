@@ -46,52 +46,16 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     rollupOptions: {
-      output: {
-        manualChunks: (id) => {
-          // Third-party vendor libraries
-          if (id.includes('node_modules')) {
-            // Large libraries get their own chunks
-            if (id.includes('recharts')) return 'charts';
-            if (id.includes('react-router-dom')) return 'router';
-            if (id.includes('dexie')) return 'database';
-            if (id.includes('zustand')) return 'state';
-            
-            // Group Radix UI components
-            if (id.includes('@radix-ui')) return 'radix-ui';
-            
-            // Form libraries
-            if (id.includes('react-hook-form') || id.includes('@hookform') || id.includes('zod')) {
-              return 'forms';
-            }
-            
-            // Core React libraries and React ecosystem
-            if (id.includes('react') || id.includes('react-dom') || 
-                id.includes('@tanstack/react-query') || id.includes('react-router')) {
-              return 'react-vendor';
-            }
-            
-            // Utility libraries
-            if (id.includes('date-fns') || id.includes('lucide-react') || 
-                id.includes('clsx') || id.includes('tailwind-merge')) {
-              return 'utils';
-            }
-            
-            // Everything else goes to vendor
-            return 'vendor';
-          }
-          
-          // Application code chunking
-          if (id.includes('src/components/ui/')) return 'ui-components';
-          if (id.includes('src/components/models/')) return 'model-components';
-          if (id.includes('src/pages/')) return 'pages';
-          if (id.includes('src/hooks/')) return 'hooks';
-          if (id.includes('src/lib/')) return 'lib';
-          if (id.includes('src/services/')) return 'services';
-        },
-        // Optimize chunk naming for better caching
-        chunkFileNames: mode === 'production' ? 'assets/[name]-[hash].js' : 'assets/[name].js',
-        entryFileNames: mode === 'production' ? 'assets/[name]-[hash].js' : 'assets/[name].js',
-        assetFileNames: mode === 'production' ? 'assets/[name]-[hash][extname]' : 'assets/[name][extname]',
+      output: mode === 'production' ? {
+        // Disable code splitting for production to avoid React context issues
+        manualChunks: undefined,
+        inlineDynamicImports: true,
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
+      } : {
+        chunkFileNames: 'assets/[name].js',
+        entryFileNames: 'assets/[name].js',
+        assetFileNames: 'assets/[name][extname]',
       }
     },
     chunkSizeWarningLimit: 800,
