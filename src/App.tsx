@@ -11,7 +11,7 @@ import { PerformanceMonitorWidget } from "./components/PerformanceMonitor";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 // Lazy load components for code splitting
-const Dashboard = lazy(() => import("./pages/SafeDashboard"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
 const ProjectsList = lazy(() => import("./pages/projects/ProjectsList"));
 const NewProject = lazy(() => import("./pages/projects/NewProject"));
 const ProjectDetail = lazy(() => import("./pages/projects/ProjectDetail"));
