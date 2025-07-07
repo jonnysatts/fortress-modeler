@@ -4,7 +4,7 @@ import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { ActualsPeriodEntry, FinancialModel } from '@/types/models';
 import { DashboardAnalyticsService, PortfolioMetrics, PeriodPerformance, ProjectPerformance } from '@/services/DashboardAnalyticsService';
 import { SupabaseStorageService } from '@/services/implementations/SupabaseStorageService';
-import { getActualsForProject, getModelsByProjectId } from '@/lib/db';
+import { getActualsForProject, getModelsForProject } from '@/lib/db';
 import { isCloudModeEnabled } from '@/config/app.config';
 
 /**
@@ -50,7 +50,7 @@ export const usePortfolioAnalytics = () => {
             financialModels = await supabaseStorage.getModelsForProject(project.id);
           } else {
             actuals = await getActualsForProject(project.id);
-            financialModels = await getModelsByProjectId(project.id);
+            financialModels = await getModelsForProject(project.id);
           }
         } catch (error) {
           console.warn(`Failed to fetch data for project ${project.id}:`, error);
