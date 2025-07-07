@@ -85,25 +85,23 @@ export class DashboardAnalyticsService {
         console.log('🔍 [Analytics Debug] Revenue streams:', model.assumptions?.revenue);
         console.log('🔍 [Analytics Debug] Cost categories:', model.assumptions?.costs);
         
-        // Calculate monthly revenue from revenue streams
-        const monthlyRevenue = model.assumptions?.revenue?.reduce((total, stream) => {
-          const frequencyMultiplier = this.getFrequencyMultiplier(stream.frequency || 'monthly');
-          const streamMonthly = stream.value * frequencyMultiplier;
-          console.log(`🔍 [Analytics Debug] Revenue stream: ${stream.name} = $${stream.value} (${stream.frequency}) → $${streamMonthly}/month`);
-          return total + streamMonthly;
+        // Calculate weekly revenue from revenue streams (values are already correct)
+        const weeklyRevenue = model.assumptions?.revenue?.reduce((total, stream) => {
+          console.log(`🔍 [Analytics Debug] Revenue stream: ${stream.name} = $${stream.value}/week (${stream.frequency})`);
+          return total + stream.value;
         }, 0) || 0;
         
-        // Calculate monthly costs from cost categories
-        const monthlyCosts = model.assumptions?.costs?.reduce((total, cost) => {
-          console.log(`🔍 [Analytics Debug] Cost category: ${cost.name} = $${cost.value}/month`);
+        // Calculate weekly costs from cost categories (assuming they're also weekly)
+        const weeklyCosts = model.assumptions?.costs?.reduce((total, cost) => {
+          console.log(`🔍 [Analytics Debug] Cost category: ${cost.name} = $${cost.value}/week`);
           return total + cost.value;
         }, 0) || 0;
         
-        const modelAnnualRevenue = monthlyRevenue * 12;
-        const modelAnnualCosts = monthlyCosts * 12;
+        const modelAnnualRevenue = weeklyRevenue * 52;
+        const modelAnnualCosts = weeklyCosts * 52;
         
-        console.log(`🔍 [Analytics Debug] Model ${model.name}: Monthly Rev=$${monthlyRevenue}, Annual Rev=$${modelAnnualRevenue}`);
-        console.log(`🔍 [Analytics Debug] Model ${model.name}: Monthly Costs=$${monthlyCosts}, Annual Costs=$${modelAnnualCosts}`);
+        console.log(`🔍 [Analytics Debug] Model ${model.name}: Weekly Rev=$${weeklyRevenue}, Annual Rev=$${modelAnnualRevenue}`);
+        console.log(`🔍 [Analytics Debug] Model ${model.name}: Weekly Costs=$${weeklyCosts}, Annual Costs=$${modelAnnualCosts}`);
         
         totalProjectedRevenue += modelAnnualRevenue;
         totalProjectedCosts += modelAnnualCosts;
@@ -198,20 +196,19 @@ export class DashboardAnalyticsService {
         // Add projected data for comparison (normalized to period)
         if (project?.financialModels) {
           project.financialModels.forEach(model => {
-            // Calculate monthly revenue from revenue streams
-            const monthlyRevenue = model.assumptions?.revenue?.reduce((total, stream) => {
-              const frequencyMultiplier = this.getFrequencyMultiplier(stream.frequency || 'monthly');
-              return total + (stream.value * frequencyMultiplier);
+            // Calculate weekly revenue from revenue streams (values are already correct)
+            const weeklyRevenue = model.assumptions?.revenue?.reduce((total, stream) => {
+              return total + stream.value;
             }, 0) || 0;
             
-            // Calculate monthly costs from cost categories
-            const monthlyCosts = model.assumptions?.costs?.reduce((total, cost) => {
+            // Calculate weekly costs from cost categories
+            const weeklyCosts = model.assumptions?.costs?.reduce((total, cost) => {
               return total + cost.value;
             }, 0) || 0;
 
-            const periodMultiplier = actual.periodType === 'Week' ? 1/4 : 1; // Approximate weeks to months
-            periodData.projectedRevenue += monthlyRevenue * periodMultiplier;
-            periodData.projectedCosts += monthlyCosts * periodMultiplier;
+            const periodMultiplier = actual.periodType === 'Week' ? 1 : 4.33; // Week to week, or week to month
+            periodData.projectedRevenue += weeklyRevenue * periodMultiplier;
+            periodData.projectedCosts += weeklyCosts * periodMultiplier;
           });
         }
 
@@ -287,19 +284,18 @@ export class DashboardAnalyticsService {
       let projectedCosts = 0;
       
       project.financialModels?.forEach(model => {
-        // Calculate monthly revenue from revenue streams
-        const monthlyRevenue = model.assumptions?.revenue?.reduce((total, stream) => {
-          const frequencyMultiplier = this.getFrequencyMultiplier(stream.frequency || 'monthly');
-          return total + (stream.value * frequencyMultiplier);
+        // Calculate weekly revenue from revenue streams (values are already correct)
+        const weeklyRevenue = model.assumptions?.revenue?.reduce((total, stream) => {
+          return total + stream.value;
         }, 0) || 0;
         
-        // Calculate monthly costs from cost categories
-        const monthlyCosts = model.assumptions?.costs?.reduce((total, cost) => {
+        // Calculate weekly costs from cost categories
+        const weeklyCosts = model.assumptions?.costs?.reduce((total, cost) => {
           return total + cost.value;
         }, 0) || 0;
         
-        projectedRevenue += monthlyRevenue * 12;
-        projectedCosts += monthlyCosts * 12;
+        projectedRevenue += weeklyRevenue * 52;
+        projectedCosts += weeklyCosts * 52;
       });
 
       const actualProfit = actualRevenue - actualCosts;
@@ -331,19 +327,6 @@ export class DashboardAnalyticsService {
     });
   }
 
-  /**
-   * Get frequency multiplier to convert to monthly amounts
-   */
-  private static getFrequencyMultiplier(frequency: 'weekly' | 'monthly' | 'quarterly' | 'annually' | 'one-time'): number {
-    switch (frequency) {
-      case 'weekly': return 4.33; // ~4.33 weeks per month
-      case 'monthly': return 1;
-      case 'quarterly': return 1/3; // Quarterly to monthly
-      case 'annually': return 1/12; // Annual to monthly
-      case 'one-time': return 1/12; // Spread one-time over 12 months for annual calc
-      default: return 1;
-    }
-  }
 
   /**
    * Format period for consistent display
