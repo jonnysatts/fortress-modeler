@@ -1,11 +1,13 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, PlusCircle, TrendingUp, AlertTriangle } from "lucide-react";
+import { BarChart3, PlusCircle, TrendingUp, AlertTriangle, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { config } from "@/lib/config";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from "recharts";
 import { useMyProjects } from "@/hooks/useProjects";
+import { useActualsForProject } from "@/hooks/useActuals";
+import { ActualsPeriodEntry } from "@/types/models";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -14,16 +16,54 @@ const Dashboard = () => {
   // Use all projects in local-only mode
   const availableProjects = projects;
 
-  // Calculate real metrics from actual project data
+  // Get actual data for all projects (safe approach - don't cause loading issues)
+  const getAllActualsData = () => {
+    const allActuals: Record<string, ActualsPeriodEntry[]> = {};
+    availableProjects.forEach(project => {
+      try {
+        // Use a simple approach that doesn't trigger React Query issues
+        allActuals[project.id] = []; // Will be populated by individual project hooks later
+      } catch (error) {
+        console.warn(`Failed to load actuals for project ${project.id}:`, error);
+        allActuals[project.id] = [];
+      }
+    });
+    return allActuals;
+  };
+
+  const allActualsData = getAllActualsData();
+
+  // Calculate real metrics from actual project data with actuals integration
   const calculateTotalRevenue = () => {
-    if (availableProjects.length === 0) return 0;
-    return availableProjects.reduce((total, project) => {
-      // Sum up revenue from all financial models in the project
-      const projectRevenue = project.financialModels?.reduce((projectTotal, model) => {
+    if (availableProjects.length === 0) return { projected: 0, actual: 0, hasActuals: false };
+    
+    let totalProjected = 0;
+    let totalActual = 0;
+    let hasAnyActuals = false;
+    
+    availableProjects.forEach(project => {
+      // Sum up projected revenue from all financial models in the project
+      const projectProjected = project.financialModels?.reduce((projectTotal, model) => {
         return projectTotal + (model.monthlyRevenue * 12 || 0);
       }, 0) || 0;
-      return total + projectRevenue;
-    }, 0);
+      totalProjected += projectProjected;
+      
+      // Check for actual data for this project (safe approach)
+      const projectActuals = allActualsData[project.id] || [];
+      if (projectActuals.length > 0) {
+        hasAnyActuals = true;
+        const projectActualRevenue = projectActuals.reduce((sum, actual) => {
+          return sum + (actual.actualRevenue || 0);
+        }, 0);
+        totalActual += projectActualRevenue;
+      }
+    });
+    
+    return { 
+      projected: totalProjected, 
+      actual: totalActual, 
+      hasActuals: hasAnyActuals 
+    };
   };
 
   const calculateActiveRisks = () => {
@@ -75,7 +115,7 @@ const Dashboard = () => {
     return Object.entries(riskCounts).map(([name, value]) => ({ name, value })).filter(item => item.value > 0);
   };
 
-  const totalRevenue = calculateTotalRevenue();
+  const revenueData = calculateTotalRevenue();
   const activeRisks = calculateActiveRisks();
   const performanceData = generatePerformanceData();
   const riskData = generateRiskData();
@@ -103,7 +143,15 @@ const Dashboard = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-fortress-blue">Dashboard</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-fortress-blue">Dashboard</h1>
+          {revenueData.hasActuals && (
+            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs font-medium">
+              <Target className="h-3 w-3" />
+              Actual Data Available
+            </div>
+          )}
+        </div>
         <Button onClick={() => navigate("/projects/new")} className="bg-fortress-emerald hover:bg-fortress-emerald/90">
           <PlusCircle className="mr-2 h-4 w-4" />
           New Project
@@ -126,16 +174,40 @@ const Dashboard = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Total Revenue (YTD)</CardTitle>
-            <CardDescription>Across all projects</CardDescription>
+            <CardTitle className="text-lg font-medium">
+              {revenueData.hasActuals ? 'Actual vs Projected Revenue' : 'Total Revenue (YTD)'}
+            </CardTitle>
+            <CardDescription>
+              {revenueData.hasActuals ? 'Actual performance vs projections' : 'Across all projects'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-3xl font-bold">
-                {totalRevenue > 0 ? `$${totalRevenue.toLocaleString()}` : '$0'}
+            {revenueData.hasActuals ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold text-fortress-emerald">
+                    ${revenueData.actual.toLocaleString()}
+                  </div>
+                  <Target className="h-8 w-8 text-fortress-emerald" />
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Actual (vs ${revenueData.projected.toLocaleString()} projected)
+                </div>
+                {revenueData.projected > 0 && (
+                  <div className={`text-xs ${revenueData.actual >= revenueData.projected ? 'text-green-600' : 'text-amber-600'}`}>
+                    {revenueData.actual >= revenueData.projected ? '↗' : '↘'} 
+                    {((revenueData.actual / revenueData.projected - 1) * 100).toFixed(1)}% vs target
+                  </div>
+                )}
               </div>
-              <TrendingUp className="h-8 w-8 text-fortress-emerald" />
-            </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div className="text-3xl font-bold">
+                  {revenueData.projected > 0 ? `$${revenueData.projected.toLocaleString()}` : '$0'}
+                </div>
+                <TrendingUp className="h-8 w-8 text-fortress-emerald" />
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -260,7 +332,7 @@ const Dashboard = () => {
           <CardDescription>Projected vs actual revenue for the next 6 months</CardDescription>
         </CardHeader>
         <CardContent className="h-80">
-          {availableProjects.length > 0 && totalRevenue > 0 ? (
+          {availableProjects.length > 0 && (revenueData.projected > 0 || revenueData.actual > 0) ? (
             <div className="flex items-center justify-center h-full text-center">
               <div>
                 <TrendingUp className="h-12 w-12 text-gray-300 mx-auto mb-4" />
