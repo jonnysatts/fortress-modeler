@@ -10,22 +10,47 @@ export default function AuthCallback() {
   const [message, setMessage] = useState('Processing authentication...');
 
   useEffect(() => {
+    console.log('AuthCallback component mounted');
+    console.log('Current location:', window.location);
+    
     const handleAuthCallback = async () => {
       try {
+        // Add a small delay to ensure the page is fully loaded
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        console.log('Starting auth callback handling...');
+        
         // Get the current URL hash which contains the auth tokens
         const hash = window.location.hash;
+        const searchParams = new URLSearchParams(window.location.search);
+        
         console.log('Auth callback - URL hash:', hash);
+        console.log('Auth callback - Search params:', window.location.search);
         console.log('Auth callback - Full URL:', window.location.href);
         
-        if (hash) {
+        // Check for error in URL params first
+        const error = searchParams.get('error');
+        const errorDescription = searchParams.get('error_description');
+        
+        if (error) {
+          throw new Error(`Auth error: ${error} - ${errorDescription}`);
+        }
+        
+        if (hash || searchParams.has('code')) {
+          console.log('Found auth data, getting session...');
+          
           // Supabase will automatically handle the callback
           const { data, error } = await supabase.auth.getSession();
+          
+          console.log('Session data:', data);
+          console.log('Session error:', error);
           
           if (error) {
             throw error;
           }
           
           if (data.session) {
+            console.log('Session found, redirecting...');
             setStatus('success');
             setMessage('Authentication successful! Redirecting...');
             
@@ -34,10 +59,10 @@ export default function AuthCallback() {
               navigate('/migration');
             }, 2000);
           } else {
-            throw new Error('No session found');
+            throw new Error('No session found after callback');
           }
         } else {
-          throw new Error('No authentication data found');
+          throw new Error('No authentication data found in URL');
         }
       } catch (error) {
         console.error('Auth callback error:', error);
@@ -47,7 +72,7 @@ export default function AuthCallback() {
         // Redirect to migration page after error
         setTimeout(() => {
           navigate('/migration');
-        }, 3000);
+        }, 5000);
       }
     };
 
@@ -84,7 +109,7 @@ export default function AuthCallback() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle>Authentication</CardTitle>
+          <CardTitle>Authentication Callback</CardTitle>
           <CardDescription>
             Completing your sign-in process
           </CardDescription>
@@ -105,6 +130,11 @@ export default function AuthCallback() {
                 Redirecting back to migration page...
               </p>
             )}
+            <div className="mt-6 p-4 bg-gray-100 rounded text-xs">
+              <p><strong>Debug info:</strong></p>
+              <p>URL: {window.location.href}</p>
+              <p>Status: {status}</p>
+            </div>
           </div>
         </CardContent>
       </Card>
