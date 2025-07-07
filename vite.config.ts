@@ -54,7 +54,6 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('recharts')) return 'charts';
             if (id.includes('react-router-dom')) return 'router';
             if (id.includes('dexie')) return 'database';
-            if (id.includes('@tanstack/react-query')) return 'react-query';
             if (id.includes('zustand')) return 'state';
             
             // Group Radix UI components
@@ -65,8 +64,9 @@ export default defineConfig(({ mode }) => ({
               return 'forms';
             }
             
-            // Core React libraries
-            if (id.includes('react') || id.includes('react-dom')) {
+            // Core React libraries and React ecosystem
+            if (id.includes('react') || id.includes('react-dom') || 
+                id.includes('@tanstack/react-query') || id.includes('react-router')) {
               return 'react-vendor';
             }
             
