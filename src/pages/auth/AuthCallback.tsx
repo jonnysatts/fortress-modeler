@@ -129,7 +129,11 @@ export default function AuthCallback() {
             hasError: searchParams.has('error')
           });
           
-          throw new Error('No authentication data found in URL');
+          // No auth data found - user might have navigated here directly
+          // Instead of throwing an error, redirect to dashboard silently
+          console.log('No auth data, redirecting to dashboard...');
+          navigate('/', { replace: true });
+          return;
         }
       } catch (error) {
         console.error('Auth callback error:', error);

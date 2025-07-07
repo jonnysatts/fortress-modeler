@@ -10,11 +10,50 @@ import { KPICard, VarianceIndicator } from "@/components/dashboard/KPICard";
 
 const EnhancedDashboard = () => {
   const navigate = useNavigate();
-  const { data: projects = [], isLoading: projectsLoading } = useMyProjects();
-  const { data: analytics, isLoading: analyticsLoading } = usePortfolioAnalytics();
-  const { data: chartData, isLoading: chartLoading } = usePerformanceChartData();
-  const { riskData, totalRisk, projectRisks } = useRiskAnalysis();
-  const { indicators, dataCompleteness, projectsWithActuals, totalProjects } = useVarianceIndicators();
+  
+  // Add error handling for all hooks
+  const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useMyProjects();
+  const { data: analytics, isLoading: analyticsLoading, error: analyticsError } = usePortfolioAnalytics();
+  const { data: chartData = [], isLoading: chartLoading } = usePerformanceChartData();
+  const { riskData = [], totalRisk = 0, projectRisks = [] } = useRiskAnalysis();
+  const { 
+    indicators = [], 
+    dataCompleteness = 0, 
+    projectsWithActuals = 0, 
+    totalProjects = 0 
+  } = useVarianceIndicators();
+
+  // Handle errors
+  if (projectsError || analyticsError) {
+    console.error('Dashboard error:', { projectsError, analyticsError });
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-fortress-blue">Dashboard</h1>
+        </div>
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="pt-6">
+            <div className="flex items-start">
+              <AlertTriangle className="h-5 w-5 text-red-500 mr-3 mt-0.5" />
+              <div>
+                <h4 className="font-medium text-red-800">Error Loading Dashboard</h4>
+                <p className="text-sm text-red-700 mt-1">
+                  {projectsError?.message || analyticsError?.message || 'Failed to load dashboard data. Please refresh the page.'}
+                </p>
+                <Button 
+                  variant="outline" 
+                  className="mt-3"
+                  onClick={() => window.location.reload()}
+                >
+                  Refresh Page
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const isLoading = projectsLoading || analyticsLoading;
 

@@ -10,10 +10,10 @@ import { isCloudModeEnabled } from '@/config/app.config';
  * Hook for portfolio-wide analytics combining actual and projected data
  */
 export const usePortfolioAnalytics = () => {
-  const { data: projects = [], isLoading: projectsLoading } = useMyProjects();
+  const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useMyProjects();
 
   return useQuery({
-    queryKey: ['portfolio-analytics', projects.map(p => p.id)],
+    queryKey: ['portfolio-analytics', projects.map(p => p?.id).filter(Boolean)],
     queryFn: async () => {
       if (projects.length === 0) {
         return {
@@ -74,10 +74,13 @@ export const usePortfolioAnalytics = () => {
         projectPerformance
       };
     },
-    enabled: !projectsLoading && projects.length > 0,
+    enabled: !projectsLoading && !projectsError && projects.length >= 0,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
-    retry: 2,
+    retry: 1,
+    onError: (error) => {
+      console.error('Portfolio analytics error:', error);
+    },
   });
 };
 
