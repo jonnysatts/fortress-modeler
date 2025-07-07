@@ -64,7 +64,7 @@ export function ExportModal({
             Export Financial Report
           </DialogTitle>
           <DialogDescription>
-            Choose the format that best suits your needs. All exports include your current model data and analysis.
+            Choose the format that best suits your needs. All exports include your current scenario data and analysis.
           </DialogDescription>
         </DialogHeader>
         

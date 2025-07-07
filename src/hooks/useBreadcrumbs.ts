@@ -51,7 +51,7 @@ export const useBreadcrumbs = (options: UseBreadcrumbsOptions = {}) => {
         // New model page
         else if (path === `/projects/${projectId}/models/new`) {
           breadcrumbItems.push(createProjectBreadcrumb(projectId, projectName));
-          breadcrumbItems.push(createTabBreadcrumb('New Model'));
+          breadcrumbItems.push(createTabBreadcrumb('New Scenario'));
         }
         // Model detail pages
         else if (modelId && modelName) {
@@ -60,7 +60,7 @@ export const useBreadcrumbs = (options: UseBreadcrumbsOptions = {}) => {
           // Model edit page
           if (path === `/projects/${projectId}/models/${modelId}/edit`) {
             breadcrumbItems.push(createModelBreadcrumb(projectId, modelId, modelName));
-            breadcrumbItems.push(createTabBreadcrumb('Edit Model'));
+            breadcrumbItems.push(createTabBreadcrumb('Edit Scenario'));
           }
           // Model detail page
           else {
@@ -102,7 +102,7 @@ export const useBreadcrumbs = (options: UseBreadcrumbsOptions = {}) => {
 const getTabDisplayName = (tabValue: string): string => {
   const tabNames: Record<string, string> = {
     'overview': 'Overview',
-    'models': 'Models',
+    'models': 'Scenarios',
     'performance': 'Track Performance',
     'analysis': 'Insights',
     'risks': 'Risk Assessment',

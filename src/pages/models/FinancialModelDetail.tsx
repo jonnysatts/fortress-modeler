@@ -311,7 +311,7 @@ const FinancialModelDetail = () => {
             </div>
          </div>
           <div className="flex space-x-2">
-            <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/models/${model.id}/edit`)} disabled={!model.id}><Edit className="mr-1 h-4 w-4" /> Edit</Button>
+            <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/models/${model.id}/edit`)} disabled={!model.id}><Edit className="mr-1 h-4 w-4" /> Edit Scenario</Button>
             <AlertDialog>
                <AlertDialogTrigger asChild><Button variant="destructive" size="sm" disabled={!model.id}><Trash2 className="mr-1 h-4 w-4" /> Delete</Button></AlertDialogTrigger>
                <AlertDialogContent>
@@ -344,7 +344,7 @@ const FinancialModelDetail = () => {
          <TabsContent value="setup" className="space-y-4">
            <Card>
              <CardHeader>
-               <CardTitle>Model Setup & Assumptions</CardTitle>
+               <CardTitle>Scenario Setup & Assumptions</CardTitle>
              </CardHeader>
              <CardContent>
                <div className="space-y-6">
@@ -470,11 +470,11 @@ const FinancialModelDetail = () => {
          <TabsContent value="track-actuals" className="space-y-4">
            <Card>
              <CardHeader>
-               <CardTitle>Model Performance Tracking</CardTitle>
+               <CardTitle>Scenario Performance Tracking</CardTitle>
              </CardHeader>
              <CardContent>
                <p className="text-muted-foreground mb-4">
-                 Track actual performance data for this specific model. For project-level performance tracking across all models, 
+                 Track actual performance data for this specific scenario. For project-level performance tracking across all scenarios, 
                  <span className="text-fortress-blue cursor-pointer hover:underline" onClick={() => navigate(`/projects/${projectId}?tab=performance`)}>
                    go to the project's Track Performance tab
                  </span>.
@@ -483,7 +483,7 @@ const FinancialModelDetail = () => {
                  <div className="mb-4">
                    <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground/50" />
                  </div>
-                 <p>Model-specific actuals tracking coming soon...</p>
+                 <p>Scenario-specific actuals tracking coming soon...</p>
                  <p className="text-sm mt-2">For now, use the project-level performance tracking.</p>
                </div>
              </CardContent>

@@ -196,7 +196,7 @@ const ProjectDetail = () => {
             size="sm"
           >
             <PlusCircle className="mr-1 h-4 w-4" />
-            New Model
+            New Scenario
           </Button>
           <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/edit`)}>
             <Edit className="mr-1 h-4 w-4" />
@@ -238,7 +238,7 @@ const ProjectDetail = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="models">Models</TabsTrigger>
+          <TabsTrigger value="models">Scenarios</TabsTrigger>
           <TabsTrigger value="performance">Track Performance</TabsTrigger>
           <TabsTrigger value="analysis">Insights</TabsTrigger>
           <TabsTrigger value="risks">Risk Assessment</TabsTrigger>
@@ -268,9 +268,9 @@ const ProjectDetail = () => {
         <TabsContent value="models" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Financial Models</CardTitle>
+              <CardTitle>Financial Scenarios</CardTitle>
               <CardDescription>
-                Compare and manage your financial models and projections for this project.
+                Compare and manage your financial scenarios and projections for this project.
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
@@ -280,7 +280,7 @@ const ProjectDetail = () => {
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Primary</TableHead>
-                      <TableHead>Growth Model</TableHead>
+                      <TableHead>Growth Scenario</TableHead>
                       <TableHead>Revenue Streams</TableHead>
                       <TableHead>Cost Categories</TableHead>
                       <TableHead>Created</TableHead>
@@ -362,16 +362,16 @@ const ProjectDetail = () => {
                       <BarChart3 className="h-6 w-6 text-muted-foreground" />
                     </div>
                   </div>
-                  <h3 className="mb-1 text-lg font-medium">No financial models yet</h3>
+                  <h3 className="mb-1 text-lg font-medium">No financial scenarios yet</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Create your first financial model to start projecting revenue and costs.
+                    Create your first financial scenario to start projecting revenue and costs.
                   </p>
                   <Button 
                     className="bg-fortress-emerald hover:bg-fortress-emerald/90"
                     onClick={() => navigate(`/projects/${projectId}/models/new`)}
                   >
                     <PlusCircle className="mr-2 h-4 w-4" />
-                    New Financial Model
+                    New Financial Scenario
                   </Button>
                 </div>
               )}

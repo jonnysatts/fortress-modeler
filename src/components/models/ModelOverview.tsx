@@ -468,13 +468,13 @@ const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverviewProp
       {/* Quick Actions Bar */}
        <div className="flex space-x-2 mb-4 border-b pb-4">
           <Button variant="outline" size="sm" onClick={handleEdit} disabled={!projectId || !model.id}>
-              <Edit className="mr-1 h-4 w-4" /> Edit Model
+              <Edit className="mr-1 h-4 w-4" /> Edit Scenario
           </Button>
           <Button variant="outline" size="sm" onClick={handleDownload}>
               <Download className="mr-1 h-4 w-4" /> Download Report
           </Button>
           <Button variant="outline" size="sm" onClick={handleShare}>
-              <Share2 className="mr-1 h-4 w-4" /> Share Model
+              <Share2 className="mr-1 h-4 w-4" /> Share Scenario
           </Button>
        </div>
 

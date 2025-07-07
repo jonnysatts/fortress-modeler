@@ -129,14 +129,14 @@ export const ProjectOverview: React.FC<ProjectOverviewProps> = ({
         </div>
         <h3 className="mb-2 text-xl font-medium">Welcome to {project.name}</h3>
         <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-          Get started by creating your first financial model to begin tracking projections and performance.
+          Get started by creating your first financial scenario to begin tracking projections and performance.
         </p>
         <Button 
           onClick={onCreateModel}
           className="bg-fortress-emerald hover:bg-fortress-emerald/90"
         >
           <PlusCircle className="mr-2 h-4 w-4" />
-          Create First Financial Model
+          Create First Financial Scenario
         </Button>
       </div>
     );
@@ -158,7 +158,7 @@ export const ProjectOverview: React.FC<ProjectOverviewProps> = ({
               </CardDescription>
             </div>
             <div className="text-right text-sm text-muted-foreground">
-              <div>{aggregateMetrics.modelCount} financial model{aggregateMetrics.modelCount !== 1 ? 's' : ''}</div>
+              <div>{aggregateMetrics.modelCount} financial scenario{aggregateMetrics.modelCount !== 1 ? 's' : ''}</div>
               <div>{aggregateMetrics.periodsTracked} period{aggregateMetrics.periodsTracked !== 1 ? 's' : ''} tracked</div>
             </div>
           </div>
@@ -171,7 +171,7 @@ export const ProjectOverview: React.FC<ProjectOverviewProps> = ({
           title="Projected Revenue"
           value={formatCurrency(aggregateMetrics.totalProjectedRevenue)}
           icon={DollarSign}
-          subtitle="Across all models"
+          subtitle="Across all scenarios"
         />
         <StatCard
           title="Projected Profit"
@@ -201,10 +201,10 @@ export const ProjectOverview: React.FC<ProjectOverviewProps> = ({
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Financial Models</CardTitle>
+              <CardTitle className="text-lg">Financial Scenarios</CardTitle>
               <Button size="sm" onClick={onCreateModel}>
                 <PlusCircle className="mr-2 h-4 w-4" />
-                New Model
+                New Scenario
               </Button>
             </div>
           </CardHeader>
@@ -237,7 +237,7 @@ export const ProjectOverview: React.FC<ProjectOverviewProps> = ({
               </div>
             ) : (
               <div className="text-center py-6 text-muted-foreground">
-                No models created yet
+                No scenarios created yet
               </div>
             )}
           </CardContent>

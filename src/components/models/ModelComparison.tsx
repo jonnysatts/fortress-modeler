@@ -112,8 +112,8 @@ export const ModelComparison: React.FC<ModelComparisonProps> = ({ models, onView
     return (
       <EmptyState
         icon={BarChart3}
-        title="No Models to Compare"
-        description="Create multiple financial models to enable comparison features."
+        title="No Scenarios to Compare"
+        description="Create multiple financial scenarios to enable comparison features."
       />
     );
   }
@@ -124,16 +124,16 @@ export const ModelComparison: React.FC<ModelComparisonProps> = ({ models, onView
         <CardHeader>
           <CardTitle className="flex items-center">
             <BarChart3 className="mr-2 h-5 w-5" />
-            Model Comparison
+            Scenario Comparison
           </CardTitle>
           <CardDescription>
-            You need at least 2 models to enable comparison features.
+            You need at least 2 scenarios to enable comparison features.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
             <p className="text-muted-foreground mb-4">
-              Only one model found. Create additional models to compare different scenarios.
+              Only one scenario found. Create additional scenarios to compare different options.
             </p>
             <Button onClick={() => onViewModel(models[0].id)} variant="outline">
               <Eye className="mr-2 h-4 w-4" />
@@ -152,7 +152,7 @@ export const ModelComparison: React.FC<ModelComparisonProps> = ({ models, onView
         <CardHeader>
           <CardTitle className="flex items-center">
             <BarChart3 className="mr-2 h-5 w-5" />
-            Model Comparison
+            Scenario Comparison
             <HelpTooltip 
               title={helpContent.modelComparison.title}
               content={helpContent.modelComparison.content}
@@ -160,7 +160,7 @@ export const ModelComparison: React.FC<ModelComparisonProps> = ({ models, onView
             />
           </CardTitle>
           <CardDescription>
-            Select up to 4 models to compare their key metrics and performance
+            Select up to 4 scenarios to compare their key metrics and performance
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -195,7 +195,7 @@ export const ModelComparison: React.FC<ModelComparisonProps> = ({ models, onView
           
           {selectedModels.length >= 4 && (
             <p className="text-sm text-muted-foreground mt-4">
-              Maximum of 4 models can be compared at once. Unselect some models to add others.
+              Maximum of 4 scenarios can be compared at once. Unselect some scenarios to add others.
             </p>
           )}
         </CardContent>
@@ -207,7 +207,7 @@ export const ModelComparison: React.FC<ModelComparisonProps> = ({ models, onView
           <CardHeader>
             <CardTitle>Key Metrics Comparison</CardTitle>
             <CardDescription>
-              Side-by-side comparison of financial metrics for selected models
+              Side-by-side comparison of financial metrics for selected scenarios
             </CardDescription>
           </CardHeader>
           <CardContent>

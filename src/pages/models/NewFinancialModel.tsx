@@ -190,10 +190,10 @@ const NewFinancialModel = () => {
         </Button>
         <div>
           <h1 className="text-3xl font-bold text-fortress-blue">
-            New Financial Model
+            New Financial Scenario
           </h1>
           <p className="text-muted-foreground">
-            Create a financial model for {currentProject.name}
+            Create a financial scenario for {currentProject.name}
           </p>
         </div>
       </div>
@@ -202,7 +202,7 @@ const NewFinancialModel = () => {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           <Card>
             <CardHeader>
-              <CardTitle>Model Information</CardTitle>
+              <CardTitle>Scenario Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <FormField
@@ -210,9 +210,9 @@ const NewFinancialModel = () => {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Model Name</FormLabel>
+                    <FormLabel>Scenario Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Base Financial Model" {...field} />
+                      <Input placeholder="Base Financial Scenario" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -225,7 +225,7 @@ const NewFinancialModel = () => {
             <TabsList className="grid grid-cols-3 mb-4">
               <TabsTrigger value="revenue">Revenue Assumptions</TabsTrigger>
               <TabsTrigger value="costs">Cost Assumptions</TabsTrigger>
-              <TabsTrigger value="growth">Growth Model</TabsTrigger>
+              <TabsTrigger value="growth">Growth Scenario</TabsTrigger>
             </TabsList>
 
             <TabsContent value="revenue" className="space-y-4">
@@ -429,7 +429,7 @@ const NewFinancialModel = () => {
             <TabsContent value="growth" className="space-y-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>Growth Model</CardTitle>
+                  <CardTitle>Growth Scenario</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <FormField
@@ -437,14 +437,14 @@ const NewFinancialModel = () => {
                     name="growthModelType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Growth Model Type</FormLabel>
+                        <FormLabel>Growth Scenario Type</FormLabel>
                         <Select
                           onValueChange={field.onChange}
                           defaultValue={field.value}
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select a growth model" />
+                              <SelectValue placeholder="Select a growth scenario" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -516,7 +516,7 @@ const NewFinancialModel = () => {
             </Button>
             <Button type="submit" className="bg-fortress-emerald hover:bg-fortress-emerald/90">
               <Save className="mr-2 h-4 w-4" />
-              Save Model
+              Save Scenario
             </Button>
           </div>
         </form>

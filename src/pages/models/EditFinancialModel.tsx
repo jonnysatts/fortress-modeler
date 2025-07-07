@@ -80,25 +80,25 @@ const EditFinancialModel = () => {
             Edit: {model.name}
           </h1>
           <p className="text-muted-foreground">
-            Edit financial model for {projectName}
+            Edit financial scenario for {projectName}
           </p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Edit Model</CardTitle>
+          <CardTitle>Edit Scenario</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-center py-6">
-            Editor for standard financial models is under development. 
-            Please return to the model view.
+            Editor for standard financial scenarios is under development. 
+            Please return to the scenario view.
           </p>
           <div className="flex justify-center mt-4">
             <Button 
               onClick={() => navigate(`/projects/${projectId}/models/${modelId}`)}
             >
-              Return to Model
+              Return to Scenario
             </Button>
           </div>
         </CardContent>
