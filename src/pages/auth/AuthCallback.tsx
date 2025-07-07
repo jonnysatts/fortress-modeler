@@ -57,27 +57,39 @@ export default function AuthCallback() {
             });
             
             if (accessToken) {
-              // Manually set the session if we have tokens
-              const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken || ''
-              });
-              
-              console.log('Manual session set result:', { sessionData, sessionError });
-              
-              if (sessionError) {
-                throw sessionError;
-              }
-              
-              if (sessionData.session) {
-                console.log('Manual session established, redirecting...');
-                setStatus('success');
-                setMessage('Authentication successful! Redirecting...');
+              try {
+                // Manually set the session if we have tokens
+                const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+                  access_token: accessToken,
+                  refresh_token: refreshToken || ''
+                });
                 
-                setTimeout(() => {
-                  navigate('/migration');
-                }, 2000);
-                return;
+                console.log('Manual session set result:', { sessionData, sessionError });
+                
+                if (sessionError) {
+                  console.log('Session error details:', {
+                    message: sessionError.message,
+                    name: sessionError.name,
+                    cause: sessionError.cause
+                  });
+                  throw sessionError;
+                }
+                
+                if (sessionData.session) {
+                  console.log('Manual session established, redirecting...');
+                  setStatus('success');
+                  setMessage('Authentication successful! Redirecting...');
+                  
+                  setTimeout(() => {
+                    navigate('/migration');
+                  }, 1000);
+                  return;
+                } else {
+                  console.log('No session in sessionData, but continuing...');
+                }
+              } catch (sessionErr) {
+                console.error('Session establishment failed:', sessionErr);
+                // Don't throw here, try the fallback method
               }
             }
           }
