@@ -72,3 +72,62 @@ Important Notes
 - No need for --yolo flag for read-only analysis
 - Gemini's context window can handle entire codebases that would overflow Claude's context
 - When checking implementations, be specific about what you're looking for to get accurate results
+
+# OpenAI Codex MCP Server
+
+The OpenAI Codex MCP server is installed and available for code generation, explanation, and debugging tasks. It provides access to OpenAI's models through specialized methods.
+
+## Available Methods
+
+### write_code
+Generate code for specific tasks with language specification:
+- **Parameters**: `task` (string), `language` (string), `model` (optional)
+- **Example**: "Use OpenAI Codex to write a Python function that calculates prime numbers"
+
+### explain_code
+Get detailed explanations of code functionality:
+- **Parameters**: `code` (string), `model` (optional)
+- **Example**: "Use OpenAI Codex to explain this quicksort algorithm"
+
+### debug_code
+Find and fix bugs in code:
+- **Parameters**: `code` (string), `issue_description` (optional), `model` (optional)
+- **Example**: "Use OpenAI Codex to debug this JavaScript function"
+
+### codex_completion
+General code generation and explanations:
+- **Parameters**: `prompt` (string), `model` (optional), `images` (optional), `additional_args` (optional)
+- **Example**: "Use OpenAI Codex to write a sorting algorithm"
+
+## Available Models
+
+### Reasoning Models (O-series)
+- `o3`: Most powerful reasoning model
+- `o3-mini`: Small alternative to o3
+- `o1`: Previous full o-series reasoning model
+- `o1-mini`: Small alternative to o1
+- `o1-pro`: Version of o1 with more compute
+
+### GPT Models
+- `gpt-4.1`: Flagship GPT model for complex tasks
+- `gpt-4o`: Fast, intelligent, flexible GPT model
+- `gpt-4.1-mini`: Balanced for intelligence, speed, and cost
+- `gpt-4o-mini`: Fast, affordable small model
+
+## When to Use OpenAI Codex
+
+Use OpenAI Codex when:
+- You need a different perspective on code generation
+- Complex algorithmic problems require reasoning models
+- Debugging challenging issues
+- Explaining complex code patterns
+- User specifically requests OpenAI Codex usage
+- Want to compare solutions from different AI models
+
+## Usage Examples
+
+The user can request OpenAI Codex by saying:
+- "Use OpenAI Codex to write a Python sorting function"
+- "Ask OpenAI Codex to explain this algorithm"
+- "Use OpenAI Codex with the o3 model to debug this code"
+- "Can you use OpenAI Codex to generate a React component?"

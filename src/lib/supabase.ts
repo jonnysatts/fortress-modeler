@@ -161,7 +161,31 @@ export const db = {
       .eq('id', userId)
       .single();
     
-    if (error && error.code !== 'PGRST116') throw error;
+    // If profile not found (PGRST116), return null instead of throwing
+    if (error) {
+      if (error.code === 'PGRST116') {
+        console.log('[db.getProfile] Profile not found for user:', userId);
+        return null;
+      }
+      // Only throw for actual errors, not "not found"
+      console.error('[db.getProfile] Error fetching profile:', error);
+      throw error;
+    }
+    return data;
+  },
+
+  // Create user profile
+  async createProfile(profile: any) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .insert(profile)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('[db.createProfile] Error creating profile:', error);
+      throw error;
+    }
     return data;
   },
 

@@ -68,7 +68,8 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
           setUser(initialSession?.user ?? null);
           
           if (initialSession?.user) {
-            console.log('👤 [SupabaseAuth] User found, loading profile...');
+            console.log('👤 [SupabaseAuth] User found, ensuring profile exists...');
+            await ensureUserProfile(initialSession.user);
             await loadUserProfile(initialSession.user.id);
           } else {
             console.log('👤 [SupabaseAuth] No user found in session');
@@ -95,6 +96,7 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
+          await ensureUserProfile(session.user);
           await loadUserProfile(session.user.id);
         } else {
           setProfile(null);
@@ -121,21 +123,11 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       console.log('🔍 [ensureUserProfile] Ensuring profile exists for user:', user.id);
       
       // Try to get existing profile
-      const { data: existingProfile, error: getError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      const existingProfile = await db.getProfile(user.id);
       
       if (existingProfile) {
         console.log('✅ [ensureUserProfile] Profile already exists');
         return existingProfile;
-      }
-      
-      if (getError && getError.code !== 'PGRST116') {
-        // Error other than "not found"
-        console.error('❌ [ensureUserProfile] Error checking for profile:', getError);
-        throw getError;
       }
       
       // Profile doesn't exist, create it
@@ -149,15 +141,11 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         preferences: {}
       };
       
-      const { data: createdProfile, error: createError } = await supabase
-        .from('profiles')
-        .insert(newProfile)
-        .select()
-        .single();
+      const createdProfile = await db.createProfile(newProfile);
       
-      if (createError) {
-        console.error('❌ [ensureUserProfile] Failed to create profile:', createError);
-        throw createError;
+      if (!createdProfile) {
+        console.error('❌ [ensureUserProfile] Failed to create profile');
+        throw new Error('Failed to create profile');
       }
       
       console.log('✅ [ensureUserProfile] Profile created successfully:', createdProfile.id);
@@ -179,8 +167,14 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       );
       
       const profileData = await Promise.race([profilePromise, timeoutPromise]);
-      setProfile(profileData);
-      console.log('✅ [loadUserProfile] Profile loaded successfully:', { userId, hasProfile: !!profileData });
+      
+      if (profileData) {
+        setProfile(profileData);
+        console.log('✅ [loadUserProfile] Profile loaded successfully:', { userId, hasProfile: !!profileData });
+      } else {
+        console.log('⚠️ [loadUserProfile] No profile found for user:', userId);
+        setProfile(null);
+      }
     } catch (error) {
       console.log('⚠️ [loadUserProfile] Failed to load profile (continuing anyway):', { userId, error: error?.message });
       // Don't throw error here - profile might not exist yet, continue without it
