@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FinancialModel } from '@/lib/db';
+import { FinancialModel, setPrimaryFinancialModel } from '@/lib/db';
 import { ActualsPeriodEntry } from '@/types/models';
 import { 
   calculateProjectScenarioAnalysis, 
@@ -24,7 +24,8 @@ import {
   AlertTriangle, 
   Target,
   Eye,
-  PlusCircle 
+  PlusCircle,
+  Loader2
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { HelpTooltip, helpContent } from '@/components/ui/HelpTooltip';
@@ -46,6 +47,24 @@ export const ScenarioOverview: React.FC<ScenarioOverviewProps> = ({
 }) => {
   const scenarioAnalysis = calculateProjectScenarioAnalysis(models, actualsData);
   const [selectedPrimaryId, setSelectedPrimaryId] = useState(scenarioAnalysis.primaryModelId);
+  const [isUpdatingPrimary, setIsUpdatingPrimary] = useState(false);
+
+  // Handle primary model selection with database persistence
+  const handlePrimaryModelChange = async (newPrimaryId: string) => {
+    if (newPrimaryId === selectedPrimaryId) return;
+
+    setIsUpdatingPrimary(true);
+    try {
+      await setPrimaryFinancialModel(newPrimaryId);
+      setSelectedPrimaryId(newPrimaryId);
+      console.log(`✅ Successfully set model ${newPrimaryId} as primary for project ${project.id}`);
+    } catch (error) {
+      console.error('❌ Failed to set primary model:', error);
+      // Optionally show a toast notification here
+    } finally {
+      setIsUpdatingPrimary(false);
+    }
+  };
 
   // Recalculate analysis if primary model changes
   const currentAnalysis = React.useMemo(() => {
@@ -135,9 +154,16 @@ export const ScenarioOverview: React.FC<ScenarioOverviewProps> = ({
             <div className="flex items-center space-x-2">
               <Target className="h-5 w-5 text-fortress-blue" />
               <span className="font-medium">Primary Scenario:</span>
-              <Select value={selectedPrimaryId} onValueChange={setSelectedPrimaryId}>
+              <Select 
+                value={selectedPrimaryId} 
+                onValueChange={handlePrimaryModelChange}
+                disabled={isUpdatingPrimary}
+              >
                 <SelectTrigger className="w-64">
                   <SelectValue />
+                  {isUpdatingPrimary && (
+                    <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                  )}
                 </SelectTrigger>
                 <SelectContent>
                   {currentAnalysis.scenarios.map((scenario) => (
@@ -153,7 +179,7 @@ export const ScenarioOverview: React.FC<ScenarioOverviewProps> = ({
                 </SelectContent>
               </Select>
               <HelpTooltip 
-                content="Choose which scenario to use for detailed charts and analysis. Other scenarios will still be visible in comparisons."
+                content="Choose which scenario to use for dashboard projections and detailed analysis. This selection is saved automatically."
                 side="right"
               />
             </div>

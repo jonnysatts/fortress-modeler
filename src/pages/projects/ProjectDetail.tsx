@@ -1,6 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { ArrowLeft, Edit, Trash2, PlusCircle, BarChart3, AlertTriangle, Building } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, PlusCircle, BarChart3, AlertTriangle, Building, Target, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { FinancialModel, Project } from "@/lib/db";
+import { FinancialModel, Project, setPrimaryFinancialModel } from "@/lib/db";
 import { toast } from "sonner";
 import { useProject, useDeleteProject } from "@/hooks/useProjects";
 import { useModelsForProject } from "@/hooks/useModels";
@@ -70,6 +70,7 @@ const ComponentLoader = ({ message = "Loading..." }: { message?: string }) => (
 const ProjectDetail = () => {
     const { projectId } = useParams<{ projectId: string }>();
     const [selectedModelId, setSelectedModelId] = useState<string>('');
+    const [updatingPrimaryModel, setUpdatingPrimaryModel] = useState<string | null>(null);
 
   const navigate = useNavigate();
 
@@ -87,6 +88,22 @@ const ProjectDetail = () => {
 
   const selectedModel = financialModels.find(m => m.id === selectedModelId) || financialModels[0];
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Handle primary model selection
+  const handleSetPrimaryModel = async (modelId: string) => {
+    setUpdatingPrimaryModel(modelId);
+    try {
+      await setPrimaryFinancialModel(modelId);
+      toast.success('Primary model updated successfully');
+      // Trigger a refetch of models to get updated isPrimary flags
+      window.location.reload(); // Simple approach - could use query invalidation instead
+    } catch (error) {
+      console.error('Failed to set primary model:', error);
+      toast.error('Failed to update primary model');
+    } finally {
+      setUpdatingPrimaryModel(null);
+    }
+  };
   
   // Breadcrumb navigation
   const breadcrumbs = useBreadcrumbs({
@@ -262,6 +279,7 @@ const ProjectDetail = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
+                      <TableHead>Primary</TableHead>
                       <TableHead>Growth Model</TableHead>
                       <TableHead>Revenue Streams</TableHead>
                       <TableHead>Cost Categories</TableHead>
@@ -279,6 +297,35 @@ const ProjectDetail = () => {
                           >
                             {model.name}
                           </Link>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            {model.isPrimary ? (
+                              <Badge variant="default" className="text-xs">
+                                <Target className="mr-1 h-3 w-3" />
+                                Primary
+                              </Badge>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleSetPrimaryModel(model.id);
+                                }}
+                                disabled={updatingPrimaryModel === model.id}
+                              >
+                                {updatingPrimaryModel === model.id ? (
+                                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Target className="mr-1 h-3 w-3" />
+                                )}
+                                Set Primary
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="capitalize">
                           {model.assumptions.growthModel.type}{" "}
