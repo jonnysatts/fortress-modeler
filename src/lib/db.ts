@@ -31,6 +31,7 @@ export interface FinancialModel {
   id: string; // UUID primary key
   projectId: string; // Project UUID reference
   name: string;
+  isPrimary?: boolean; // Whether this model is used for dashboard projections
   assumptions: {
     revenue: RevenueAssumption[];
     costs: CostAssumption[];
@@ -489,6 +490,37 @@ export const deleteFinancialModel = async (id: string): Promise<void> => {
     if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
     logError(error, 'deleteFinancialModel');
     throw new DatabaseError(`Failed to delete financial model with ID ${id}`, error);
+  }
+};
+
+// Set a model as primary for dashboard projections
+export const setPrimaryFinancialModel = async (modelId: string): Promise<void> => {
+  try {
+    if (!modelId?.trim()) {
+      throw new ValidationError('Invalid model ID provided');
+    }
+
+    const model = await getModelById(modelId);
+    if (!model) {
+      throw new NotFoundError(`Financial model with ID ${modelId} not found`);
+    }
+
+    // First, unset any existing primary model for this project
+    const projectModels = await getModelsForProject(model.projectId);
+    for (const projectModel of projectModels) {
+      if (projectModel.isPrimary) {
+        await db.financialModels.update(projectModel.id, { isPrimary: false });
+      }
+    }
+
+    // Set the specified model as primary
+    await db.financialModels.update(modelId, { isPrimary: true });
+    
+    console.log(`✅ Set model ${model.name} as primary for project ${model.projectId}`);
+  } catch (error) {
+    if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
+    logError(error, 'setPrimaryFinancialModel');
+    throw new DatabaseError(`Failed to set primary financial model with ID ${modelId}`, error);
   }
 };
 

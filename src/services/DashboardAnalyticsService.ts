@@ -79,20 +79,21 @@ export class DashboardAnalyticsService {
         });
       }
 
-      // Calculate projected annual revenue/costs from assumptions
-      project.financialModels?.forEach(model => {
-        console.log('🔍 [Analytics Debug] Processing model:', model.name);
-        console.log('🔍 [Analytics Debug] Revenue streams:', model.assumptions?.revenue);
-        console.log('🔍 [Analytics Debug] Cost categories:', model.assumptions?.costs);
+      // Only use primary model for dashboard projections
+      const primaryModel = this.getPrimaryModel(project.financialModels || []);
+      if (primaryModel) {
+        console.log('🔍 [Analytics Debug] Processing PRIMARY model:', primaryModel.name);
+        console.log('🔍 [Analytics Debug] Revenue streams:', primaryModel.assumptions?.revenue);
+        console.log('🔍 [Analytics Debug] Cost categories:', primaryModel.assumptions?.costs);
         
         // Calculate weekly revenue from revenue streams (values are already correct)
-        const weeklyRevenue = model.assumptions?.revenue?.reduce((total, stream) => {
+        const weeklyRevenue = primaryModel.assumptions?.revenue?.reduce((total, stream) => {
           console.log(`🔍 [Analytics Debug] Revenue stream: ${stream.name} = $${stream.value}/week (${stream.frequency})`);
           return total + stream.value;
         }, 0) || 0;
         
         // Calculate weekly costs from cost categories (assuming they're also weekly)
-        const weeklyCosts = model.assumptions?.costs?.reduce((total, cost) => {
+        const weeklyCosts = primaryModel.assumptions?.costs?.reduce((total, cost) => {
           console.log(`🔍 [Analytics Debug] Cost category: ${cost.name} = $${cost.value}/week`);
           return total + cost.value;
         }, 0) || 0;
@@ -100,12 +101,14 @@ export class DashboardAnalyticsService {
         const modelAnnualRevenue = weeklyRevenue * 52;
         const modelAnnualCosts = weeklyCosts * 52;
         
-        console.log(`🔍 [Analytics Debug] Model ${model.name}: Weekly Rev=$${weeklyRevenue}, Annual Rev=$${modelAnnualRevenue}`);
-        console.log(`🔍 [Analytics Debug] Model ${model.name}: Weekly Costs=$${weeklyCosts}, Annual Costs=$${modelAnnualCosts}`);
+        console.log(`🔍 [Analytics Debug] Model ${primaryModel.name}: Weekly Rev=$${weeklyRevenue}, Annual Rev=$${modelAnnualRevenue}`);
+        console.log(`🔍 [Analytics Debug] Model ${primaryModel.name}: Weekly Costs=$${weeklyCosts}, Annual Costs=$${modelAnnualCosts}`);
         
         totalProjectedRevenue += modelAnnualRevenue;
         totalProjectedCosts += modelAnnualCosts;
-      });
+      } else {
+        console.log('🔍 [Analytics Debug] No primary model found for project:', project.name);
+      }
     });
 
     const totalActualProfit = totalActualRevenue - totalActualCosts;
@@ -193,23 +196,22 @@ export class DashboardAnalyticsService {
           periodData.actualCosts += cost || 0;
         });
 
-        // Add projected data for comparison (normalized to period)
-        if (project?.financialModels) {
-          project.financialModels.forEach(model => {
-            // Calculate weekly revenue from revenue streams (values are already correct)
-            const weeklyRevenue = model.assumptions?.revenue?.reduce((total, stream) => {
-              return total + stream.value;
-            }, 0) || 0;
-            
-            // Calculate weekly costs from cost categories
-            const weeklyCosts = model.assumptions?.costs?.reduce((total, cost) => {
-              return total + cost.value;
-            }, 0) || 0;
+        // Add projected data for comparison (normalized to period) - use primary model only
+        const primaryModel = this.getPrimaryModel(project?.financialModels || []);
+        if (primaryModel) {
+          // Calculate weekly revenue from revenue streams (values are already correct)
+          const weeklyRevenue = primaryModel.assumptions?.revenue?.reduce((total, stream) => {
+            return total + stream.value;
+          }, 0) || 0;
+          
+          // Calculate weekly costs from cost categories
+          const weeklyCosts = primaryModel.assumptions?.costs?.reduce((total, cost) => {
+            return total + cost.value;
+          }, 0) || 0;
 
-            const periodMultiplier = actual.periodType === 'Week' ? 1 : 4.33; // Week to week, or week to month
-            periodData.projectedRevenue += weeklyRevenue * periodMultiplier;
-            periodData.projectedCosts += weeklyCosts * periodMultiplier;
-          });
+          const periodMultiplier = actual.periodType === 'Week' ? 1 : 4.33; // Week to week, or week to month
+          periodData.projectedRevenue += weeklyRevenue * periodMultiplier;
+          periodData.projectedCosts += weeklyCosts * periodMultiplier;
         }
 
         periodData.count++;
@@ -279,24 +281,25 @@ export class DashboardAnalyticsService {
         lastActualPeriod = this.formatPeriodKey(latestActual.period, latestActual.periodType);
       }
 
-      // Calculate projected metrics from assumptions
+      // Calculate projected metrics from assumptions - use primary model only
       let projectedRevenue = 0;
       let projectedCosts = 0;
       
-      project.financialModels?.forEach(model => {
+      const primaryModel = this.getPrimaryModel(project.financialModels || []);
+      if (primaryModel) {
         // Calculate weekly revenue from revenue streams (values are already correct)
-        const weeklyRevenue = model.assumptions?.revenue?.reduce((total, stream) => {
+        const weeklyRevenue = primaryModel.assumptions?.revenue?.reduce((total, stream) => {
           return total + stream.value;
         }, 0) || 0;
         
         // Calculate weekly costs from cost categories
-        const weeklyCosts = model.assumptions?.costs?.reduce((total, cost) => {
+        const weeklyCosts = primaryModel.assumptions?.costs?.reduce((total, cost) => {
           return total + cost.value;
         }, 0) || 0;
         
-        projectedRevenue += weeklyRevenue * 52;
-        projectedCosts += weeklyCosts * 52;
-      });
+        projectedRevenue = weeklyRevenue * 52;
+        projectedCosts = weeklyCosts * 52;
+      }
 
       const actualProfit = actualRevenue - actualCosts;
       const projectedProfit = projectedRevenue - projectedCosts;
@@ -327,6 +330,24 @@ export class DashboardAnalyticsService {
     });
   }
 
+
+  /**
+   * Get the primary model for dashboard projections
+   * Falls back to first model if no primary is set
+   */
+  private static getPrimaryModel(models: any[]): any | null {
+    if (!models || models.length === 0) return null;
+    
+    // Look for a model marked as primary
+    const primaryModel = models.find(model => model.isPrimary === true);
+    if (primaryModel) {
+      return primaryModel;
+    }
+    
+    // Fallback: use the first model if no primary is set
+    console.log('🔍 [Analytics Debug] No primary model found, using first model as fallback');
+    return models[0];
+  }
 
   /**
    * Format period for consistent display
