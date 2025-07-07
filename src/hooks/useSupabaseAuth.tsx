@@ -68,8 +68,9 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
           setUser(initialSession?.user ?? null);
           
           if (initialSession?.user) {
-            console.log('👤 [SupabaseAuth] User found, ensuring profile exists...');
-            await ensureUserProfile(initialSession.user);
+            console.log('👤 [SupabaseAuth] User found, loading profile...');
+            // Temporarily skip ensureUserProfile to prevent hanging
+            // await ensureUserProfile(initialSession.user);
             await loadUserProfile(initialSession.user.id);
           } else {
             console.log('👤 [SupabaseAuth] No user found in session');
@@ -96,7 +97,8 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          await ensureUserProfile(session.user);
+          // Temporarily skip ensureUserProfile to prevent hanging
+          // await ensureUserProfile(session.user);
           await loadUserProfile(session.user.id);
         } else {
           setProfile(null);
