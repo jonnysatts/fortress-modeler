@@ -315,7 +315,7 @@ export class DashboardAnalyticsService {
    * Get the primary model for dashboard projections
    * Falls back to first model if no primary is set
    */
-  private static getPrimaryModel(models: any[]): any | null {
+  private static getPrimaryModel(models: FinancialModel[]): FinancialModel | null {
     if (!models || models.length === 0) return null;
     
     // Look for a model marked as primary

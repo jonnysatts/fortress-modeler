@@ -7,7 +7,9 @@ import { useNavigate } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { usePortfolioAnalytics, usePerformanceChartData, useRiskAnalysis, useVarianceIndicators } from "@/hooks/usePortfolioAnalytics";
 import { KPICard, VarianceIndicator } from "@/components/dashboard/KPICard";
+import { ForecastAccuracyCard } from "@/components/dashboard/ForecastAccuracyCard";
 import { useMyProjects } from "@/hooks/useProjects";
+import { useForecastAccuracy } from "@/hooks/useForecastAccuracy";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -18,6 +20,7 @@ const Dashboard = () => {
   const { data: chartData, isLoading: chartLoading } = usePerformanceChartData();
   const { riskData, totalRisk, isLoading: riskLoading } = useRiskAnalysis();
   const { indicators, dataCompleteness, projectsWithActuals, totalProjects } = useVarianceIndicators();
+  const { data: forecastAccuracy, isLoading: forecastLoading, error: forecastError } = useForecastAccuracy();
 
   const isLoading = projectsLoading || analyticsLoading;
 
@@ -154,6 +157,56 @@ const Dashboard = () => {
                 status={indicator.status}
               />
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Forecast Accuracy Section */}
+      {hasActuals && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-1">
+            {forecastLoading ? (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg font-medium">Forecast Accuracy</CardTitle>
+                  <CardDescription>Loading accuracy metrics...</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="animate-pulse space-y-4">
+                    <div className="h-12 bg-muted rounded"></div>
+                    <div className="h-2 bg-muted rounded"></div>
+                    <div className="space-y-2">
+                      <div className="h-4 bg-muted rounded w-3/4"></div>
+                      <div className="h-4 bg-muted rounded w-1/2"></div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : forecastError ? (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg font-medium">Forecast Accuracy</CardTitle>
+                  <CardDescription>Unable to load accuracy data</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm text-muted-foreground">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 inline mr-2" />
+                    Failed to calculate forecast accuracy. Please try refreshing the page.
+                  </div>
+                </CardContent>
+              </Card>
+            ) : forecastAccuracy && forecastAccuracy.projectsAnalyzed > 0 ? (
+              <ForecastAccuracyCard
+                overallMAPE={forecastAccuracy.overallMAPE}
+                accuracyTrend={forecastAccuracy.accuracyTrend}
+                confidenceScore={forecastAccuracy.confidenceScore}
+                projectsAnalyzed={forecastAccuracy.projectsAnalyzed}
+                projectsWithPoorAccuracy={forecastAccuracy.projectsWithPoorAccuracy}
+              />
+            ) : null}
+          </div>
+          <div className="md:col-span-2">
+            {/* Space for future accuracy insights or detailed breakdown */}
           </div>
         </div>
       )}
