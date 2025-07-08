@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
-import { usePortfolioAnalytics, usePerformanceChartData, useRiskAnalysis, useVarianceIndicators } from "@/hooks/usePortfolioAnalytics";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { usePortfolioAnalytics, usePerformanceChartData, useVarianceIndicators } from "@/hooks/usePortfolioAnalytics";
 import { KPICard, VarianceIndicator } from "@/components/dashboard/KPICard";
 import { ForecastAccuracyCard } from "@/components/dashboard/ForecastAccuracyCard";
 import { PortfolioHealthSummary } from "@/components/dashboard/ProjectHealthCard";
 import { VarianceTrendSummary } from "@/components/dashboard/VarianceTrendChart";
+import { RiskInsights } from "@/components/dashboard/RiskInsights";
 import { useMyProjects } from "@/hooks/useProjects";
 import { useForecastAccuracy } from "@/hooks/useForecastAccuracy";
 import { useProjectHealth } from "@/hooks/useProjectHealth";
@@ -24,7 +25,6 @@ const Dashboard = () => {
   // Use enhanced analytics hooks
   const { data: analytics, isLoading: analyticsLoading, error: analyticsError } = usePortfolioAnalytics();
   const { data: chartData, isLoading: chartLoading } = usePerformanceChartData();
-  const { riskData, totalRisk, isLoading: riskLoading } = useRiskAnalysis();
   const { indicators, dataCompleteness, projectsWithActuals, totalProjects } = useVarianceIndicators();
   const { data: forecastAccuracy, isLoading: forecastLoading, error: forecastError } = useForecastAccuracy();
   const { data: projectHealth, isLoading: healthLoading } = useProjectHealth();
@@ -35,9 +35,6 @@ const Dashboard = () => {
   // Get metrics from analytics service
   const portfolioMetrics = analytics?.portfolioMetrics;
   const hasActuals = (portfolioMetrics?.projectsWithActuals || 0) > 0;
-  
-
-  const COLORS = ['#1A2942', '#3E5C89', '#10B981', '#334155'];
 
   if (isLoading) {
     return (
@@ -338,63 +335,7 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>Project Risk Analysis</CardTitle>
-            <CardDescription>Based on variance and performance trends</CardDescription>
-          </CardHeader>
-          <CardContent className="h-80">
-            {riskData && riskData.length > 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="w-full h-full flex flex-col">
-                  <div className="flex-1">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={riskData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        >
-                          {riskData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip 
-                          formatter={(value) => [`${value} projects`, '']} 
-                          contentStyle={{ 
-                            backgroundColor: '#f8fafc', 
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '6px' 
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="text-center mt-2">
-                    <div className="text-sm text-muted-foreground">
-                      Average Risk Score: {totalRisk?.toFixed(1) || 0}/100
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-center">
-                <div>
-                  <AlertTriangle className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-muted-foreground">No risk data available</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Risk analysis requires actual performance data
-                  </p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <RiskInsights className="col-span-1" />
       </div>
 
       {/* Project Performance Summary */}

@@ -49,7 +49,7 @@ const PerformanceAnalysis = lazy(() => import("@/components/models/PerformanceAn
 const ActualsInputForm = lazy(() => import("@/components/models/ActualsInputForm").then(m => ({ default: m.ActualsInputForm })));
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDate } from "@/lib/utils";
-const ProjectRiskDashboard = lazy(() => import("@/components/risk/ProjectRiskDashboard").then(m => ({ default: m.ProjectRiskDashboard })));
+const SimpleRiskDashboard = lazy(() => import("@/components/risk/SimpleRiskDashboard").then(m => ({ default: m.SimpleRiskDashboard })));
 
 // Loading component for lazy-loaded components
 const ComponentLoader = ({ message = "Loading..." }: { message?: string }) => (
@@ -452,7 +452,7 @@ const ProjectDetail = () => {
         
         <TabsContent value="risks" className="space-y-4">
           <Suspense fallback={<ComponentLoader message="Loading risk management..." />}>
-            <ProjectRiskDashboard projectId={projectId || ''} />
+            <SimpleRiskDashboard projectId={projectId || ''} />
           </Suspense>
         </TabsContent>
       </Tabs>
