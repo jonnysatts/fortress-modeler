@@ -119,6 +119,7 @@ const Dashboard = () => {
             icon={<DollarSign className="h-8 w-8 text-fortress-emerald" />}
             formatValue={(v) => `$${v.toLocaleString()}`}
             hasActualData={hasActuals}
+            periodsCompared={portfolioMetrics.totalPeriodsWithActuals}
           />
         )}
 
@@ -133,6 +134,7 @@ const Dashboard = () => {
             icon={<TrendingDown className="h-8 w-8 text-red-500" />}
             formatValue={(v) => `$${v.toLocaleString()}`}
             hasActualData={hasActuals}
+            periodsCompared={portfolioMetrics.totalPeriodsWithActuals}
           />
         )}
 
@@ -147,6 +149,7 @@ const Dashboard = () => {
             icon={<TrendingUp className="h-8 w-8 text-fortress-emerald" />}
             formatValue={(v) => `$${v.toLocaleString()}`}
             hasActualData={hasActuals}
+            periodsCompared={portfolioMetrics.totalPeriodsWithActuals}
           />
         )}
       </div>

@@ -15,6 +15,8 @@ export interface PortfolioMetrics {
   projectsWithActuals: number;
   totalProjects: number;
   actualsDataCompleteness: number; // percentage
+  totalPeriodsWithActuals: number; // Total periods across all projects that have actual data
+  averagePeriodsPerProject: number; // Average periods of actual data per project
 }
 
 export interface PeriodPerformance {
@@ -58,6 +60,7 @@ export class DashboardAnalyticsService {
     let totalProjectedRevenue = 0;
     let totalProjectedCosts = 0;
     let projectsWithActuals = 0;
+    let totalPeriodsWithActuals = 0;
 
     projects.forEach(project => {
       const projectActuals = allActuals[project.id] || [];
@@ -65,6 +68,7 @@ export class DashboardAnalyticsService {
 
       if (hasActuals) {
         projectsWithActuals++;
+        totalPeriodsWithActuals += projectActuals.length;
         
         // Sum up all actual data for this project
         projectActuals.forEach(actual => {
@@ -82,22 +86,21 @@ export class DashboardAnalyticsService {
 
       // Only use primary model for dashboard projections
       const primaryModel = this.getPrimaryModel(project.financialModels || []);
-      if (primaryModel) {
-        console.log('🔍 [Analytics Debug] Processing PRIMARY model:', primaryModel.name);
+      if (primaryModel && hasActuals) {
+        // FIXED: Only calculate projected values for periods that have actuals
+        const projectedForActualPeriods = this.calculateProjectedForActualPeriods(
+          primaryModel, 
+          projectActuals
+        );
         
-        // Use proper simulation logic instead of simple multiplication
+        totalProjectedRevenue += projectedForActualPeriods.revenue;
+        totalProjectedCosts += projectedForActualPeriods.costs;
+        
+      } else if (primaryModel && !hasActuals) {
+        // For projects without actuals, show full projection for reference
         const simulation = runModelSimulation(primaryModel);
-        
-        console.log(`🔍 [Analytics Debug] Model ${primaryModel.name}: Proper Simulation Results:`);
-        console.log(`🔍 [Analytics Debug] - Total Revenue: $${simulation.totalRevenue}`);
-        console.log(`🔍 [Analytics Debug] - Total Costs: $${simulation.totalCosts}`);
-        console.log(`🔍 [Analytics Debug] - Total Profit: $${simulation.totalProfit}`);
-        console.log(`🔍 [Analytics Debug] - Total Attendance: ${simulation.totalAttendance}`);
-        
         totalProjectedRevenue += simulation.totalRevenue;
         totalProjectedCosts += simulation.totalCosts;
-      } else {
-        console.log('🔍 [Analytics Debug] No primary model found for project:', project.name);
       }
     });
 
@@ -121,11 +124,10 @@ export class DashboardAnalyticsService {
       ? (projectsWithActuals / projects.length) * 100 
       : 0;
 
-    console.log('🔍 [Analytics Debug] FINAL TOTALS:');
-    console.log(`🔍 [Analytics Debug] Total Projected Revenue: $${totalProjectedRevenue}`);
-    console.log(`🔍 [Analytics Debug] Total Projected Costs: $${totalProjectedCosts}`);
-    console.log(`🔍 [Analytics Debug] Total Actual Revenue: $${totalActualRevenue}`);
-    console.log(`🔍 [Analytics Debug] Total Actual Costs: $${totalActualCosts}`);
+
+    const averagePeriodsPerProject = projectsWithActuals > 0 
+      ? totalPeriodsWithActuals / projectsWithActuals 
+      : 0;
 
     return {
       totalActualRevenue,
@@ -139,8 +141,166 @@ export class DashboardAnalyticsService {
       profitVariance,
       projectsWithActuals,
       totalProjects: projects.length,
-      actualsDataCompleteness
+      actualsDataCompleteness,
+      totalPeriodsWithActuals,
+      averagePeriodsPerProject
     };
+  }
+
+  /**
+   * Calculate projected values only for periods that have actual data
+   * This ensures we're comparing like-for-like timeframes
+   */
+  private static calculateProjectedForActualPeriods(
+    model: any,
+    actuals: ActualsPeriodEntry[]
+  ): { revenue: number; costs: number } {
+    if (!model?.assumptions || actuals.length === 0) {
+      return { revenue: 0, costs: 0 };
+    }
+
+    let totalProjectedRevenue = 0;
+    let totalProjectedCosts = 0;
+
+    // Generate projected periods using the same logic as useForecastAccuracy
+    const projectedPeriods = this.generateProjectedPeriods(model);
+
+    // Only sum projections for periods that have actual data
+    actuals.forEach(actual => {
+      const projectedPeriod = projectedPeriods.find(p => p.period === actual.period);
+      if (projectedPeriod) {
+        totalProjectedRevenue += projectedPeriod.revenue;
+        totalProjectedCosts += projectedPeriod.costs;
+      }
+    });
+
+    return {
+      revenue: totalProjectedRevenue,
+      costs: totalProjectedCosts
+    };
+  }
+
+  /**
+   * Generate projected revenue and costs for each period from a financial model
+   * This replicates the logic from useForecastAccuracy to ensure consistency
+   */
+  private static generateProjectedPeriods(model: any): Array<{ period: number; revenue: number; costs: number }> {
+    if (!model?.assumptions) {
+      return [];
+    }
+
+    const periods: Array<{ period: number; revenue: number; costs: number }> = [];
+    const metadata = model.assumptions.metadata;
+    const isWeeklyEvent = metadata?.type === 'WeeklyEvent';
+    
+    // Determine number of periods
+    const duration = isWeeklyEvent ? (metadata?.weeks || 12) : 12;
+    
+    for (let period = 1; period <= duration; period++) {
+      let currentAttendance = metadata?.initialWeeklyAttendance || 0;
+      
+      // Apply attendance growth for weekly events
+      if (isWeeklyEvent && period > 1 && metadata?.growth) {
+        const attendanceGrowthRate = (metadata.growth.attendanceGrowthRate || 0) / 100;
+        currentAttendance = (metadata.initialWeeklyAttendance || 0) * Math.pow(1 + attendanceGrowthRate, period - 1);
+      }
+      
+      // Calculate period revenue
+      let periodRevenue = 0;
+      model.assumptions.revenue.forEach((stream: any) => {
+        let streamRevenue = 0;
+        const baseValue = stream.value;
+        
+        if (isWeeklyEvent && metadata) {
+          // Weekly event specific revenue calculation
+          if (stream.name === "F&B Sales") {
+            let spend = metadata.perCustomer?.fbSpend || 0;
+            if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
+              spend *= Math.pow(1 + (metadata.growth.fbSpendGrowth || 0) / 100, period - 1);
+            }
+            streamRevenue = currentAttendance * spend;
+          } else if (stream.name === "Merchandise Sales") {
+            let spend = metadata.perCustomer?.merchandiseSpend || 0;
+            if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
+              spend *= Math.pow(1 + (metadata.growth.merchandiseSpendGrowth || 0) / 100, period - 1);
+            }
+            streamRevenue = currentAttendance * spend;
+          } else {
+            streamRevenue = baseValue;
+            if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
+              let growthRate = 0;
+              switch(stream.name) {
+                case "Ticket Sales": growthRate = (metadata.growth.ticketPriceGrowth || 0) / 100; break;
+                case "Online Sales": growthRate = (metadata.growth.onlineSpendGrowth || 0) / 100; break;
+                case "Miscellaneous Revenue": growthRate = (metadata.growth.miscSpendGrowth || 0) / 100; break;
+              }
+              streamRevenue *= Math.pow(1 + growthRate, period - 1);
+            }
+          }
+        } else {
+          // Non-weekly event revenue calculation
+          streamRevenue = baseValue;
+          if (period > 1) {
+            const { type, rate } = model.assumptions.growthModel;
+            if (type === "linear") {
+              streamRevenue = baseValue * (1 + rate * (period - 1));
+            } else {
+              streamRevenue = baseValue * Math.pow(1 + rate, period - 1);
+            }
+          }
+        }
+        periodRevenue += streamRevenue;
+      });
+
+      // Calculate period costs
+      let periodCosts = 0;
+      model.assumptions.costs.forEach((cost: any) => {
+        let costValue = 0;
+        const costType = cost.type?.toLowerCase();
+        const baseValue = cost.value;
+
+        if (isWeeklyEvent && metadata) {
+          // Weekly event specific cost calculation
+          if (costType === "fixed") {
+            costValue = period === 1 ? baseValue : 0; // Setup costs only in first period
+          } else if (costType === "variable") {
+            if (cost.name === "F&B COGS") {
+              const cogsPct = metadata.costs?.fbCOGSPercent || 30;
+              let fbSpend = metadata.perCustomer?.fbSpend || 0;
+              if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
+                fbSpend *= Math.pow(1 + (metadata.growth.fbSpendGrowth || 0) / 100, period - 1);
+              }
+              const fbRevenueThisPeriod = currentAttendance * fbSpend;
+              costValue = fbRevenueThisPeriod * (cogsPct / 100);
+            } else {
+              costValue = baseValue;
+            }
+          } else {
+            costValue = baseValue;
+          }
+        } else {
+          // Non-weekly event cost calculation
+          costValue = baseValue;
+          if (period > 1) {
+            const { type, rate } = model.assumptions.growthModel;
+            if (type === "linear") {
+              costValue = baseValue * (1 + rate * (period - 1));
+            } else {
+              costValue = baseValue * Math.pow(1 + rate, period - 1);
+            }
+          }
+        }
+        periodCosts += costValue;
+      });
+
+      periods.push({
+        period,
+        revenue: periodRevenue,
+        costs: periodCosts
+      });
+    }
+    
+    return periods;
   }
 
   /**

@@ -13,6 +13,7 @@ interface KPICardProps {
   formatValue?: (value: number) => string;
   showVariance?: boolean;
   hasActualData?: boolean;
+  periodsCompared?: number; // How many periods of actual data are being compared
 }
 
 export const KPICard: React.FC<KPICardProps> = ({
@@ -24,7 +25,8 @@ export const KPICard: React.FC<KPICardProps> = ({
   icon,
   formatValue = (v) => v.toLocaleString(),
   showVariance = true,
-  hasActualData = true
+  hasActualData = true,
+  periodsCompared = 1
 }) => {
   const getVarianceDisplay = () => {
     if (!showVariance || variance === undefined) return null;
@@ -52,7 +54,9 @@ export const KPICard: React.FC<KPICardProps> = ({
           <TrendingDown className="h-3 w-3 mr-1" />
         )}
         <span>{Math.abs(variance).toFixed(1)}%</span>
-        <span className="ml-1 text-gray-500">vs projected</span>
+        <span className="ml-1 text-gray-500">
+          vs projected ({periodsCompared} period{periodsCompared !== 1 ? 's' : ''})
+        </span>
       </div>
     );
   };
