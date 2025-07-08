@@ -1,5 +1,5 @@
 import { useEffect, useState, lazy, Suspense } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useNavigate, useParams, Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Edit, Trash2, PlusCircle, BarChart3, AlertTriangle, Building, Target, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,6 +70,7 @@ const ComponentLoader = ({ message = "Loading..." }: { message?: string }) => (
 
 const ProjectDetail = () => {
     const { projectId } = useParams<{ projectId: string }>();
+    const [searchParams] = useSearchParams();
     const [selectedModelId, setSelectedModelId] = useState<string>('');
     const [updatingPrimaryModel, setUpdatingPrimaryModel] = useState<string | null>(null);
 
@@ -89,6 +90,14 @@ const ProjectDetail = () => {
 
   const selectedModel = financialModels.find(m => m.id === selectedModelId) || financialModels[0];
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Handle URL tab parameter
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['overview', 'models', 'performance', 'analysis', 'risks'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   // Handle primary model selection
   const handleSetPrimaryModel = async (modelId: string) => {

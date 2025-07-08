@@ -30,9 +30,10 @@ interface RiskInsight {
 
 interface RiskInsightsProps {
   className?: string;
+  primaryProjectId?: string; // ID of the primary project to link to
 }
 
-export const RiskInsights: React.FC<RiskInsightsProps> = ({ className }) => {
+export const RiskInsights: React.FC<RiskInsightsProps> = ({ className, primaryProjectId }) => {
   const navigate = useNavigate();
 
   // Mock insights - replace with real data from your analytics
@@ -149,7 +150,13 @@ export const RiskInsights: React.FC<RiskInsightsProps> = ({ className }) => {
           <Button 
             variant="outline" 
             size="sm"
-            onClick={() => navigate('/projects')} // Navigate to projects list or specific project
+            onClick={() => {
+              if (primaryProjectId) {
+                navigate(`/projects/${primaryProjectId}?tab=risks`);
+              } else {
+                navigate('/projects');
+              }
+            }}
           >
             View Details
             <ArrowRight className="h-4 w-4 ml-1" />
@@ -201,7 +208,17 @@ export const RiskInsights: React.FC<RiskInsightsProps> = ({ className }) => {
 
         {insights.length > 3 && (
           <div className="text-center pt-2">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/projects')}>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => {
+                if (primaryProjectId) {
+                  navigate(`/projects/${primaryProjectId}?tab=risks`);
+                } else {
+                  navigate('/projects');
+                }
+              }}
+            >
               View {insights.length - 3} more insights
             </Button>
           </div>

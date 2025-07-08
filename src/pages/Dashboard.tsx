@@ -35,6 +35,11 @@ const Dashboard = () => {
   // Get metrics from analytics service
   const portfolioMetrics = analytics?.portfolioMetrics;
   const hasActuals = (portfolioMetrics?.projectsWithActuals || 0) > 0;
+  
+  // Get the first project with actuals or the most recent project for risk navigation
+  const primaryProject = projects.find(p => 
+    analytics?.projectPerformance?.find(perf => perf.projectId === p.id && perf.hasActuals)
+  ) || projects[0];
 
   if (isLoading) {
     return (
@@ -335,7 +340,10 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        <RiskInsights className="col-span-1" />
+        <RiskInsights 
+          className="col-span-1" 
+          primaryProjectId={primaryProject?.id}
+        />
       </div>
 
       {/* Project Performance Summary */}
