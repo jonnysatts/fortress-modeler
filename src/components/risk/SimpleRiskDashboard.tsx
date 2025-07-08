@@ -3,13 +3,24 @@
  * Replaces technical metrics with actionable insights
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { Plus, AlertTriangle, CheckCircle2, Clock, TrendingUp, Eye, Calendar } from "lucide-react";
+import { 
+  Plus, 
+  AlertTriangle, 
+  CheckCircle2, 
+  Clock, 
+  TrendingUp, 
+  Eye, 
+  Calendar, 
+  Edit, 
+  Trash2, 
+  MoreHorizontal 
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { 
   SimpleRisk, 
@@ -19,6 +30,25 @@ import {
   RISK_STATUS_CONFIG 
 } from '@/types/simpleRisk';
 import { AddRiskModal } from './AddRiskModal';
+import { EditRiskModal } from './EditRiskModal';
+import { SimpleRiskService } from '@/services/SimpleRiskService';
+import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SimpleRiskDashboardProps {
   projectId: string;
@@ -30,44 +60,55 @@ export const SimpleRiskDashboard: React.FC<SimpleRiskDashboardProps> = ({
   className
 }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [risks, setRisks] = useState<SimpleRisk[]>([
-    // Mock data for demonstration - replace with real data
-    {
-      id: '1',
-      projectId,
-      title: 'Key customer may not renew contract',
-      description: 'Our largest customer (40% of revenue) contract expires next month and they haven\'t confirmed renewal yet.',
-      category: 'customer-market',
-      priority: 'high',
-      status: 'mitigating',
-      potentialImpact: 'Could lose 40% of projected Q4 revenue',
-      mitigationPlan: 'Schedule urgent meeting with customer success team, prepare alternative pricing proposal',
-      owner: 'Sarah Johnson',
-      targetDate: '2024-02-15',
-      createdAt: '2024-01-10T10:00:00Z',
-      updatedAt: '2024-01-15T15:30:00Z',
-      createdBy: 'current-user'
-    },
-    {
-      id: '2',
-      projectId,
-      title: 'Development timeline at risk',
-      description: 'Core feature development is taking longer than expected due to technical complexity.',
-      category: 'timeline-delivery',
-      priority: 'medium',
-      status: 'monitoring',
-      potentialImpact: 'Could delay launch by 3-4 weeks',
-      mitigationPlan: 'Consider reducing scope for MVP, add extra developer resources',
-      owner: 'Mike Chen',
-      targetDate: '2024-02-20',
-      createdAt: '2024-01-12T14:00:00Z',
-      updatedAt: '2024-01-12T14:00:00Z',
-      createdBy: 'current-user'
-    }
-  ]);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedRisk, setSelectedRisk] = useState<SimpleRisk | null>(null);
+  const [riskToDelete, setRiskToDelete] = useState<SimpleRisk | null>(null);
+  const [risks, setRisks] = useState<SimpleRisk[]>([]);
 
-  const handleRiskAdded = (newRisk: SimpleRisk) => {
+  // Load risks when component mounts or projectId changes
+  useEffect(() => {
+    loadRisks();
+  }, [projectId]);
+
+  const loadRisks = () => {
+    // Initialize with sample data if no risks exist (for demo purposes)
+    SimpleRiskService.initializeSampleData(projectId);
+    const projectRisks = SimpleRiskService.getRisksForProject(projectId);
+    setRisks(projectRisks);
+  };
+
+  const handleRiskAdded = (newRiskData: Omit<SimpleRisk, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newRisk = SimpleRiskService.createRisk(newRiskData);
     setRisks(prev => [...prev, newRisk]);
+  };
+
+  const handleRiskUpdated = (updatedRisk: SimpleRisk) => {
+    const result = SimpleRiskService.updateRisk(projectId, updatedRisk.id, updatedRisk);
+    if (result) {
+      setRisks(prev => prev.map(r => r.id === updatedRisk.id ? result : r));
+    }
+  };
+
+  const handleEditRisk = (risk: SimpleRisk) => {
+    setSelectedRisk(risk);
+    setIsEditModalOpen(true);
+  };
+
+  const handleDeleteRisk = (risk: SimpleRisk) => {
+    setRiskToDelete(risk);
+  };
+
+  const confirmDeleteRisk = () => {
+    if (riskToDelete) {
+      const success = SimpleRiskService.deleteRisk(projectId, riskToDelete.id);
+      if (success) {
+        setRisks(prev => prev.filter(r => r.id !== riskToDelete.id));
+        toast.success('Risk deleted successfully');
+      } else {
+        toast.error('Failed to delete risk');
+      }
+      setRiskToDelete(null);
+    }
   };
 
   const getRiskSummary = (): SimpleRiskSummary => {
@@ -279,11 +320,35 @@ export const SimpleRiskDashboard: React.FC<SimpleRiskDashboardProps> = ({
                     </div>
                   </div>
                   
-                  <div className="flex items-center space-x-2">
-                    {getRiskStatusIcon(risk.status)}
-                    <span className="text-sm text-muted-foreground">
-                      {RISK_STATUS_CONFIG[risk.status].label}
-                    </span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      {getRiskStatusIcon(risk.status)}
+                      <span className="text-sm text-muted-foreground">
+                        {RISK_STATUS_CONFIG[risk.status].label}
+                      </span>
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEditRisk(risk)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Risk
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleDeleteRisk(risk)}
+                          className="text-red-600 focus:text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete Risk
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               </div>
@@ -327,6 +392,37 @@ export const SimpleRiskDashboard: React.FC<SimpleRiskDashboardProps> = ({
         projectId={projectId}
         onRiskAdded={handleRiskAdded}
       />
+
+      {/* Edit Risk Modal */}
+      {selectedRisk && (
+        <EditRiskModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          risk={selectedRisk}
+          onRiskUpdated={handleRiskUpdated}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!riskToDelete} onOpenChange={() => setRiskToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Risk</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{riskToDelete?.title}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteRisk}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              Delete Risk
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
