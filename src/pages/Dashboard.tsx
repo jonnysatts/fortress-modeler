@@ -35,6 +35,19 @@ const Dashboard = () => {
   // Get metrics from analytics service
   const portfolioMetrics = analytics?.portfolioMetrics;
   const hasActuals = (portfolioMetrics?.projectsWithActuals || 0) > 0;
+  
+  // Debug logging to see what's happening with the new components
+  console.log('🔍 Dashboard Debug:', {
+    hasActuals,
+    forecastLoading,
+    forecastError: !!forecastError,
+    forecastAccuracy: !!forecastAccuracy,
+    projectsAnalyzed: forecastAccuracy?.projectsAnalyzed || 0,
+    varianceTrends: !!varianceTrends,
+    varianceTrendsLength: varianceTrends?.varianceTrends?.length || 0,
+    projectHealth: !!projectHealth,
+    healthLoading
+  });
 
   const COLORS = ['#1A2942', '#3E5C89', '#10B981', '#334155'];
 
@@ -170,6 +183,16 @@ const Dashboard = () => {
       )}
 
       {/* Forecast Accuracy Section */}
+      {hasActuals && (
+        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded">
+          <p className="text-blue-800">🔍 DEBUG: Forecast Accuracy section should render here</p>
+          <p>hasActuals: {hasActuals.toString()}</p>
+          <p>forecastLoading: {forecastLoading.toString()}</p>
+          <p>forecastError: {forecastError ? 'YES' : 'NO'}</p>
+          <p>forecastAccuracy: {forecastAccuracy ? 'YES' : 'NO'}</p>
+          <p>projectsAnalyzed: {forecastAccuracy?.projectsAnalyzed || 0}</p>
+        </div>
+      )}
       {hasActuals && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-1">
