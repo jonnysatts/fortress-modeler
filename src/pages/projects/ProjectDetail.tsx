@@ -49,7 +49,7 @@ const PerformanceAnalysis = lazy(() => import("@/components/models/PerformanceAn
 const ActualsInputForm = lazy(() => import("@/components/models/ActualsInputForm").then(m => ({ default: m.ActualsInputForm })));
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDate } from "@/lib/utils";
-import { RiskAssessmentTab } from "@/components/risk/RiskAssessmentTab";
+const ProjectRiskDashboard = lazy(() => import("@/components/risk/ProjectRiskDashboard").then(m => ({ default: m.ProjectRiskDashboard })));
 
 // Loading component for lazy-loaded components
 const ComponentLoader = ({ message = "Loading..." }: { message?: string }) => (
@@ -451,18 +451,9 @@ const ProjectDetail = () => {
         </TabsContent>
         
         <TabsContent value="risks" className="space-y-4">
-          <RiskAssessmentTab
-            projectId={projectId || ''}
-            projectName={project?.name || ''}
-            financialModels={financialModels}
-            actualsData={actualsData}
-            onAddRisk={() => {
-              console.log('Add Risk button clicked');
-              toast.info('Manual risk entry coming soon!', {
-                description: 'Manual risk entry and mitigation tracking will be available in the next update.'
-              });
-            }}
-          />
+          <Suspense fallback={<ComponentLoader message="Loading risk management..." />}>
+            <ProjectRiskDashboard projectId={projectId || ''} />
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>
