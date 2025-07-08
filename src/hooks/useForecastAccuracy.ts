@@ -233,7 +233,7 @@ export const useForecastAccuracy = () => {
             };
           });
 
-        if (periodsWithData.length >= 2) { // Need at least 2 periods for meaningful analysis
+        if (periodsWithData.length >= 1) { // Need at least 1 period for analysis
           // Calculate accuracy for revenue
           const revenueAccuracy = ForecastAccuracyService.calculateForecastAccuracy(
             projectId,
@@ -259,7 +259,7 @@ export const useForecastAccuracy = () => {
               };
             });
 
-          if (costPeriodsWithData.length >= 2) {
+          if (costPeriodsWithData.length >= 1) {
             const costAccuracy = ForecastAccuracyService.calculateForecastAccuracy(
               projectId,
               'costs',
