@@ -4,6 +4,8 @@ import { DatabaseError, NotFoundError, ValidationError, logError } from './error
 import { getDemoData } from './demo-data';
 import config from './config';
 import { isUUID } from './utils';
+import { isCloudModeEnabled } from '@/config/app.config';
+import { SupabaseStorageService } from '@/services/implementations/SupabaseStorageService';
 
 // Define interfaces for our database tables
 export interface Project {
@@ -500,13 +502,10 @@ export const setPrimaryFinancialModel = async (modelId: string): Promise<void> =
       throw new ValidationError('Invalid model ID provided');
     }
 
-    // Import dynamically to avoid circular dependencies
-    const { isCloudModeEnabled } = await import('./config');
     const cloudMode = isCloudModeEnabled();
 
     if (cloudMode) {
       // Use Supabase for cloud mode
-      const { SupabaseStorageService } = await import('@/services/implementations/SupabaseStorageService');
       const supabaseStorage = new SupabaseStorageService();
       
       // Get the model to find its project
