@@ -1,5 +1,6 @@
 import { ActualsPeriodEntry } from '@/types/models';
 import { Project } from '@/lib/db';
+import { runModelSimulation } from '@/lib/project-aggregation';
 
 export interface PortfolioMetrics {
   totalActualRevenue: number;
@@ -83,29 +84,18 @@ export class DashboardAnalyticsService {
       const primaryModel = this.getPrimaryModel(project.financialModels || []);
       if (primaryModel) {
         console.log('🔍 [Analytics Debug] Processing PRIMARY model:', primaryModel.name);
-        console.log('🔍 [Analytics Debug] Revenue streams:', primaryModel.assumptions?.revenue);
-        console.log('🔍 [Analytics Debug] Cost categories:', primaryModel.assumptions?.costs);
         
-        // Calculate weekly revenue from revenue streams (values are already correct)
-        const weeklyRevenue = primaryModel.assumptions?.revenue?.reduce((total, stream) => {
-          console.log(`🔍 [Analytics Debug] Revenue stream: ${stream.name} = $${stream.value}/week (${stream.frequency})`);
-          return total + stream.value;
-        }, 0) || 0;
+        // Use proper simulation logic instead of simple multiplication
+        const simulation = runModelSimulation(primaryModel);
         
-        // Calculate weekly costs from cost categories (assuming they're also weekly)
-        const weeklyCosts = primaryModel.assumptions?.costs?.reduce((total, cost) => {
-          console.log(`🔍 [Analytics Debug] Cost category: ${cost.name} = $${cost.value}/week`);
-          return total + cost.value;
-        }, 0) || 0;
+        console.log(`🔍 [Analytics Debug] Model ${primaryModel.name}: Proper Simulation Results:`);
+        console.log(`🔍 [Analytics Debug] - Total Revenue: $${simulation.totalRevenue}`);
+        console.log(`🔍 [Analytics Debug] - Total Costs: $${simulation.totalCosts}`);
+        console.log(`🔍 [Analytics Debug] - Total Profit: $${simulation.totalProfit}`);
+        console.log(`🔍 [Analytics Debug] - Total Attendance: ${simulation.totalAttendance}`);
         
-        const modelAnnualRevenue = weeklyRevenue * 52;
-        const modelAnnualCosts = weeklyCosts * 52;
-        
-        console.log(`🔍 [Analytics Debug] Model ${primaryModel.name}: Weekly Rev=$${weeklyRevenue}, Annual Rev=$${modelAnnualRevenue}`);
-        console.log(`🔍 [Analytics Debug] Model ${primaryModel.name}: Weekly Costs=$${weeklyCosts}, Annual Costs=$${modelAnnualCosts}`);
-        
-        totalProjectedRevenue += modelAnnualRevenue;
-        totalProjectedCosts += modelAnnualCosts;
+        totalProjectedRevenue += simulation.totalRevenue;
+        totalProjectedCosts += simulation.totalCosts;
       } else {
         console.log('🔍 [Analytics Debug] No primary model found for project:', project.name);
       }
@@ -199,19 +189,17 @@ export class DashboardAnalyticsService {
         // Add projected data for comparison (normalized to period) - use primary model only
         const primaryModel = this.getPrimaryModel(project?.financialModels || []);
         if (primaryModel) {
-          // Calculate weekly revenue from revenue streams (values are already correct)
-          const weeklyRevenue = primaryModel.assumptions?.revenue?.reduce((total, stream) => {
-            return total + stream.value;
-          }, 0) || 0;
+          // Use proper simulation logic for accurate projections
+          const simulation = runModelSimulation(primaryModel);
+          const duration = primaryModel.assumptions?.metadata?.weeks || 12;
           
-          // Calculate weekly costs from cost categories
-          const weeklyCosts = primaryModel.assumptions?.costs?.reduce((total, cost) => {
-            return total + cost.value;
-          }, 0) || 0;
-
+          // Calculate average per period from total simulation
+          const avgRevenuePerPeriod = simulation.totalRevenue / duration;
+          const avgCostsPerPeriod = simulation.totalCosts / duration;
+          
           const periodMultiplier = actual.periodType === 'Week' ? 1 : 4.33; // Week to week, or week to month
-          periodData.projectedRevenue += weeklyRevenue * periodMultiplier;
-          periodData.projectedCosts += weeklyCosts * periodMultiplier;
+          periodData.projectedRevenue += avgRevenuePerPeriod * periodMultiplier;
+          periodData.projectedCosts += avgCostsPerPeriod * periodMultiplier;
         }
 
         periodData.count++;
@@ -287,18 +275,10 @@ export class DashboardAnalyticsService {
       
       const primaryModel = this.getPrimaryModel(project.financialModels || []);
       if (primaryModel) {
-        // Calculate weekly revenue from revenue streams (values are already correct)
-        const weeklyRevenue = primaryModel.assumptions?.revenue?.reduce((total, stream) => {
-          return total + stream.value;
-        }, 0) || 0;
-        
-        // Calculate weekly costs from cost categories
-        const weeklyCosts = primaryModel.assumptions?.costs?.reduce((total, cost) => {
-          return total + cost.value;
-        }, 0) || 0;
-        
-        projectedRevenue = weeklyRevenue * 52;
-        projectedCosts = weeklyCosts * 52;
+        // Use proper simulation logic for accurate projections
+        const simulation = runModelSimulation(primaryModel);
+        projectedRevenue = simulation.totalRevenue;
+        projectedCosts = simulation.totalCosts;
       }
 
       const actualProfit = actualRevenue - actualCosts;
