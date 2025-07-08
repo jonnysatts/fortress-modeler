@@ -500,23 +500,60 @@ export const setPrimaryFinancialModel = async (modelId: string): Promise<void> =
       throw new ValidationError('Invalid model ID provided');
     }
 
-    const model = await getModelById(modelId);
-    if (!model) {
-      throw new NotFoundError(`Financial model with ID ${modelId} not found`);
-    }
+    // Import dynamically to avoid circular dependencies
+    const { isCloudModeEnabled } = await import('./config');
+    const cloudMode = isCloudModeEnabled();
 
-    // First, unset any existing primary model for this project
-    const projectModels = await getModelsForProject(model.projectId);
-    for (const projectModel of projectModels) {
-      if (projectModel.isPrimary) {
-        await db.financialModels.update(projectModel.id, { isPrimary: false });
+    if (cloudMode) {
+      // Use Supabase for cloud mode
+      const { SupabaseStorageService } = await import('@/services/implementations/SupabaseStorageService');
+      const supabaseStorage = new SupabaseStorageService();
+      
+      // Get the model to find its project
+      const model = await supabaseStorage.getModel(modelId);
+      if (!model) {
+        throw new NotFoundError(`Financial model with ID ${modelId} not found`);
       }
-    }
 
-    // Set the specified model as primary
-    await db.financialModels.update(modelId, { isPrimary: true });
-    
-    console.log(`✅ Set model ${model.name} as primary for project ${model.projectId}`);
+      // Get all models for the project
+      const projectModels = await supabaseStorage.getModelsForProject(model.projectId);
+      
+      // Update all models: unset existing primary and set new primary
+      for (const projectModel of projectModels) {
+        if (projectModel.id === modelId) {
+          await supabaseStorage.updateModel(projectModel.id, { 
+            ...projectModel, 
+            isPrimary: true 
+          });
+        } else if (projectModel.isPrimary) {
+          await supabaseStorage.updateModel(projectModel.id, { 
+            ...projectModel, 
+            isPrimary: false 
+          });
+        }
+      }
+      
+      console.log(`✅ Set model ${model.name} as primary for project ${model.projectId} (Supabase)`);
+    } else {
+      // Use IndexedDB for local mode
+      const model = await getModelById(modelId);
+      if (!model) {
+        throw new NotFoundError(`Financial model with ID ${modelId} not found`);
+      }
+
+      // First, unset any existing primary model for this project
+      const projectModels = await getModelsForProject(model.projectId);
+      for (const projectModel of projectModels) {
+        if (projectModel.isPrimary) {
+          await db.financialModels.update(projectModel.id, { isPrimary: false });
+        }
+      }
+
+      // Set the specified model as primary
+      await db.financialModels.update(modelId, { isPrimary: true });
+      
+      console.log(`✅ Set model ${model.name} as primary for project ${model.projectId} (IndexedDB)`);
+    }
   } catch (error) {
     if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
     logError(error, 'setPrimaryFinancialModel');

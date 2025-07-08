@@ -344,6 +344,7 @@ export class SupabaseStorageService implements IStorageService {
       
       if (modelData.name !== undefined) updateData.name = modelData.name;
       if (modelData.assumptions !== undefined) updateData.assumptions = modelData.assumptions;
+      if (modelData.isPrimary !== undefined) updateData.is_primary = modelData.isPrimary;
 
       const { data, error } = await supabase
         .from('financial_models')
@@ -638,6 +639,7 @@ export class SupabaseStorageService implements IStorageService {
       id: supabaseModel.id,
       projectId: supabaseModel.project_id,
       name: supabaseModel.name,
+      isPrimary: supabaseModel.is_primary || false,
       assumptions: supabaseModel.assumptions as any,
       createdAt: new Date(supabaseModel.created_at),
       updatedAt: new Date(supabaseModel.updated_at),
