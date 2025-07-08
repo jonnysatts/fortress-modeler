@@ -49,6 +49,7 @@ const PerformanceAnalysis = lazy(() => import("@/components/models/PerformanceAn
 const ActualsInputForm = lazy(() => import("@/components/models/ActualsInputForm").then(m => ({ default: m.ActualsInputForm })));
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDate } from "@/lib/utils";
+import { RiskAssessmentTab } from "@/components/risk/RiskAssessmentTab";
 
 // Loading component for lazy-loaded components
 const ComponentLoader = ({ message = "Loading..." }: { message?: string }) => (
@@ -450,31 +451,18 @@ const ProjectDetail = () => {
         </TabsContent>
         
         <TabsContent value="risks" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Risk Assessment</CardTitle>
-              <CardDescription>
-                Identify and manage project risks
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="text-center py-10">
-                <div className="mb-4 flex justify-center">
-                  <div className="rounded-full bg-muted p-4">
-                    <AlertTriangle className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                </div>
-                <h3 className="mb-1 text-lg font-medium">No risks identified yet</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Document potential risks to better manage your project.
-                </p>
-                <Button className="bg-fortress-emerald hover:bg-fortress-emerald/90">
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Add Risk
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <RiskAssessmentTab
+            projectId={projectId || ''}
+            projectName={project?.name || ''}
+            financialModels={financialModels}
+            actualsData={actualsData}
+            onAddRisk={() => {
+              console.log('Add Risk button clicked');
+              toast.info('Manual risk entry coming soon!', {
+                description: 'Manual risk entry and mitigation tracking will be available in the next update.'
+              });
+            }}
+          />
         </TabsContent>
       </Tabs>
     </div>

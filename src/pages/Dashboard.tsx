@@ -1,15 +1,21 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { BarChart3, PlusCircle, TrendingUp, AlertTriangle, Target, DollarSign, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { usePortfolioAnalytics, usePerformanceChartData, useRiskAnalysis, useVarianceIndicators } from "@/hooks/usePortfolioAnalytics";
 import { KPICard, VarianceIndicator } from "@/components/dashboard/KPICard";
 import { ForecastAccuracyCard } from "@/components/dashboard/ForecastAccuracyCard";
+import { PortfolioHealthSummary } from "@/components/dashboard/ProjectHealthCard";
+import { VarianceTrendSummary } from "@/components/dashboard/VarianceTrendChart";
 import { useMyProjects } from "@/hooks/useProjects";
 import { useForecastAccuracy } from "@/hooks/useForecastAccuracy";
+import { useProjectHealth } from "@/hooks/useProjectHealth";
+import { useVarianceTrends } from "@/hooks/useVarianceTrends";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -21,6 +27,8 @@ const Dashboard = () => {
   const { riskData, totalRisk, isLoading: riskLoading } = useRiskAnalysis();
   const { indicators, dataCompleteness, projectsWithActuals, totalProjects } = useVarianceIndicators();
   const { data: forecastAccuracy, isLoading: forecastLoading, error: forecastError } = useForecastAccuracy();
+  const { data: projectHealth, isLoading: healthLoading } = useProjectHealth();
+  const { data: varianceTrends, isLoading: varianceLoading } = useVarianceTrends();
 
   const isLoading = projectsLoading || analyticsLoading;
 
@@ -206,7 +214,80 @@ const Dashboard = () => {
             ) : null}
           </div>
           <div className="md:col-span-2">
-            {/* Space for future accuracy insights or detailed breakdown */}
+            {/* Variance Trends Summary */}
+            {varianceTrends && varianceTrends.varianceTrends.length > 0 && (
+              <VarianceTrendSummary
+                varianceTrends={varianceTrends.varianceTrends}
+                title="Variance Trends"
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Advanced Analytics Section - Phase A2 & A3 */}
+      {hasActuals && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Project Health Summary */}
+          {projectHealth && (
+            <PortfolioHealthSummary
+              healthScores={projectHealth.healthScores}
+              title="Portfolio Health"
+            />
+          )}
+          
+          {/* Space for additional analytics */}
+          <div className="space-y-4">
+            {projectHealth && projectHealth.allInsights.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg font-medium">Key Insights</CardTitle>
+                  <CardDescription>
+                    Critical insights across your portfolio
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {projectHealth.allInsights.slice(0, 3).map((insight, index) => (
+                      <div 
+                        key={index}
+                        className={cn(
+                          "p-3 rounded-lg border-l-4",
+                          insight.severity === 'high' ? "border-red-500 bg-red-50" :
+                          insight.severity === 'medium' ? "border-yellow-500 bg-yellow-50" :
+                          "border-blue-500 bg-blue-50"
+                        )}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-sm">{insight.title}</h4>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {insight.description}
+                            </p>
+                          </div>
+                          <Badge 
+                            variant="outline"
+                            className={cn(
+                              "text-xs ml-2",
+                              insight.severity === 'high' ? "border-red-500 text-red-700" :
+                              insight.severity === 'medium' ? "border-yellow-500 text-yellow-700" :
+                              "border-blue-500 text-blue-700"
+                            )}
+                          >
+                            {insight.severity}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                    {projectHealth.allInsights.length > 3 && (
+                      <p className="text-xs text-muted-foreground text-center">
+                        +{projectHealth.allInsights.length - 3} more insights available
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       )}

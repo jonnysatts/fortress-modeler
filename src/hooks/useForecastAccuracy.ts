@@ -17,6 +17,135 @@ interface ForecastAccuracyData {
   insights: AccuracyInsight[];
 }
 
+interface ProjectedPeriod {
+  period: number;
+  revenue: number;
+  costs: number;
+}
+
+/**
+ * Generate projected revenue and costs for each period from a financial model
+ * This replicates the projection logic from ModelProjections component
+ */
+function generateProjectedPeriods(model: FinancialModel): ProjectedPeriod[] {
+  if (!model?.assumptions) {
+    return [];
+  }
+
+  const periods: ProjectedPeriod[] = [];
+  const metadata = model.assumptions.metadata;
+  const isWeeklyEvent = metadata?.type === 'WeeklyEvent';
+  
+  // Determine number of periods
+  const duration = isWeeklyEvent ? (metadata?.weeks || 12) : 12;
+  
+  for (let period = 1; period <= duration; period++) {
+    let currentAttendance = metadata?.initialWeeklyAttendance || 0;
+    
+    // Apply attendance growth for weekly events
+    if (isWeeklyEvent && period > 1 && metadata?.growth) {
+      const attendanceGrowthRate = (metadata.growth.attendanceGrowthRate || 0) / 100;
+      currentAttendance = (metadata.initialWeeklyAttendance || 0) * Math.pow(1 + attendanceGrowthRate, period - 1);
+    }
+    
+    // Calculate period revenue
+    let periodRevenue = 0;
+    model.assumptions.revenue.forEach(stream => {
+      let streamRevenue = 0;
+      const baseValue = stream.value;
+      
+      if (isWeeklyEvent && metadata) {
+        // Weekly event specific revenue calculation
+        if (stream.name === "F&B Sales") {
+          let spend = metadata.perCustomer?.fbSpend || 0;
+          if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
+            spend *= Math.pow(1 + (metadata.growth.fbSpendGrowth || 0) / 100, period - 1);
+          }
+          streamRevenue = currentAttendance * spend;
+        } else if (stream.name === "Merchandise Sales") {
+          let spend = metadata.perCustomer?.merchandiseSpend || 0;
+          if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
+            spend *= Math.pow(1 + (metadata.growth.merchandiseSpendGrowth || 0) / 100, period - 1);
+          }
+          streamRevenue = currentAttendance * spend;
+        } else {
+          streamRevenue = baseValue;
+          if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
+            let growthRate = 0;
+            switch(stream.name) {
+              case "Ticket Sales": growthRate = (metadata.growth.ticketPriceGrowth || 0) / 100; break;
+              case "Online Sales": growthRate = (metadata.growth.onlineSpendGrowth || 0) / 100; break;
+              case "Miscellaneous Revenue": growthRate = (metadata.growth.miscSpendGrowth || 0) / 100; break;
+            }
+            streamRevenue *= Math.pow(1 + growthRate, period - 1);
+          }
+        }
+      } else {
+        // Non-weekly event revenue calculation
+        streamRevenue = baseValue;
+        if (period > 1) {
+          const { type, rate } = model.assumptions.growthModel;
+          if (type === "linear") {
+            streamRevenue = baseValue * (1 + rate * (period - 1));
+          } else {
+            streamRevenue = baseValue * Math.pow(1 + rate, period - 1);
+          }
+        }
+      }
+      periodRevenue += streamRevenue;
+    });
+
+    // Calculate period costs
+    let periodCosts = 0;
+    model.assumptions.costs.forEach(cost => {
+      let costValue = 0;
+      const costType = cost.type?.toLowerCase();
+      const baseValue = cost.value;
+
+      if (isWeeklyEvent && metadata) {
+        // Weekly event specific cost calculation
+        if (costType === "fixed") {
+          costValue = period === 1 ? baseValue : 0; // Setup costs only in first period
+        } else if (costType === "variable") {
+          if (cost.name === "F&B COGS") {
+            const cogsPct = metadata.costs?.fbCOGSPercent || 30;
+            let fbSpend = metadata.perCustomer?.fbSpend || 0;
+            if (period > 1 && metadata.growth?.useCustomerSpendGrowth) {
+              fbSpend *= Math.pow(1 + (metadata.growth.fbSpendGrowth || 0) / 100, period - 1);
+            }
+            const fbRevenueThisPeriod = currentAttendance * fbSpend;
+            costValue = fbRevenueThisPeriod * (cogsPct / 100);
+          } else {
+            costValue = baseValue;
+          }
+        } else {
+          costValue = baseValue;
+        }
+      } else {
+        // Non-weekly event cost calculation
+        costValue = baseValue;
+        if (period > 1) {
+          const { type, rate } = model.assumptions.growthModel;
+          if (type === "linear") {
+            costValue = baseValue * (1 + rate * (period - 1));
+          } else {
+            costValue = baseValue * Math.pow(1 + rate, period - 1);
+          }
+        }
+      }
+      periodCosts += costValue;
+    });
+
+    periods.push({
+      period,
+      revenue: periodRevenue,
+      costs: periodCosts
+    });
+  }
+  
+  return periods;
+}
+
 /**
  * Hook for calculating forecast accuracy across the portfolio
  */
@@ -76,20 +205,31 @@ export const useForecastAccuracy = () => {
       const projectAccuracies: ForecastAccuracy[] = [];
       
       for (const { projectId, projectName, actuals, primaryModel } of projectDataResults) {
-        if (!primaryModel || actuals.length === 0) continue;
+        if (!primaryModel || actuals.length === 0) {
+          continue;
+        }
+
+        // Generate projected periods data from the model
+        const projectedPeriods = generateProjectedPeriods(primaryModel);
 
         // Get periods that have both actuals and projections
         const periodsWithData = actuals
           .filter(actual => {
-            const projectedPeriod = primaryModel.periods.find(p => p.period === actual.period);
-            return projectedPeriod && actual.revenue !== undefined && projectedPeriod.revenue !== undefined;
+            // Calculate actual revenue for this period
+            const actualRevenue = Object.values(actual.revenueActuals || {}).reduce((sum, val) => sum + val, 0);
+            
+            // Find matching projected period
+            const projectedPeriod = projectedPeriods.find(p => p.period === actual.period);
+            
+            return actualRevenue > 0 && projectedPeriod?.revenue !== undefined;
           })
           .map(actual => {
-            const projectedPeriod = primaryModel.periods.find(p => p.period === actual.period)!;
+            const actualRevenue = Object.values(actual.revenueActuals || {}).reduce((sum, val) => sum + val, 0);
+            const projectedPeriod = projectedPeriods.find(p => p.period === actual.period)!;
             return {
               period: actual.period,
-              actual: actual.revenue || 0,
-              projected: projectedPeriod.revenue || 0
+              actual: actualRevenue,
+              projected: projectedPeriod.revenue
             };
           });
 
@@ -105,15 +245,17 @@ export const useForecastAccuracy = () => {
           // Could also calculate for costs and profit if needed
           const costPeriodsWithData = actuals
             .filter(actual => {
-              const projectedPeriod = primaryModel.periods.find(p => p.period === actual.period);
-              return projectedPeriod && actual.costs !== undefined && projectedPeriod.costs !== undefined;
+              const actualCosts = Object.values(actual.costActuals || {}).reduce((sum, val) => sum + val, 0);
+              const projectedPeriod = projectedPeriods.find(p => p.period === actual.period);
+              return actualCosts > 0 && projectedPeriod?.costs !== undefined;
             })
             .map(actual => {
-              const projectedPeriod = primaryModel.periods.find(p => p.period === actual.period)!;
+              const actualCosts = Object.values(actual.costActuals || {}).reduce((sum, val) => sum + val, 0);
+              const projectedPeriod = projectedPeriods.find(p => p.period === actual.period)!;
               return {
                 period: actual.period,
-                actual: actual.costs || 0,
-                projected: projectedPeriod.costs || 0
+                actual: actualCosts,
+                projected: projectedPeriod.costs
               };
             });
 
