@@ -682,4 +682,77 @@ export class SupabaseStorageService implements IStorageService {
     
     return Object.keys(result).length > 0 ? result : undefined;
   }
+
+  // ==================================================
+  // SHARING METHODS
+  // ==================================================
+
+  async getPublicProjects(): Promise<Project[]> {
+    try {
+      console.log('🔍 [SupabaseStorageService] Fetching public projects from Supabase');
+
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('is_public', true)
+        .is('deleted_at', null)
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ [SupabaseStorageService] Public projects fetch error:', error);
+        throw handleSupabaseError(error);
+      }
+
+      const projects = (data || []).map((project) => this.mapSupabaseProjectToProject(project));
+      console.log('✅ [SupabaseStorageService] Successfully fetched public projects:', projects.length);
+      return projects;
+    } catch (error) {
+      console.error('❌ [SupabaseStorageService] getPublicProjects error:', error);
+      throw new DatabaseError('Failed to fetch public projects', error);
+    }
+  }
+
+  async getSharedProjects(): Promise<Project[]> {
+    try {
+      console.log('🔍 [SupabaseStorageService] Fetching shared projects from Supabase');
+
+      const user = await this.getCurrentUser();
+      if (!user.email) {
+        console.log('User has no email, cannot fetch shared projects');
+        return [];
+      }
+
+      const { data, error } = await supabase
+        .from('projects')
+        .select(`
+          *,
+          project_shares!inner (
+            permission
+          )
+        `)
+        .eq('project_shares.shared_with_email', user.email)
+        .is('deleted_at', null)
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ [SupabaseStorageService] Shared projects fetch error:', error);
+        throw handleSupabaseError(error);
+      }
+
+      const projects = (data || []).map((project) => {
+        const mappedProject = this.mapSupabaseProjectToProject(project);
+        // Add permission from the join
+        if (project.project_shares?.[0]?.permission) {
+          mappedProject.permission = project.project_shares[0].permission;
+        }
+        return mappedProject;
+      });
+      
+      console.log('✅ [SupabaseStorageService] Successfully fetched shared projects:', projects.length);
+      return projects;
+    } catch (error) {
+      console.error('❌ [SupabaseStorageService] getSharedProjects error:', error);
+      throw new DatabaseError('Failed to fetch shared projects', error);
+    }
+  }
 }

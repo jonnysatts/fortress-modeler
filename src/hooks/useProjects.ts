@@ -58,10 +58,8 @@ export const useSharedProjects = () => {
       }
       
       try {
-        // For now, return empty array since the backend endpoint needs to be implemented
-        // TODO: Implement /api/projects/shared endpoint
-        console.log('Shared projects feature coming soon');
-        return [];
+        const supabaseStorage = new SupabaseStorageService();
+        return await supabaseStorage.getSharedProjects();
       } catch (error) {
         console.error('Error fetching shared projects:', error);
         throw error;
@@ -85,10 +83,8 @@ export const usePublicProjects = () => {
       }
       
       try {
-        // For now, return empty array since the backend endpoint needs to be implemented
-        // TODO: Implement /api/projects/public endpoint
-        console.log('Public projects feature coming soon');
-        return [];
+        const supabaseStorage = new SupabaseStorageService();
+        return await supabaseStorage.getPublicProjects();
       } catch (error) {
         console.error('Error fetching public projects:', error);
         throw error;
