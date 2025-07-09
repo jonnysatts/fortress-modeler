@@ -58,18 +58,10 @@ export const useSharedProjects = () => {
       }
       
       try {
-        const supabaseStorage = new SupabaseStorageService();
-        const response = await fetch('/api/projects/shared', {
-          headers: {
-            'Authorization': `Bearer ${(await supabaseStorage['getSupabase']().auth.getSession())?.data.session?.access_token}`
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch shared projects');
-        }
-        
-        return response.json();
+        // For now, return empty array since the backend endpoint needs to be implemented
+        // TODO: Implement /api/projects/shared endpoint
+        console.log('Shared projects feature coming soon');
+        return [];
       } catch (error) {
         console.error('Error fetching shared projects:', error);
         throw error;
@@ -93,13 +85,10 @@ export const usePublicProjects = () => {
       }
       
       try {
-        const response = await fetch('/api/projects/public');
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch public projects');
-        }
-        
-        return response.json();
+        // For now, return empty array since the backend endpoint needs to be implemented
+        // TODO: Implement /api/projects/public endpoint
+        console.log('Public projects feature coming soon');
+        return [];
       } catch (error) {
         console.error('Error fetching public projects:', error);
         throw error;
