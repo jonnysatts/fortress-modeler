@@ -36,6 +36,7 @@ const actualsFormSchema = z.object({
   attendanceActual: z.number().min(0, "Attendance must be non-negative").optional(),
   notes: z.string().max(500, "Notes must be 500 characters or less").optional(),
   useFbCogsPercentage: z.boolean().default(false),
+  useMerchandiseCogsPercentage: z.boolean().default(false),
   useMarketingPlan: z.boolean().default(false),
 });
 
@@ -54,6 +55,7 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
   
   const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
   const [useFbCogsPercentage, setUseFbCogsPercentage] = useState<boolean>(false);
+  const [useMerchandiseCogsPercentage, setUseMerchandiseCogsPercentage] = useState<boolean>(false);
   const [useMarketingPlan, setUseMarketingPlan] = useState<boolean>(false);
 
   const revenueItems: RevenueStream[] = model.assumptions.revenue || [];

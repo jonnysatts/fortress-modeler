@@ -44,6 +44,7 @@ export interface ModelMetadata {
   };
   costs?: {
     fbCOGSPercent?: number;
+    merchandiseCOGSPercent?: number;
     staffCount?: number;
     staffCostPerPerson?: number;
     managementCosts?: number;
