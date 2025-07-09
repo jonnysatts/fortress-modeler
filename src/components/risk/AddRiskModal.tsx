@@ -16,8 +16,6 @@ import { CalendarIcon, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { riskService } from '@/services/RiskService';
-import { useAuth } from '@/hooks/useAuth';
-
 interface User {
   id: string;
   email: string;
@@ -34,6 +32,7 @@ interface AddRiskModalProps {
   onClose: () => void;
   projectId: string;
   onRiskAdded: () => void; // Updated to just trigger refresh
+  user?: User | null;
 }
 
 interface RiskFormData {
@@ -141,9 +140,9 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
   isOpen,
   onClose,
   projectId,
-  onRiskAdded
+  onRiskAdded,
+  user
 }) => {
-  const { user } = useAuth() as { user: User | null };
   const [step, setStep] = useState<'category' | 'details' | 'assessment'>('category');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<RiskFormData>({

@@ -42,6 +42,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 interface FinancialModel {
   id: string;
@@ -221,6 +222,9 @@ export const RiskAssessmentTab: React.FC<RiskAssessmentTabProps> = ({
   } = useRisks(projectId);
   
   const { mutate: deleteRisk } = useDeleteRisk();
+  
+  // Get user from auth context
+  const { user } = useAuth();
 
   // Calculate automatic risks from forecast accuracy
   const automaticRiskSummary = useMemo<RiskSummary>(() => {
@@ -778,6 +782,7 @@ export const RiskAssessmentTab: React.FC<RiskAssessmentTabProps> = ({
         onClose={() => setShowAddModal(false)}
         projectId={projectId}
         onRiskAdded={handleRiskAdded}
+        user={user}
       />
       
       {selectedRisk && (
