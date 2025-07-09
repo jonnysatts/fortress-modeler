@@ -266,8 +266,10 @@ class RiskService {
       const { error } = await supabase
         .from('risks')
         .delete()
-        .eq('id', riskId)
-        .eq('user_id', user.user.id);
+        .eq('id', riskId);
+        // Removed .eq('user_id', user.user.id) constraint
+        // Security is now handled by RLS policies which allow deletion
+        // based on project ownership/access rather than risk creator
 
       if (error) throw error;
     } catch (error) {
