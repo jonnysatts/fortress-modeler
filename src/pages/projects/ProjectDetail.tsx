@@ -1,6 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { useNavigate, useParams, Link, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Edit, Trash2, PlusCircle, BarChart3, AlertTriangle, Building, Target, Loader2 } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, PlusCircle, BarChart3, AlertTriangle, Building, Target, Loader2, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -49,6 +49,8 @@ const PerformanceAnalysis = lazy(() => import("@/components/models/PerformanceAn
 const ActualsInputForm = lazy(() => import("@/components/models/ActualsInputForm").then(m => ({ default: m.ActualsInputForm })));
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDate } from "@/lib/utils";
+import { ShareProjectModal } from "@/components/projects/ShareProjectModal";
+import { isCloudModeEnabled } from "@/config/app.config";
 const SimpleRiskDashboard = lazy(() => import("@/components/risk/SimpleRiskDashboard").then(m => ({ default: m.SimpleRiskDashboard })));
 
 // Loading component for lazy-loaded components
@@ -73,6 +75,7 @@ const ProjectDetail = () => {
     const [searchParams] = useSearchParams();
     const [selectedModelId, setSelectedModelId] = useState<string>('');
     const [updatingPrimaryModel, setUpdatingPrimaryModel] = useState<string | null>(null);
+    const [shareModalOpen, setShareModalOpen] = useState(false);
 
   const navigate = useNavigate();
 
@@ -208,6 +211,12 @@ const ProjectDetail = () => {
             <PlusCircle className="mr-1 h-4 w-4" />
             New Scenario
           </Button>
+          {isCloudModeEnabled() && (
+            <Button variant="outline" size="sm" onClick={() => setShareModalOpen(true)}>
+              <Share2 className="mr-1 h-4 w-4" />
+              Share
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/edit`)}>
             <Edit className="mr-1 h-4 w-4" />
             Edit
@@ -465,6 +474,14 @@ const ProjectDetail = () => {
           </Suspense>
         </TabsContent>
       </Tabs>
+      
+      {project && (
+        <ShareProjectModal 
+          project={project}
+          open={shareModalOpen}
+          onOpenChange={setShareModalOpen}
+        />
+      )}
     </div>
   );
 };

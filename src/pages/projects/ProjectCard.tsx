@@ -1,11 +1,12 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Building, Edit } from "lucide-react";
+import { Building, Edit, Share2, Globe, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Project } from "@/lib/db";
+import { ShareProjectModal } from "@/components/projects/ShareProjectModal";
 
 interface ProjectCardProps {
   project: Project;
@@ -13,6 +14,7 @@ interface ProjectCardProps {
 
 export const ProjectCard = ({ project }: ProjectCardProps) => {
   const navigate = useNavigate();
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   const handleProjectClick = () => {
     navigate(`/projects/${project.id}`);
@@ -37,6 +39,18 @@ export const ProjectCard = ({ project }: ProjectCardProps) => {
               <Badge variant="outline" className="text-xs">
                 {project.productType}
               </Badge>
+              {project.is_public && (
+                <Badge variant="secondary" className="text-xs gap-1">
+                  <Globe className="h-3 w-3" />
+                  Public
+                </Badge>
+              )}
+              {project.shared_by && project.permission !== 'owner' && (
+                <Badge variant="secondary" className="text-xs gap-1">
+                  <Users className="h-3 w-3" />
+                  Shared
+                </Badge>
+              )}
             </div>
           </div>
         </div>
@@ -53,20 +67,41 @@ export const ProjectCard = ({ project }: ProjectCardProps) => {
             Created {new Date(project.createdAt).toLocaleDateString()}
           </p>
           <div className="flex gap-2" onClick={e => e.stopPropagation()}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/projects/${project.id}/edit`);
-              }}
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
+            {(!project.permission || project.permission === 'owner') && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShareModalOpen(true);
+                  }}
+                >
+                  <Share2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/projects/${project.id}/edit`);
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </CardContent>
+      
+      <ShareProjectModal 
+        project={project}
+        open={shareModalOpen}
+        onOpenChange={setShareModalOpen}
+      />
     </Card>
   );
 };

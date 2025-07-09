@@ -459,9 +459,6 @@ const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverviewProp
     setExportModalOpen(true);
   }, []);
   
-  const handleShare = useCallback(() => {
-    alert("Share model functionality not implemented yet.");
-  }, []);
 
   return (
     <div className="space-y-6">
@@ -472,9 +469,6 @@ const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverviewProp
           </Button>
           <Button variant="outline" size="sm" onClick={handleDownload}>
               <Download className="mr-1 h-4 w-4" /> Download Report
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleShare}>
-              <Share2 className="mr-1 h-4 w-4" /> Share Scenario
           </Button>
        </div>
 

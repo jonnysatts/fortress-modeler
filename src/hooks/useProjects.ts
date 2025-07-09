@@ -48,13 +48,34 @@ export const useMyProjects = () => {
 };
 
 export const useSharedProjects = () => {
+  const cloudEnabled = isCloudModeEnabled();
+  
   return useQuery<Project[], Error>({
     queryKey: ['projects', 'shared'],
     queryFn: async () => {
-      // Local-only mode - no shared projects
-      return [];
+      if (!cloudEnabled) {
+        return [];
+      }
+      
+      try {
+        const supabaseStorage = new SupabaseStorageService();
+        const response = await fetch('/api/projects/shared', {
+          headers: {
+            'Authorization': `Bearer ${(await supabaseStorage['getSupabase']().auth.getSession())?.data.session?.access_token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch shared projects');
+        }
+        
+        return response.json();
+      } catch (error) {
+        console.error('Error fetching shared projects:', error);
+        throw error;
+      }
     },
-    enabled: false, // Disabled in local-only mode
+    enabled: cloudEnabled,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: 3,
@@ -62,13 +83,29 @@ export const useSharedProjects = () => {
 };
 
 export const usePublicProjects = () => {
+  const cloudEnabled = isCloudModeEnabled();
+  
   return useQuery<Project[], Error>({
     queryKey: ['projects', 'public'],
     queryFn: async () => {
-      // Local-only mode - no public projects
-      return [];
+      if (!cloudEnabled) {
+        return [];
+      }
+      
+      try {
+        const response = await fetch('/api/projects/public');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch public projects');
+        }
+        
+        return response.json();
+      } catch (error) {
+        console.error('Error fetching public projects:', error);
+        throw error;
+      }
     },
-    enabled: false, // Disabled in local-only mode
+    enabled: cloudEnabled,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: 3,
