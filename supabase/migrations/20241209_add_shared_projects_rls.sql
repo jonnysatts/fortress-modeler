@@ -6,7 +6,7 @@ USING (
   id IN (
     SELECT project_id 
     FROM project_shares 
-    WHERE user_id = auth.uid()
+    WHERE shared_with_id = auth.uid()
   )
 );
 
@@ -18,9 +18,9 @@ CREATE POLICY "Users can view shares involving them" ON project_shares
 FOR SELECT
 TO authenticated
 USING (
-  user_id = auth.uid() OR 
+  shared_with_id = auth.uid() OR 
   project_id IN (
-    SELECT id FROM projects WHERE owner_id = auth.uid()
+    SELECT id FROM projects WHERE user_id = auth.uid()
   )
 );
 
@@ -29,6 +29,6 @@ FOR ALL
 TO authenticated
 USING (
   project_id IN (
-    SELECT id FROM projects WHERE owner_id = auth.uid()
+    SELECT id FROM projects WHERE user_id = auth.uid()
   )
 );
