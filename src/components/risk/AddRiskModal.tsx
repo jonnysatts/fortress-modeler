@@ -3,7 +3,7 @@
  * Updated for Phase 2 to work with enhanced risk management system
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -159,7 +159,7 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
     impact_score: 50
   });
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setStep('category');
     setIsSubmitting(false);
     setFormData({
@@ -175,12 +175,17 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
       probability: 50,
       impact_score: 50
     });
-  };
+  }, []);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     handleReset();
     onClose();
-  };
+  }, [handleReset, onClose]);
+
+  // Create stable form field handlers
+  const handleFieldChange = useCallback((field: keyof RiskFormData, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  }, []);
 
   const handleSubmit = async () => {
     if (!user?.id) {
@@ -247,7 +252,7 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
               "p-4 cursor-pointer border-2 transition-all hover:shadow-sm",
               formData.category === key ? "border-fortress-emerald bg-green-50" : "border-border hover:border-gray-300"
             )}
-            onClick={() => setFormData(prev => ({ ...prev, category: key as RiskCategory }))}
+            onClick={() => handleFieldChange('category', key as RiskCategory)}
           >
             <div className="flex items-start space-x-3">
               <span className="text-2xl">{config.icon}</span>
@@ -288,7 +293,7 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
             id="title"
             placeholder="e.g., Key customer may not renew contract"
             value={formData.title}
-            onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+            onChange={(e) => handleFieldChange('title', e.target.value)}
             className="mt-1"
           />
         </div>
@@ -301,7 +306,7 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
             id="description"
             placeholder="Provide details about this risk..."
             value={formData.description}
-            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+            onChange={(e) => handleFieldChange('description', e.target.value)}
             className="mt-1"
             rows={3}
           />
@@ -315,7 +320,7 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
             id="impact"
             placeholder="e.g., Could lose 30% of projected revenue, delay launch by 2 months..."
             value={formData.impact_description}
-            onChange={(e) => setFormData(prev => ({ ...prev, impact_description: e.target.value }))}
+            onChange={(e) => handleFieldChange('impact_description', e.target.value)}
             className="mt-1"
             rows={2}
           />
@@ -329,7 +334,7 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
             id="mitigation"
             placeholder="What actions will you take to address this risk?"
             value={formData.mitigation_plan}
-            onChange={(e) => setFormData(prev => ({ ...prev, mitigation_plan: e.target.value }))}
+            onChange={(e) => handleFieldChange('mitigation_plan', e.target.value)}
             className="mt-1"
             rows={2}
           />
@@ -343,7 +348,7 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
             id="owner"
             placeholder="Who's responsible for this risk?"
             value={formData.owner}
-            onChange={(e) => setFormData(prev => ({ ...prev, owner: e.target.value }))}
+            onChange={(e) => handleFieldChange('owner', e.target.value)}
             className="mt-1"
           />
         </div>
@@ -356,7 +361,7 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
             id="targetDate"
             type="date"
             value={formData.target_resolution_date}
-            onChange={(e) => setFormData(prev => ({ ...prev, target_resolution_date: e.target.value }))}
+            onChange={(e) => handleFieldChange('target_resolution_date', e.target.value)}
             className="mt-1"
           />
         </div>
@@ -384,7 +389,7 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
                   "p-3 cursor-pointer border-2 transition-all text-center",
                   formData.priority === key ? `${config.bgColor} ${config.borderColor}` : "border-border hover:border-gray-300"
                 )}
-                onClick={() => setFormData(prev => ({ ...prev, priority: key as RiskPriority }))}
+                onClick={() => handleFieldChange('priority', key as RiskPriority)}
               >
                 <div className={cn("font-medium text-sm", formData.priority === key ? config.textColor : "")}>
                   {config.label}
@@ -407,7 +412,7 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
               min="0"
               max="100"
               value={formData.probability}
-              onChange={(e) => setFormData(prev => ({ ...prev, probability: parseInt(e.target.value) }))}
+              onChange={(e) => handleFieldChange('probability', parseInt(e.target.value))}
               className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
             />
             <div className="flex justify-between text-xs text-muted-foreground mt-1">
@@ -427,7 +432,7 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
               min="0"
               max="100"
               value={formData.impact_score}
-              onChange={(e) => setFormData(prev => ({ ...prev, impact_score: parseInt(e.target.value) }))}
+              onChange={(e) => handleFieldChange('impact_score', parseInt(e.target.value))}
               className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
             />
             <div className="flex justify-between text-xs text-muted-foreground mt-1">
@@ -441,7 +446,7 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
           <Label className="text-sm font-medium">Status</Label>
           <Select 
             value={formData.status} 
-            onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as RiskStatus }))}
+            onValueChange={(value) => handleFieldChange('status', value as RiskStatus)}
           >
             <SelectTrigger className="mt-1">
               <SelectValue />

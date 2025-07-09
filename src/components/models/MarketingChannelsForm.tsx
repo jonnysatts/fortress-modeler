@@ -217,8 +217,18 @@ export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({
                    </div>
                  </div>
                  <div>
-                   <Label htmlFor="weeklyBudget">Weekly Budget</Label>
-                   <Input id="weeklyBudget" type="number" value={editingChannel.weeklyBudget} onChange={(e) => handleInputChange('weeklyBudget', parseFloat(e.target.value) || 0)} placeholder="0"/>
+                   <Label htmlFor="weeklyBudget">Weekly Budget <span className="text-red-500">*</span></Label>
+                   <Input 
+                     id="weeklyBudget" 
+                     type="number" 
+                     value={editingChannel.weeklyBudget} 
+                     onChange={(e) => handleInputChange('weeklyBudget', parseFloat(e.target.value) || 0)} 
+                     placeholder="Enter weekly budget amount (required for actuals tracking)"
+                     className={editingChannel.weeklyBudget <= 0 ? "border-red-300 focus:border-red-500" : ""}
+                   />
+                   {editingChannel.weeklyBudget <= 0 && (
+                     <p className="text-xs text-red-600 mt-1">Budget amount required to enable marketing actuals tracking</p>
+                   )}
                  </div>
                  <div>
                    <Label htmlFor="targetAudience">Target Audience</Label>
@@ -313,13 +323,38 @@ export const MarketingChannelsForm: React.FC<MarketingChannelsFormProps> = ({
            </div>
         )}
 
-        <div className="mt-6 pt-6 border-t flex justify-between items-center">
-            <p className="text-lg font-semibold">
-                {allocationMode === 'channels' && channels.length > 0 ? `Total Weekly Budget: ${formatCurrency(totalWeeklyChannelBudget)}` : ""}
-            </p>
+        <div className="mt-6 pt-6 border-t space-y-3">
+          <div className="flex justify-between items-center">
+            <div>
+              {allocationMode === 'channels' && channels.length > 0 && (
+                <div>
+                  <p className="text-lg font-semibold">
+                    Total Weekly Budget: {formatCurrency(totalWeeklyChannelBudget)}
+                  </p>
+                  {totalWeeklyChannelBudget <= 0 && (
+                    <p className="text-sm text-amber-600 mt-1">
+                      ⚠️ Set budget amounts to enable marketing actuals tracking
+                    </p>
+                  )}
+                </div>
+              )}
+              {allocationMode === 'highLevel' && (
+                <div>
+                  <p className="text-lg font-semibold">
+                    Total Budget: {formatCurrency(totalBudget)}
+                  </p>
+                  {totalBudget <= 0 && (
+                    <p className="text-sm text-amber-600 mt-1">
+                      ⚠️ Set budget amount to enable marketing actuals tracking
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
             <Button onClick={handleSaveChanges} disabled={!isDirty}>
                 Save Marketing Setup
             </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

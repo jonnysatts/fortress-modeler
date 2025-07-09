@@ -81,6 +81,19 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
       }
   }, [model.assumptions.marketing]);
 
+  const marketingSetupStatus = useMemo(() => {
+      const marketingSetup = model.assumptions.marketing;
+      if (!marketingSetup) return 'not_configured';
+      if (marketingSetup.allocationMode === 'channels') {
+          if (!marketingSetup.channels || marketingSetup.channels.length === 0) return 'no_channels';
+          if (!marketingSetup.channels.some(ch => ch.weeklyBudget > 0)) return 'no_budget';
+          return 'configured';
+      } else {
+          if ((marketingSetup.totalBudget || 0) <= 0) return 'no_budget';
+          return 'configured';
+      }
+  }, [model.assumptions.marketing]);
+
   // Get F&B COGS percentage and F&B revenue from model for percentage calculation
   const fbCogsPercentage = useMemo(() => {
     return model.assumptions.metadata?.costs?.fbCOGSPercent || 30;
@@ -417,10 +430,14 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
                       <div className="border border-dashed border-gray-300 rounded-lg p-4 text-center bg-gray-50">
                         <Settings className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                         <p className="text-sm text-gray-600 mb-2">
-                          No marketing budget configured for this model
+                          {marketingSetupStatus === 'not_configured' && 'No marketing budget configured for this model'}
+                          {marketingSetupStatus === 'no_channels' && 'Marketing setup started but no channels added'}
+                          {marketingSetupStatus === 'no_budget' && 'Marketing channels set up but no budget amounts allocated'}
                         </p>
                         <p className="text-xs text-gray-500 mb-3">
-                          Set up marketing budget to track planned vs actual marketing spend
+                          {marketingSetupStatus === 'not_configured' && 'Set up marketing budget to track planned vs actual marketing spend'}
+                          {marketingSetupStatus === 'no_channels' && 'Add marketing channels with budget amounts to enable actuals tracking'}
+                          {marketingSetupStatus === 'no_budget' && 'Set budget amounts for your marketing channels to enable actuals tracking'}
                         </p>
                         <Button 
                           variant="outline" 
