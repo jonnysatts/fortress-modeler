@@ -1,124 +1,95 @@
 # Fortress Modeler Cloud
 
-A comprehensive financial modeling and business analysis platform built with React, TypeScript, and modern web technologies.
+**Enterprise Business Planning & Financial Analytics Platform**
 
-## 🚀 Quick Start
+Fortress Modeler Cloud is a comprehensive business planning and financial analytics platform designed for product managers, business analysts, and strategic planners. Built with modern web technologies, it provides sophisticated financial modeling, risk management, performance analytics, and collaborative planning capabilities.
 
-### Option 1: One-Click Setup (Recommended)
+## 🎯 What Fortress Modeler Cloud Is
 
-**Mac/Linux:**
-```bash
-git clone https://github.com/jonnysatts/fortress-modeler.git
-cd fortress-modeler
-./setup.sh
-```
+**Not just a financial calculator** - Fortress Modeler Cloud is a complete business planning ecosystem that enables organizations to:
 
-**Windows:**
-```bash
-git clone https://github.com/jonnysatts/fortress-modeler.git
-cd fortress-modeler
-scripts\setup\setup.bat
-```
+- **Model Complex Business Scenarios** with revenue streams, cost structures, growth models, and marketing budgets
+- **Assess and Manage Risks** with comprehensive risk categorization, impact analysis, and mitigation tracking
+- **Track Performance** with actual vs. projected variance analysis and forecast accuracy metrics
+- **Collaborate in Real-Time** with cloud-based sharing and multi-user project access
+- **Generate Professional Reports** with PDF and Excel export capabilities
+- **Monitor Portfolio Health** with enterprise-grade analytics dashboards
 
-### 🖥️ Windows Quick Launch
+## � Key Capabilities
 
-For Windows users, we provide several helper scripts:
-- **Launch App**: `scripts\windows\launch-fortress.bat`
-- **PowerShell Launch**: Right-click `scripts\windows\Launch-Fortress.ps1` → Run with PowerShell
-- **Diagnose Issues**: `scripts\windows\diagnose-pc.bat`
-- **Fix Port Issues**: `scripts\windows\fix-port-8081.bat`
+### 📊 Advanced Financial Modeling
+- **Multi-Stream Revenue Models**: Fixed, variable, and recurring revenue with custom frequencies
+- **Comprehensive Cost Management**: Staffing, marketing, operations with category-based tracking
+- **Growth Model Engine**: Linear, exponential, seasonal, and custom growth patterns
+- **Marketing Budget Allocation**: Channel-based budgeting with audience targeting
+- **Scenario Planning**: Compare optimistic, realistic, and pessimistic projections
 
-### Option 2: Manual Setup
+### 🛡️ Risk Management System
+- **Risk Assessment Framework**: Likelihood vs. Impact scoring with visual heat maps
+- **Risk Categorization**: Financial, operational, strategic, regulatory risk types
+- **Mitigation Tracking**: Owner assignment, status monitoring, and action planning
+- **Risk Insights Dashboard**: Portfolio-wide risk visibility and trend analysis
 
-1. **Install Node.js v18+** from https://nodejs.org/
-2. **Clone and install:**
-   ```bash
-   git clone https://github.com/jonnysatts/fortress-modeler.git
-   cd fortress-modeler
-   npm install
-   ```
-3. **Configure environment:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your Supabase credentials
-   ```
-4. **Start the app:**
-   ```bash
-   npm run dev
-   ```
+### � Performance Analytics
+- **Variance Analysis**: Real-time actual vs. projected performance tracking
+- **Forecast Accuracy Metrics**: MAPE (Mean Absolute Percentage Error) calculations
+- **Project Health Monitoring**: Automated health scoring with early warning indicators
+- **Portfolio Dashboard**: Enterprise-grade KPIs with drill-down capabilities
 
-🌐 **App runs at:** http://localhost:8081/
+### 👥 Collaboration Features
+- **Real-Time Sharing**: Cloud-based project sharing with permission controls
+- **Multi-User Access**: Owner, editor, and viewer permission levels
+- **Supabase Integration**: Real-time updates and collaborative editing
+- **Export & Reporting**: Professional PDF reports and Excel data exports
 
-📖 **Detailed setup:** See [INSTALLATION_GUIDE.md](./docs/INSTALLATION_GUIDE.md)
+## 🏗️ Architecture Overview
 
-## 🏗️ Project Overview
-
-Fortress Modeler Cloud is a sophisticated financial modeling application that enables users to create, analyze, and manage financial projections for various business scenarios. The platform features advanced visualization, real-time calculations, and comprehensive data management capabilities.
-
-### Key Features
-
-- **Financial Model Creation** - Build complex financial models with revenue streams, cost categories, and growth projections
-- **Interactive Dashboards** - Real-time charts and visualizations powered by Recharts
-- **Performance Tracking** - Compare actual vs. projected performance with detailed analytics
-- **Scenario Analysis** - Create and compare multiple financial scenarios
-- **Data Export** - Export models and reports to PDF and Excel formats
-- **Local-First Architecture** - All data stored locally with IndexedDB for optimal performance
-
-## 🚀 Performance Optimizations
-
-This application has been extensively optimized for production performance:
-
-### Bundle Optimization
-- **Intelligent Code Splitting** - Vendor libraries separated into logical chunks
-- **Lazy Loading** - Components load only when needed
-- **Compression** - Gzip and Brotli compression (up to 82% size reduction)
-- **Tree Shaking** - Unused code automatically removed
-
-### Runtime Performance
-- **React.memo** - Heavy chart components memoized to prevent unnecessary re-renders
-- **Multi-layer Caching** - React Query + in-memory cache for database operations
-- **Performance Monitoring** - Real-time performance tracking in development mode
-- **Optimized Database Queries** - IndexedDB with proper indexing and caching
-
-### Bundle Analysis
-The application generates detailed bundle analysis reports to help monitor bundle size and composition. After building, check `dist/bundle-analysis.html` for insights.
-
-## 🛠️ Tech Stack
-
-### Core Technologies
-- **React 18** - Modern React with concurrent features
-- **TypeScript** - Type-safe development
-- **Vite** - Fast build tool and development server
-- **Tailwind CSS** - Utility-first CSS framework
-
-### UI & Visualization
-- **Radix UI** - Accessible component primitives
-- **Shadcn/ui** - Beautiful, customizable components
-- **Recharts** - Powerful charting library
-- **Lucide React** - Modern icon library
+### Frontend Stack
+- **React 18** with TypeScript for type-safe development
+- **Vite** for fast development and optimized production builds
+- **Tailwind CSS** with Radix UI components for enterprise-grade design
+- **Recharts** for sophisticated data visualization
+- **React Query** for intelligent data caching and synchronization
 
 ### Data Management
-- **React Query** - Server state management and caching
-- **Zustand** - Client-side state management
-- **Dexie** - IndexedDB wrapper for local data storage
-- **Zod** - Schema validation
+- **Dual Storage Mode**: Local-first (IndexedDB) and cloud (Supabase) options
+- **Dexie.js** for robust local database management
+- **Supabase** for cloud storage, real-time collaboration, and authentication
+- **Zod** for comprehensive data validation and type safety
 
-### Development & Testing
-- **Vitest** - Fast unit testing framework
-- **Testing Library** - Component testing utilities
-- **Puppeteer** - E2E testing
-- **ESLint & Prettier** - Code quality and formatting
+### State Management
+- **Zustand** for client-side state management
+- **React Query** for server state and caching
+- **Custom Hooks** for business logic encapsulation
 
-## 🏃‍♂️ Getting Started
+## 📱 User Experience
+
+### Target Users
+- **Product Managers** planning new product launches and business models
+- **Business Analysts** creating financial projections and performance reports
+- **Strategic Planners** modeling different business scenarios and outcomes
+- **Finance Teams** tracking actual vs. projected performance
+- **Executive Teams** monitoring portfolio health and risk exposure
+
+### Core Workflows
+1. **Project Creation**: Define business context, product type, and target audience
+2. **Financial Modeling**: Build comprehensive revenue and cost models
+3. **Risk Assessment**: Identify, categorize, and plan risk mitigation
+4. **Performance Tracking**: Input actual data and monitor variance
+5. **Analytics Review**: Analyze trends, accuracy, and portfolio health
+6. **Reporting**: Generate professional reports for stakeholders
+
+## 🛠️ Installation & Setup
 
 ### Prerequisites
-- Node.js 18+ and npm (install with [nvm](https://github.com/nvm-sh/nvm#installing-and-updating))
+- Node.js 18+ and npm
+- Optional: Supabase account for cloud features
 
-### Installation
+### Quick Start
 
 ```bash
 # Clone the repository
-git clone <YOUR_GIT_URL>
+git clone https://github.com/jonnysatts/fortress-modeler.git
 cd fortress-modeler-cloud
 
 # Install dependencies
@@ -128,207 +99,231 @@ npm install
 npm run dev
 ```
 
+**Application runs at:** http://localhost:8081/
+
+### Platform-Specific Setup
+
+**Windows Users:**
+```bash
+# Quick setup script
+scripts\setup\setup.bat
+
+# Or use PowerShell launcher
+scripts\windows\Launch-Fortress.ps1
+```
+
+**Mac/Linux Users:**
+```bash
+# One-click setup
+./setup.sh
+```
+
+### Cloud Configuration (Optional)
+
+For collaboration features, configure Supabase:
+
+1. Copy `.env.example` to `.env`
+2. Add your Supabase credentials:
+   ```
+   VITE_SUPABASE_URL=your_supabase_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
+3. Run database migrations (see `docs/SUPABASE_SETUP.md`)
+
 ## 📁 Project Structure
 
 ```
 fortress-modeler-cloud/
-├── src/                    # Source code
-│   ├── components/         # React components
-│   ├── pages/             # Page components
-│   ├── hooks/             # Custom React hooks
-│   ├── lib/               # Utilities and libraries
-│   ├── services/          # Business logic and API
-│   └── types/             # TypeScript type definitions
-├── scripts/               # Utility scripts
-│   ├── windows/           # Windows-specific scripts
-│   │   ├── launch-fortress.bat
-│   │   ├── Launch-Fortress.ps1
-│   │   ├── diagnose-pc.bat
-│   │   └── fix-port-8081.bat
-│   └── setup/             # Setup and installation scripts
-│       ├── setup.bat
-│       ├── setup-windows.bat
-│       └── build-installer.bat
-├── docs/                  # Documentation
-│   ├── INSTALLATION_GUIDE.md
-│   ├── REQUIREMENTS.md
-│   ├── WINDOWS_INSTALLER.md
-│   └── PORT_TROUBLESHOOTING.md
-├── electron/              # Electron desktop app
-├── public/                # Static assets
-├── dist/                  # Build output
-└── tests/                 # Test files
+├── src/
+│   ├── components/           # React components
+│   │   ├── dashboard/       # Dashboard analytics components
+│   │   ├── models/          # Financial modeling components
+│   │   ├── risk/            # Risk management components
+│   │   ├── layout/          # Application layout
+│   │   └── ui/              # Base UI components
+│   ├── hooks/               # Custom React hooks
+│   │   ├── usePortfolioAnalytics.ts
+│   │   ├── useRisks.ts
+│   │   ├── useForecastAccuracy.ts
+│   │   └── useVarianceTrends.ts
+│   ├── services/            # Business logic services
+│   │   ├── RiskService.ts
+│   │   ├── DashboardAnalyticsService.ts
+│   │   └── FinancialModelService.ts
+│   ├── lib/                 # Utilities and libraries
+│   │   ├── db.ts           # Database operations
+│   │   ├── security.ts     # Security utilities
+│   │   └── board-ready-export.ts
+│   ├── types/               # TypeScript definitions
+│   │   ├── models.ts       # Financial model types
+│   │   ├── risk.ts         # Risk management types
+│   │   └── analytics.ts    # Analytics types
+│   └── pages/               # Application pages
+├── server/                  # Backend server (Node.js)
+│   ├── src/api/            # API routes
+│   ├── src/services/       # Server-side services
+│   └── src/db/             # Database connections
+├── supabase/               # Database migrations
+├── docs/                   # Documentation
+├── scripts/                # Build and utility scripts
+└── electron/               # Desktop app configuration
 ```
+
+## 🎯 Features Deep Dive
+
+### Financial Modeling Engine
+- **Product-Specific Templates**: Event-based, subscription, one-time purchase models
+- **Dynamic Growth Calculations**: Customer acquisition, retention, and expansion modeling
+- **Marketing ROI Tracking**: Channel attribution and budget optimization
+- **Cash Flow Projections**: Monthly and weekly cash flow modeling
+
+### Risk Management Framework
+- **Risk Heat Maps**: Visual representation of likelihood vs. impact
+- **Automated Risk Indicators**: System-generated risk alerts based on performance data
+- **Mitigation Progress Tracking**: Action item management with owner assignment
+- **Portfolio Risk Aggregation**: Enterprise-wide risk exposure analysis
+
+### Performance Analytics Suite
+- **Variance Dashboard**: Real-time actual vs. projected comparisons
+- **Forecast Accuracy Scoring**: Historical accuracy analysis with trend identification
+- **Project Health Indicators**: Automated scoring based on multiple metrics
+- **Portfolio Analytics**: Cross-project insights and comparative analysis
+
+## 🔧 Development
 
 ### Available Scripts
 
 ```bash
 # Development
-npm run dev          # Start development server on http://localhost:8080
-npm run build        # Build for production
-npm run preview      # Preview production build
+npm run dev              # Start development server
+npm run build           # Production build
+npm run preview         # Preview production build
 
 # Testing
-npm test            # Run unit tests
-npm run test:watch  # Run tests in watch mode
-npm run test:ui     # Open Vitest UI
-npm run test:e2e    # Run E2E tests with Puppeteer
+npm test                # Run unit tests
+npm run test:e2e        # Run end-to-end tests
+npm run test:coverage   # Generate coverage report
 
 # Code Quality
-npm run lint        # Run ESLint
-npm run type-check  # Run TypeScript compiler check
+npm run lint            # ESLint analysis
+npm run typecheck       # TypeScript validation
+
+# Desktop App
+npm run electron:dev    # Development with Electron
+npm run electron:build  # Build desktop application
 ```
 
-## 📱 Application Structure
+### Technology Stack
 
-### Core Modules
+**Core Technologies:**
+- React 18, TypeScript, Vite
+- Tailwind CSS, Radix UI, Shadcn/ui
+- React Query, Zustand, React Hook Form
 
-- **Projects** - Create and manage business projects
-- **Financial Models** - Build comprehensive financial projections
-- **Performance Analysis** - Track actual vs. projected performance
-- **Data Visualization** - Interactive charts and dashboards
+**Data & Analytics:**
+- Dexie (IndexedDB), Supabase
+- Recharts, Chart.js
+- jsPDF, xlsx (exports)
 
-### Project Structure
+**Development Tools:**
+- Vitest, Testing Library
+- ESLint, Prettier
+- Electron, Puppeteer
 
-```
-fortress-modeler-cloud/
-├── src/                 # Source code
-│   ├── components/      # Reusable UI components
-│   │   ├── ui/         # Base UI components (shadcn/ui)
-│   │   ├── layout/     # Layout components
-│   │   └── models/     # Financial modeling components
-│   ├── pages/          # Application pages/routes
-│   ├── hooks/          # Custom React hooks
-│   ├── lib/            # Utility libraries
-│   │   ├── db.ts      # Database schema and operations
-│   │   ├── cache.ts   # Caching layer
-│   │   └── performance.ts # Performance monitoring
-│   ├── services/       # Business logic services
-│   └── types/          # TypeScript type definitions
-├── docs/               # Documentation
-│   ├── INSTALLATION_GUIDE.md
-│   ├── QUICK_FIXES.md
-│   ├── REQUIREMENTS.md
-│   ├── PORT_TROUBLESHOOTING.md
-│   ├── WHY_PORT_8081.md
-│   ├── WINDOWS_INSTALLER.md
-│   └── INSTALLER_SUMMARY.md
-├── scripts/            # Build and utility scripts
-│   ├── windows/        # Windows-specific scripts
-│   │   ├── launch-fortress.bat
-│   │   ├── launch-fortress-windows.bat
-│   │   ├── Launch-Fortress.ps1
-│   │   ├── fix-port-8081.bat
-│   │   ├── start-app.bat
-│   │   ├── start-app-any-port.bat
-│   │   └── diagnose-pc.bat
-│   ├── setup/          # Setup and installation scripts
-│   │   ├── setup.bat
-│   │   ├── setup-windows.bat
-│   │   ├── setup-electron.bat
-│   │   └── build-installer.bat
-│   ├── configure-env.bat
-│   └── diagnose-port.bat
-├── server/             # Backend server code
-├── temp-files/         # Temporary and test files
-│   ├── tests/          # Test HTML and JS files
-│   └── sql/            # SQL scripts
-└── public/             # Static assets
-```
+## 🌟 Performance Optimizations
 
-## 🎯 Key Features Deep Dive
-
-### Financial Modeling
-- **Revenue Streams** - Multiple revenue categories with growth rates
-- **Cost Management** - Fixed, variable, and recurring cost modeling
-- **Growth Projections** - Linear, exponential, and seasonal growth models
-- **Scenario Planning** - Compare optimistic, realistic, and pessimistic scenarios
-
-### Visualization & Analytics
-- **Interactive Charts** - Revenue trends, cost analysis, and performance tracking
-- **Financial Matrix** - Detailed period-by-period breakdowns
-- **Category Breakdowns** - Pie charts and bar charts for cost/revenue analysis
-- **Performance Metrics** - NPV, IRR, payback period, and ROI calculations
-
-### Data Management
-- **Local Storage** - All data stored locally using IndexedDB
-- **Import/Export** - Support for CSV, Excel, and PDF formats
-- **Data Validation** - Comprehensive validation using Zod schemas
-- **Backup & Restore** - Easy data backup and restoration
-
-## 🔧 Development
-
-### Architecture Principles
-
-1. **Local-First** - All data stored locally for optimal performance and privacy
-2. **Type Safety** - Comprehensive TypeScript coverage
-3. **Component Composition** - Reusable, composable components
-4. **Performance First** - Optimized for speed and efficiency
-5. **Accessibility** - WCAG compliant components
-
-### Performance Monitoring
-
-In development mode, the application includes a performance monitoring widget that tracks:
-- Component render times
-- Database query performance
-- Bundle loading metrics
-- User interaction responsiveness
-
-Access the performance monitor via the floating chart icon in the bottom-right corner.
-
-### Testing Strategy
-
-- **Unit Tests** - Component logic and utility functions
-- **Integration Tests** - Component interactions and data flow
-- **E2E Tests** - Complete user workflows
-- **Performance Tests** - Bundle size and runtime performance
-
-## 📊 Production Deployment
-
-### Build Optimization
-
-The production build includes:
-- **Code Splitting** - Optimal chunk sizes for caching
-- **Compression** - Gzip and Brotli compression
-- **Asset Optimization** - Images and fonts optimized
-- **Source Maps** - Available for debugging (dev mode only)
+### Production Features
+- **Intelligent Code Splitting**: Vendor chunks and lazy loading
+- **Advanced Caching**: Multi-layer caching with React Query
+- **Bundle Optimization**: Tree shaking, compression (82% size reduction)
+- **Performance Monitoring**: Real-time metrics in development mode
 
 ### Performance Metrics
+- **First Contentful Paint**: < 1.5s
+- **Largest Contentful Paint**: < 2.5s
+- **Total Bundle Size**: ~1.5MB (compressed to ~470KB)
+- **Runtime Performance**: Optimized for 60fps interactions
 
-Production builds achieve:
-- **First Contentful Paint** - < 1.5s
-- **Largest Contentful Paint** - < 2.5s
-- **Cumulative Layout Shift** - < 0.1
-- **Total Bundle Size** - ~1.5MB (compressed to ~470KB with Brotli)
+## 📚 Documentation
+
+### Core Documentation
+- [User Guide](docs/USER_GUIDE.md) - Complete workflows for product managers
+- [Architecture Guide](docs/ARCHITECTURE.md) - Technical architecture and data flow
+- [API Reference](docs/API_REFERENCE.md) - Data models and service documentation
+
+### Feature Documentation
+- [Risk Management](docs/RISK_MANAGEMENT.md) - Risk assessment methodology
+- [Analytics Guide](docs/ANALYTICS_GUIDE.md) - Performance analytics features
+- [Collaboration](docs/COLLABORATION.md) - Team sharing and real-time features
+
+### Setup & Deployment
+- [Installation Guide](docs/INSTALLATION_GUIDE.md) - Detailed setup instructions
+- [Deployment Modes](docs/DEPLOYMENT_MODES.md) - Local vs. cloud deployment
+- [Supabase Setup](docs/SUPABASE_SETUP.md) - Cloud configuration guide
+
+## � Production Deployment
+
+### Deployment Options
+
+**Local Deployment:**
+- Self-hosted with IndexedDB storage
+- No external dependencies
+- Full offline capability
+
+**Cloud Deployment:**
+- Supabase backend integration
+- Real-time collaboration
+- Scalable multi-user support
+
+### Build for Production
+
+```bash
+# Build optimized production bundle
+npm run build
+
+# Build desktop application
+npm run electron:build
+
+# Build with specific environment
+npm run build -- --mode production
+```
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+3. Follow the existing code patterns and TypeScript conventions
+4. Add tests for new features
+5. Update documentation as needed
+6. Commit with descriptive messages
+7. Push to the branch and open a Pull Request
 
 ### Development Guidelines
-
-- Follow the existing code style and patterns
-- Add tests for new features
-- Update documentation as needed
-- Ensure all tests pass before submitting
-- Keep commits focused and descriptive
+- Maintain TypeScript strict mode compliance
+- Follow component composition patterns
+- Add comprehensive error handling
+- Include performance considerations
+- Update relevant documentation
 
 ## 📄 License
 
-This project is private and proprietary. All rights reserved.
+This project is proprietary. All rights reserved.
 
-## 🆘 Support
+## 🆘 Support & Troubleshooting
 
-For issues and questions:
-1. Check the existing issues in the repository
-2. Create a new issue with detailed description
-3. Include steps to reproduce any bugs
-4. Provide browser and system information
+**Common Issues:**
+- [Port Troubleshooting](docs/PORT_TROUBLESHOOTING.md)
+- [Windows Installation](docs/WINDOWS_INSTALLER.md)
+- [Requirements](docs/REQUIREMENTS.md)
+
+**For Support:**
+1. Check existing documentation
+2. Review GitHub issues
+3. Create detailed bug reports with reproduction steps
+4. Include system information and error logs
 
 ---
 
-Built with ❤️ using modern web technologies for optimal performance and user experience.
+**Built with modern web technologies for enterprise-grade business planning and financial analytics.**
+
+*Fortress Modeler Cloud - Empowering informed business decisions through sophisticated modeling and analytics.*
