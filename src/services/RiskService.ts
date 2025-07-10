@@ -195,11 +195,35 @@ class RiskService {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) throw new Error('User not authenticated');
 
+      // Convert percentage-based inputs to database-expected format
+      const probability1to5 = this.convertPercentageTo1to5Scale(data.probability || 50);
+      const impact1to5 = this.convertPercentageTo1to5Scale(data.impact_score || 50);
+      
+      // Calculate enhanced risk score with priority multiplier
+      const enhancedRiskScore = this.calculateEnhancedRiskScore(
+        probability1to5, 
+        impact1to5, 
+        data.priority
+      );
+
+      // Map UI fields to database schema
       const riskData = {
-        ...data,
+        project_id: data.project_id,
         user_id: user.user.id,
+        title: data.title,
+        description: data.description,
+        category: data.category,
+        priority: data.priority,
         status: data.status || 'identified',
-        source: data.source || 'manual'
+        potential_impact: data.impact_description, // Map impact_description → potential_impact
+        mitigation_plan: data.mitigation_plan,
+        owner: data.owner,
+        target_date: data.target_resolution_date || null, // Map target_resolution_date → target_date
+        probability: probability1to5, // Convert percentage to 1-5 scale
+        impact: impact1to5, // Convert percentage to 1-5 scale
+        risk_score: enhancedRiskScore, // Enhanced calculation with priority multiplier
+        source: data.source || 'manual',
+        automatic_trigger_data: data.automatic_trigger_data
       };
 
       const { data: newRisk, error } = await supabase
@@ -208,7 +232,10 @@ class RiskService {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error details:', error);
+        throw error;
+      }
 
       // Create notification for new risk (stubbed until database migration)
       try {
@@ -409,7 +436,34 @@ class RiskService {
     return priority;
   }
 
-  // Calculate risk score
+  // Enhanced risk score calculation with priority multiplier
+  calculateEnhancedRiskScore(probability1to5: number, impact1to5: number, priority: RiskPriority): number {
+    const baseScore = probability1to5 * impact1to5; // 1-25 range
+    
+    // Priority multipliers for business relevance
+    const priorityMultipliers = {
+      low: 1.0,
+      medium: 1.5,
+      high: 2.0,
+      critical: 3.0
+    };
+    
+    const multipliedScore = baseScore * priorityMultipliers[priority];
+    
+    // Keep result within database constraints (1-25)
+    return Math.min(25, Math.max(1, Math.round(multipliedScore)));
+  }
+
+  // Convert percentage (0-100) to 1-5 scale for database
+  convertPercentageTo1to5Scale(percentage: number): number {
+    if (percentage <= 20) return 1;
+    if (percentage <= 40) return 2;
+    if (percentage <= 60) return 3;
+    if (percentage <= 80) return 4;
+    return 5;
+  }
+
+  // Calculate risk score (legacy method for backward compatibility)
   calculateRiskScore(probability: number, impact: number): number {
     return Math.round((probability * impact) / 100);
   }

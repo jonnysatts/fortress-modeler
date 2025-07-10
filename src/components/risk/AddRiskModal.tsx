@@ -466,12 +466,25 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
         </div>
 
         <div className="bg-gray-50 p-3 rounded-lg">
-          <div className="text-sm font-medium mb-1">Risk Score</div>
+          <div className="text-sm font-medium mb-1">Enhanced Risk Score</div>
           <div className="text-2xl font-bold text-fortress-emerald">
-            {Math.round((formData.probability * formData.impact_score) / 100)}
+            {(() => {
+              // Convert percentages to 1-5 scale for calculation
+              const prob1to5 = Math.ceil(formData.probability / 20);
+              const impact1to5 = Math.ceil(formData.impact_score / 20);
+              const baseScore = prob1to5 * impact1to5;
+              
+              // Priority multipliers
+              const multipliers = { low: 1.0, medium: 1.5, high: 2.0, critical: 3.0 };
+              const multipliedScore = baseScore * multipliers[formData.priority];
+              
+              return Math.min(25, Math.max(1, Math.round(multipliedScore)));
+            })()}
           </div>
-          <div className="text-xs text-muted-foreground">
-            Calculated from probability × impact
+          <div className="text-xs text-muted-foreground space-y-1">
+            <div>Base: {Math.ceil(formData.probability / 20)} × {Math.ceil(formData.impact_score / 20)} = {Math.ceil(formData.probability / 20) * Math.ceil(formData.impact_score / 20)}</div>
+            <div>Priority Multiplier: {formData.priority === 'low' ? '1.0x' : formData.priority === 'medium' ? '1.5x' : formData.priority === 'high' ? '2.0x' : '3.0x'}</div>
+            <div>📊 <strong>{formData.priority.toUpperCase()}</strong> priority risks score higher</div>
           </div>
         </div>
       </div>
