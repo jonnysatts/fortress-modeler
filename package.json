@@ -42,7 +42,9 @@
     "dev:5173": "npm run dev -- --port 5173",
     "dev:8080": "npm run dev -- --port 8080",
     "diagnose": "node scripts/diagnose-port.cjs",
-    "fix-port": "node scripts/fix-oauth-port.cjs"
+    "fix-port": "node scripts/fix-oauth-port.cjs",
+    "migrate-legacy": "node scripts/migrate-legacy-data.js",
+    "setup-migration": "node scripts/setup-migration.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -86,6 +88,7 @@
     "colord": "^2.9.3",
     "date-fns": "^3.6.0",
     "dexie": "^4.0.11",
+    "dotenv": "^17.2.0",
     "embla-carousel-react": "^8.3.0",
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",

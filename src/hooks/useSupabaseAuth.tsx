@@ -66,11 +66,11 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // Add timeout to prevent infinite loading - reduced to 5 seconds
+    // Increase timeout to 10 seconds and make profile operations non-blocking
     const timeoutId = setTimeout(() => {
-      console.log('⏰ [SupabaseAuth] Session check timeout (5s), stopping loading...');
+      console.log('⏰ [SupabaseAuth] Session check timeout (10s), stopping loading...');
       setIsLoading(false);
-    }, 5000); // 5-second timeout
+    }, 10000); // Increased to 10-second timeout
 
     // Get initial session
     const getInitialSession = async () => {
@@ -92,13 +92,18 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
           logService.error('Failed to get initial session', error as AuthError);
           errorService.logError(error as AuthError, 'SupabaseAuth.getInitialSession', 'auth', 'medium');
         } else {
+          // Set session and user immediately - don't wait for profile operations
           setSession(initialSession);
           setUser(toAppUser(initialSession?.user ?? null));
           
+          // Clear loading state early since we have the essential auth data
+          clearTimeout(timeoutId);
+          setIsLoading(false);
+          
+          // Handle profile operations in background (non-blocking)
           if (initialSession?.user) {
-            console.log('👤 [SupabaseAuth] User found, ensuring profile exists...');
-            await ensureUserProfile(initialSession.user);
-            await loadUserProfile(initialSession.user.id);
+            console.log('👤 [SupabaseAuth] User found, handling profile in background...');
+            handleProfileOperations(initialSession.user);
           } else {
             console.log('👤 [SupabaseAuth] No user found in session');
           }
@@ -106,10 +111,21 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         logService.error('Error during initial session setup', error);
         errorService.logError(error, 'SupabaseAuth.initialSetup', 'auth', 'high');
-      } finally {
-        console.log('✅ [SupabaseAuth] Initial session setup complete, clearing timeout and stopping loading');
         clearTimeout(timeoutId);
         setIsLoading(false);
+      }
+    };
+
+    // Handle profile operations separately and non-blocking
+    const handleProfileOperations = async (user: any) => {
+      try {
+        console.log('🔄 [SupabaseAuth] Starting background profile operations...');
+        await ensureUserProfile(user);
+        await loadUserProfile(user.id);
+        console.log('✅ [SupabaseAuth] Background profile operations completed');
+      } catch (error) {
+        console.warn('⚠️ [SupabaseAuth] Profile operations failed (app will continue):', error);
+        // Don't throw - profile issues shouldn't block authentication
       }
     };
 
@@ -120,12 +136,14 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       async (event, session) => {
         logService.debug('Auth state changed', { event, userId: session?.user?.id });
         
+        // Set auth state immediately
         setSession(session);
         setUser(toAppUser(session?.user ?? null));
+        setIsLoading(false);
         
+        // Handle profile operations in background
         if (session?.user) {
-          await ensureUserProfile(session.user);
-          await loadUserProfile(session.user.id);
+          handleProfileOperations(session.user);
         } else {
           setProfile(null);
         }
@@ -136,8 +154,6 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
           logService.info('User signed out');
           setProfile(null);
         }
-        
-        setIsLoading(false);
       }
     );
 

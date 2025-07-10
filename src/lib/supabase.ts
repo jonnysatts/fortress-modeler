@@ -91,10 +91,10 @@ export const auth = {
     } catch (err) {
       console.error('❌ signInWithGoogle exception details:', {
         err,
-        message: err?.message,
-        name: err?.name,
-        cause: err?.cause,
-        stack: err?.stack,
+        message: (err as any)?.message,
+        name: (err as any)?.name,
+        cause: (err as any)?.cause,
+        stack: (err as any)?.stack,
         type: typeof err
       });
       throw err;
@@ -153,25 +153,44 @@ export const auth = {
 
 // Database helper functions
 export const db = {
-  // Get user profile
+  // Get user profile with timeout
   async getProfile(userId: string) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    
-    // If profile not found (PGRST116), return null instead of throwing
-    if (error) {
-      if (error.code === 'PGRST116') {
-        console.log('[db.getProfile] Profile not found for user:', userId);
+    try {
+      console.log('[db.getProfile] Fetching profile for user:', userId);
+      
+      // Add timeout to prevent hanging
+      const profilePromise = supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile fetch timeout after 3s')), 3000)
+      );
+      
+      const { data, error } = await Promise.race([profilePromise, timeoutPromise]) as any;
+      
+      // If profile not found (PGRST116), return null instead of throwing
+      if (error) {
+        if (error.code === 'PGRST116') {
+          console.log('[db.getProfile] Profile not found for user:', userId);
+          return null;
+        }
+        // Only throw for actual errors, not "not found"
+        console.error('[db.getProfile] Error fetching profile:', error);
+        throw error;
+      }
+      
+      console.log('[db.getProfile] Profile found for user:', userId);
+      return data;
+    } catch (error) {
+      if ((error as Error).message?.includes('timeout')) {
+        console.warn('[db.getProfile] Profile fetch timed out, returning null');
         return null;
       }
-      // Only throw for actual errors, not "not found"
-      console.error('[db.getProfile] Error fetching profile:', error);
       throw error;
     }
-    return data;
   },
 
   // Create user profile
