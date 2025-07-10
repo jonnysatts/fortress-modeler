@@ -480,9 +480,9 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
 
   const renderStepContent = () => {
     switch (step) {
-      case 'category': return <CategoryStep />;
-      case 'details': return <DetailsStep />;
-      case 'assessment': return <AssessmentStep />;
+      case 'category': return CategoryStep();
+      case 'details': return DetailsStep();
+      case 'assessment': return AssessmentStep();
     }
   };
 
