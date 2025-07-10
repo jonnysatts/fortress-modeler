@@ -1,6 +1,7 @@
 import { query, withTransaction } from '../db/connection';
 import { validate as uuidValidate } from 'uuid';
 import { PoolClient } from 'pg';
+import { ProjectData } from '../types/common';
 
 export interface Project {
   id: string;
@@ -10,7 +11,7 @@ export interface Project {
   description?: string;
   product_type?: string;
   target_audience?: string;
-  data: any;
+  data: ProjectData;
   version: number;
   created_at: Date;
   updated_at: Date;
@@ -23,7 +24,7 @@ export interface CreateProjectData {
   description?: string;
   product_type?: string;
   target_audience?: string;
-  data?: any;
+  data?: ProjectData;
 }
 
 export interface UpdateProjectData {
@@ -31,7 +32,7 @@ export interface UpdateProjectData {
   description?: string;
   product_type?: string;
   target_audience?: string;
-  data?: any;
+  data?: ProjectData;
 }
 
 export interface SyncProjectData extends CreateProjectData {
@@ -170,7 +171,7 @@ export class ProjectService {
     updateData: UpdateProjectData
   ): Promise<Project | null> {
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: (string | ProjectData | undefined)[] = [];
     let paramCount = 1;
     
     if (updateData.name !== undefined) {

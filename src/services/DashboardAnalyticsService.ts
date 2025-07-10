@@ -1,4 +1,4 @@
-import { ActualsPeriodEntry } from '@/types/models';
+import { ActualsPeriodEntry, Model, RevenueStream, CostCategory } from '@/types/models';
 import { Project } from '@/lib/db';
 import { runModelSimulation } from '@/lib/project-aggregation';
 
@@ -152,7 +152,7 @@ export class DashboardAnalyticsService {
    * This ensures we're comparing like-for-like timeframes
    */
   private static calculateProjectedForActualPeriods(
-    model: any,
+    model: Model,
     actuals: ActualsPeriodEntry[]
   ): { revenue: number; costs: number } {
     if (!model?.assumptions || actuals.length === 0) {
@@ -184,7 +184,7 @@ export class DashboardAnalyticsService {
    * Generate projected revenue and costs for each period from a financial model
    * This replicates the logic from useForecastAccuracy to ensure consistency
    */
-  private static generateProjectedPeriods(model: any): Array<{ period: number; revenue: number; costs: number }> {
+  private static generateProjectedPeriods(model: Model): Array<{ period: number; revenue: number; costs: number }> {
     if (!model?.assumptions) {
       return [];
     }
@@ -207,7 +207,7 @@ export class DashboardAnalyticsService {
       
       // Calculate period revenue
       let periodRevenue = 0;
-      model.assumptions.revenue.forEach((stream: any) => {
+      model.assumptions.revenue.forEach((stream: RevenueStream) => {
         let streamRevenue = 0;
         const baseValue = stream.value;
         
@@ -254,7 +254,7 @@ export class DashboardAnalyticsService {
 
       // Calculate period costs
       let periodCosts = 0;
-      model.assumptions.costs.forEach((cost: any) => {
+      model.assumptions.costs.forEach((cost: CostCategory) => {
         let costValue = 0;
         const costType = cost.type?.toLowerCase();
         const baseValue = cost.value;

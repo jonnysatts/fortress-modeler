@@ -11,7 +11,7 @@ export interface ErrorContext {
   url?: string;
   userAgent?: string;
   timestamp?: Date;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface IErrorService {
@@ -23,7 +23,7 @@ export interface IErrorService {
     context?: string, 
     category?: ErrorCategory,
     severity?: ErrorSeverity,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): void;
 
   /**
@@ -49,7 +49,7 @@ export interface IErrorService {
   /**
    * Handle network errors with retry logic
    */
-  handleNetworkError(error: Error | unknown, context: string, retryFn?: () => Promise<any>): Promise<void>;
+  handleNetworkError(error: Error | unknown, context: string, retryFn?: () => Promise<unknown>): Promise<void>;
 
   /**
    * Handle validation errors for forms

@@ -1,8 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Project, FinancialModel, db, getProject, createProject, updateProject, deleteProject } from '@/lib/db';
-import { SupabaseStorageService } from '@/services/implementations/SupabaseStorageService';
 import { toast } from 'sonner';
 import { isCloudModeEnabled } from '@/config/app.config';
+import { useMemo } from 'react';
+import { getSupabaseStorageService } from '@/services/singleton';
 
 // --- Projects --- //
 
@@ -20,7 +21,7 @@ export const useMyProjects = () => {
         // Use Supabase for cloud storage - create service when auth is ready
         console.log('🌤️ Using Supabase for projects');
         try {
-          const supabaseStorage = new SupabaseStorageService();
+          const supabaseStorage = getSupabaseStorageService();
           console.log('🔍 Service created successfully');
           const result = await supabaseStorage.getAllProjects();
           console.log('🔍 getAllProjects result:', result);
@@ -58,7 +59,7 @@ export const useSharedProjects = () => {
       }
       
       try {
-        const supabaseStorage = new SupabaseStorageService();
+        const supabaseStorage = getSupabaseStorageService();
         return await supabaseStorage.getSharedProjects();
       } catch (error) {
         console.error('Error fetching shared projects:', error);
@@ -83,7 +84,7 @@ export const usePublicProjects = () => {
       }
       
       try {
-        const supabaseStorage = new SupabaseStorageService();
+        const supabaseStorage = getSupabaseStorageService();
         return await supabaseStorage.getPublicProjects();
       } catch (error) {
         console.error('Error fetching public projects:', error);
@@ -106,7 +107,7 @@ export const useProject = (projectId: string | undefined) => {
       if (isCloudModeEnabled()) {
         // Use Supabase for cloud storage - create service when auth is ready
         console.log('🌤️ Getting project from Supabase');
-        const supabaseStorage = new SupabaseStorageService();
+        const supabaseStorage = getSupabaseStorageService();
         const project = await supabaseStorage.getProject(projectId);
         if (!project) throw new Error('Project not found');
         return project;
@@ -136,7 +137,7 @@ export const useCreateProject = () => {
         try {
           // Use Supabase for cloud storage - create service when auth is ready
           console.log('🌤️ Attempting to create project in Supabase');
-          const supabaseStorage = new SupabaseStorageService();
+          const supabaseStorage = getSupabaseStorageService();
           const result = await Promise.race([
             supabaseStorage.createProject(newProjectData as Omit<Project, 'id' | 'createdAt' | 'updatedAt'>),
             new Promise((_, reject) => 
@@ -188,7 +189,7 @@ export const useUpdateProject = () => {
       if (isCloudModeEnabled()) {
         // Use Supabase for cloud storage - create service when auth is ready
         console.log('🌤️ Updating project in Supabase');
-        const supabaseStorage = new SupabaseStorageService();
+        const supabaseStorage = getSupabaseStorageService();
         return await supabaseStorage.updateProject(id, data);
       } else {
         // Use IndexedDB for local storage
@@ -223,7 +224,7 @@ export const useDeleteProject = () => {
       if (isCloudModeEnabled()) {
         // Use Supabase for cloud storage - create service when auth is ready
         console.log('🌤️ Deleting project in Supabase');
-        const supabaseStorage = new SupabaseStorageService();
+        const supabaseStorage = getSupabaseStorageService();
         await supabaseStorage.deleteProject(id);
       } else {
         // Use IndexedDB for local storage

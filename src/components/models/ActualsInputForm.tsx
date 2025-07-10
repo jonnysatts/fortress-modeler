@@ -69,6 +69,7 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
       attendanceActual: undefined,
       notes: '',
       useFbCogsPercentage: false,
+      useMerchandiseCogsPercentage: false,
       useMarketingPlan: false,
     },
   });
@@ -103,11 +104,24 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
 
   const fbRevenue = useMemo(() => {
     return form.watch('revenueActuals')['F&B Sales'] || 0;
-  }, [form.watch('revenueActuals')['F&B Sales']]);
+  }, [form]);
 
   const calculatedFbCogs = useMemo(() => {
     return calculateFbCOGS(fbRevenue, fbCogsPercentage);
   }, [fbRevenue, fbCogsPercentage]);
+
+  // Get Merchandise COGS percentage and Merchandise revenue for percentage calculation
+  const merchandiseCogsPercentage = useMemo(() => {
+    return model.assumptions.metadata?.costs?.merchandiseCOGSPercent || 30;
+  }, [model.assumptions.metadata?.costs?.merchandiseCOGSPercent]);
+
+  const merchandiseRevenue = useMemo(() => {
+    return form.watch('revenueActuals')['Merchandise Sales'] || 0;
+  }, [form]);
+
+  const calculatedMerchandiseCogs = useMemo(() => {
+    return calculateFbCOGS(merchandiseRevenue, merchandiseCogsPercentage); // Reuse same calculation function
+  }, [merchandiseRevenue, merchandiseCogsPercentage]);
 
   // Get expected marketing spend for current week
   const expectedMarketingSpend = useMemo(() => {
@@ -129,6 +143,17 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
     }
   }, [fbRevenue, useFbCogsPercentage, calculatedFbCogs, form]);
 
+  // Auto-update Merchandise COGS when using percentage mode and Merchandise revenue changes
+  useEffect(() => {
+    if (useMerchandiseCogsPercentage && merchandiseRevenue >= 0) {
+      const calculatedValue = Math.round(calculatedMerchandiseCogs);
+      form.setValue('costActuals', {
+        ...form.getValues('costActuals'),
+        'Merchandise COGS': calculatedValue
+      }, { shouldValidate: true, shouldDirty: true });
+    }
+  }, [merchandiseRevenue, useMerchandiseCogsPercentage, calculatedMerchandiseCogs, form]);
+
   // Auto-update Marketing Budget when using plan mode
   useEffect(() => {
     if (useMarketingPlan && expectedMarketingSpend >= 0) {
@@ -149,10 +174,12 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
         attendanceActual: currentActual?.attendanceActual,
         notes: currentActual?.notes || '',
         useFbCogsPercentage: currentActual?.useFbCogsPercentage || false,
+        useMerchandiseCogsPercentage: currentActual?.useMerchandiseCogsPercentage || false,
         useMarketingPlan: currentActual?.useMarketingPlan || false
     };
     form.reset(initialValues);
     setUseFbCogsPercentage(currentActual?.useFbCogsPercentage || false);
+    setUseMerchandiseCogsPercentage(currentActual?.useMerchandiseCogsPercentage || false);
     setUseMarketingPlan(currentActual?.useMarketingPlan || false);
   }, [selectedPeriod, existingActuals, form]);
 
@@ -236,6 +263,7 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
         attendanceActual: sanitizedAttendance,
         notes: sanitizedNotes,
         useFbCogsPercentage: useFbCogsPercentage,
+        useMerchandiseCogsPercentage: useMerchandiseCogsPercentage,
         useMarketingPlan: useMarketingPlan
     };
 
@@ -351,6 +379,50 @@ export const ActualsInputForm: React.FC<ActualsInputFormProps> = ({
                         {useFbCogsPercentage && (
                           <p className="text-xs text-muted-foreground ml-1">
                             Calculated: {fbCogsPercentage}% of F&B Revenue (${Math.round(fbRevenue)})
+                          </p>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // Special handling for Merchandise COGS
+                  if (item.name === 'Merchandise COGS') {
+                    return (
+                      <div key={`cost-${item.name}`} className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`use-percentage-${item.name}`}
+                            checked={useMerchandiseCogsPercentage}
+                            onCheckedChange={(checked) => {
+                              setUseMerchandiseCogsPercentage(checked as boolean);
+                              form.setValue('useMerchandiseCogsPercentage', checked as boolean);
+                              // When switching to percentage, calculate and set the value
+                              if (checked) {
+                                const calculatedValue = Math.round(calculatedMerchandiseCogs);
+                                form.setValue('costActuals', {
+                                  ...form.getValues('costActuals'),
+                                  [item.name]: calculatedValue
+                                });
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`use-percentage-${item.name}`} className="col-span-1 text-sm">
+                            Use {merchandiseCogsPercentage}% of Merchandise Revenue
+                          </Label>
+                          <Input 
+                            id={`cost-${item.name}`}
+                            type="text"
+                            className="col-span-2 h-8"
+                            value={useMerchandiseCogsPercentage ? Math.round(calculatedMerchandiseCogs).toString() : (form.watch('costActuals')[item.name] || '')}
+                            onChange={(e) => !useMerchandiseCogsPercentage && handleInputChange('cost', item.name, e.target.value)}
+                            onBlur={(e) => !useMerchandiseCogsPercentage && handleInputBlur('cost', item.name, e.target.value)}
+                            placeholder="0"
+                            disabled={useMerchandiseCogsPercentage}
+                          />
+                        </div>
+                        {useMerchandiseCogsPercentage && (
+                          <p className="text-xs text-muted-foreground ml-1">
+                            Calculated: {merchandiseCogsPercentage}% of Merchandise Revenue (${Math.round(merchandiseRevenue)})
                           </p>
                         )}
                       </div>

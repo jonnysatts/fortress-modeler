@@ -18,23 +18,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { User } from '@/types/user';
 import { 
   AlertTriangle, 
   DollarSign, 
   Calendar, 
-  User, 
   BarChart3,
   Target,
-  Activity
+  Activity,
+  User as UserIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import { useUpdateRisk } from '@/hooks/useRisks';
 import { RiskCategory, RiskPriority, RiskStatus } from '@/services/RiskService';
 
-interface User {
-  id: string;
-  email: string;
-}
+
 
 interface Risk {
   id: string;
@@ -82,7 +80,7 @@ const RISK_CATEGORIES = {
   },
   'resources': {
     name: 'Resources & Team',
-    icon: <User className="h-4 w-4" />,
+    icon: <UserIcon className="h-4 w-4" />,
     color: 'orange'
   },
   'market': {
@@ -265,7 +263,7 @@ export const EditRiskModal: React.FC<EditRiskModalProps> = ({
               type="button"
               variant={formData.priority === key ? "default" : "outline"}
               className={`justify-start ${formData.priority === key ? 'bg-fortress-emerald' : ''}`}
-              onClick={() => setFormData(prev => ({ ...prev, priority: key as any }))}
+              onClick={() => setFormData(prev => ({ ...prev, priority: key as RiskPriority }))}
             >
               <div className="flex items-center gap-2">
                 <div className={`w-3 h-3 rounded-full bg-${config.color}-500`} />
@@ -281,7 +279,7 @@ export const EditRiskModal: React.FC<EditRiskModalProps> = ({
         <Label>Status</Label>
         <Select
           value={formData.status}
-          onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as any }))}
+          onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as RiskStatus }))}
         >
           <SelectTrigger className="mt-1">
             <SelectValue placeholder="Select status" />

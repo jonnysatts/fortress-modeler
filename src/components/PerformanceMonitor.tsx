@@ -17,12 +17,11 @@ export const PerformanceMonitorWidget = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
 
-  // Only show in development
-  if (process.env.NODE_ENV !== 'development') {
-    return null;
-  }
-
   useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') {
+      return;
+    }
+
     if (isVisible) {
       // Update metrics immediately
       updateMetrics();
@@ -38,7 +37,7 @@ export const PerformanceMonitorWidget = () => {
       clearInterval(refreshInterval);
       setRefreshInterval(null);
     }
-  }, [isVisible]);
+  }, [isVisible, refreshInterval]);
 
   const updateMetrics = () => {
     const report = performanceMonitor.getReport();
@@ -60,6 +59,10 @@ export const PerformanceMonitorWidget = () => {
     const [type, ...detail] = name.split(':');
     return { type, detail: detail.join(':') };
   };
+
+  if (process.env.NODE_ENV !== 'development') {
+    return null;
+  }
 
   // Floating button to toggle visibility
   if (!isVisible) {

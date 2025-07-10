@@ -1,6 +1,14 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { OAuth2Client } from 'google-auth-library';
-import jwt from 'jsonwebtoken';
+import jwt, { JwtPayload } from 'jsonwebtoken';
+
+interface UserPayload extends JwtPayload {
+  id: string;
+  email: string;
+  name: string;
+}
+
+export const authRouter = express.Router();
 
 export const authRouter = express.Router();
 
@@ -114,7 +122,7 @@ function authenticateToken(req: Request, res: Response, next: NextFunction) {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as UserPayload;
     req.user = decoded;
     next();
   } catch (error) {

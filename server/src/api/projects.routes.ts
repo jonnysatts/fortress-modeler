@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { ProjectService } from '../services/project.service';
 import { FinancialModelService } from '../services/financial-model.service';
 import { authenticateToken, AuthRequest, rateLimitByUser } from '../middleware/auth.middleware';
+import { ProjectData } from '../types/common';
 
 const router = Router();
 
@@ -142,13 +143,21 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
+interface UpdateProjectData {
+  name?: string;
+  description?: string;
+  product_type?: string;
+  target_audience?: string;
+  data?: ProjectData;
+}
+
 // PUT /projects/:id - Update project
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { name, description, product_type, target_audience, data } = req.body;
     
-    const updateData: any = {};
+    const updateData: UpdateProjectData = {};
     
     if (name !== undefined) {
       if (name.trim().length === 0) {

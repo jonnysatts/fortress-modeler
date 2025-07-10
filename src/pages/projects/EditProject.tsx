@@ -64,7 +64,7 @@ const EditProject = () => {
     if (project.avatarImage) {
       setInitialImage(project.avatarImage);
     }
-  }, [project, form.reset, setInitialImage]);
+  }, [project, form, setInitialImage]);
 
   // Submit handler (uses updateProject)
   const onSubmit = async (data: FormValues) => {

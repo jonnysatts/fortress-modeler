@@ -152,9 +152,13 @@ app.get('/health/detailed', async (req, res) => {
     },
     database: {
       status: 'unknown',
-      latency: null as any,
-      connections: null as any,
-      error: null as any
+      latency: null as number | null,
+      connections: null as {
+        total: number;
+        idle: number;
+        waiting: number;
+      } | null,
+      error: null as string | null
     },
     auth: {
       google_oauth: 'from-secrets',
@@ -232,8 +236,12 @@ app.use('*', (req, res) => {
   });
 });
 
+interface ServerError extends Error {
+  status?: number;
+}
+
 // Error handling middleware
-app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((error: ServerError, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Server error:', error);
   
   res.status(error.status || 500).json({

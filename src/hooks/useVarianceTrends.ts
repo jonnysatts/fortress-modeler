@@ -3,7 +3,7 @@ import { useMyProjects } from '@/hooks/useProjects';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { ActualsPeriodEntry, FinancialModel } from '@/types/models';
 import { VarianceTrendService, VarianceTrend, VarianceInsight } from '@/services/VarianceTrendService';
-import { SupabaseStorageService } from '@/services/implementations/SupabaseStorageService';
+import { getSupabaseStorageService } from '@/services/singleton';
 import { getActualsForProject, getModelsForProject } from '@/lib/db';
 import { isCloudModeEnabled } from '@/config/app.config';
 
@@ -50,7 +50,7 @@ export const useVarianceTrends = () => {
         
         try {
           if (isCloudModeEnabled()) {
-            const supabaseStorage = new SupabaseStorageService();
+            const supabaseStorage = getSupabaseStorageService();
             actuals = await supabaseStorage.getActualsForProject(project.id);
             financialModels = await supabaseStorage.getModelsForProject(project.id);
           } else {

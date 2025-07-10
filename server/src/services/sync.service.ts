@@ -1,7 +1,8 @@
 import { query, withTransaction } from '../db/connection';
 import { PoolClient } from 'pg';
-import { ProjectService, SyncProjectData } from './project.service';
-import { FinancialModelService, SyncModelData } from './financial-model.service';
+import { ProjectService, SyncProjectData, Project } from './project.service';
+import { FinancialModelService, SyncModelData, FinancialModel } from './financial-model.service';
+import { SyncData, PendingChange } from '../types/common';
 
 export interface SyncEvent {
   id: string;
@@ -40,7 +41,7 @@ export interface SyncChange {
   action: 'create' | 'update' | 'delete';
   local_id?: number;
   id?: string;
-  data: any;
+  data: SyncData;
   timestamp: string; // ISO date string
 }
 
@@ -58,7 +59,7 @@ export interface ServerChange {
   action: 'create' | 'update' | 'delete';
   id: string;
   local_id?: number;
-  data: any;
+  data: SyncData;
   version: number;
   updated_at: string;
 }
@@ -67,8 +68,8 @@ export interface ConflictItem {
   type: 'project' | 'model';
   id: string;
   local_id?: number;
-  local_data: any;
-  server_data: any;
+  local_data: SyncData;
+  server_data: SyncData;
   local_timestamp: string;
   server_timestamp: string;
   resolution_needed: 'manual' | 'auto_server' | 'auto_client';
@@ -77,7 +78,7 @@ export interface ConflictItem {
 export interface StoredConflict extends ConflictItem {
   conflict_id: string;
   resolution: 'pending' | 'use_server' | 'use_client' | 'merge';
-  resolved_data?: any;
+  resolved_data?: SyncData;
   resolved_at?: string;
 }
 
@@ -107,7 +108,7 @@ export class SyncService {
     updates: Partial<Pick<SyncStatus, 'last_sync' | 'sync_token' | 'pending_changes' | 'sync_in_progress' | 'last_error'>>
   ): Promise<SyncStatus> {
     const updateFields: string[] = [];
-    const values: any[] = [];
+    const values: (Date | string | PendingChange[] | boolean | undefined)[] = [];
     let paramCount = 1;
     
     if (updates.last_sync !== undefined) {
@@ -155,8 +156,8 @@ export class SyncService {
     entityType: 'project' | 'model',
     entityId: string,
     action: 'CREATE' | 'UPDATE' | 'DELETE',
-    dataBefore?: any,
-    dataAfter?: any,
+    dataBefore?: SyncData,
+    dataAfter?: SyncData,
     localEntityId?: number,
     timestampLocal?: Date,
     syncBatchId?: string
@@ -211,7 +212,7 @@ export class SyncService {
     userId: string,
     conflictId: string,
     resolution: 'use_server' | 'use_client' | 'merge',
-    resolvedData?: any
+    resolvedData?: SyncData
   ): Promise<StoredConflict | null> {
     // Fetch conflict
     const result = await query(
@@ -603,8 +604,8 @@ export class SyncService {
   
   // Force full sync (download all data)
   static async getFullSyncData(userId: string): Promise<{
-    projects: any[];
-    models: any[];
+    projects: Project[];
+    models: FinancialModel[];
     sync_token: string;
     last_sync: string;
   }> {

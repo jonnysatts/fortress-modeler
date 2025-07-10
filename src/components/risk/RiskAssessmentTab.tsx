@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import type { User } from '@/types/user';
 import { 
   AlertTriangle, 
   PlusCircle, 
@@ -22,8 +23,8 @@ import {
   Edit,
   Trash2,
   Calendar,
-  User,
-  BarChart3
+  BarChart3,
+  User as UserIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ForecastAccuracyService, type RiskFlag } from '@/services/ForecastAccuracyService';
@@ -31,6 +32,8 @@ import { ActualsPeriodEntry } from '@/types/models';
 import { useRisks, useDeleteRisk } from '@/hooks/useRisks';
 import { AddRiskModal } from './AddRiskModal';
 import { EditRiskModal } from './EditRiskModal';
+import { RiskCard } from './RiskCard';
+import { Risk } from '@/services/RiskService';
 import {
   Table,
   TableBody,
@@ -43,11 +46,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 
-interface User {
-  id: string;
-  email: string;
-  [key: string]: any;
-}
+
 
 interface FinancialModel {
   id: string;
@@ -100,7 +99,7 @@ const RISK_CATEGORY_CONFIG = {
   },
   'resources': {
     name: 'Resources & Team',
-    icon: <User className="h-4 w-4" />,
+    icon: <UserIcon className="h-4 w-4" />,
     bgColor: 'bg-orange-50',
     borderColor: 'border-orange-200',
     textColor: 'text-orange-800'
@@ -218,7 +217,7 @@ export const RiskAssessmentTab: React.FC<RiskAssessmentTabProps> = ({
   const [selectedTab, setSelectedTab] = useState('overview');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedRisk, setSelectedRisk] = useState<any>(null);
+  const [selectedRisk, setSelectedRisk] = useState<Risk | null>(null);
   
   // Use the enhanced risk management hooks
   const { 
@@ -378,7 +377,7 @@ export const RiskAssessmentTab: React.FC<RiskAssessmentTabProps> = ({
     setShowAddModal(true);
   }, []);
 
-  const handleEditRisk = useCallback((risk: any) => {
+  const handleEditRisk = useCallback((risk: Risk) => {
     setSelectedRisk(risk);
     setShowEditModal(true);
   }, []);
@@ -671,90 +670,22 @@ export const RiskAssessmentTab: React.FC<RiskAssessmentTabProps> = ({
                   <p className="text-sm text-muted-foreground mt-2">Loading risks...</p>
                 </div>
               ) : risksError ? (
-                <Alert>
+                <Alert variant="destructive">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
                     Error loading risks: {risksError.message}
                   </AlertDescription>
                 </Alert>
               ) : manualRisks && manualRisks.length > 0 ? (
-                <div className="space-y-4">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Risk Title</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Priority</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Owner</TableHead>
-                        <TableHead>Risk Score</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {manualRisks.map((risk) => {
-                        const categoryConfig = getRiskCategoryConfig(risk.category);
-                        const priorityConfig = PRIORITY_CONFIG[risk.priority as keyof typeof PRIORITY_CONFIG];
-                        const statusConfig = STATUS_CONFIG[risk.status as keyof typeof STATUS_CONFIG];
-                        
-                        return (
-                          <TableRow key={risk.id}>
-                            <TableCell className="font-medium">
-                              <div>
-                                <div className="font-medium">{risk.title}</div>
-                                <div className="text-sm text-muted-foreground line-clamp-2">
-                                  {risk.description}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                {categoryConfig.icon}
-                                <span className="text-sm">{categoryConfig.name}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={cn("text-xs", priorityConfig.bgColor, priorityConfig.textColor)}>
-                                {priorityConfig.label}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className={cn("text-xs", statusConfig.bgColor, statusConfig.textColor)}>
-                                {statusConfig.label}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-sm">{risk.owner || 'Unassigned'}</div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <div className="text-sm font-medium">{risk.risk_score}</div>
-                                <Progress value={risk.risk_score} className="h-1.5 w-12" />
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEditRisk(risk)}
-                                >
-                                  <Edit className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteRisk(risk.id)}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {manualRisks.map((risk: Risk) => (
+                    <RiskCard
+                      key={risk.id}
+                      risk={risk}
+                      onEdit={handleEditRisk}
+                      onDelete={handleDeleteRisk}
+                    />
+                  ))}
                 </div>
               ) : (
                 <div className="text-center py-10">

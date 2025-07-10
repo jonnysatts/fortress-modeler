@@ -20,7 +20,7 @@ const NewFinancialModel = lazy(() => import("./pages/models/NewFinancialModel"))
 const FinancialModelDetail = lazy(() => import("./pages/models/FinancialModelDetail"));
 const EditFinancialModel = lazy(() => import("./pages/models/EditFinancialModel"));
 const Settings = lazy(() => import("./pages/Settings"));
-const Migration = lazy(() => import("./pages/Migration"));
+const RisksOverview = lazy(() => import("./pages/RisksOverview").then(module => ({ default: module.RisksOverview })));
 const AuthCallback = lazy(() => import("./pages/auth/AuthCallback"));
 const Login = lazy(() => import("./pages/Login").then(module => ({ default: module.Login })));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -74,9 +74,8 @@ const App = () => {
                 <Route path="projects/:projectId/models/:modelId/edit" element={<EditFinancialModel />} />
                 <Route path="modeling" element={<Dashboard />} />
                 <Route path="performance" element={<Dashboard />} />
-                <Route path="risks" element={<Dashboard />} />
+                <Route path="risks" element={<RisksOverview />} />
                 <Route path="settings" element={<Settings />} />
-                <Route path="migration" element={<Migration />} />
               </Route>
               <Route path="*" element={<NotFound />} />
               </Routes>

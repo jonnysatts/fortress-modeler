@@ -151,11 +151,7 @@ export const RiskInsights: React.FC<RiskInsightsProps> = ({ className, primaryPr
             variant="outline" 
             size="sm"
             onClick={() => {
-              if (primaryProjectId) {
-                navigate(`/projects/${primaryProjectId}?tab=risks`);
-              } else {
-                navigate('/projects');
-              }
+              navigate('/risks');
             }}
           >
             View Details

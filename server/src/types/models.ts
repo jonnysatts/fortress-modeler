@@ -1,3 +1,4 @@
+// Server-side model types that match client types
 export interface RevenueStream {
   name: string;
   value: number;
@@ -76,28 +77,14 @@ export interface ModelAssumptions {
   marketing?: MarketingSetup;
 }
 
-export interface Model {
-  id: string; // UUID primary key
-  name: string;
-  description?: string;
-  createdAt?: string | Date;
-  updatedAt?: string | Date;
-  assumptions: ModelAssumptions;
-}
+// Generic type for results cache - can store any computed results
+export type ResultsCache = Record<string, unknown>;
 
-// --- NEW: Actuals Data Interface ---
-export interface ActualsPeriodEntry {
-  id: string; // UUID primary key
-  projectId: string; // Project UUID reference
-  period: number; // Week or Month number
-  periodType: 'Week' | 'Month'; // Type of period
-  // Use Record<string, number> for flexibility
-  revenueActuals: Record<string, number>; 
-  costActuals: Record<string, number>; 
-  attendanceActual?: number; // NEW: Actual attendance for the period
-  notes?: string;
-  useFbCogsPercentage?: boolean; // NEW: Whether to use model percentage for F&B COGS
-  useMerchandiseCogsPercentage?: boolean; // NEW: Whether to use model percentage for Merchandise COGS
-  useMarketingPlan?: boolean; // NEW: Whether to use planned marketing spend from model
-}
-// --- End NEW --- 
+// JSON type that matches Supabase's Json type
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];

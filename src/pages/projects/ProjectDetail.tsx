@@ -17,11 +17,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { FinancialModel, Project, setPrimaryFinancialModel } from "@/lib/db";
+import { FinancialModel as DbFinancialModel, Project, setPrimaryFinancialModel } from "@/lib/db";
 import { toast } from "sonner";
 import { useProject, useDeleteProject } from "@/hooks/useProjects";
 import { useModelsForProject } from "@/hooks/useModels";
 import { useActualsForProject } from "@/hooks/useActuals";
+import { FinancialModel } from '@/lib/db';
 import {
   Table,
   TableBody,
@@ -474,7 +475,7 @@ const ProjectDetail = () => {
           <RiskAssessmentTab 
             projectId={projectId || ''} 
             projectName={project.name}
-            financialModels={financialModels}
+            financialModels={financialModels.map(m => ({...m, periods: []}))}
             actualsData={actualsData}
             user={user}
           />

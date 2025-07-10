@@ -5,7 +5,7 @@ import { useForecastAccuracy } from '@/hooks/useForecastAccuracy';
 import { useVarianceTrends } from '@/hooks/useVarianceTrends';
 import { ActualsPeriodEntry, FinancialModel } from '@/types/models';
 import { ProjectHealthService, ProjectHealthScore, PortfolioHealthSummary, HealthInsight } from '@/services/ProjectHealthService';
-import { SupabaseStorageService } from '@/services/implementations/SupabaseStorageService';
+import { getSupabaseStorageService } from '@/services/singleton';
 import { getActualsForProject, getModelsForProject } from '@/lib/db';
 import { isCloudModeEnabled } from '@/config/app.config';
 
@@ -47,7 +47,7 @@ export const useProjectHealth = () => {
         
         try {
           if (isCloudModeEnabled()) {
-            const supabaseStorage = new SupabaseStorageService();
+            const supabaseStorage = getSupabaseStorageService();
             actuals = await supabaseStorage.getActualsForProject(project.id);
             financialModels = await supabaseStorage.getModelsForProject(project.id);
           } else {

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getActualsForProject, upsertActualsPeriod } from '@/lib/db';
-import { SupabaseStorageService } from '@/services/implementations/SupabaseStorageService';
+import { getSupabaseStorageService } from '@/services/singleton';
 import { ActualsPeriodEntry } from '@/types/models';
 import { toast } from 'sonner';
 import { isCloudModeEnabled } from '@/config/app.config';
@@ -17,7 +17,7 @@ export const useActualsForProject = (projectId: string | undefined) => {
       if (isCloudModeEnabled()) {
         // Use Supabase for cloud storage
         console.log('🌤️ Getting actuals from Supabase');
-        const supabaseStorage = new SupabaseStorageService();
+        const supabaseStorage = getSupabaseStorageService();
         return await supabaseStorage.getActualsForProject(projectId);
       } else {
         // Use IndexedDB for local storage
@@ -44,7 +44,7 @@ export const useSaveActuals = () => {
         if (isCloudModeEnabled()) {
           // Use Supabase for cloud storage
           console.log('🌤️ Saving actuals to Supabase');
-          const supabaseStorage = new SupabaseStorageService();
+          const supabaseStorage = getSupabaseStorageService();
           const result = await supabaseStorage.upsertActualsPeriod(actualsData);
           console.log('✅ Actuals saved to Supabase:', result.id);
           return result;

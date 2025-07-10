@@ -87,10 +87,6 @@ export const useBreadcrumbs = (options: UseBreadcrumbsOptions = {}) => {
     else if (path === '/settings') {
       breadcrumbItems.push(createTabBreadcrumb('Settings'));
     }
-    // Migration page
-    else if (path === '/migration') {
-      breadcrumbItems.push(createTabBreadcrumb('Migration'));
-    }
 
     return breadcrumbItems;
   }, [location.pathname, projectId, projectName, modelId, modelName, activeTab]);

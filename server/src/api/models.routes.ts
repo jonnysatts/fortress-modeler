@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { FinancialModelService } from '../services/financial-model.service';
 import { ProjectService } from '../services/project.service';
 import { authenticateToken, AuthRequest, rateLimitByUser } from '../middleware/auth.middleware';
+import { ModelAssumptions, ResultsCache } from '../types/models';
 
 const router = Router();
 
@@ -142,13 +143,19 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
+interface UpdateModelData {
+  name?: string;
+  assumptions?: ModelAssumptions;
+  results_cache?: ResultsCache;
+}
+
 // PUT /models/:id - Update model
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { name, assumptions, results_cache } = req.body;
     
-    const updateData: any = {};
+    const updateData: UpdateModelData = {};
     
     if (name !== undefined) {
       if (name.trim().length === 0) {

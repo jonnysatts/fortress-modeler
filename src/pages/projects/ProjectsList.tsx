@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Search, Folder as FolderIcon, Globe, Users } from "lucide-react";
@@ -19,7 +19,7 @@ const ProjectsList = () => {
   const { data: sharedProjects = [], isLoading: isLoadingSharedProjects, error: sharedProjectsError } = useSharedProjects();
   const { data: publicProjects = [], isLoading: isLoadingPublicProjects, error: publicProjectsError } = usePublicProjects();
 
-  const filterProjects = (projects: any[]) => {
+  const filterProjects = useCallback((projects: any[]) => {
     if (!searchTerm) return projects;
     
     return projects.filter(project => {
@@ -28,11 +28,11 @@ const ProjectsList = () => {
              (project.description && project.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
              (project.productType && project.productType.toLowerCase().includes(searchTerm.toLowerCase()));
     });
-  };
+  }, [searchTerm]);
 
-  const filteredMyProjects = useMemo(() => filterProjects(myProjects), [myProjects, searchTerm]);
-  const filteredSharedProjects = useMemo(() => filterProjects(sharedProjects), [sharedProjects, searchTerm]);
-  const filteredPublicProjects = useMemo(() => filterProjects(publicProjects), [publicProjects, searchTerm]);
+  const filteredMyProjects = useMemo(() => filterProjects(myProjects), [myProjects, filterProjects]);
+  const filteredSharedProjects = useMemo(() => filterProjects(sharedProjects), [sharedProjects, filterProjects]);
+  const filteredPublicProjects = useMemo(() => filterProjects(publicProjects), [publicProjects, filterProjects]);
 
   return (
     <div className="space-y-6">

@@ -1,4 +1,4 @@
-import { Pool, PoolClient } from 'pg';
+import { Pool, PoolClient, QueryResult } from 'pg';
 import fs from 'fs';
 import path from 'path';
 
@@ -57,7 +57,7 @@ export function initializeDatabase(config?: DatabaseConfig): Pool {
     };
   }
 
-  pool = new Pool(dbConfig as any);
+  pool = new Pool(dbConfig);
   
   // Handle pool errors
   pool.on('error', (err) => {
@@ -128,7 +128,7 @@ export async function runMigrations(): Promise<{ success: boolean; error?: strin
 }
 
 // Query helper with error handling
-export async function query(text: string, params?: any[]): Promise<any> {
+export async function query<T = any>(text: string, params?: (string | number | boolean | null)[]): Promise<QueryResult<T>> {
   const db = getDatabase();
   try {
     const start = Date.now();

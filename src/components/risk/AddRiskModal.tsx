@@ -15,12 +15,8 @@ import { Card } from "@/components/ui/card";
 import { CalendarIcon, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { User } from '@/types/user';
 import { riskService } from '@/services/RiskService';
-interface User {
-  id: string;
-  email: string;
-  [key: string]: any;
-}
 
 // Enhanced risk types from our database system
 export type RiskCategory = 'customer' | 'revenue' | 'timeline' | 'resources' | 'market';
@@ -183,7 +179,7 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
   }, [handleReset, onClose]);
 
   // Create stable form field handlers
-  const handleFieldChange = useCallback((field: keyof RiskFormData, value: any) => {
+  const handleFieldChange = useCallback((field: keyof RiskFormData, value: RiskFormData[keyof RiskFormData]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   }, []);
 
@@ -211,7 +207,7 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
         description: formData.description,
         category: formData.category,
         priority: formData.priority,
-        status: formData.status as any, // Type assertion for now
+        status: formData.status,
         impact_description: formData.impact_description,
         mitigation_plan: formData.mitigation_plan,
         owner: formData.owner,

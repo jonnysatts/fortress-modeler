@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FinancialModel, db, getModelsForProject, getModelById, addFinancialModel, updateFinancialModel, deleteFinancialModel } from '@/lib/db';
-import { SupabaseStorageService } from '@/services/implementations/SupabaseStorageService';
+import { getSupabaseStorageService } from '@/services/singleton';
 import { toast } from 'sonner';
 import { isCloudModeEnabled } from '@/config/app.config';
 
@@ -15,7 +15,7 @@ export const useModelsForProject = (projectId: string | undefined) => {
       if (isCloudModeEnabled()) {
         // Use Supabase for cloud storage
         console.log('🌤️ Getting models from Supabase');
-        const supabaseStorage = new SupabaseStorageService();
+        const supabaseStorage = getSupabaseStorageService();
         const models = await supabaseStorage.getModelsForProject(projectId);
         console.log('useModelsForProject found models in Supabase', { projectId, count: models.length });
         return models;
@@ -43,7 +43,7 @@ export const useModel = (modelId: string | undefined) => {
       if (isCloudModeEnabled()) {
         // Use Supabase for cloud storage
         console.log('🌤️ Getting model from Supabase');
-        const supabaseStorage = new SupabaseStorageService();
+        const supabaseStorage = getSupabaseStorageService();
         const model = await supabaseStorage.getModel(modelId);
         if (!model) throw new Error(`Model with ID ${modelId} not found`);
         return model;
@@ -68,7 +68,7 @@ export const useCreateModel = () => {
         if (isCloudModeEnabled()) {
           // Use Supabase for cloud storage
           console.log('🌤️ Creating model in Supabase');
-          const supabaseStorage = new SupabaseStorageService();
+          const supabaseStorage = getSupabaseStorageService();
           const result = await supabaseStorage.createModel(newModelData);
           console.log('✅ Model created in Supabase:', result.id);
           return result;
@@ -122,7 +122,7 @@ export const useUpdateModel = () => {
         if (isCloudModeEnabled()) {
           // Use Supabase for cloud storage
           console.log('🌤️ Updating model in Supabase');
-          const supabaseStorage = new SupabaseStorageService();
+          const supabaseStorage = getSupabaseStorageService();
           const result = await supabaseStorage.updateModel(id, data);
           console.log('✅ Model updated in Supabase:', result.id);
           return result;
@@ -181,7 +181,7 @@ export const useDeleteModel = () => {
         if (isCloudModeEnabled()) {
           // Use Supabase for cloud storage
           console.log('🌤️ Deleting model in Supabase');
-          const supabaseStorage = new SupabaseStorageService();
+          const supabaseStorage = getSupabaseStorageService();
           await supabaseStorage.deleteModel(modelId);
           console.log('✅ Model deleted in Supabase:', modelId);
         } else {

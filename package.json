@@ -8,9 +8,9 @@
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
-    "predev": "node scripts/check-deps.cjs",
-    "prebuild": "node scripts/check-deps.cjs",
-    "prelint": "node scripts/check-deps.cjs",
+    "predev": "npx tsx scripts/check-deps.ts",
+    "prebuild": "npx tsx scripts/check-deps.ts",
+    "prelint": "npx tsx scripts/check-deps.ts",
     "verify": "node scripts/verify-requirements.cjs",
     "dev": "node scripts/dev-with-port-check.cjs",
     "dev:vite": "vite",
@@ -146,7 +146,7 @@
     "tsx": "^4.6.2",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "^5.4.1",
+    "vite": "^7.0.3",
     "vite-plugin-compression": "^0.5.1",
     "vitest": "^3.2.4",
     "wait-on": "^7.2.0"

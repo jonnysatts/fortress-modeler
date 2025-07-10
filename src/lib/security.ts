@@ -122,7 +122,9 @@ export function escapeHtml(text: string): string {
 export function isAlphanumericSafe(input: string, allowedChars: string = ' -_'): boolean {
   if (typeof input !== 'string') return false;
   
-  const pattern = new RegExp(`^[a-zA-Z0-9${allowedChars.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}]+$`);
+  // Escape special regex characters in allowedChars
+  const escapedChars = allowedChars.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+  const pattern = new RegExp(`^[a-zA-Z0-9${escapedChars}]+$`);
   return pattern.test(input);
 }
 

@@ -1,5 +1,6 @@
 import { query, withTransaction } from '../db/connection';
 import { PoolClient } from 'pg';
+import { UserPreferences } from '../types/common';
 
 export interface User {
   id: string;
@@ -8,7 +9,7 @@ export interface User {
   name?: string;
   picture?: string;
   company_domain?: string;
-  preferences: any;
+  preferences: UserPreferences;
   created_at: Date;
   updated_at: Date;
 }
@@ -19,14 +20,14 @@ export interface CreateUserData {
   name?: string;
   picture?: string;
   company_domain?: string;
-  preferences?: any;
+  preferences?: UserPreferences;
 }
 
 export interface UpdateUserData {
   name?: string;
   picture?: string;
   company_domain?: string;
-  preferences?: any;
+  preferences?: UserPreferences;
 }
 
 export class UserService {
@@ -83,7 +84,7 @@ export class UserService {
   // Update user
   static async updateUser(id: string, updateData: UpdateUserData): Promise<User | null> {
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: (string | UserPreferences | undefined)[] = [];
     let paramCount = 1;
     
     if (updateData.name !== undefined) {
@@ -132,7 +133,7 @@ export class UserService {
   }
   
   // Update user preferences
-  static async updateUserPreferences(id: string, preferences: any): Promise<boolean> {
+  static async updateUserPreferences(id: string, preferences: UserPreferences): Promise<boolean> {
     const sql = `
       UPDATE users 
       SET preferences = $1, updated_at = NOW()

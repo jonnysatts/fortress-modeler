@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { SupabaseStorageService } from '../../implementations/SupabaseStorageService';
 import { SupabaseRealtimeService } from '../../implementations/SupabaseRealtimeService';
-import { DataMigrationService } from '../../migration/DataMigrationService';
 import { serviceContainer, SERVICE_TOKENS } from '../../container/ServiceContainer';
 import { bootstrapServices } from '../../bootstrap';
 import { supabase } from '@/lib/supabase';
@@ -13,7 +12,6 @@ const originalEnv = import.meta.env;
 describe('Supabase Integration Tests', () => {
   let storageService: SupabaseStorageService;
   let realtimeService: SupabaseRealtimeService;
-  let migrationService: DataMigrationService;
   let testUserId: string;
   let testProjectId: string;
   let testModelId: string;
@@ -36,7 +34,6 @@ describe('Supabase Integration Tests', () => {
     // Initialize services
     storageService = new SupabaseStorageService();
     realtimeService = new SupabaseRealtimeService();
-    migrationService = new DataMigrationService();
 
     // Mock authenticated user
     testUserId = 'test-user-integration';
@@ -328,146 +325,6 @@ describe('Supabase Integration Tests', () => {
     });
   });
 
-  describe('Migration Integration', () => {
-    it('should validate migration status correctly', async () => {
-      // Mock both local and remote data
-      const mockLocalProjects = [
-        {
-          id: 'local-project-1',
-          name: 'Local Project 1',
-          productType: 'SaaS',
-          description: 'Local test project',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          targetAudience: 'Developers',
-          timeline: { startDate: new Date() },
-          avatarImage: null,
-          is_public: false,
-          shared_by: 'test@example.com',
-          owner_email: 'test@example.com',
-          share_count: 0,
-          permission: 'owner' as const,
-        },
-      ];
-
-      const mockRemoteProjects = [
-        {
-          id: 'remote-project-1',
-          name: 'Remote Project 1',
-          productType: 'E-commerce',
-          description: 'Remote test project',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          targetAudience: 'Consumers',
-          timeline: { startDate: new Date() },
-          avatarImage: null,
-          is_public: true,
-          shared_by: 'test@example.com',
-          owner_email: 'test@example.com',
-          share_count: 5,
-          permission: 'owner' as const,
-        },
-      ];
-
-      // Mock DexieStorageService responses
-      const mockDexieService = {
-        getAllProjects: vi.fn().mockResolvedValue(mockLocalProjects),
-        getModelsForProject: vi.fn().mockResolvedValue([]),
-        getActualsForProject: vi.fn().mockResolvedValue([]),
-      };
-
-      // Mock SupabaseStorageService responses
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        is: vi.fn().mockReturnThis(),
-        order: vi.fn().mockReturnThis(),
-        mockResolvedValue: vi.fn().mockResolvedValue({ data: mockRemoteProjects, error: null }),
-      } as any);
-
-      // Replace service implementations temporarily
-      const originalDexieService = (migrationService as any).dexieService;
-      const originalSupabaseService = (migrationService as any).supabaseService;
-
-      (migrationService as any).dexieService = mockDexieService;
-      (migrationService as any).supabaseService = {
-        getAllProjects: vi.fn().mockResolvedValue(mockRemoteProjects),
-        getModelsForProject: vi.fn().mockResolvedValue([]),
-        getActualsForProject: vi.fn().mockResolvedValue([]),
-      };
-
-      const status = await migrationService.getMigrationStatus();
-
-      expect(status).toEqual({
-        localDataExists: true,
-        remoteDataExists: true,
-        localCount: {
-          projects: 1,
-          models: 0,
-          actuals: 0,
-        },
-        remoteCount: {
-          projects: 1,
-          models: 0,
-          actuals: 0,
-        },
-        lastMigration: undefined,
-      });
-
-      // Restore original services
-      (migrationService as any).dexieService = originalDexieService;
-      (migrationService as any).supabaseService = originalSupabaseService;
-    });
-
-    it('should handle dry run migration correctly', async () => {
-      const mockLocalProjects = [
-        {
-          id: 'dry-run-project-1',
-          name: 'Dry Run Project',
-          productType: 'SaaS',
-          description: 'Test dry run',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          targetAudience: 'Testers',
-          timeline: { startDate: new Date() },
-          avatarImage: null,
-          is_public: false,
-          shared_by: 'test@example.com',
-          owner_email: 'test@example.com',
-          share_count: 0,
-          permission: 'owner' as const,
-        },
-      ];
-
-      // Mock DexieStorageService for dry run
-      const mockDexieService = {
-        getAllProjects: vi.fn().mockResolvedValue(mockLocalProjects),
-        getModelsForProject: vi.fn().mockResolvedValue([]),
-        getActualsForProject: vi.fn().mockResolvedValue([]),
-      };
-
-      // Replace service implementations temporarily
-      const originalDexieService = (migrationService as any).dexieService;
-      (migrationService as any).dexieService = mockDexieService;
-
-      const result = await migrationService.migrateAllData({
-        dryRun: true,
-        validateData: false,
-      });
-
-      expect(result.success).toBe(true);
-      expect(result.projectsMigrated).toBe(0); // No actual migration in dry run
-      expect(result.modelsMigrated).toBe(0);
-      expect(result.actualsMigrated).toBe(0);
-      expect(result.errors).toHaveLength(0);
-
-      // Verify no actual data changes were made
-      expect(storageService.createProject).not.toHaveBeenCalled();
-
-      // Restore original service
-      (migrationService as any).dexieService = originalDexieService;
-    });
-  });
 
   describe('Real-time Integration', () => {
     it('should handle presence updates correctly', async () => {

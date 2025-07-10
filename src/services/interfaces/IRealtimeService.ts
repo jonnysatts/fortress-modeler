@@ -47,8 +47,8 @@ export interface RealtimePayload {
   eventType: 'INSERT' | 'UPDATE' | 'DELETE';
   table: string;
   schema: string;
-  old_record?: any;
-  new_record?: any;
+  old_record?: Record<string, unknown>;
+  new_record?: Record<string, unknown>;
   timestamp: string;
 }
 

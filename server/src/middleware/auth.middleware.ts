@@ -3,12 +3,10 @@ import { AuthService } from '../services/auth.service';
 import { User } from '../services/user.service';
 
 // Extend Express Request to include user
-declare global {
-  namespace Express {
-    interface Request {
-      user?: User;
-      userId?: string;
-    }
+declare module 'express-serve-static-core' {
+  interface Request {
+    user?: User;
+    userId?: string;
   }
 }
 

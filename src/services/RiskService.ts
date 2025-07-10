@@ -319,14 +319,85 @@ class RiskService {
   // Get risk analytics for a project (stubbed)
   async getRiskAnalytics(projectId: string): Promise<RiskAnalytics | null> {
     try {
-      // TODO: Implement risk_analytics table
-      // For now, return null until database migration is complete
-      console.log('Risk analytics not yet implemented for project:', projectId);
-      return null;
+      // Get all risks for the project
+      const risks = await this.getRisksForProject(projectId);
+      const automaticRisks = await this.getAutomaticRiskIndicators(projectId);
+      
+      // Calculate risk distribution
+      const totalRisks = risks.length;
+      const risksByPriority = {
+        critical: risks.filter(r => r.priority === 'critical').length,
+        high: risks.filter(r => r.priority === 'high').length,
+        medium: risks.filter(r => r.priority === 'medium').length,
+        low: risks.filter(r => r.priority === 'low').length,
+      };
+      
+      const risksByStatus = {
+        identified: risks.filter(r => r.status === 'identified').length,
+        assessing: risks.filter(r => r.status === 'assessing').length,
+        mitigating: risks.filter(r => r.status === 'mitigating').length,
+        monitoring: risks.filter(r => r.status === 'monitoring').length,
+        resolved: risks.filter(r => r.status === 'resolved').length,
+      };
+      
+      // Calculate risk trend (simplified version)
+      const recentRisks = risks.filter(r => {
+        const riskDate = new Date(r.created_at || Date.now());
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        return riskDate > thirtyDaysAgo;
+      });
+      
+      const riskTrend = recentRisks.length > totalRisks * 0.3 ? 'increasing' : 
+                      recentRisks.length < totalRisks * 0.1 ? 'decreasing' : 'stable';
+      
+      // Calculate overall risk score (0-100)
+      const riskScore = Math.min(100, Math.max(0, 
+        (risksByPriority.critical * 25) + 
+        (risksByPriority.high * 15) + 
+        (risksByPriority.medium * 10) + 
+        (risksByPriority.low * 5) +
+        (automaticRisks.length * 5)
+      ));
+
+      return {
+        projectId,
+        totalRisks,
+        risksByPriority,
+        risksByStatus,
+        riskScore,
+        riskTrend: riskTrend as 'increasing' | 'decreasing' | 'stable',
+        automaticRisksDetected: automaticRisks.length,
+        lastCalculated: new Date().toISOString(),
+        recommendations: this.generateRiskRecommendations(risks, automaticRisks, riskScore)
+      };
     } catch (error) {
-      console.error('Error fetching risk analytics:', error);
+      console.error('Error calculating risk analytics:', error);
       return null;
     }
+  }
+
+  private generateRiskRecommendations(risks: Risk[], automaticRisks: RiskFlag[], riskScore: number): string[] {
+    const recommendations: string[] = [];
+    
+    if (riskScore > 75) {
+      recommendations.push('High risk score detected. Prioritize mitigation of critical and high-priority risks.');
+    }
+    
+    if (automaticRisks.length > 3) {
+      recommendations.push('Multiple forecast accuracy risks detected. Review model assumptions and data quality.');
+    }
+    
+    const unresolvedCritical = risks.filter(r => r.priority === 'critical' && r.status !== 'resolved').length;
+    if (unresolvedCritical > 0) {
+      recommendations.push(`${unresolvedCritical} critical risk(s) need immediate attention.`);
+    }
+    
+    const identifiedRisks = risks.filter(r => r.status === 'identified').length;
+    if (identifiedRisks > 5) {
+      recommendations.push('Consider moving identified risks to assessment phase for active management.');
+    }
+    
+    return recommendations;
   }
 
   // Convert automatic risk detection to manual risk
@@ -363,13 +434,94 @@ class RiskService {
     }
   }
 
-  // Get automatic risk indicators for a project (stubbed)
+  // Get automatic risk indicators for a project
   async getAutomaticRiskIndicators(projectId: string): Promise<RiskFlag[]> {
     try {
-      // TODO: Implement proper automatic risk detection
-      // For now, return empty array until ForecastAccuracyService methods are implemented
-      console.log('Automatic risk indicators not yet implemented for project:', projectId);
-      return [];
+      const riskFlags: RiskFlag[] = [];
+      
+      // Get project data and models for analysis
+      const { data: project } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+        
+      if (!project) {
+        console.warn('Project not found for risk analysis:', projectId);
+        return [];
+      }
+
+      // Get models for the project
+      const { data: models } = await supabase
+        .from('financial_models')
+        .select('*')
+        .eq('project_id', projectId)
+        .is('deleted_at', null);
+
+      // Get actuals data for comparison
+      const { data: actualsData } = await supabase
+        .from('actuals_period_entries')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('period', { ascending: true });
+
+      if (!models || models.length === 0) {
+        // Risk: No financial models
+        riskFlags.push({
+          riskCategory: 'planning',
+          severity: 'medium',
+          description: 'No financial models defined for project',
+          suggestedAction: 'Create at least one financial model to enable forecasting and risk assessment',
+          dataSource: 'project_analysis',
+          confidence: 95
+        });
+        return riskFlags;
+      }
+
+      // Use ForecastAccuracyService to analyze each model
+      const ForecastAccuracyService = (await import('./ForecastAccuracyService')).ForecastAccuracyService;
+      
+      for (const model of models) {
+        try {
+          // Analyze forecast accuracy for revenue
+          const revenueAccuracy = ForecastAccuracyService.analyzeAccuracy(
+            projectId,
+            'revenue',
+            model,
+            actualsData || []
+          );
+          
+          // Analyze forecast accuracy for costs  
+          const costsAccuracy = ForecastAccuracyService.analyzeAccuracy(
+            projectId,
+            'costs',
+            model,
+            actualsData || []
+          );
+
+          // Extract risk flags from accuracy analysis
+          const revenueRisks = ForecastAccuracyService.identifyAccuracyRisks(revenueAccuracy);
+          const costRisks = ForecastAccuracyService.identifyAccuracyRisks(costsAccuracy);
+
+          riskFlags.push(...revenueRisks, ...costRisks);
+        } catch (analysisError) {
+          console.warn('Error analyzing model for risks:', model.id, analysisError);
+        }
+      }
+
+      // Additional business logic risks
+      if (actualsData && actualsData.length === 0) {
+        riskFlags.push({
+          riskCategory: 'data_quality',
+          severity: 'medium',
+          description: 'No actual performance data available for comparison',
+          suggestedAction: 'Start tracking actual revenue and cost data to improve forecast accuracy',
+          dataSource: 'data_completeness_check',
+          confidence: 90
+        });
+      }
+
+      return riskFlags;
     } catch (error) {
       console.error('Error getting automatic risk indicators:', error);
       return [];

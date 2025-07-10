@@ -7,22 +7,22 @@ export interface ILogService {
   /**
    * Log a debug message (development only)
    */
-  debug(message: string, data?: any): void;
+  debug(message: string, data?: unknown): void;
 
   /**
    * Log an informational message
    */
-  info(message: string, data?: any): void;
+  info(message: string, data?: unknown): void;
 
   /**
    * Log a warning message
    */
-  warn(message: string, data?: any): void;
+  warn(message: string, data?: unknown): void;
 
   /**
    * Log an error message
    */
-  error(message: string, error?: Error | unknown, data?: any): void;
+  error(message: string, error?: Error | unknown, data?: unknown): void;
 
   /**
    * Set the minimum log level

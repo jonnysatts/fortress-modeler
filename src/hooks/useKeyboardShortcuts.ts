@@ -15,6 +15,29 @@ export const useKeyboardShortcuts = (options: KeyboardShortcutOptions = {}) => {
   const location = useLocation();
   const { projectId, modelId, onNewProject, onNewModel, onSearch } = options;
 
+  const navigateToTab = useCallback((tab: string) => {
+    const currentPath = location.pathname;
+    
+    if (currentPath.includes('/models/') && !currentPath.includes('/edit')) {
+      // On model detail page - these shortcuts don't apply to model tabs
+      return;
+    }
+    
+    if (currentPath.includes('/projects/') && !currentPath.includes('/models/')) {
+      // On project detail page
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', tab);
+      window.history.pushState({}, '', url.toString());
+      
+      // Manually trigger tab change if using controlled tabs
+      const tabTrigger = document.querySelector(`[data-value="${tab}"]`) as HTMLButtonElement;
+      if (tabTrigger) {
+        tabTrigger.click();
+        toast.success(`Switched to ${tab} tab`);
+      }
+    }
+  }, [location.pathname]);
+
   const handleKeyPress = useCallback((event: KeyboardEvent) => {
     // Don't trigger shortcuts when typing in inputs
     if (
@@ -125,30 +148,7 @@ export const useKeyboardShortcuts = (options: KeyboardShortcutOptions = {}) => {
       event.preventDefault();
       window.history.back();
     }
-  }, [navigate, location.pathname, projectId, modelId, onNewProject, onNewModel, onSearch]);
-
-  const navigateToTab = (tab: string) => {
-    const currentPath = location.pathname;
-    
-    if (currentPath.includes('/models/') && !currentPath.includes('/edit')) {
-      // On model detail page - these shortcuts don't apply to model tabs
-      return;
-    }
-    
-    if (currentPath.includes('/projects/') && !currentPath.includes('/models/')) {
-      // On project detail page
-      const url = new URL(window.location.href);
-      url.searchParams.set('tab', tab);
-      window.history.pushState({}, '', url.toString());
-      
-      // Manually trigger tab change if using controlled tabs
-      const tabTrigger = document.querySelector(`[data-value="${tab}"]`) as HTMLButtonElement;
-      if (tabTrigger) {
-        tabTrigger.click();
-        toast.success(`Switched to ${tab} tab`);
-      }
-    }
-  };
+  }, [navigate, location.pathname, projectId, onNewProject, onNewModel, onSearch, navigateToTab]);
 
   const showShortcutHelp = () => {
     const shortcuts = [

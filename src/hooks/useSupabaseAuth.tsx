@@ -1,10 +1,27 @@
-import React, { createContext, useContext, ReactNode, useEffect, useState } from 'react';
-import { User, Session, AuthError } from '@supabase/supabase-js';
+import React, { createContext, useContext, ReactNode, useEffect, useState, useMemo } from 'react';
+import type { User as SupabaseUser, Session, AuthError } from '@supabase/supabase-js';
 import { supabase, auth as supabaseAuth, db } from '@/lib/supabase';
+import { User as AppUser } from '@/types/user';
+
+// Helper function to convert Supabase User to App User
+function toAppUser(supabaseUser: SupabaseUser | null): AppUser | null {
+  if (!supabaseUser) return null;
+  
+  // Ensure email is always defined for our app's User type
+  if (!supabaseUser.email) {
+    console.warn('User without email detected, this should not happen in production');
+    return null;
+  }
+  
+  return {
+    ...supabaseUser,
+    email: supabaseUser.email,
+  } as AppUser;
+}
 
 // Enhanced auth context for Supabase integration
 interface SupabaseAuthContextType {
-  user: User | null;
+  user: AppUser | null;
   session: Session | null;
   profile: any | null;
   isAuthenticated: boolean;
@@ -18,23 +35,34 @@ interface SupabaseAuthContextType {
 const SupabaseAuthContext = createContext<SupabaseAuthContextType | undefined>(undefined);
 
 export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
   // Simplified logging for OAuth testing
-  const logService = {
+  const logService = useMemo(() => ({
     debug: (msg: string, data?: any) => console.log(`[DEBUG] ${msg}`, data),
     info: (msg: string, data?: any) => console.log(`[INFO] ${msg}`, data),
     warn: (msg: string, data?: any) => console.warn(`[WARN] ${msg}`, data),
     error: (msg: string, data?: any) => console.error(`[ERROR] ${msg}`, data)
-  };
+  }), []);
   
-  const errorService = {
+  const errorService = useMemo(() => ({
     logError: (error: any, context: string, category: string, severity: string) => 
       console.error(`[${severity.toUpperCase()}] ${context}:`, error),
-    showError: (message: string) => console.error('User Error:', message)
+    showErrorToUser: (message: string) => console.error('User Error:', message)
+  }), []);
+
+  const isAuthError = (error: any): error is AuthError => {
+    return error && typeof error === 'object' && 'message' in error && 'status' in error;
+  };
+
+  const getErrorMessage = (error: unknown): string => {
+    if (isAuthError(error)) return error.message;
+    if (error instanceof Error) return error.message;
+    if (typeof error === 'string') return error;
+    return 'An unknown error occurred';
   };
 
   useEffect(() => {
@@ -57,15 +85,15 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
           userId: initialSession?.user?.id,
           userEmail: initialSession?.user?.email,
           expiresAt: initialSession?.expires_at,
-          error: error?.message
+          error: (error as AuthError)?.message
         });
         
         if (error) {
-          logService.error('Failed to get initial session', error);
-          errorService.logError(error, 'SupabaseAuth.getInitialSession', 'auth', 'medium');
+          logService.error('Failed to get initial session', error as AuthError);
+          errorService.logError(error as AuthError, 'SupabaseAuth.getInitialSession', 'auth', 'medium');
         } else {
           setSession(initialSession);
-          setUser(initialSession?.user ?? null);
+          setUser(toAppUser(initialSession?.user ?? null));
           
           if (initialSession?.user) {
             console.log('👤 [SupabaseAuth] User found, loading profile...');
@@ -94,7 +122,7 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         logService.debug('Auth state changed', { event, userId: session?.user?.id });
         
         setSession(session);
-        setUser(session?.user ?? null);
+        setUser(toAppUser(session?.user ?? null));
         
         if (session?.user) {
           // Temporarily skip ensureUserProfile to prevent hanging
@@ -118,7 +146,7 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [logService, errorService]);
 
   const ensureUserProfile = async (user: any) => {
     try {
@@ -199,10 +227,10 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       
       const { data, error } = await supabaseAuth.signInWithGoogle();
       
-      console.log('🔍 Post-OAuth call:', { data, error });
+      console.log('🔍 Post-OAuth call:', { data, error: error as AuthError });
       
       if (error) {
-        throw error;
+        throw error as AuthError;
       }
       
       // Check if we got a URL but no redirect happened
@@ -218,19 +246,10 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       errorService.logError(error, 'SupabaseAuth.login', 'auth', 'high');
       
       // DETAILED ERROR LOGGING FOR OAUTH DEBUG
-      console.error('🚨 DETAILED OAUTH ERROR:', {
-        error,
-        message: error?.message,
-        details: error?.details,
-        hint: error?.hint,
-        code: error?.code,
-        status: error?.status,
-        stack: error?.stack
-      });
+      console.error('🚨 DETAILED OAUTH ERROR:', error);
       
       // Show the actual error details
-      const errorDetails = error?.message || error?.details || error?.hint || error?.toString();
-      errorService.showErrorToUser(`OAuth Debug: ${errorDetails}`);
+      errorService.showErrorToUser(`OAuth Debug: ${getErrorMessage(error)}`);
       throw error;
     } finally {
       setIsLoading(false);
@@ -245,7 +264,7 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabaseAuth.signOut();
       
       if (error) {
-        throw error;
+        throw error as AuthError;
       }
       
       // Clear local state
@@ -255,10 +274,10 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       
       logService.info('User logged out successfully');
     } catch (error) {
-      logService.error('Logout failed', error);
-      errorService.logError(error, 'SupabaseAuth.logout', 'auth', 'medium');
+      logService.error('Logout failed', error as AuthError);
+      errorService.logError(error as AuthError, 'SupabaseAuth.logout', 'auth', 'medium');
       errorService.showErrorToUser('Failed to sign out. Please try again.');
-      throw error;
+      throw error as AuthError;
     } finally {
       setIsLoading(false);
     }
@@ -278,10 +297,10 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       }
       
     } catch (error) {
-      logService.error('OAuth callback handling failed', error);
-      errorService.logError(error, 'SupabaseAuth.handleCallback', 'auth', 'high');
+      logService.error('OAuth callback handling failed', error as AuthError);
+      errorService.logError(error as AuthError, 'SupabaseAuth.handleCallback', 'auth', 'high');
       errorService.showErrorToUser('Authentication failed. Please try signing in again.');
-      throw error;
+      throw error as AuthError;
     }
   };
 
@@ -298,10 +317,10 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       
       logService.info('User profile updated successfully', { userId: user.id });
     } catch (error) {
-      logService.error('Profile update failed', error);
-      errorService.logError(error, 'SupabaseAuth.updateProfile', 'auth', 'medium');
+      logService.error('Profile update failed', error as AuthError);
+      errorService.logError(error as AuthError, 'SupabaseAuth.updateProfile', 'auth', 'medium');
       errorService.showErrorToUser('Failed to update profile. Please try again.');
-      throw error;
+      throw error as AuthError;
     }
   };
 

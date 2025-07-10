@@ -5,7 +5,7 @@ import { getDemoData } from './demo-data';
 import config from './config';
 import { isUUID } from './utils';
 import { isCloudModeEnabled } from '@/config/app.config';
-import { SupabaseStorageService } from '@/services/implementations/SupabaseStorageService';
+import { getSupabaseStorageService } from '@/services/singleton';
 
 // Define interfaces for our database tables
 export interface Project {
@@ -506,7 +506,7 @@ export const setPrimaryFinancialModel = async (modelId: string): Promise<void> =
 
     if (cloudMode) {
       // Use Supabase for cloud mode
-      const supabaseStorage = new SupabaseStorageService();
+      const supabaseStorage = getSupabaseStorageService();
       
       // Get the model to find its project
       const model = await supabaseStorage.getModel(modelId);

@@ -81,7 +81,7 @@ export default function AuthCallback() {
                   setMessage('Authentication successful! Redirecting...');
                   
                   setTimeout(() => {
-                    navigate('/migration');
+                    navigate('/');
                   }, 1000);
                   return;
                 } else {
@@ -110,7 +110,7 @@ export default function AuthCallback() {
             setMessage('Authentication successful! Redirecting...');
             
             setTimeout(() => {
-              navigate('/migration');
+              navigate('/');
             }, 2000);
           } else {
             throw new Error('No session found after callback');
@@ -140,9 +140,9 @@ export default function AuthCallback() {
         setStatus('error');
         setMessage(error instanceof Error ? error.message : 'Authentication failed');
         
-        // Redirect to migration page after error
+        // Redirect to dashboard after error
         setTimeout(() => {
-          navigate('/migration');
+          navigate('/');
         }, 5000);
       }
     };
@@ -193,12 +193,12 @@ export default function AuthCallback() {
             </p>
             {status === 'success' && (
               <p className="text-xs text-gray-500 mt-2">
-                Redirecting to migration page...
+                Redirecting to dashboard...
               </p>
             )}
             {status === 'error' && (
               <p className="text-xs text-gray-500 mt-2">
-                Redirecting back to migration page...
+                Redirecting back to dashboard...
               </p>
             )}
             <div className="mt-6 p-4 bg-gray-100 rounded text-xs">
