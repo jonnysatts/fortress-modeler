@@ -30,6 +30,7 @@ import { ForecastAccuracyService, type RiskFlag } from '@/services/ForecastAccur
 import { ActualsPeriodEntry } from '@/types/models';
 import { useRisks, useDeleteRisk } from '@/hooks/useRisks';
 import { AddRiskModal } from './AddRiskModal';
+import { EditRiskModal } from './EditRiskModal';
 import {
   Table,
   TableBody,
@@ -789,37 +790,19 @@ export const RiskAssessmentTab: React.FC<RiskAssessmentTabProps> = ({
         user={user}
       />
       
-      {/* Edit functionality temporarily disabled - will be re-implemented with Supabase */}
-      {selectedRisk && showEditModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-medium mb-4">Edit Risk</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Risk editing will be available in the next update. For now, you can delete and recreate the risk.
-            </p>
-            <div className="flex gap-2 justify-end">
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setShowEditModal(false);
-                  setSelectedRisk(null);
-                }}
-              >
-                Close
-              </Button>
-              <Button 
-                variant="destructive"
-                onClick={() => {
-                  handleDeleteRisk(selectedRisk.id);
-                  setShowEditModal(false);
-                  setSelectedRisk(null);
-                }}
-              >
-                Delete Risk
-              </Button>
-            </div>
-          </div>
-        </div>
+      {/* Edit Risk Modal */}
+      {selectedRisk && (
+        <EditRiskModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedRisk(null);
+          }}
+          risk={selectedRisk}
+          projectId={projectId}
+          onRiskUpdated={handleRiskUpdated}
+          user={user}
+        />
       )}
     </div>
   );
