@@ -52,6 +52,7 @@ import { formatDate } from "@/lib/utils";
 import { ShareProjectModal } from "@/components/projects/ShareProjectModal";
 import { isCloudModeEnabled } from "@/config/app.config";
 import { RiskAssessmentTab } from "@/components/risk/RiskAssessmentTab";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 
 // Loading component for lazy-loaded components
 const ComponentLoader = ({ message = "Loading..." }: { message?: string }) => (
@@ -78,6 +79,7 @@ const ProjectDetail = () => {
     const [shareModalOpen, setShareModalOpen] = useState(false);
 
   const navigate = useNavigate();
+  const { user } = useSupabaseAuth();
 
   const { data: project, isLoading: projectLoading, error: projectError } = useProject(projectId);
   const { data: financialModels = [], isLoading: modelsLoading } = useModelsForProject(projectId);
@@ -474,6 +476,7 @@ const ProjectDetail = () => {
             projectName={project.name}
             financialModels={financialModels}
             actualsData={actualsData}
+            user={user}
           />
         </TabsContent>
       </Tabs>

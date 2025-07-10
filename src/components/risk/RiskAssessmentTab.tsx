@@ -42,7 +42,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { useAuth } from "@/hooks/useAuth";
+
+interface User {
+  id: string;
+  email: string;
+  [key: string]: any;
+}
 
 interface FinancialModel {
   id: string;
@@ -60,6 +65,7 @@ interface RiskAssessmentTabProps {
   financialModels: FinancialModel[];
   actualsData: ActualsPeriodEntry[];
   onAddRisk?: () => void;
+  user?: User | null;
 }
 
 interface RiskSummary {
@@ -206,7 +212,8 @@ export const RiskAssessmentTab: React.FC<RiskAssessmentTabProps> = ({
   projectName,
   financialModels,
   actualsData,
-  onAddRisk
+  onAddRisk,
+  user
 }) => {
   const [selectedTab, setSelectedTab] = useState('overview');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -223,8 +230,6 @@ export const RiskAssessmentTab: React.FC<RiskAssessmentTabProps> = ({
   
   const { mutate: deleteRisk } = useDeleteRisk();
   
-  // Get user from auth context
-  const { user } = useAuth();
 
   // Calculate automatic risks from forecast accuracy
   const automaticRiskSummary = useMemo<RiskSummary>(() => {

@@ -12,13 +12,13 @@ export interface Risk {
   category: RiskCategory;
   priority: RiskPriority;
   status: RiskStatus;
-  potential_impact?: string;
+  impact_description?: string;
   mitigation_plan?: string;
   owner?: string;
-  target_date?: string;
+  target_resolution_date?: string;
   risk_score?: number;
   probability?: number;
-  impact?: number;
+  impact_score?: number;
   source: 'manual' | 'automatic';
   automatic_trigger_data?: any;
   created_at: string;
@@ -77,21 +77,23 @@ export interface RiskAnalytics {
 
 export type RiskCategory = 'customer' | 'revenue' | 'timeline' | 'resources' | 'market';
 export type RiskPriority = 'low' | 'medium' | 'high' | 'critical';
-export type RiskStatus = 'identified' | 'assessing' | 'mitigating' | 'monitoring' | 'closed';
+export type RiskStatus = 'identified' | 'monitoring' | 'mitigating' | 'resolved';
 
 export interface CreateRiskData {
   project_id: string;
+  user_id: string;
   title: string;
   description?: string;
   category: RiskCategory;
   priority: RiskPriority;
   status?: RiskStatus;
-  potential_impact?: string;
+  impact_description?: string;
   mitigation_plan?: string;
   owner?: string;
-  target_date?: string;
+  target_resolution_date?: string | null;
   probability?: number;
-  impact?: number;
+  impact_score?: number;
+  risk_score?: number;
   source?: 'manual' | 'automatic';
   automatic_trigger_data?: any;
 }
@@ -102,12 +104,13 @@ export interface UpdateRiskData {
   category?: RiskCategory;
   priority?: RiskPriority;
   status?: RiskStatus;
-  potential_impact?: string;
+  impact_description?: string;
   mitigation_plan?: string;
   owner?: string;
-  target_date?: string;
+  target_resolution_date?: string | null;
   probability?: number;
-  impact?: number;
+  impact_score?: number;
+  risk_score?: number;
 }
 
 // Business-focused risk categories with descriptions
@@ -168,23 +171,18 @@ export const RISK_STATUSES = {
     color: 'bg-gray-100 text-gray-800',
     description: 'Risk has been identified and documented'
   },
-  assessing: {
-    label: 'Assessing',
-    color: 'bg-blue-100 text-blue-800',
-    description: 'Currently analyzing impact and probability'
+  monitoring: {
+    label: 'Monitoring',
+    color: 'bg-purple-100 text-purple-800',
+    description: 'Risk is under control but being monitored'
   },
   mitigating: {
     label: 'Mitigating',
     color: 'bg-yellow-100 text-yellow-800',
     description: 'Actively working to reduce risk impact'
   },
-  monitoring: {
-    label: 'Monitoring',
-    color: 'bg-purple-100 text-purple-800',
-    description: 'Risk is under control but being monitored'
-  },
-  closed: {
-    label: 'Closed',
+  resolved: {
+    label: 'Resolved',
     color: 'bg-green-100 text-green-800',
     description: 'Risk has been resolved or is no longer relevant'
   }
@@ -206,13 +204,13 @@ class RiskService {
 
       const { data: newRisk, error } = await supabase
         .from('risks')
-        .insert([riskData] as any)
+        .insert([riskData])
         .select()
         .single();
 
       if (error) throw error;
 
-      // Create notification for new risk (will implement after database migration)
+      // Create notification for new risk (stubbed until database migration)
       try {
         await this.createNotification({
           risk_id: newRisk.id,
@@ -244,13 +242,12 @@ class RiskService {
         .from('risks')
         .update(updates)
         .eq('id', riskId)
-        .eq('user_id', user.user.id)
         .select()
         .single();
 
       if (error) throw error;
 
-      return updatedRisk;
+      return updatedRisk as Risk;
     } catch (error) {
       console.error('Error updating risk:', error);
       throw error;
@@ -267,9 +264,6 @@ class RiskService {
         .from('risks')
         .delete()
         .eq('id', riskId);
-        // Removed .eq('user_id', user.user.id) constraint
-        // Security is now handled by RLS policies which allow deletion
-        // based on project ownership/access rather than risk creator
 
       if (error) throw error;
     } catch (error) {
@@ -288,28 +282,20 @@ class RiskService {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return risks || [];
+      return (risks || []) as Risk[];
     } catch (error) {
       console.error('Error fetching risks:', error);
       throw error;
     }
   }
 
-  // Get risk analytics for a project
+  // Get risk analytics for a project (stubbed)
   async getRiskAnalytics(projectId: string): Promise<RiskAnalytics | null> {
     try {
-      const { data: analytics, error } = await supabase
-        .from('risk_analytics')
-        .select('*')
-        .eq('project_id', projectId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching risk analytics:', error);
-        return null;
-      }
-
-      return analytics;
+      // TODO: Implement risk_analytics table
+      // For now, return null until database migration is complete
+      console.log('Risk analytics not yet implemented for project:', projectId);
+      return null;
     } catch (error) {
       console.error('Error fetching risk analytics:', error);
       return null;
@@ -319,17 +305,21 @@ class RiskService {
   // Convert automatic risk detection to manual risk
   async convertAutomaticToManualRisk(automaticRisk: RiskFlag, projectId: string): Promise<Risk> {
     try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error('User not authenticated');
+
       const category = this.mapRiskCategoryToBusinessCategory(automaticRisk.riskCategory);
       const priority = this.mapSeverityToPriority(automaticRisk.severity);
 
       const riskData: CreateRiskData = {
         project_id: projectId,
+        user_id: user.user.id,
         title: automaticRisk.description,
         description: `Automatically detected risk: ${automaticRisk.description}`,
         category,
         priority,
         status: 'identified',
-        potential_impact: automaticRisk.suggestedAction || 'Monitor and assess impact',
+        impact_description: automaticRisk.suggestedAction || 'Monitor and assess impact',
         mitigation_plan: automaticRisk.suggestedAction || 'Develop mitigation strategy',
         source: 'automatic',
         automatic_trigger_data: {
@@ -346,96 +336,47 @@ class RiskService {
     }
   }
 
-  // Get automatic risk indicators for a project
+  // Get automatic risk indicators for a project (stubbed)
   async getAutomaticRiskIndicators(projectId: string): Promise<RiskFlag[]> {
     try {
-      // Get actuals data for the project
-      const { data: actualsData, error: actualsError } = await supabase
-        .from('actuals_period_entries')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('period', { ascending: true });
-
-      if (actualsError) throw actualsError;
-
-      if (!actualsData || actualsData.length < 2) {
-        return [];
-      }
-
-      const risks: RiskFlag[] = [];
-
-      // Check revenue accuracy
-      const revenueAccuracy = ForecastAccuracyService.checkRevenueAccuracy(actualsData);
-      if (revenueAccuracy) {
-        risks.push(...revenueAccuracy.riskImplications);
-      }
-
-      // Check cost accuracy
-      const costAccuracy = ForecastAccuracyService.checkCostAccuracy(actualsData);
-      if (costAccuracy) {
-        risks.push(...costAccuracy.riskImplications);
-      }
-
-      return risks;
+      // TODO: Implement proper automatic risk detection
+      // For now, return empty array until ForecastAccuracyService methods are implemented
+      console.log('Automatic risk indicators not yet implemented for project:', projectId);
+      return [];
     } catch (error) {
       console.error('Error getting automatic risk indicators:', error);
       return [];
     }
   }
 
-  // Get risk notifications for a user
+  // Get risk notifications for a user (stubbed)
   async getRiskNotifications(userId?: string): Promise<RiskNotification[]> {
     try {
-      const { data: user } = await supabase.auth.getUser();
-      const targetUserId = userId || user.user?.id;
-      
-      if (!targetUserId) throw new Error('User not authenticated');
-
-      const { data: notifications, error } = await supabase
-        .from('risk_notifications')
-        .select('*')
-        .eq('user_id', targetUserId)
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (error) throw error;
-      return notifications || [];
+      // TODO: Implement risk_notifications table
+      // For now, return empty array until database migration is complete
+      console.log('Risk notifications not yet implemented for user:', userId);
+      return [];
     } catch (error) {
       console.error('Error fetching risk notifications:', error);
       return [];
     }
   }
 
-  // Mark notification as read
-  async markNotificationAsRead(notificationId: string): Promise<void> {
+  // Mark notifications as read (stubbed)
+  async markNotificationsAsRead(notificationIds: string[]): Promise<void> {
     try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) throw new Error('User not authenticated');
-
-      const { error } = await supabase
-        .from('risk_notifications')
-        .update({ is_read: true })
-        .eq('id', notificationId)
-        .eq('user_id', user.user.id);
-
-      if (error) throw error;
+      // TODO: Implement when risk_notifications table exists
+      console.log('Mark notifications as read not yet implemented:', notificationIds);
     } catch (error) {
-      console.error('Error marking notification as read:', error);
-      throw error;
+      console.error('Error marking notifications as read:', error);
     }
   }
 
-  // Create a notification
+  // Create a notification (stubbed)
   private async createNotification(data: Omit<RiskNotification, 'id' | 'is_read' | 'created_at'>): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('risk_notifications')
-        .insert([{
-          ...data,
-          is_read: false
-        }]);
-
-      if (error) throw error;
+      // TODO: Implement when risk_notifications table exists
+      console.log('Create notification not yet implemented:', data);
     } catch (error) {
       console.error('Error creating notification:', error);
     }
@@ -470,7 +411,7 @@ class RiskService {
 
   // Calculate risk score
   calculateRiskScore(probability: number, impact: number): number {
-    return probability * impact;
+    return Math.round((probability * impact) / 100);
   }
 
   // Get risk summary for dashboard
@@ -484,7 +425,6 @@ class RiskService {
   }> {
     try {
       const risks = await this.getRisksByProject(projectId);
-      const analytics = await this.getRiskAnalytics(projectId);
 
       const criticalRisks = risks.filter(r => r.priority === 'critical').length;
       const highRisks = risks.filter(r => r.priority === 'high').length;
@@ -507,10 +447,10 @@ class RiskService {
         return daysSinceCreated <= 7;
       });
 
-      // Get urgent actions (high/critical priority risks that are not closed)
+      // Get urgent actions (high/critical priority risks that are not resolved)
       const urgentActions = risks.filter(r => 
         (r.priority === 'critical' || r.priority === 'high') && 
-        r.status !== 'closed'
+        r.status !== 'resolved'
       );
 
       return {
