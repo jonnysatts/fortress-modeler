@@ -51,7 +51,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDate } from "@/lib/utils";
 import { ShareProjectModal } from "@/components/projects/ShareProjectModal";
 import { isCloudModeEnabled } from "@/config/app.config";
-const SimpleRiskDashboard = lazy(() => import("@/components/risk/SimpleRiskDashboard").then(m => ({ default: m.SimpleRiskDashboard })));
+import { RiskAssessmentTab } from "@/components/risk/RiskAssessmentTab";
 
 // Loading component for lazy-loaded components
 const ComponentLoader = ({ message = "Loading..." }: { message?: string }) => (
@@ -469,9 +469,12 @@ const ProjectDetail = () => {
         </TabsContent>
         
         <TabsContent value="risks" className="space-y-4">
-          <Suspense fallback={<ComponentLoader message="Loading risk management..." />}>
-            <SimpleRiskDashboard projectId={projectId || ''} />
-          </Suspense>
+          <RiskAssessmentTab 
+            projectId={projectId || ''} 
+            projectName={project.name}
+            financialModels={financialModels}
+            actualsData={actualsData}
+          />
         </TabsContent>
       </Tabs>
       
