@@ -235,7 +235,7 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
     }
   };
 
-  const CategoryStep = () => (
+  const CategoryStep = useCallback(() => (
     <div className="space-y-4">
       <div>
         <h3 className="text-lg font-medium mb-2">What type of risk is this?</h3>
@@ -273,9 +273,9 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
         ))}
       </div>
     </div>
-  );
+  ), [formData.category, handleFieldChange]);
 
-  const DetailsStep = () => (
+  const DetailsStep = useCallback(() => (
     <div className="space-y-4">
       <div>
         <h3 className="text-lg font-medium mb-2">Describe the risk</h3>
@@ -367,9 +367,10 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
         </div>
       </div>
     </div>
-  );
+  ), [formData.title, formData.description, formData.impact_description, formData.mitigation_plan, formData.owner, formData.target_resolution_date, handleFieldChange]);
 
-  const AssessmentStep = () => (
+  // Memoize step components to prevent recreation on every render
+  const AssessmentStep = useCallback(() => (
     <div className="space-y-4">
       <div>
         <h3 className="text-lg font-medium mb-2">Risk Assessment</h3>
@@ -475,7 +476,7 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({
         </div>
       </div>
     </div>
-  );
+  ), [formData.priority, formData.probability, formData.impact_score, formData.status, handleFieldChange]);
 
   const renderStepContent = () => {
     switch (step) {
