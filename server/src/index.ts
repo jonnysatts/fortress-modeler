@@ -7,8 +7,6 @@ import {
   getDatabaseHealth, 
   closeDatabase 
 } from './db/connection';
-import { handleCorsOptions } from './middleware/auth.middleware';
-import authRoutes from './api/auth.routes';
 import projectRoutes from './api/projects.routes';
 import syncRoutes from './api/sync.routes';
 import modelRoutes from './api/models.routes';
@@ -64,9 +62,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
 }));
 
-// Handle CORS preflight
-app.use(handleCorsOptions);
-
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -107,7 +102,6 @@ app.get('/', (req, res) => {
     documentation: {
       health: '/health',
       detailedHealth: '/health/detailed',
-      authentication: '/api/auth/*',
       projects: '/api/projects/*',
       models: '/api/models/*',
       sync: '/api/sync/*'
@@ -195,7 +189,6 @@ app.get('/health/detailed', async (req, res) => {
 });
 
 // API Routes
-app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/models', modelRoutes);
@@ -211,14 +204,6 @@ app.use('*', (req, res) => {
     available_endpoints: [
       'GET /health',
       'GET /health/detailed',
-      'GET /api/auth/google',
-      'POST /api/auth/google/callback',
-      'POST /api/auth/verify',
-      'POST /api/auth/refresh',
-      'GET /api/auth/me',
-      'PATCH /api/auth/me',
-      'POST /api/auth/logout',
-      'DELETE /api/auth/account',
       'GET /api/projects',
       'POST /api/projects',
       'GET /api/projects/:id',
@@ -288,12 +273,6 @@ const server = app.listen(PORT, () => {
   console.log('  GET  /health           - Basic health check');
   console.log('  GET  /health/detailed  - Detailed system status');
   console.log('');
-  console.log('  🔐 Authentication:');
-  console.log('  GET  /api/auth/google  - Get Google OAuth URL');
-  console.log('  POST /api/auth/google/callback - Handle OAuth callback');
-  console.log('  POST /api/auth/verify  - Verify JWT token');
-  console.log('  GET  /api/auth/me     - Get user profile');
-  console.log('');
   console.log('  📁 Projects:');
   console.log('  GET  /api/projects     - Get all user projects');
   console.log('  POST /api/projects     - Create new project');
@@ -319,8 +298,6 @@ const server = app.listen(PORT, () => {
   console.log('  GOOGLE_CLIENT_ID: Loaded from Google Secrets Manager');
   console.log('  JWT_SECRET: Loaded from Google Secrets Manager');
   console.log('');
-  
-  console.log('✅ Google OAuth configured via Google Secrets Manager');
   
   if (!dbInitialized) {
     console.log('⚠️  Database not connected - run "npm run db:setup" and "npm run db:migrate"');

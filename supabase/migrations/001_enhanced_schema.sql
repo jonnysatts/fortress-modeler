@@ -434,13 +434,60 @@ CREATE POLICY presence_policy ON presence
 -- REAL-TIME SUBSCRIPTIONS SETUP
 -- =====================================================
 
--- Enable real-time for collaboration tables
-ALTER PUBLICATION supabase_realtime ADD TABLE projects;
-ALTER PUBLICATION supabase_realtime ADD TABLE financial_models;
-ALTER PUBLICATION supabase_realtime ADD TABLE actual_performance;
-ALTER PUBLICATION supabase_realtime ADD TABLE actuals_period_entries;
-ALTER PUBLICATION supabase_realtime ADD TABLE project_shares;
-ALTER PUBLICATION supabase_realtime ADD TABLE presence;
+-- Enable real-time for collaboration tables, handling cases where they might already be added.
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.projects;
+EXCEPTION
+    WHEN duplicate_object THEN
+        RAISE NOTICE 'Table "projects" is already in the publication, skipping.';
+END;
+$$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.financial_models;
+EXCEPTION
+    WHEN duplicate_object THEN
+        RAISE NOTICE 'Table "financial_models" is already in the publication, skipping.';
+END;
+$$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.actual_performance;
+EXCEPTION
+    WHEN duplicate_object THEN
+        RAISE NOTICE 'Table "actual_performance" is already in the publication, skipping.';
+END;
+$$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.actuals_period_entries;
+EXCEPTION
+    WHEN duplicate_object THEN
+        RAISE NOTICE 'Table "actuals_period_entries" is already in the publication, skipping.';
+END;
+$$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.project_shares;
+EXCEPTION
+    WHEN duplicate_object THEN
+        RAISE NOTICE 'Table "project_shares" is already in the publication, skipping.';
+END;
+$$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.presence;
+EXCEPTION
+    WHEN duplicate_object THEN
+        RAISE NOTICE 'Table "presence" is already in the publication, skipping.';
+END;
+$$;
 
 -- =====================================================
 -- VIEWS FOR OPTIMIZED QUERIES (Gemini Suggestions)
@@ -487,6 +534,9 @@ GROUP BY fm.id, fm.name, fm.project_id, fm.assumptions, fm.results_cache, fm.cre
 -- =====================================================
 -- INITIALIZATION DATA
 -- =====================================================
+
+-- Drop the old function if it exists with a different return type
+DROP FUNCTION IF EXISTS migrate_user_data(TEXT, TEXT, TEXT, TEXT, JSONB);
 
 -- Create service role functions for data migration
 CREATE OR REPLACE FUNCTION migrate_user_data(

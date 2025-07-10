@@ -120,15 +120,15 @@ scripts\windows\Launch-Fortress.ps1
 
 ### Cloud Configuration (Optional)
 
-For collaboration features, configure Supabase:
+For collaboration features, you can connect the application to a Supabase project.
 
-1. Copy `.env.example` to `.env`
-2. Add your Supabase credentials:
-   ```
-   VITE_SUPABASE_URL=your_supabase_url
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   ```
-3. Run database migrations (see `docs/SUPABASE_SETUP.md`)
+1.  **Set up Supabase:** Create a project on [Supabase](https://supabase.com/).
+2.  **Configure Environment:** Copy `.env.example` to `.env` and add your Supabase URL and anon key.
+    ```
+    VITE_SUPABASE_URL=your_supabase_url
+    VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+    ```
+3.  **Run Database Migrations:** To set up the required database schema, follow the [Database Migration Guide](docs/guides/DATABASE_MIGRATIONS.md).
 
 ## 📁 Project Structure
 
@@ -159,10 +159,7 @@ fortress-modeler-cloud/
 │   │   ├── risk.ts         # Risk management types
 │   │   └── analytics.ts    # Analytics types
 │   └── pages/               # Application pages
-├── server/                  # Backend server (Node.js)
-│   ├── src/api/            # API routes
-│   ├── src/services/       # Server-side services
-│   └── src/db/             # Database connections
+├── server/                  # Optional backend for admin tasks
 ├── supabase/               # Database migrations
 ├── docs/                   # Documentation
 ├── scripts/                # Build and utility scripts
@@ -258,8 +255,8 @@ npm run electron:build  # Build desktop application
 
 ### Setup & Deployment
 - [Installation Guide](docs/INSTALLATION_GUIDE.md) - Detailed setup instructions
-- [Deployment Modes](docs/DEPLOYMENT_MODES.md) - Local vs. cloud deployment
-- [Supabase Setup](docs/SUPABASE_SETUP.md) - Cloud configuration guide
+- [Database Migration Guide](docs/guides/DATABASE_MIGRATIONS.md) - Setting up the Supabase schema
+- [Backup & Restore Guide](docs/guides/BACKUP_STRATEGY.md) - How to backup and restore the database
 
 ## � Production Deployment
 

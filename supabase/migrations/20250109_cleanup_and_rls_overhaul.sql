@@ -1,14 +1,48 @@
--- Final fix for infinite recursion in RLS policies
--- This ensures all policies are properly replaced without conflicts
+-- Migration: 20250109_cleanup_and_rls_overhaul.sql
+-- Merged from 20250109_cleanup_dummy_risks.sql and 20250109_final_sharing_policies.sql
+-- This migration cleans up test data and performs a full overhaul of RLS policies.
 
--- Step 1: Completely disable RLS on all tables
+-- Step 1: Clean up dummy/test risks
+DELETE FROM risks 
+WHERE title ILIKE '%test%' 
+   OR title ILIKE '%dummy%' 
+   OR title ILIKE '%example%'
+   OR title ILIKE '%sample%'
+   OR title ILIKE '%demo%'
+   OR title = 'Test Risk'
+   OR title = 'Sample Risk'
+   OR title = 'Demo Risk'
+   OR title = 'Dummy Risk';
+
+DELETE FROM risks 
+WHERE description ILIKE '%lorem ipsum%'
+   OR description ILIKE '%placeholder%'
+   OR description ILIKE '%this is a test%'
+   OR description ILIKE '%dummy%'
+   OR description = 'Test description'
+   OR description = 'Sample description';
+
+DELETE FROM risks 
+WHERE user_id NOT IN (
+    SELECT id FROM auth.users
+);
+
+DELETE FROM risks 
+WHERE project_id NOT IN (
+    SELECT id FROM projects
+);
+
+COMMENT ON TABLE risks IS 'Cleaned up dummy/test risks on 2025-01-09';
+
+
+-- Step 2: Completely disable RLS on all tables
 ALTER TABLE projects DISABLE ROW LEVEL SECURITY;
 ALTER TABLE project_shares DISABLE ROW LEVEL SECURITY;
 ALTER TABLE risks DISABLE ROW LEVEL SECURITY;
 ALTER TABLE risk_updates DISABLE ROW LEVEL SECURITY;
 ALTER TABLE risk_notifications DISABLE ROW LEVEL SECURITY;
 
--- Step 2: Drop ALL policies (including any that might exist)
+-- Step 3: Drop ALL policies (including any that might exist)
 DO $$ 
 DECLARE
     pol RECORD;
@@ -39,14 +73,14 @@ BEGIN
     END LOOP;
 END $$;
 
--- Step 3: Re-enable RLS
+-- Step 4: Re-enable RLS
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE project_shares ENABLE ROW LEVEL SECURITY;
 ALTER TABLE risks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE risk_updates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE risk_notifications ENABLE ROW LEVEL SECURITY;
 
--- Step 4: Create completely new, simple policies without ANY cross-table references
+-- Step 5: Create completely new, simple policies without ANY cross-table references
 
 -- Projects policies - completely self-contained
 CREATE POLICY "projects_select_own" ON projects FOR SELECT 
@@ -134,3 +168,4 @@ BEGIN
     RAISE NOTICE 'All infinite recursion issues resolved!';
     RAISE NOTICE 'All policies are now self-contained and simple.';
 END $$;
+

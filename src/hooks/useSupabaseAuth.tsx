@@ -96,9 +96,8 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
           setUser(toAppUser(initialSession?.user ?? null));
           
           if (initialSession?.user) {
-            console.log('👤 [SupabaseAuth] User found, loading profile...');
-            // Temporarily skip ensureUserProfile to prevent hanging
-            // await ensureUserProfile(initialSession.user);
+            console.log('👤 [SupabaseAuth] User found, ensuring profile exists...');
+            await ensureUserProfile(initialSession.user);
             await loadUserProfile(initialSession.user.id);
           } else {
             console.log('👤 [SupabaseAuth] No user found in session');
@@ -125,8 +124,7 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         setUser(toAppUser(session?.user ?? null));
         
         if (session?.user) {
-          // Temporarily skip ensureUserProfile to prevent hanging
-          // await ensureUserProfile(session.user);
+          await ensureUserProfile(session.user);
           await loadUserProfile(session.user.id);
         } else {
           setProfile(null);
@@ -206,7 +204,7 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         setProfile(null);
       }
     } catch (error) {
-      console.log('⚠️ [loadUserProfile] Failed to load profile (continuing anyway):', { userId, error: error?.message });
+      console.log('⚠️ [loadUserProfile] Failed to load profile (continuing anyway):', { userId, error: (error as Error)?.message });
       // Don't throw error here - profile might not exist yet, continue without it
       setProfile(null);
     }
@@ -225,19 +223,20 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         origin: window.location.origin
       });
       
-      const { data, error } = await supabaseAuth.signInWithGoogle();
+      const result = await supabaseAuth.signInWithGoogle();
       
-      console.log('🔍 Post-OAuth call:', { data, error: error as AuthError });
+      console.log('🔍 Post-OAuth call:', result);
       
-      if (error) {
-        throw error as AuthError;
+      if ('error' in result && result.error) {
+        throw result.error;
       }
       
       // Check if we got a URL but no redirect happened
-      if (data?.url) {
-        console.log('🔍 Got OAuth URL:', data.url);
+      if ('data' in result && result.data && typeof result.data === 'object' && 'url' in result.data) {
+        const url = (result.data as any).url;
+        console.log('🔍 Got OAuth URL:', url);
         // If we have a URL but haven't redirected, force it
-        window.location.href = data.url;
+        window.location.href = url;
       }
       
       logService.info('OAuth redirect initiated');
@@ -261,11 +260,7 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       logService.debug('Initiating logout');
       
-      const { error } = await supabaseAuth.signOut();
-      
-      if (error) {
-        throw error as AuthError;
-      }
+      await supabaseAuth.signOut();
       
       // Clear local state
       setUser(null);

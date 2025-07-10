@@ -32,7 +32,7 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
       persistSession: true,
       detectSessionInUrl: true,
       storage: window.localStorage,
-      storageKey: 'sb-vplafscpcsxdxbyoxfhq-auth-token',
+      storageKey: 'sb-issmshemlkrucmxcvibs-auth-token',
     },
     realtime: {
       params: {
@@ -82,8 +82,8 @@ export const auth = {
           error,
           message: error.message,
           name: error.name,
-          cause: error.cause,
-          stack: error.stack
+          cause: (error as any).cause,
+          stack: (error as any).stack
         });
         throw error;
       }
