@@ -3,7 +3,7 @@
  * Updated for Phase 2 to show both automatic and manual risks
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -369,16 +369,16 @@ export const RiskAssessmentTab: React.FC<RiskAssessmentTabProps> = ({
     };
   }, [manualRisks]);
 
-  const handleAddRisk = () => {
+  const handleAddRisk = useCallback(() => {
     setShowAddModal(true);
-  };
+  }, []);
 
-  const handleEditRisk = (risk: any) => {
+  const handleEditRisk = useCallback((risk: any) => {
     setSelectedRisk(risk);
     setShowEditModal(true);
-  };
+  }, []);
 
-  const handleDeleteRisk = async (riskId: string) => {
+  const handleDeleteRisk = useCallback(async (riskId: string) => {
     if (window.confirm('Are you sure you want to delete this risk?')) {
       try {
         deleteRisk({ riskId, projectId });
@@ -388,19 +388,19 @@ export const RiskAssessmentTab: React.FC<RiskAssessmentTabProps> = ({
         toast.error('Failed to delete risk');
       }
     }
-  };
+  }, [deleteRisk, projectId, refetchRisks]);
 
-  const handleRiskAdded = () => {
+  const handleRiskAdded = useCallback(() => {
     refetchRisks();
     if (onAddRisk) {
       onAddRisk();
     }
-  };
+  }, [refetchRisks, onAddRisk]);
 
-  const handleRiskUpdated = () => {
+  const handleRiskUpdated = useCallback(() => {
     refetchRisks();
     setSelectedRisk(null);
-  };
+  }, [refetchRisks]);
 
   const getRiskCategoryConfig = (category: string) => {
     return RISK_CATEGORY_CONFIG[category as keyof typeof RISK_CATEGORY_CONFIG] || {
