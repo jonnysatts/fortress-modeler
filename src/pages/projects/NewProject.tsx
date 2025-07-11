@@ -17,17 +17,30 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { useImageUpload } from "@/hooks/useImageUpload";
-import { productTypes } from "@/lib/constants";
+import { productTypes, eventTypes } from "@/lib/constants";
 import { useCreateProject } from "@/hooks/useProjects";
 
-const formSchema = z.object({
-  name: z.string().min(3, "Project name must be at least 3 characters"),
-  description: z.string().optional(),
-  productType: z.string().min(1, "Please select a product type"),
-  targetAudience: z.string().optional(),
-  startDate: z.date(),
-  endDate: z.date().optional(),
-});
+const formSchema = z
+  .object({
+    name: z.string().min(3, "Project name must be at least 3 characters"),
+    description: z.string().optional(),
+    productType: z.string().min(1, "Please select a product type"),
+    targetAudience: z.string().optional(),
+    startDate: z.date(),
+    endDate: z.date().optional(),
+    eventType: z.enum(["weekly", "special"]).default("weekly"),
+    eventDate: z.date().optional(),
+    eventEndDate: z.date().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.eventType === "special" && !data.eventDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["eventDate"],
+        message: "Event date is required for special events",
+      });
+    }
+  });
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -44,8 +57,11 @@ const NewProject = () => {
       productType: "",
       targetAudience: "",
       startDate: new Date(),
+      eventType: "weekly",
     },
   });
+
+  const eventType = form.watch("eventType");
 
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
@@ -60,6 +76,9 @@ const NewProject = () => {
           endDate: data.endDate,
         },
         avatarImage: avatarDataUrl,
+        event_type: data.eventType,
+        event_date: data.eventDate,
+        event_end_date: data.eventEndDate,
       });
       
       if (createdProject && createdProject.id) {
@@ -160,6 +179,34 @@ const NewProject = () => {
                     </Select>
                     <FormDescription>
                       The type of product will determine relevant financial metrics and KPIs.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="eventType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Event Type</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select event type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {eventTypes.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Choose "Special Event" for one-off events with unique dates.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -271,6 +318,96 @@ const NewProject = () => {
                   )}
                 />
               </div>
+
+              {eventType === "special" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="eventDate"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Event Date</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                {field.value ? (
+                                  format(field.value, "PPP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              initialFocus
+                              className={cn("p-3 pointer-events-auto")}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormDescription>Date of the special event.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="eventEndDate"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Event End Date (Optional)</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                {field.value ? (
+                                  format(field.value, "PPP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value || undefined}
+                              onSelect={field.onChange}
+                              disabled={(date) =>
+                                date < (form.getValues("eventDate") || new Date(0))}
+                              initialFocus
+                              className={cn("p-3 pointer-events-auto")}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormDescription>
+                          Optional end date if the event spans multiple days.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
 
               <div>
                 <Label htmlFor="avatar-upload">Project Avatar (Optional)</Label>
