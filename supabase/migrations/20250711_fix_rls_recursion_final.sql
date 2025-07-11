@@ -24,8 +24,13 @@ DROP FUNCTION IF EXISTS can_edit_project(UUID);
 -- This function runs with the privileges of its owner (supabase_admin) and bypasses RLS within its body.
 CREATE OR REPLACE FUNCTION has_project_access(p_id UUID, u_id UUID, required_permission TEXT DEFAULT 'view')
 RETURNS BOOLEAN AS $$
+DECLARE
+  can_access BOOLEAN;
 BEGIN
-  RETURN EXISTS (
+  -- Temporarily disable RLS for this function's internal queries to prevent recursion
+  SET LOCAL row_level_security.enabled = false;
+
+  SELECT EXISTS (
     SELECT 1 FROM public.projects
     WHERE id = p_id AND (
       is_public = true OR
@@ -41,7 +46,9 @@ BEGIN
           )
       )
     )
-  );
+  ) INTO can_access;
+
+  RETURN can_access;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
