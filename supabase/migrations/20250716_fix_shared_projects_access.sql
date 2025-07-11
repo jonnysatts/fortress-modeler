@@ -54,7 +54,7 @@ BEGIN
     WHERE 
         p.deleted_at IS NULL
         AND ps.shared_with_email = (
-            SELECT email FROM auth.users WHERE id = auth.uid()
+            SELECT email FROM auth.users WHERE auth.users.id = auth.uid()
         )
         AND p.user_id != auth.uid()  -- Don't include own projects in shared list
     ORDER BY p.updated_at DESC;
