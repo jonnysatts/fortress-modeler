@@ -101,9 +101,9 @@ VALUES
     }');
 
 -- 4. Insert a sample risk for the project
-INSERT INTO public.risks (id, project_id, user_id, title, category, priority, status, mitigation_plan)
+INSERT INTO public.risks (id, project_id, user_id, name, type, likelihood, impact, status, mitigation)
 VALUES
-    ('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '00000000-0000-0000-0000-000000000001', 'Market Competition', 'market', 'high', 'identified', 'Develop unique feature set and strong marketing campaign.');
+    ('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '00000000-0000-0000-0000-000000000001', 'Market Competition', 'market', 'high', 'high', 'active', 'Develop unique feature set and strong marketing campaign.');
 
 -- Log completion
 DO $$

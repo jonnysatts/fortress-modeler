@@ -9,8 +9,8 @@
 export const appConfig = {
   // Supabase Configuration
   supabase: {
-    url: 'https://vplafscpcsxdxbyoxfhq.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwbGFmc2NwY3N4ZHhieW94ZmhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTEyNjY5MDQsImV4cCI6MjA2Njg0MjkwNH0.y3RL3Aq-2q_OW0AKoawV0-Q0JFpleTs5xHt52lVAsnQ'
+    url: 'https://issmshemlkrucmxcvibs.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlzc21zaGVtbGtydWNteGN2aWJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIxMzM1MzAsImV4cCI6MjA2NzcwOTUzMH0.xhxwSFCNSsG4Q1xta4L_uLKlnSHZfp7N3wXW0E3fOdg'
   },
   
   // Feature Flags

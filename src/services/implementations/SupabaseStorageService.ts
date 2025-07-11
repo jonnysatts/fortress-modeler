@@ -11,6 +11,11 @@ type SupabaseSpecialEventForecast = Database['public']['Tables']['special_event_
 type SupabaseSpecialEventActual = Database['public']['Tables']['special_event_actuals']['Row'];
 type SupabaseSpecialEventMilestone = Database['public']['Tables']['special_event_milestones']['Row'];
 
+// Type for the get_user_projects() function return value
+type GetUserProjectsResult = Omit<SupabaseProject, 'id'> & {
+  project_id: string;
+};
+
 /**
  * Supabase-based implementation of the storage service
  * This implementation provides cloud storage with real-time capabilities
@@ -57,7 +62,7 @@ export class SupabaseStorageService implements IStorageService {
 
   async getAllProjects(): Promise<Project[]> {
     try {
-      console.log('🔍 [SupabaseStorageService] Fetching all projects from Supabase');
+      console.log('🔍 [SupabaseStorageService] Fetching all projects using get_user_projects()');
 
       // Check current user first
       const user = await this.getCurrentUser();
@@ -66,13 +71,10 @@ export class SupabaseStorageService implements IStorageService {
         email: user.email
       });
 
-      // Test direct query with explicit session check
-      console.log('🔍 [SupabaseStorageService] About to query projects table...');
+      // Use the new RLS-safe function instead of direct table query
+      console.log('🔍 [SupabaseStorageService] Calling get_user_projects() function...');
       const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .is('deleted_at', null)
-        .order('updated_at', { ascending: false });
+        .rpc('get_user_projects' as any) as { data: GetUserProjectsResult[] | null, error: any };
 
       console.log('🔍 [SupabaseStorageService] Project fetch result:', {
         dataCount: data?.length || 0,
@@ -93,7 +95,12 @@ export class SupabaseStorageService implements IStorageService {
         throw handleSupabaseError(error);
       }
 
-      const projects = (data || []).map((project) => this.mapSupabaseProjectToProject(project));
+      const projects = (data || []).map((project) => {
+        // The get_user_projects function returns project_id instead of id
+        // Map it back to id for consistent interface
+        const mappedProject = { ...project, id: project.project_id };
+        return this.mapSupabaseProjectToProject(mappedProject);
+      });
       console.log('✅ [SupabaseStorageService] Successfully mapped projects:', projects.length);
       return projects;
     } catch (error) {

@@ -32,7 +32,7 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
       persistSession: true,
       detectSessionInUrl: true,
       storage: window.localStorage,
-      storageKey: 'sb-issmshemlkrucmxcvibs-auth-token',
+      storageKey: 'sb-jjearfzmvmpohbebcnju-auth-token',
     },
     realtime: {
       params: {
