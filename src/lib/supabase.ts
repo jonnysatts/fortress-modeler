@@ -46,7 +46,8 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
 export const auth = {
   // Sign in with Google OAuth
   async signInWithGoogle() {
-    const redirectUrl = `${window.location.origin}/auth/callback`;
+    // Use /login as the redirect URL for better UX
+    const redirectUrl = `${window.location.origin}/login`;
     console.log('🚀 signInWithGoogle called:', {
       provider: 'google',
       redirectTo: redirectUrl,
