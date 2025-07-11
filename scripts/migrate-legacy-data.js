@@ -17,17 +17,17 @@ config();
 
 // Configuration
 const CONFIG = {
-  // Old Database (source)
+  // Old Database (source) - issmshemlkrucmxcvibs has the data
   OLD_DB: {
-    url: 'https://vplafscpcsxdxbyoxfhq.supabase.co',
+    url: 'https://issmshemlkrucmxcvibs.supabase.co',
     serviceKey: process.env.OLD_SUPABASE_SERVICE_ROLE_KEY || '',
     anonKey: process.env.OLD_SUPABASE_ANON_KEY || '',
   },
   
-  // New Database (destination) - use service role key for admin operations
+  // New Database (destination) - jjearfzmvmpohbebcnju is the target
   NEW_DB: {
-    url: process.env.VITE_SUPABASE_URL || 'https://issmshemlkrucmxcvibs.supabase.co',
-    serviceKey: process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    url: process.env.VITE_SUPABASE_URL || 'https://jjearfzmvmpohbebcnju.supabase.co',
+    serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
     anonKey: process.env.VITE_SUPABASE_ANON_KEY || '',
   },
   

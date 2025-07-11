@@ -1184,17 +1184,9 @@ export class SupabaseStorageService implements IStorageService {
         return [];
       }
 
+      // Use the new get_shared_projects() function to avoid RLS issues
       const { data, error } = await supabase
-        .from('projects')
-        .select(`
-          *,
-          project_shares!inner (
-            permission
-          )
-        `)
-        .eq('project_shares.shared_with_email', user.email)
-        .is('deleted_at', null)
-        .order('updated_at', { ascending: false });
+        .rpc('get_shared_projects' as any) as { data: any[] | null, error: any };
 
       if (error) {
         console.error('❌ [SupabaseStorageService] Shared projects fetch error:', error);
@@ -1203,9 +1195,9 @@ export class SupabaseStorageService implements IStorageService {
 
       const projects = (data || []).map((project) => {
         const mappedProject = this.mapSupabaseProjectToProject(project);
-        // Add permission from the join
-        if (project.project_shares?.[0]?.permission) {
-          mappedProject.permission = project.project_shares[0].permission as 'owner' | 'view' | 'edit';
+        // Add permission from the function result
+        if (project.permission) {
+          mappedProject.permission = project.permission as 'owner' | 'view' | 'edit';
         }
         return mappedProject;
       });
