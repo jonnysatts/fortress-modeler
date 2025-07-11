@@ -27,6 +27,51 @@ export interface Project {
   owner_email?: string;
   share_count?: number;
   permission?: 'owner' | 'view' | 'edit';
+  event_type?: 'weekly' | 'special';
+  event_date?: Date;
+  event_end_date?: Date;
+}
+
+export interface SpecialEventForecast {
+  id: string;
+  project_id: string;
+  forecast_fnb_revenue?: number;
+  forecast_fnb_cogs_pct?: number;
+  forecast_merch_revenue?: number;
+  forecast_merch_cogs_pct?: number;
+  forecast_sponsorship_income?: number;
+  forecast_ticket_sales?: number;
+  forecast_other_income?: number;
+  forecast_total_costs?: number;
+  notes?: string;
+  created_at: Date;
+}
+
+export interface SpecialEventActual {
+  id: string;
+  project_id: string;
+  actual_fnb_revenue?: number;
+  actual_fnb_cogs?: number;
+  actual_merch_revenue?: number;
+  actual_merch_cogs?: number;
+  actual_sponsorship_income?: number;
+  actual_ticket_sales?: number;
+  actual_other_income?: number;
+  actual_total_costs?: number;
+  attendance?: number;
+  notes?: string;
+  success_rating?: number;
+  created_at: Date;
+}
+
+export interface SpecialEventMilestone {
+  id: string;
+  project_id: string;
+  milestone_label?: string;
+  target_date?: Date;
+  completed?: boolean;
+  assignee?: string;
+  notes?: string;
 }
 
 export interface FinancialModel {
@@ -112,6 +157,9 @@ export class FortressDB extends Dexie {
   risks!: Table<Risk, string>;
   scenarios!: Table<Scenario, string>;
   actuals!: Table<ActualsPeriodEntry, string>;
+  specialEventForecasts!: Table<SpecialEventForecast, string>;
+  specialEventActuals!: Table<SpecialEventActual, string>;
+  specialEventMilestones!: Table<SpecialEventMilestone, string>;
 
   constructor() {
     super('FortressDB');
@@ -226,6 +274,30 @@ export class FortressDB extends Dexie {
         console.error('❌ Migration failed:', error);
         throw error;
       }
+    });
+
+    this.version(8).stores({
+      projects: '&id, name, productType, createdAt, updatedAt, event_type, event_date, event_end_date',
+      financialModels: '&id, projectId, name, createdAt, updatedAt',
+      actualPerformance: '&id, projectId, date',
+      risks: '&id, projectId, type, likelihood, impact, status',
+      scenarios: '&id, projectId, modelId, name, createdAt',
+      actuals: '&id, &[projectId+period], projectId, period',
+      specialEventForecasts: '&id, project_id',
+      specialEventActuals: '&id, project_id',
+      specialEventMilestones: '&id, project_id'
+    });
+
+    this.version(9).stores({
+      projects: '&id, name, productType, createdAt, updatedAt, event_type, event_date, event_end_date',
+      financialModels: '&id, projectId, name, createdAt, updatedAt',
+      actualPerformance: '&id, projectId, date',
+      risks: '&id, projectId, type, likelihood, impact, status',
+      scenarios: '&id, projectId, modelId, name, createdAt',
+      actuals: '&id, &[projectId+period], projectId, period',
+      specialEventForecasts: '&id, project_id',
+      specialEventActuals: '&id, project_id',
+      specialEventMilestones: '&id, project_id'
     });
 
     this.version(4).stores({
@@ -344,13 +416,16 @@ export const deleteProject = async (id: string): Promise<void> => {
     const projectId = existingProject.id;
 
     // Use transaction for atomicity
-    await db.transaction('rw', [db.projects, db.financialModels, db.actualPerformance, db.risks, db.scenarios, db.actuals], async () => {
+    await db.transaction('rw', [db.projects, db.financialModels, db.actualPerformance, db.risks, db.scenarios, db.actuals, db.specialEventForecasts, db.specialEventActuals, db.specialEventMilestones], async () => {
       await db.projects.delete(projectId);
       await db.financialModels.where('projectId').equals(projectId).delete();
       await db.actualPerformance.where('projectId').equals(projectId).delete();
       await db.risks.where('projectId').equals(projectId).delete();
       await db.scenarios.where('projectId').equals(projectId).delete();
       await db.actuals.where('projectId').equals(projectId).delete();
+      await db.specialEventForecasts.where('project_id').equals(projectId).delete();
+      await db.specialEventActuals.where('project_id').equals(projectId).delete();
+      await db.specialEventMilestones.where('project_id').equals(projectId).delete();
     });
   } catch (error) {
     if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
@@ -576,7 +651,7 @@ export const addDemoData = async (): Promise<void> => {
     // Add demo project
     const projectId = await db.projects.add({
       ...demoData.project,
-      uuid: crypto.randomUUID(),
+      id: crypto.randomUUID(), // Add id here
       createdAt: timestamp,
       updatedAt: timestamp
     });
@@ -584,7 +659,7 @@ export const addDemoData = async (): Promise<void> => {
     // Add demo financial model
     await db.financialModels.add({
       ...demoData.financialModel,
-      uuid: crypto.randomUUID(),
+      id: crypto.randomUUID(), // Add id here
       projectId,
       createdAt: timestamp,
       updatedAt: timestamp

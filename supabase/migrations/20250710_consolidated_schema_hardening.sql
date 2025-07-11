@@ -55,45 +55,7 @@ BEGIN
 END;
 $$;
 
--- 3. Add RLS Helper Functions
-CREATE OR REPLACE FUNCTION can_view_project(p_id UUID)
-RETURNS BOOLEAN AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1 FROM public.projects
-    WHERE id = p_id AND (
-      is_public = true OR
-      user_id = auth.uid() OR
-      id IN (
-        SELECT project_id FROM public.project_shares
-        WHERE project_id = p_id
-          AND shared_with_id = auth.uid()
-          AND status = 'accepted'
-      )
-    )
-  );
-END;
-$$ LANGUAGE plpgsql STABLE;
-
-CREATE OR REPLACE FUNCTION can_edit_project(p_id UUID)
-RETURNS BOOLEAN AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1 FROM public.projects
-    WHERE id = p_id AND (
-      user_id = auth.uid() OR
-      id IN (
-        SELECT project_id FROM public.project_shares
-        WHERE project_id = p_id
-          AND shared_with_id = auth.uid()
-          AND permission IN ('edit', 'admin')
-          AND status = 'accepted'
-      )
-    )
-  );
-END;
-$$ LANGUAGE plpgsql STABLE;
-
+-- 3. Add RLS Helper Functions (only is_project_owner remains, others inlined)
 CREATE OR REPLACE FUNCTION is_project_owner(p_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
@@ -104,11 +66,20 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE;
 
--- 4. Refactor RLS policies to use helper functions
+-- 4. Refactor RLS policies to use helper functions or inlined logic
 -- PROJECTS
 DROP POLICY IF EXISTS projects_select_policy ON public.projects;
 CREATE POLICY projects_select_policy ON public.projects
-    FOR SELECT USING (can_view_project(id));
+    FOR SELECT USING (
+        user_id = auth.uid() OR -- Owner
+        is_public = true OR -- Public projects
+        EXISTS ( -- Shared projects
+            SELECT 1 FROM public.project_shares
+            WHERE project_id = projects.id -- Reference the current project's ID
+              AND shared_with_id = auth.uid()
+              AND status = 'accepted'
+        )
+    );
 
 DROP POLICY IF EXISTS projects_insert_policy ON public.projects;
 CREATE POLICY projects_insert_policy ON public.projects
@@ -116,7 +87,16 @@ CREATE POLICY projects_insert_policy ON public.projects
 
 DROP POLICY IF EXISTS projects_update_policy ON public.projects;
 CREATE POLICY projects_update_policy ON public.projects
-    FOR UPDATE USING (can_edit_project(id));
+    FOR UPDATE USING (
+        user_id = auth.uid() OR -- Owner
+        EXISTS ( -- Edit permission
+            SELECT 1 FROM public.project_shares
+            WHERE project_id = projects.id -- Reference the current project's ID
+              AND shared_with_id = auth.uid()
+              AND permission IN ('edit', 'admin')
+              AND status = 'accepted'
+        )
+    );
 
 DROP POLICY IF EXISTS projects_delete_policy ON public.projects;
 CREATE POLICY projects_delete_policy ON public.projects
@@ -125,45 +105,206 @@ CREATE POLICY projects_delete_policy ON public.projects
 -- FINANCIAL MODELS
 DROP POLICY IF EXISTS financial_models_select_policy ON public.financial_models;
 CREATE POLICY financial_models_select_policy ON public.financial_models
-    FOR SELECT USING (can_view_project(project_id));
+    FOR SELECT USING (
+        project_id IN (
+            SELECT id FROM public.projects WHERE
+            user_id = auth.uid() OR
+            is_public = true OR
+            EXISTS (
+                SELECT 1 FROM public.project_shares
+                WHERE project_id = projects.id
+                  AND shared_with_id = auth.uid()
+                  AND status = 'accepted'
+            )
+        )
+    );
 
 DROP POLICY IF EXISTS financial_models_insert_policy ON public.financial_models;
 CREATE POLICY financial_models_insert_policy ON public.financial_models
-    FOR INSERT WITH CHECK (can_edit_project(project_id) AND user_id = auth.uid());
+    FOR INSERT WITH CHECK (
+        user_id = auth.uid() AND
+        project_id IN (
+            SELECT id FROM public.projects WHERE
+            user_id = auth.uid() OR
+            EXISTS (
+                SELECT 1 FROM public.project_shares
+                WHERE project_id = projects.id
+                  AND shared_with_id = auth.uid()
+                  AND permission IN ('edit', 'admin')
+                  AND status = 'accepted'
+            )
+        )
+    );
 
 DROP POLICY IF EXISTS financial_models_update_policy ON public.financial_models;
 CREATE POLICY financial_models_update_policy ON public.financial_models
-    FOR UPDATE USING (can_edit_project(project_id));
+    FOR UPDATE USING (
+        project_id IN (
+            SELECT id FROM public.projects WHERE
+            user_id = auth.uid() OR
+            EXISTS (
+                SELECT 1 FROM public.project_shares
+                WHERE project_id = projects.id
+                  AND shared_with_id = auth.uid()
+                  AND permission IN ('edit', 'admin')
+                  AND status = 'accepted'
+            )
+        )
+    );
 
 DROP POLICY IF EXISTS financial_models_delete_policy ON public.financial_models;
 CREATE POLICY financial_models_delete_policy ON public.financial_models
-    FOR DELETE USING (can_edit_project(project_id));
+    FOR DELETE USING (
+        project_id IN (
+            SELECT id FROM public.projects WHERE
+            user_id = auth.uid() OR
+            EXISTS (
+                SELECT 1 FROM public.project_shares
+                WHERE project_id = projects.id
+                  AND shared_with_id = auth.uid()
+                  AND permission IN ('edit', 'admin')
+                  AND status = 'accepted'
+            )
+        )
+    );
 
--- OTHER PROJECT-LINKED TABLES
+-- OTHER PROJECT-LINKED TABLES (using inlined logic)
 DROP POLICY IF EXISTS actual_performance_policy ON public.actual_performance;
 CREATE POLICY actual_performance_policy ON public.actual_performance
-    FOR ALL USING (can_edit_project(project_id))
-    WITH CHECK (can_edit_project(project_id) AND user_id = auth.uid());
+    FOR ALL USING (
+        project_id IN (
+            SELECT id FROM public.projects WHERE
+            user_id = auth.uid() OR
+            EXISTS (
+                SELECT 1 FROM public.project_shares
+                WHERE project_id = projects.id
+                  AND shared_with_id = auth.uid()
+                  AND permission IN ('edit', 'admin')
+                  AND status = 'accepted'
+            )
+        )
+    )
+    WITH CHECK (
+        user_id = auth.uid() AND
+        project_id IN (
+            SELECT id FROM public.projects WHERE
+            user_id = auth.uid() OR
+            EXISTS (
+                SELECT 1 FROM public.project_shares
+                WHERE project_id = projects.id
+                  AND shared_with_id = auth.uid()
+                  AND permission IN ('edit', 'admin')
+                  AND status = 'accepted'
+            )
+        )
+    );
 
 DROP POLICY IF EXISTS actuals_period_policy ON public.actuals_period_entries;
 CREATE POLICY actuals_period_policy ON public.actuals_period_entries
-    FOR ALL USING (can_edit_project(project_id))
-    WITH CHECK (can_edit_project(project_id) AND user_id = auth.uid());
+    FOR ALL USING (
+        project_id IN (
+            SELECT id FROM public.projects WHERE
+            user_id = auth.uid() OR
+            EXISTS (
+                SELECT 1 FROM public.project_shares
+                WHERE project_id = projects.id
+                  AND shared_with_id = auth.uid()
+                  AND permission IN ('edit', 'admin')
+                  AND status = 'accepted'
+            )
+        )
+    )
+    WITH CHECK (
+        user_id = auth.uid() AND
+        project_id IN (
+            SELECT id FROM public.projects WHERE
+            user_id = auth.uid() OR
+            EXISTS (
+                SELECT 1 FROM public.project_shares
+                WHERE project_id = projects.id
+                  AND shared_with_id = auth.uid()
+                  AND permission IN ('edit', 'admin')
+                  AND status = 'accepted'
+            )
+        )
+    );
 
 DROP POLICY IF EXISTS risks_policy ON public.risks;
 CREATE POLICY risks_policy ON public.risks
-    FOR ALL USING (can_edit_project(project_id))
-    WITH CHECK (can_edit_project(project_id) AND user_id = auth.uid());
+    FOR ALL USING (
+        project_id IN (
+            SELECT id FROM public.projects WHERE
+            user_id = auth.uid() OR
+            EXISTS (
+                SELECT 1 FROM public.project_shares
+                WHERE project_id = projects.id
+                  AND shared_with_id = auth.uid()
+                  AND permission IN ('edit', 'admin')
+                  AND status = 'accepted'
+            )
+        )
+    )
+    WITH CHECK (
+        user_id = auth.uid() AND
+        project_id IN (
+            SELECT id FROM public.projects WHERE
+            user_id = auth.uid() OR
+            EXISTS (
+                SELECT 1 FROM public.project_shares
+                WHERE project_id = projects.id
+                  AND shared_with_id = auth.uid()
+                  AND permission IN ('edit', 'admin')
+                  AND status = 'accepted'
+            )
+        )
+    );
 
 DROP POLICY IF EXISTS scenarios_policy ON public.scenarios;
 CREATE POLICY scenarios_policy ON public.scenarios
-    FOR ALL USING (can_edit_project(project_id))
-    WITH CHECK (can_edit_project(project_id) AND user_id = auth.uid());
+    FOR ALL USING (
+        project_id IN (
+            SELECT id FROM public.projects WHERE
+            user_id = auth.uid() OR
+            EXISTS (
+                SELECT 1 FROM public.project_shares
+                WHERE project_id = projects.id
+                  AND shared_with_id = auth.uid()
+                  AND permission IN ('edit', 'admin')
+                  AND status = 'accepted'
+            )
+        )
+    )
+    WITH CHECK (
+        user_id = auth.uid() AND
+        project_id IN (
+            SELECT id FROM public.projects WHERE
+            user_id = auth.uid() OR
+            EXISTS (
+                SELECT 1 FROM public.project_shares
+                WHERE project_id = projects.id
+                  AND shared_with_id = auth.uid()
+                  AND permission IN ('edit', 'admin')
+                  AND status = 'accepted'
+            )
+        )
+    );
 
 -- PRESENCE
 DROP POLICY IF EXISTS presence_policy ON public.presence;
 CREATE POLICY presence_policy ON public.presence
-    FOR ALL USING (can_view_project(project_id))
+    FOR ALL USING (
+        project_id IN (
+            SELECT id FROM public.projects WHERE
+            user_id = auth.uid() OR
+            is_public = true OR
+            EXISTS (
+                SELECT 1 FROM public.project_shares
+                WHERE project_id = projects.id
+                  AND shared_with_id = auth.uid()
+                  AND status = 'accepted'
+            )
+        )
+    )
     WITH CHECK (user_id = auth.uid());
 
 -- Completion message

@@ -67,6 +67,9 @@ export interface Database {
           created_at: string
           updated_at: string
           deleted_at: string | null
+          event_type: string | null
+          event_date: string | null
+          event_end_date: string | null
         }
         Insert: {
           id?: string
@@ -85,6 +88,9 @@ export interface Database {
           created_at?: string
           updated_at?: string
           deleted_at?: string | null
+          event_type?: string | null
+          event_date?: string | null
+          event_end_date?: string | null
         }
         Update: {
           id?: string
@@ -103,12 +109,162 @@ export interface Database {
           created_at?: string
           updated_at?: string
           deleted_at?: string | null
+          event_type?: string | null
+          event_date?: string | null
+          event_end_date?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "projects_user_id_fkey"
             columns: ["user_id"]
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      special_event_forecasts: {
+        Row: {
+          id: string
+          project_id: string
+          forecast_fnb_revenue: number | null
+          forecast_fnb_cogs_pct: number | null
+          forecast_merch_revenue: number | null
+          forecast_merch_cogs_pct: number | null
+          forecast_sponsorship_income: number | null
+          forecast_ticket_sales: number | null
+          forecast_other_income: number | null
+          forecast_total_costs: number | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          forecast_fnb_revenue?: number | null
+          forecast_fnb_cogs_pct?: number | null
+          forecast_merch_revenue?: number | null
+          forecast_merch_cogs_pct?: number | null
+          forecast_sponsorship_income?: number | null
+          forecast_ticket_sales?: number | null
+          forecast_other_income?: number | null
+          forecast_total_costs?: number | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          forecast_fnb_revenue?: number | null
+          forecast_fnb_cogs_pct?: number | null
+          forecast_merch_revenue?: number | null
+          forecast_merch_cogs_pct?: number | null
+          forecast_sponsorship_income?: number | null
+          forecast_ticket_sales?: number | null
+          forecast_other_income?: number | null
+          forecast_total_costs?: number | null
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "special_event_forecasts_project_id_fkey"
+            columns: ["project_id"]
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      special_event_actuals: {
+        Row: {
+          id: string
+          project_id: string
+          actual_fnb_revenue: number | null
+          actual_fnb_cogs: number | null
+          actual_merch_revenue: number | null
+          actual_merch_cogs: number | null
+          actual_sponsorship_income: number | null
+          actual_ticket_sales: number | null
+          actual_other_income: number | null
+          actual_total_costs: number | null
+          attendance: number | null
+          notes: string | null
+          success_rating: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          actual_fnb_revenue?: number | null
+          actual_fnb_cogs?: number | null
+          actual_merch_revenue?: number | null
+          actual_merch_cogs?: number | null
+          actual_sponsorship_income?: number | null
+          actual_ticket_sales?: number | null
+          actual_other_income?: number | null
+          actual_total_costs?: number | null
+          attendance?: number | null
+          notes?: string | null
+          success_rating?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          actual_fnb_revenue?: number | null
+          actual_fnb_cogs?: number | null
+          actual_merch_revenue?: number | null
+          actual_merch_cogs?: number | null
+          actual_sponsorship_income?: number | null
+          actual_ticket_sales?: number | null
+          actual_other_income?: number | null
+          actual_total_costs?: number | null
+          attendance?: number | null
+          notes?: string | null
+          success_rating?: number | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "special_event_actuals_project_id_fkey"
+            columns: ["project_id"]
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      special_event_milestones: {
+        Row: {
+          id: string
+          project_id: string
+          milestone_label: string | null
+          target_date: string | null
+          completed: boolean | null
+          assignee: string | null
+          notes: string | null
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          milestone_label?: string | null
+          target_date?: string | null
+          completed?: boolean | null
+          assignee?: string | null
+          notes?: string | null
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          milestone_label?: string | null
+          target_date?: string | null
+          completed?: boolean | null
+          assignee?: string | null
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "special_event_milestones_project_id_fkey"
+            columns: ["project_id"]
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           }
         ]
@@ -125,6 +281,7 @@ export interface Database {
           created_at: string
           updated_at: string
           deleted_at: string | null
+          is_primary: boolean | null
         }
         Insert: {
           id?: string
@@ -137,6 +294,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
           deleted_at?: string | null
+          is_primary?: boolean | null
         }
         Update: {
           id?: string
@@ -149,6 +307,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
           deleted_at?: string | null
+          is_primary?: boolean | null
         }
         Relationships: [
           {
@@ -216,7 +375,7 @@ export interface Database {
           id: string
           project_id: string
           user_id: string
-          period: string
+          period: number
           data: Json
           created_at: string
           updated_at: string
@@ -225,7 +384,7 @@ export interface Database {
           id?: string
           project_id: string
           user_id: string
-          period: string
+          period: number
           data: Json
           created_at?: string
           updated_at?: string
@@ -234,7 +393,7 @@ export interface Database {
           id?: string
           project_id?: string
           user_id?: string
-          period?: string
+          period?: number
           data?: Json
           created_at?: string
           updated_at?: string

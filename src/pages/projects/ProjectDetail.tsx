@@ -260,15 +260,25 @@ const ProjectDetail = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="models">Scenarios</TabsTrigger>
-          <TabsTrigger value="performance">Track Performance</TabsTrigger>
-          <TabsTrigger value="analysis">Insights</TabsTrigger>
+          {project.event_type === 'special' ? (
+            <>
+              <TabsTrigger value="forecast">Forecast</TabsTrigger>
+              <TabsTrigger value="actuals">Actuals</TabsTrigger>
+              <TabsTrigger value="milestones">Milestones</TabsTrigger>
+            </>
+          ) : (
+            <>
+              <TabsTrigger value="models">Scenarios</TabsTrigger>
+              <TabsTrigger value="performance">Track Performance</TabsTrigger>
+              <TabsTrigger value="analysis">Insights</TabsTrigger>
+            </>
+          )}
           <TabsTrigger value="risks">Risk Assessment</TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview" className="space-y-4">
           {/* Conditional rendering: Single model vs Multi-model scenarios */}
-          {financialModels.length <= 1 ? (
+          {financialModels.length <= 1 && project.event_type !== 'special' ? (
             <ProjectOverview
               project={project}
               models={financialModels}
@@ -286,190 +296,215 @@ const ProjectDetail = () => {
             />
           )}
         </TabsContent>
-        
-        <TabsContent value="models" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Financial Scenarios</CardTitle>
-              <CardDescription>
-                Compare and manage your financial scenarios and projections for this project.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              {financialModels.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Primary</TableHead>
-                      <TableHead>Growth Scenario</TableHead>
-                      <TableHead>Revenue Streams</TableHead>
-                      <TableHead>Cost Categories</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {financialModels.map((model) => (
-                      <TableRow key={model.id} className="cursor-pointer hover:bg-muted/50">
-                        <TableCell className="font-medium">
-                          <Link 
-                            to={`/projects/${projectId}/models/${model.id}`}
-                            className="text-fortress-blue hover:underline"
-                          >
-                            {model.name}
-                          </Link>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            {model.isPrimary ? (
-                              <Badge variant="default" className="text-xs">
-                                <Target className="mr-1 h-3 w-3" />
-                                Primary
-                              </Badge>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  handleSetPrimaryModel(model.id);
-                                }}
-                                disabled={updatingPrimaryModel === model.id}
+
+        {project.event_type === 'special' ? (
+          <>
+            <TabsContent value="forecast" className="space-y-4">
+              <Card>
+                <CardHeader><CardTitle>Special Event Forecast</CardTitle></CardHeader>
+                <CardContent><p className="text-muted-foreground">Special Event Forecast form will go here.</p></CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="actuals" className="space-y-4">
+              <Card>
+                <CardHeader><CardTitle>Special Event Actuals</CardTitle></CardHeader>
+                <CardContent><p className="text-muted-foreground">Special Event Actuals input form will go here.</p></CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="milestones" className="space-y-4">
+              <Card>
+                <CardHeader><CardTitle>Event Milestones</CardTitle></CardHeader>
+                <CardContent><p className="text-muted-foreground">Special Event Milestones tracker will go here.</p></CardContent>
+              </Card>
+            </TabsContent>
+          </>
+        ) : (
+          <>
+            <TabsContent value="models" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Financial Scenarios</CardTitle>
+                  <CardDescription>
+                    Compare and manage your financial scenarios and projections for this project.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  {financialModels.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Primary</TableHead>
+                          <TableHead>Growth Scenario</TableHead>
+                          <TableHead>Revenue Streams</TableHead>
+                          <TableHead>Cost Categories</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {financialModels.map((model) => (
+                          <TableRow key={model.id} className="cursor-pointer hover:bg-muted/50">
+                            <TableCell className="font-medium">
+                              <Link 
+                                to={`/projects/${projectId}/models/${model.id}`}
+                                className="text-fortress-blue hover:underline"
                               >
-                                {updatingPrimaryModel === model.id ? (
-                                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                {model.name}
+                              </Link>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                {model.isPrimary ? (
+                                  <Badge variant="default" className="text-xs">
+                                    <Target className="mr-1 h-3 w-3" />
+                                    Primary
+                                  </Badge>
                                 ) : (
-                                  <Target className="mr-1 h-3 w-3" />
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleSetPrimaryModel(model.id);
+                                    }}
+                                    disabled={updatingPrimaryModel === model.id}
+                                  >
+                                    {updatingPrimaryModel === model.id ? (
+                                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <Target className="mr-1 h-3 w-3" />
+                                    )}
+                                    Set Primary
+                                  </Button>
                                 )}
-                                Set Primary
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="capitalize">
-                          {model.assumptions.growthModel.type}{" "}
-                          ({(model.assumptions.growthModel.rate * 100).toFixed(0)}%)
-                        </TableCell>
-                        <TableCell>{model.assumptions.revenue.length}</TableCell>
-                        <TableCell>{model.assumptions.costs.length}</TableCell>
-                        <TableCell>{formatDate(model.createdAt)}</TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-8 w-8 p-0"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                navigate(`/projects/${projectId}/models/${model.id}`);
-                              }}
-                            >
-                              <BarChart3 className="h-4 w-4" />
-                              <span className="sr-only">View</span>
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-10">
-                  <div className="mb-4 flex justify-center">
-                    <div className="rounded-full bg-muted p-4">
-                      <BarChart3 className="h-6 w-6 text-muted-foreground" />
-                    </div>
-                  </div>
-                  <h3 className="mb-1 text-lg font-medium">No financial scenarios yet</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Create your first financial scenario to start projecting revenue and costs.
-                  </p>
-                  <Button 
-                    className="bg-fortress-emerald hover:bg-fortress-emerald/90"
-                    onClick={() => navigate(`/projects/${projectId}/models/new`)}
-                  >
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    New Financial Scenario
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          
-          {/* Model Comparison */}
-          <ModelComparison
-            models={financialModels}
-            onViewModel={(modelId) => navigate(`/projects/${projectId}/models/${modelId}`)}
-          />
-        </TabsContent>
-        
-        <TabsContent value="performance" className="space-y-4">
-          {financialModels.length > 0 ? (
-            <>
-              {/* Model Selector */}
-              {financialModels.length > 1 && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center space-x-4">
-                      <Label htmlFor="model-select" className="text-sm font-medium">
-                        Track performance for:
-                      </Label>
-                      <Select value={selectedModelId} onValueChange={setSelectedModelId}>
-                        <SelectTrigger id="model-select" className="w-64">
-                          <SelectValue placeholder="Select a model" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {financialModels.map((model) => (
-                            <SelectItem key={model.id} value={model.id}>
-                              {model.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/projects/${projectId}/models/${selectedModelId}`)}
+                              </div>
+                            </TableCell>
+                            <TableCell className="capitalize">
+                              {model.assumptions.growthModel.type}{" "}
+                              ({(model.assumptions.growthModel.rate * 100).toFixed(0)}%)
+                            </TableCell>
+                            <TableCell>{model.assumptions.revenue.length}</TableCell>
+                            <TableCell>{model.assumptions.costs.length}</TableCell>
+                            <TableCell>{formatDate(model.createdAt)}</TableCell>
+                            <TableCell>
+                              <div className="flex space-x-2">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-8 w-8 p-0"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    navigate(`/projects/${projectId}/models/${model.id}`);
+                                  }}
+                                >
+                                  <BarChart3 className="h-4 w-4" />
+                                  <span className="sr-only">View</span>
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-center py-10">
+                      <div className="mb-4 flex justify-center">
+                        <div className="rounded-full bg-muted p-4">
+                          <BarChart3 className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                      </div>
+                      <h3 className="mb-1 text-lg font-medium">No financial scenarios yet</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Create your first financial scenario to start projecting revenue and costs.
+                      </p>
+                      <Button 
+                        className="bg-fortress-emerald hover:bg-fortress-emerald/90"
+                        onClick={() => navigate(`/projects/${projectId}/models/new`)}
                       >
-                        <BarChart3 className="mr-2 h-4 w-4" />
-                        View Model Details
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        New Financial Scenario
                       </Button>
                     </div>
-                  </CardContent>
+                  )}
+                </CardContent>
+              </Card>
+              
+              {/* Model Comparison */}
+              <ModelComparison
+                models={financialModels}
+                onViewModel={(modelId) => navigate(`/projects/${projectId}/models/${modelId}`)}
+              />
+            </TabsContent>
+            
+            <TabsContent value="performance" className="space-y-4">
+              {financialModels.length > 0 ? (
+                <>
+                  {/* Model Selector */}
+                  {financialModels.length > 1 && (
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="flex items-center space-x-4">
+                          <Label htmlFor="model-select" className="text-sm font-medium">
+                            Track performance for:
+                          </Label>
+                          <Select value={selectedModelId} onValueChange={setSelectedModelId}>
+                            <SelectTrigger id="model-select" className="w-64">
+                              <SelectValue placeholder="Select a model" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {financialModels.map((model) => (
+                                <SelectItem key={model.id} value={model.id}>
+                                  {model.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate(`/projects/${projectId}/models/${selectedModelId}`)}
+                          >
+                            <BarChart3 className="mr-2 h-4 w-4" />
+                            View Model Details
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                   <Suspense fallback={<ComponentLoader message="Loading actuals form..." />}>
+                     <ActualsInputForm 
+                        model={selectedModel} 
+                        existingActuals={actualsData} 
+                     />
+                   </Suspense>
+                   <ActualsDisplayTable 
+                      model={selectedModel}
+                      actualsData={actualsData} 
+                   />
+                </>
+              ) : (
+                <Card>
+                  <CardHeader><CardTitle>Performance Tracking</CardTitle></CardHeader>
+                  <CardContent><p className="text-muted-foreground">Create a financial model first to enable performance tracking.</p></CardContent>
                 </Card>
               )}
-               <Suspense fallback={<ComponentLoader message="Loading actuals form..." />}>
-                 <ActualsInputForm 
-                    model={selectedModel} 
-                    existingActuals={actualsData} 
+            </TabsContent>
+            
+            <TabsContent value="analysis" className="space-y-4">
+               <Suspense fallback={<ComponentLoader message="Loading performance analysis..." />}>
+                 <PerformanceAnalysis 
+                    financialModels={financialModels} 
+                    actualsData={actualsData} 
+                    projectId={projectId} 
                  />
                </Suspense>
-               <ActualsDisplayTable 
-                  model={selectedModel}
-                  actualsData={actualsData} 
-               />
-            </>
-          ) : (
-            <Card>
-              <CardHeader><CardTitle>Performance Tracking</CardTitle></CardHeader>
-              <CardContent><p className="text-muted-foreground">Create a financial model first to enable performance tracking.</p></CardContent>
-            </Card>
-          )}
-        </TabsContent>
-        
-        <TabsContent value="analysis" className="space-y-4">
-           <Suspense fallback={<ComponentLoader message="Loading performance analysis..." />}>
-             <PerformanceAnalysis 
-                financialModels={financialModels} 
-                actualsData={actualsData} 
-                projectId={projectId} 
-             />
-           </Suspense>
-        </TabsContent>
+            </TabsContent>
+          </>
+        )}
         
         <TabsContent value="risks" className="space-y-4">
           <RiskAssessmentTab 

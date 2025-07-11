@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Project, FinancialModel, db, getProject, createProject, updateProject, deleteProject } from '@/lib/db';
+import { Project, FinancialModel, SpecialEventForecast, SpecialEventActual, SpecialEventMilestone, db, getProject, createProject, updateProject, deleteProject } from '@/lib/db';
 import { toast } from 'sonner';
 import { isCloudModeEnabled } from '@/config/app.config';
 import { useMemo } from 'react';
@@ -28,11 +28,10 @@ export const useMyProjects = () => {
           return result;
         } catch (error) {
           console.error('🚨 DETAILED ERROR in getAllProjects:', {
-            error,
-            message: error?.message,
-            stack: error?.stack,
-            name: error?.name,
-            cause: error?.cause
+            error: (error as Error)?.message,
+            stack: (error as Error)?.stack,
+            name: (error as Error)?.name,
+            cause: (error as Error)?.cause
           });
           throw error; // Re-throw to let React Query handle it
         }
@@ -45,6 +44,206 @@ export const useMyProjects = () => {
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
     retry: 3,
+  });
+};
+
+// --- Special Event Actuals --- //
+
+export const useSpecialEventActuals = (projectId: string | undefined) => {
+  const queryClient = useQueryClient();
+  return useQuery<SpecialEventActual[], Error>({
+    queryKey: ['specialEventActuals', projectId],
+    queryFn: async () => {
+      if (!projectId) throw new Error('Project ID is required');
+      if (isCloudModeEnabled()) {
+        const supabaseStorage = getSupabaseStorageService();
+        return await supabaseStorage.getSpecialEventActualsForProject(projectId);
+      } else {
+        // Local IndexedDB implementation (if needed)
+        return [];
+      }
+    },
+    enabled: !!projectId,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 3,
+  });
+};
+
+export const useCreateSpecialEventActual = () => {
+  const queryClient = useQueryClient();
+  return useMutation<SpecialEventActual, Error, Partial<SpecialEventActual>>({
+    mutationFn: async (newActualData) => {
+      if (!newActualData.project_id) throw new Error('Project ID is required for actuals');
+      if (isCloudModeEnabled()) {
+        const supabaseStorage = getSupabaseStorageService();
+        return await supabaseStorage.createSpecialEventActual(newActualData);
+      } else {
+        // Local IndexedDB implementation (if needed)
+        throw new Error('Local storage for special event actuals not implemented');
+      }
+    },
+    onSuccess: (newActual) => {
+      queryClient.invalidateQueries({ queryKey: ['specialEventActuals', newActual.project_id] });
+      toast.success('Special event actual created successfully!');
+    },
+    onError: (error) => {
+      console.error('Failed to create special event actual:', error);
+      toast.error('Failed to create special event actual', {
+        description: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    },
+  });
+};
+
+export const useUpdateSpecialEventActual = () => {
+  const queryClient = useQueryClient();
+  return useMutation<SpecialEventActual, Error, { id: string; data: Partial<SpecialEventActual> }>({
+    mutationFn: async ({ id, data }) => {
+      if (isCloudModeEnabled()) {
+        const supabaseStorage = getSupabaseStorageService();
+        return await supabaseStorage.updateSpecialEventActual(id, data);
+      } else {
+        // Local IndexedDB implementation (if needed)
+        throw new Error('Local storage for special event actuals not implemented');
+      }
+    },
+    onSuccess: (updatedActual) => {
+      queryClient.invalidateQueries({ queryKey: ['specialEventActuals', updatedActual.project_id] });
+      queryClient.invalidateQueries({ queryKey: ['specialEventActuals', updatedActual.id] });
+      toast.success('Special event actual updated successfully!');
+    },
+    onError: (error) => {
+      console.error('Failed to update special event actual:', error);
+      toast.error('Failed to update special event actual', {
+        description: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    },
+  });
+};
+
+export const useDeleteSpecialEventActual = () => {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, { id: string; projectId: string }>({
+    mutationFn: async ({ id, projectId }) => {
+      if (isCloudModeEnabled()) {
+        const supabaseStorage = getSupabaseStorageService();
+        await supabaseStorage.deleteSpecialEventActual(id);
+      } else {
+        // Local IndexedDB implementation (if needed)
+        throw new Error('Local storage for special event actuals not implemented');
+      }
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['specialEventActuals', variables.projectId] });
+      toast.success('Special event actual deleted successfully!');
+    },
+    onError: (error) => {
+      console.error('Failed to delete special event actual:', error);
+      toast.error('Failed to delete special event actual', {
+        description: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    },
+  });
+};
+
+// --- Special Event Milestones --- //
+
+export const useSpecialEventMilestones = (projectId: string | undefined) => {
+  const queryClient = useQueryClient();
+  return useQuery<SpecialEventMilestone[], Error>({
+    queryKey: ['specialEventMilestones', projectId],
+    queryFn: async () => {
+      if (!projectId) throw new Error('Project ID is required');
+      if (isCloudModeEnabled()) {
+        const supabaseStorage = getSupabaseStorageService();
+        return await supabaseStorage.getSpecialEventMilestonesForProject(projectId);
+      } else {
+        // Local IndexedDB implementation (if needed)
+        return [];
+      }
+    },
+    enabled: !!projectId,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 3,
+  });
+};
+
+export const useCreateSpecialEventMilestone = () => {
+  const queryClient = useQueryClient();
+  return useMutation<SpecialEventMilestone, Error, Partial<SpecialEventMilestone>>({
+    mutationFn: async (newMilestoneData) => {
+      if (!newMilestoneData.project_id) throw new Error('Project ID is required for milestone');
+      if (isCloudModeEnabled()) {
+        const supabaseStorage = getSupabaseStorageService();
+        return await supabaseStorage.createSpecialEventMilestone(newMilestoneData);
+      } else {
+        // Local IndexedDB implementation (if needed)
+        throw new Error('Local storage for special event milestones not implemented');
+      }
+    },
+    onSuccess: (newMilestone) => {
+      queryClient.invalidateQueries({ queryKey: ['specialEventMilestones', newMilestone.project_id] });
+      toast.success('Special event milestone created successfully!');
+    },
+    onError: (error) => {
+      console.error('Failed to create special event milestone:', error);
+      toast.error('Failed to create special event milestone', {
+        description: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    },
+  });
+};
+
+export const useUpdateSpecialEventMilestone = () => {
+  const queryClient = useQueryClient();
+  return useMutation<SpecialEventMilestone, Error, { id: string; data: Partial<SpecialEventMilestone> }>({
+    mutationFn: async ({ id, data }) => {
+      if (isCloudModeEnabled()) {
+        const supabaseStorage = getSupabaseStorageService();
+        return await supabaseStorage.updateSpecialEventMilestone(id, data);
+      } else {
+        // Local IndexedDB implementation (if needed)
+        throw new Error('Local storage for special event milestones not implemented');
+      }
+    },
+    onSuccess: (updatedMilestone) => {
+      queryClient.invalidateQueries({ queryKey: ['specialEventMilestones', updatedMilestone.project_id] });
+      queryClient.invalidateQueries({ queryKey: ['specialEventMilestones', updatedMilestone.id] });
+      toast.success('Special event milestone updated successfully!');
+    },
+    onError: (error) => {
+      console.error('Failed to update special event milestone:', error);
+      toast.error('Failed to update special event milestone', {
+        description: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    },
+  });
+};
+
+export const useDeleteSpecialEventMilestone = () => {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, { id: string; projectId: string }>({
+    mutationFn: async ({ id, projectId }) => {
+      if (isCloudModeEnabled()) {
+        const supabaseStorage = getSupabaseStorageService();
+        await supabaseStorage.deleteSpecialEventMilestone(id);
+      } else {
+        // Local IndexedDB implementation (if needed)
+        throw new Error('Local storage for special event milestones not implemented');
+      }
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['specialEventMilestones', variables.projectId] });
+      toast.success('Special event milestone deleted successfully!');
+    },
+    onError: (error) => {
+      console.error('Failed to delete special event milestone:', error);
+      toast.error('Failed to delete special event milestone', {
+        description: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    },
   });
 };
 
@@ -168,13 +367,118 @@ export const useCreateProject = () => {
         return createdProject;
       }
     },
-    onSuccess: () => {
+    onSuccess: (newProject) => {
       queryClient.invalidateQueries({ queryKey: ['projects', 'my'] });
+      if (newProject.event_type === 'special') {
+        queryClient.invalidateQueries({ queryKey: ['specialEventForecasts', newProject.id] });
+        queryClient.invalidateQueries({ queryKey: ['specialEventActuals', newProject.id] });
+        queryClient.invalidateQueries({ queryKey: ['specialEventMilestones', newProject.id] });
+      }
       toast.success('Project created successfully!');
     },
     onError: (error) => {
       console.error('Failed to create project:', error);
       toast.error('Failed to create project', {
+        description: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    },
+  });
+};
+
+// --- Special Event Forecasts --- //
+
+export const useSpecialEventForecasts = (projectId: string | undefined) => {
+  const queryClient = useQueryClient();
+  return useQuery<SpecialEventForecast[], Error>({
+    queryKey: ['specialEventForecasts', projectId],
+    queryFn: async () => {
+      if (!projectId) throw new Error('Project ID is required');
+      if (isCloudModeEnabled()) {
+        const supabaseStorage = getSupabaseStorageService();
+        return await supabaseStorage.getSpecialEventForecastsForProject(projectId);
+      } else {
+        // Local IndexedDB implementation (if needed)
+        return [];
+      }
+    },
+    enabled: !!projectId,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 3,
+  });
+};
+
+export const useCreateSpecialEventForecast = () => {
+  const queryClient = useQueryClient();
+  return useMutation<SpecialEventForecast, Error, Partial<SpecialEventForecast>>({
+    mutationFn: async (newForecastData) => {
+      if (!newForecastData.project_id) throw new Error('Project ID is required for forecast');
+      if (isCloudModeEnabled()) {
+        const supabaseStorage = getSupabaseStorageService();
+        return await supabaseStorage.createSpecialEventForecast(newForecastData);
+      } else {
+        // Local IndexedDB implementation (if needed)
+        throw new Error('Local storage for special event forecasts not implemented');
+      }
+    },
+    onSuccess: (newForecast) => {
+      queryClient.invalidateQueries({ queryKey: ['specialEventForecasts', newForecast.project_id] });
+      toast.success('Special event forecast created successfully!');
+    },
+    onError: (error) => {
+      console.error('Failed to create special event forecast:', error);
+      toast.error('Failed to create special event forecast', {
+        description: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    },
+  });
+};
+
+export const useUpdateSpecialEventForecast = () => {
+  const queryClient = useQueryClient();
+  return useMutation<SpecialEventForecast, Error, { id: string; data: Partial<SpecialEventForecast> }>({
+    mutationFn: async ({ id, data }) => {
+      if (isCloudModeEnabled()) {
+        const supabaseStorage = getSupabaseStorageService();
+        return await supabaseStorage.updateSpecialEventForecast(id, data);
+      } else {
+        // Local IndexedDB implementation (if needed)
+        throw new Error('Local storage for special event forecasts not implemented');
+      }
+    },
+    onSuccess: (updatedForecast) => {
+      queryClient.invalidateQueries({ queryKey: ['specialEventForecasts', updatedForecast.project_id] });
+      queryClient.invalidateQueries({ queryKey: ['specialEventForecasts', updatedForecast.id] });
+      toast.success('Special event forecast updated successfully!');
+    },
+    onError: (error) => {
+      console.error('Failed to update special event forecast:', error);
+      toast.error('Failed to update special event forecast', {
+        description: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    },
+  });
+};
+
+export const useDeleteSpecialEventForecast = () => {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, { id: string; projectId: string }>({
+    mutationFn: async ({ id, projectId }) => {
+      if (isCloudModeEnabled()) {
+        const supabaseStorage = getSupabaseStorageService();
+        await supabaseStorage.deleteSpecialEventForecast(id);
+      } else {
+        // Local IndexedDB implementation (if needed)
+        throw new Error('Local storage for special event forecasts not implemented');
+      }
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['specialEventForecasts', variables.projectId] });
+      toast.success('Special event forecast deleted successfully!');
+    },
+    onError: (error) => {
+      console.error('Failed to delete special event forecast:', error);
+      toast.error('Failed to delete special event forecast', {
         description: error instanceof Error ? error.message : 'Unknown error occurred'
       });
     },
@@ -205,6 +509,11 @@ export const useUpdateProject = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['projects', 'my'] });
       queryClient.invalidateQueries({ queryKey: ['projects', variables.id] });
+      if (variables.data.event_type === 'special') {
+        queryClient.invalidateQueries({ queryKey: ['specialEventForecasts', variables.id] });
+        queryClient.invalidateQueries({ queryKey: ['specialEventActuals', variables.id] });
+        queryClient.invalidateQueries({ queryKey: ['specialEventMilestones', variables.id] });
+      }
       toast.success('Project updated successfully!');
     },
     onError: (error) => {
@@ -244,4 +553,3 @@ export const useDeleteProject = () => {
     },
   });
 };
-
