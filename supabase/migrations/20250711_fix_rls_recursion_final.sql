@@ -27,8 +27,8 @@ RETURNS BOOLEAN AS $$
 DECLARE
   can_access BOOLEAN;
 BEGIN
-  -- Temporarily disable RLS for this function's internal queries to prevent recursion
-  SET LOCAL row_level_security.enabled = false;
+  -- Set role to supabase_admin to bypass RLS within this function
+  PERFORM set_config('role', 'supabase_admin', true);
 
   SELECT EXISTS (
     SELECT 1 FROM public.projects
@@ -47,6 +47,9 @@ BEGIN
       )
     )
   ) INTO can_access;
+
+  -- Reset role to original
+  PERFORM set_config('role', current_user, true);
 
   RETURN can_access;
 END;
