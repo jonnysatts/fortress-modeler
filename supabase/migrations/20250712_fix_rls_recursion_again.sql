@@ -1,4 +1,4 @@
--- Migration: 20250711_fix_rls_recursion_final.sql
+-- Migration: 20250712_fix_rls_recursion_again.sql
 -- Fixes infinite recursion in RLS policies by using a SECURITY DEFINER function.
 
 -- Drop existing RLS policies that cause recursion
