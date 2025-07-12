@@ -328,6 +328,53 @@ describe('SupabaseStorageService', () => {
         expect(result.description).toBe('Updated description');
       });
 
+      it('should update event fields successfully', async () => {
+        const existingProject = {
+          id: 'project-123',
+          name: 'Old Name',
+          product_type: 'SaaS',
+          user_id: 'user-123',
+          created_at: '2023-01-01T00:00:00Z',
+          updated_at: '2023-01-01T00:00:00Z',
+          description: null,
+          target_audience: null,
+          data: {},
+          timeline: {},
+          avatar_image: null,
+          is_public: false,
+          owner_email: 'test@example.com',
+          share_count: 0,
+          deleted_at: null,
+          event_type: 'weekly',
+          event_date: null,
+          event_end_date: null,
+        };
+
+        const updatedProject = {
+          ...existingProject,
+          event_type: 'special',
+          event_date: '2023-02-01T00:00:00.000Z',
+          event_end_date: '2023-02-05T00:00:00.000Z',
+        };
+
+        const getQueryBuilder = createMockQueryBuilder(existingProject);
+        const updateQueryBuilder = createMockQueryBuilder(updatedProject);
+
+        mockSupabase.from
+          .mockReturnValueOnce(getQueryBuilder)
+          .mockReturnValueOnce(updateQueryBuilder);
+
+        const result = await service.updateProject('project-123', {
+          event_type: 'special',
+          event_date: new Date('2023-02-01T00:00:00Z'),
+          event_end_date: new Date('2023-02-05T00:00:00Z'),
+        });
+
+        expect(result.event_type).toBe('special');
+        expect(result.event_date?.toISOString()).toBe('2023-02-01T00:00:00.000Z');
+        expect(result.event_end_date?.toISOString()).toBe('2023-02-05T00:00:00.000Z');
+      });
+
       it('should throw NotFoundError for non-existent project', async () => {
         const mockQueryBuilder = createMockQueryBuilder(null, { code: 'PGRST116' });
         mockSupabase.from.mockReturnValue(mockQueryBuilder);
