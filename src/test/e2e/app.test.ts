@@ -246,6 +246,23 @@ describe('Fortress Modeler E2E Tests', () => {
       
       await takeScreenshot(page, 'export-started')
     })
+
+    it('should generate an executive report', async () => {
+      const page = getPage()
+
+      await waitForApp(page)
+
+      await page.click('a[href="/settings"], [data-testid="nav-settings"]')
+
+      const downloadPromise = page.waitForEvent('download')
+
+      await page.click('button:has-text("Executive Report")')
+
+      const download = await downloadPromise
+      expect(download.suggestedFilename()).toMatch(/\.pdf$/)
+
+      await takeScreenshot(page, 'executive-report')
+    })
   })
 
   describe('Error Handling', () => {
@@ -285,6 +302,22 @@ describe('Fortress Modeler E2E Tests', () => {
       expect(errorMessages.length).toBeGreaterThan(0)
       
       await takeScreenshot(page, 'validation-errors')
+    })
+  })
+
+  describe('Calendar Display', () => {
+    it('should display date picker when selecting start date', async () => {
+      const page = getPage()
+
+      await waitForApp(page)
+
+      await page.click('[data-testid="new-project-button"], button:has-text("New Project")')
+
+      await page.click('label:has-text("Start Date") + div button')
+
+      await page.waitForSelector('.rdp', { timeout: 5000 })
+
+      await takeScreenshot(page, 'calendar-display')
     })
   })
 
