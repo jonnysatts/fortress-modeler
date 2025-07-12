@@ -54,6 +54,9 @@ import { ShareProjectModal } from "@/components/projects/ShareProjectModal";
 import { isCloudModeEnabled } from "@/config/app.config";
 import { RiskAssessmentTab } from "@/components/risk/RiskAssessmentTab";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { SpecialEventForecastForm } from "@/components/events/SpecialEventForecastForm";
+import { SpecialEventActualForm } from "@/components/events/SpecialEventActualForm";
+import { MilestoneTracker } from "@/components/events/MilestoneTracker";
 
 // Loading component for lazy-loaded components
 const ComponentLoader = ({ message = "Loading..." }: { message?: string }) => (
@@ -300,22 +303,13 @@ const ProjectDetail = () => {
         {project.event_type === 'special' ? (
           <>
             <TabsContent value="forecast" className="space-y-4">
-              <Card>
-                <CardHeader><CardTitle>Special Event Forecast</CardTitle></CardHeader>
-                <CardContent><p className="text-muted-foreground">Special Event Forecast form will go here.</p></CardContent>
-              </Card>
+              <SpecialEventForecastForm projectId={project.id} />
             </TabsContent>
             <TabsContent value="actuals" className="space-y-4">
-              <Card>
-                <CardHeader><CardTitle>Special Event Actuals</CardTitle></CardHeader>
-                <CardContent><p className="text-muted-foreground">Special Event Actuals input form will go here.</p></CardContent>
-              </Card>
+              <SpecialEventActualForm projectId={project.id} />
             </TabsContent>
             <TabsContent value="milestones" className="space-y-4">
-              <Card>
-                <CardHeader><CardTitle>Event Milestones</CardTitle></CardHeader>
-                <CardContent><p className="text-muted-foreground">Special Event Milestones tracker will go here.</p></CardContent>
-              </Card>
+              <MilestoneTracker projectId={project.id} />
             </TabsContent>
           </>
         ) : (
