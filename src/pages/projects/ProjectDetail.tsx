@@ -1,6 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { useNavigate, useParams, Link, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Edit, Trash2, PlusCircle, BarChart3, AlertTriangle, Building, Target, Loader2, Share2 } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, PlusCircle, BarChart3, AlertTriangle, Building, Target, Loader2, Share2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { FinancialModel as DbFinancialModel, Project, setPrimaryFinancialModel } from "@/lib/db";
 import { toast } from "sonner";
-import { useProject, useDeleteProject } from "@/hooks/useProjects";
+import { useProject, useDeleteProject, useSpecialEventForecasts, useSpecialEventActuals } from "@/hooks/useProjects";
 import { useModelsForProject } from "@/hooks/useModels";
 import { useActualsForProject } from "@/hooks/useActuals";
 import { FinancialModel } from '@/lib/db';
@@ -81,6 +81,7 @@ const ProjectDetail = () => {
     const [selectedModelId, setSelectedModelId] = useState<string>('');
     const [updatingPrimaryModel, setUpdatingPrimaryModel] = useState<string | null>(null);
     const [shareModalOpen, setShareModalOpen] = useState(false);
+    const [reportLoading, setReportLoading] = useState(false);
 
   const navigate = useNavigate();
   const { user } = useSupabaseAuth();
@@ -88,6 +89,8 @@ const ProjectDetail = () => {
   const { data: project, isLoading: projectLoading, error: projectError } = useProject(projectId);
   const { data: financialModels = [], isLoading: modelsLoading } = useModelsForProject(projectId);
   const { data: actualsData = [], isLoading: actualsLoading } = useActualsForProject(projectId);
+  const { data: specialForecasts = [] } = useSpecialEventForecasts(projectId);
+  const { data: specialActuals = [] } = useSpecialEventActuals(projectId);
   const deleteProjectMutation = useDeleteProject();
 
   // Set default selected model when models load
@@ -172,6 +175,42 @@ const ProjectDetail = () => {
     });
   };
 
+  const handlePdfReport = async () => {
+    if (!project) return;
+    setReportLoading(true);
+    try {
+      const { ReportService } = await import('@/services/ReportService');
+      await ReportService.generateSingleEventPDF({
+        project,
+        forecast: specialForecasts[0],
+        actual: specialActuals[0],
+      });
+    } catch (error) {
+      console.error('Report generation failed:', error);
+      toast.error('Failed to generate report');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const handleCsvReport = async () => {
+    if (!project) return;
+    setReportLoading(true);
+    try {
+      const { ReportService } = await import('@/services/ReportService');
+      ReportService.generateSingleEventCSV({
+        project,
+        forecast: specialForecasts[0],
+        actual: specialActuals[0],
+      });
+    } catch (error) {
+      console.error('CSV generation failed:', error);
+      toast.error('Failed to generate report');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
   if (loading || !project) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
@@ -226,6 +265,14 @@ const ProjectDetail = () => {
           <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/edit`)}>
             <Edit className="mr-1 h-4 w-4" />
             Edit
+          </Button>
+          <Button variant="outline" size="sm" onClick={handlePdfReport} disabled={reportLoading}>
+            <Download className="mr-1 h-4 w-4" />
+            PDF Report
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleCsvReport} disabled={reportLoading}>
+            <Download className="mr-1 h-4 w-4" />
+            CSV Report
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
