@@ -131,6 +131,27 @@ describe('DexieStorageService', () => {
       expect(result).toEqual(updatedProject)
     })
 
+    it('should update event fields on a project', async () => {
+      const updates = {
+        event_type: 'special' as const,
+        event_date: new Date('2024-05-01T00:00:00Z'),
+        event_end_date: new Date('2024-05-02T00:00:00Z'),
+      }
+      const updatedProject = createProjectFixture({ id: 'test-id', ...updates })
+
+      mockDb.projects.put.mockResolvedValue(1)
+      mockDb.projects.get.mockResolvedValue(updatedProject)
+
+      const result = await storageService.updateProject('test-id', updates)
+
+      expect(mockDb.projects.put).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'test-id', ...updates })
+      )
+      expect(result.event_type).toBe('special')
+      expect(result.event_date?.toISOString()).toBe(updates.event_date.toISOString())
+      expect(result.event_end_date?.toISOString()).toBe(updates.event_end_date.toISOString())
+    })
+
     it('should handle update project failure', async () => {
       mockDb.projects.put.mockResolvedValue(0)
 

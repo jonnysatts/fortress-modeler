@@ -187,6 +187,9 @@ export class SupabaseStorageService implements IStorageService {
       if (projectData.avatarImage !== undefined) updateData.avatar_image = projectData.avatarImage;
       if (projectData.is_public !== undefined) updateData.is_public = projectData.is_public;
       if (projectData.timeline !== undefined) updateData.timeline = this.mapTimelineToSupabase(projectData.timeline);
+      if (projectData.event_type !== undefined) updateData.event_type = projectData.event_type;
+      if (projectData.event_date !== undefined) updateData.event_date = projectData.event_date?.toISOString() || null;
+      if (projectData.event_end_date !== undefined) updateData.event_end_date = projectData.event_end_date?.toISOString() || null;
       
       // Merge additional data
       if (Object.keys(projectData).some(key => !['id', 'createdAt', 'updatedAt', 'name', 'description', 'productType', 'targetAudience', 'avatarImage', 'is_public', 'timeline'].includes(key))) {
