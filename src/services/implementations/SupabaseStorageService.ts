@@ -667,6 +667,13 @@ export class SupabaseStorageService implements IStorageService {
       if (!actualData.project_id?.trim()) {
         throw new ValidationError('Project ID is required');
       }
+      if (
+        actualData.success_rating !== undefined &&
+        actualData.success_rating !== null &&
+        (actualData.success_rating < 1 || actualData.success_rating > 5)
+      ) {
+        throw new ValidationError('Success rating must be between 1 and 5');
+      }
       const newActual = {
         project_id: actualData.project_id,
         actual_fnb_revenue: actualData.actual_fnb_revenue || null,
@@ -701,6 +708,13 @@ export class SupabaseStorageService implements IStorageService {
       const existingActual = await this.getSpecialEventActual(actualId);
       if (!existingActual) {
         throw new NotFoundError(`Special event actual with ID ${actualId} not found`);
+      }
+      if (
+        actualData.success_rating !== undefined &&
+        actualData.success_rating !== null &&
+        (actualData.success_rating < 1 || actualData.success_rating > 5)
+      ) {
+        throw new ValidationError('Success rating must be between 1 and 5');
       }
       const updateData: any = {
         actual_fnb_revenue: actualData.actual_fnb_revenue,
