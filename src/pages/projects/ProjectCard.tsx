@@ -3,10 +3,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Building, Edit, Share2, Globe, Users } from "lucide-react";
+import { Building, Edit, Share2, Globe, Users, Calendar } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Project } from "@/lib/db";
 import { ShareProjectModal } from "@/components/projects/ShareProjectModal";
+import { formatDateRange } from "@/lib/utils";
 
 interface ProjectCardProps {
   project: Project;
@@ -61,6 +62,12 @@ export const ProjectCard = ({ project }: ProjectCardProps) => {
           <CardDescription className="mb-4 line-clamp-2">
             {project.description}
           </CardDescription>
+        )}
+        {project.event_date && (
+          <p className="text-xs text-muted-foreground flex items-center gap-1 mb-2">
+            <Calendar className="h-3 w-3" />
+            {formatDateRange(project.event_date, project.event_end_date)}
+          </p>
         )}
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground">

@@ -10,14 +10,19 @@ import { isCloudModeEnabled } from '@/config/app.config';
 /**
  * Hook for portfolio-wide analytics combining actual and projected data
  */
-export const usePortfolioAnalytics = () => {
+export const usePortfolioAnalytics = (
+  eventType: 'all' | 'weekly' | 'special' = 'all'
+) => {
   const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useMyProjects();
   const { isAuthenticated, isLoading: authLoading } = useSupabaseAuth();
 
+  const filteredProjects =
+    eventType === 'all' ? projects : projects.filter(p => p.event_type === eventType);
+
   return useQuery({
-    queryKey: ['portfolio-analytics', projects.map(p => p?.id).filter(Boolean)],
+    queryKey: ['portfolio-analytics', eventType, filteredProjects.map(p => p?.id).filter(Boolean)],
     queryFn: async () => {
-      if (projects.length === 0) {
+      if (filteredProjects.length === 0) {
         return {
           portfolioMetrics: {
             totalActualRevenue: 0,
@@ -39,7 +44,7 @@ export const usePortfolioAnalytics = () => {
       }
 
       // Fetch both actuals and financial models for all projects
-      const allProjectDataPromises = projects.map(async (project) => {
+      const allProjectDataPromises = filteredProjects.map(async (project) => {
         let actuals: ActualsPeriodEntry[] = [];
         let financialModels: FinancialModel[] = [];
         
@@ -102,8 +107,10 @@ export const usePortfolioAnalytics = () => {
 /**
  * Hook for getting performance data for charts
  */
-export const usePerformanceChartData = () => {
-  const { data: analytics } = usePortfolioAnalytics();
+export const usePerformanceChartData = (
+  eventType: 'all' | 'weekly' | 'special' = 'all'
+) => {
+  const { data: analytics } = usePortfolioAnalytics(eventType);
   
   if (!analytics?.periodPerformance) {
     return { data: [], isLoading: true };
@@ -128,8 +135,10 @@ export const usePerformanceChartData = () => {
 /**
  * Hook for risk analysis data
  */
-export const useRiskAnalysis = () => {
-  const { data: analytics } = usePortfolioAnalytics();
+export const useRiskAnalysis = (
+  eventType: 'all' | 'weekly' | 'special' = 'all'
+) => {
+  const { data: analytics } = usePortfolioAnalytics(eventType);
   
   if (!analytics?.projectPerformance) {
     return { riskData: [], totalRisk: 0, isLoading: true };
@@ -175,8 +184,10 @@ export const useRiskAnalysis = () => {
 /**
  * Hook for variance indicators
  */
-export const useVarianceIndicators = () => {
-  const { data: analytics } = usePortfolioAnalytics();
+export const useVarianceIndicators = (
+  eventType: 'all' | 'weekly' | 'special' = 'all'
+) => {
+  const { data: analytics } = usePortfolioAnalytics(eventType);
   
   if (!analytics?.portfolioMetrics) {
     return { indicators: [], isLoading: true };

@@ -1,5 +1,6 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { BarChart3, PlusCircle, TrendingUp, AlertTriangle, Target, DollarSign, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,29 +18,35 @@ import { useMyProjects } from "@/hooks/useProjects";
 import { useForecastAccuracy } from "@/hooks/useForecastAccuracy";
 import { useProjectHealth } from "@/hooks/useProjectHealth";
 import { useVarianceTrends } from "@/hooks/useVarianceTrends";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { data: projects = [], isLoading: projectsLoading } = useMyProjects();
-  
+
+  const [eventFilter, setEventFilter] = useState<'all' | 'weekly' | 'special'>('all');
+
   // Use enhanced analytics hooks
-  const { data: analytics, isLoading: analyticsLoading, error: analyticsError } = usePortfolioAnalytics();
-  const { data: chartData, isLoading: chartLoading } = usePerformanceChartData();
-  const { indicators, dataCompleteness, projectsWithActuals, totalProjects } = useVarianceIndicators();
+  const { data: analytics, isLoading: analyticsLoading, error: analyticsError } = usePortfolioAnalytics(eventFilter);
+  const { data: chartData, isLoading: chartLoading } = usePerformanceChartData(eventFilter);
+  const { indicators, dataCompleteness, projectsWithActuals, totalProjects } = useVarianceIndicators(eventFilter);
   const { data: forecastAccuracy, isLoading: forecastLoading, error: forecastError } = useForecastAccuracy();
   const { data: projectHealth, isLoading: healthLoading } = useProjectHealth();
   const { data: varianceTrends, isLoading: varianceLoading } = useVarianceTrends();
 
   const isLoading = projectsLoading || analyticsLoading;
 
+  const filteredProjects = eventFilter === 'all' ? projects : projects.filter(p => p.event_type === eventFilter);
+
   // Get metrics from analytics service
   const portfolioMetrics = analytics?.portfolioMetrics;
   const hasActuals = (portfolioMetrics?.projectsWithActuals || 0) > 0;
   
   // Get the first project with actuals or the most recent project for risk navigation
-  const primaryProject = projects.find(p => 
+  const primaryProject = filteredProjects.find(p =>
     analytics?.projectPerformance?.find(perf => perf.projectId === p.id && perf.hasActuals)
-  ) || projects[0];
+  ) || filteredProjects[0];
 
   if (isLoading) {
     return (
@@ -71,10 +78,25 @@ const Dashboard = () => {
             </div>
           )}
         </div>
-        <Button onClick={() => navigate("/projects/new")} className="bg-fortress-emerald hover:bg-fortress-emerald/90">
-          <PlusCircle className="mr-2 h-4 w-4" />
-          New Project
-        </Button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Label className="text-sm">Event Type</Label>
+            <Select value={eventFilter} onValueChange={(v) => setEventFilter(v as any)}>
+              <SelectTrigger className="w-28 h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="special">Special</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={() => navigate("/projects/new")} className="bg-fortress-emerald hover:bg-fortress-emerald/90">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            New Project
+          </Button>
+        </div>
       </div>
 
       {/* Data Completeness Alert */}
@@ -100,7 +122,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-3xl font-bold">{projects.length}</div>
+              <div className="text-3xl font-bold">{filteredProjects.length}</div>
               {hasActuals && (
                 <div className="text-xs text-green-600">
                   {projectsWithActuals} with actuals
@@ -400,9 +422,9 @@ const Dashboard = () => {
             <CardDescription>Your most recently created projects</CardDescription>
           </CardHeader>
           <CardContent>
-            {projects.length > 0 ? (
+            {filteredProjects.length > 0 ? (
               <ul className="space-y-2">
-                {projects.slice(0, 5).map((project) => (
+                {filteredProjects.slice(0, 5).map((project) => (
                   <li 
                     key={project.id} 
                     className="p-3 border rounded-md hover:bg-gray-50 cursor-pointer"
