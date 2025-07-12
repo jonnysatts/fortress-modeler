@@ -73,6 +73,18 @@ This guide provides step-by-step workflows for product managers, business analys
    - Set collaboration permissions (Owner, Editor, Viewer)
    - Configure sharing settings for team access
 
+### Special Events & Milestones
+
+1. **Create a Special Event**
+   - Open the project timeline and click **Add Event**
+   - Choose **Special Event** and provide name, start date, and end date
+   - Save to include the event in your calendar
+
+2. **Add Milestones**
+   - Click **Add Milestone** on the timeline
+   - Enter milestone name, target date, and optional notes
+   - Milestones appear on the calendar for easy tracking
+
 ## Financial Modeling
 
 ### Building Revenue Models
@@ -238,6 +250,13 @@ This guide provides step-by-step workflows for product managers, business analys
 
 ## Performance Tracking
 
+### Forecast Data Entry
+
+1. **Open Forecasts Tab**
+   - Navigate to the project and select **Forecasts**
+   - Enter revenue, cost, or attendance forecasts for each period
+   - Save to update your projections
+
 ### Actual Data Entry
 
 1. **Period-by-Period Tracking**
@@ -253,6 +272,13 @@ This guide provides step-by-step workflows for product managers, business analys
    - Automatic calculation of actual vs. projected
    - Percentage variance by revenue stream and cost category
    - Cumulative variance trends over time
+
+### Milestone Tracking
+
+1. **View Timeline**
+   - Open the timeline tab within your project
+   - Completed milestones are marked automatically
+   - Upcoming milestones highlight approaching deadlines
 
 ### Performance Indicators
 
@@ -306,6 +332,18 @@ This guide provides step-by-step workflows for product managers, business analys
    - Risk Assessment Report
    - Financial Model Comparison
    - Portfolio Health Analysis
+
+3. **Generating a Report**
+   - Open the **Reports** page from the sidebar
+   - Select a date range using the calendar filter
+   - Choose the report type and click **Generate**
+   - Download as PDF or Excel once created
+
+### Calendar Filters
+
+1. **Filtering Views**
+   - Use the calendar dropdown to select **This month**, **Last quarter**, or a custom range
+   - Dashboards and reports update automatically
 
 ### Advanced Analytics
 

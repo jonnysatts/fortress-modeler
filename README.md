@@ -10,9 +10,10 @@ Fortress Modeler Cloud is a comprehensive business planning and financial analyt
 
 - **Model Complex Business Scenarios** with revenue streams, cost structures, growth models, and marketing budgets
 - **Assess and Manage Risks** with comprehensive risk categorization, impact analysis, and mitigation tracking
-- **Track Performance** with actual vs. projected variance analysis and forecast accuracy metrics
+- **Track Performance** by inputting forecasts and actual results for each period, with variance analysis and forecast accuracy metrics
 - **Collaborate in Real-Time** with cloud-based sharing and multi-user project access
 - **Generate Professional Reports** with PDF and Excel export capabilities
+- **Schedule Special Events** with milestone management and calendar filters
 - **Monitor Portfolio Health** with enterprise-grade analytics dashboards
 
 ## � Key Capabilities
@@ -73,11 +74,12 @@ Fortress Modeler Cloud is a comprehensive business planning and financial analyt
 
 ### Core Workflows
 1. **Project Creation**: Define business context, product type, and target audience
-2. **Financial Modeling**: Build comprehensive revenue and cost models
-3. **Risk Assessment**: Identify, categorize, and plan risk mitigation
-4. **Performance Tracking**: Input actual data and monitor variance
-5. **Analytics Review**: Analyze trends, accuracy, and portfolio health
-6. **Reporting**: Generate professional reports for stakeholders
+2. **Special Events & Milestones**: Schedule events and milestones on the project calendar
+3. **Financial Modeling**: Build comprehensive revenue and cost models and enter forecasts
+4. **Risk Assessment**: Identify, categorize, and plan risk mitigation
+5. **Performance Tracking**: Input actual results and monitor milestone progress
+6. **Analytics Review**: Analyze trends, accuracy, and portfolio health
+7. **Reporting & Filters**: Generate reports and use calendar filters to focus on specific periods
 
 ## 🛠️ Installation & Setup
 
@@ -185,6 +187,11 @@ fortress-modeler-cloud/
 - **Forecast Accuracy Scoring**: Historical accuracy analysis with trend identification
 - **Project Health Indicators**: Automated scoring based on multiple metrics
 - **Portfolio Analytics**: Cross-project insights and comparative analysis
+
+### Event Scheduling & Calendar Filters
+- **Special Events**: Define one-off events with unique assumptions
+- **Milestones**: Track key dates across the project timeline
+- **Calendar Filtering**: Focus analytics and reports on specific periods
 
 ## 🔧 Development
 
