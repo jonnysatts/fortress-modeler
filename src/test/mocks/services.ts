@@ -1,11 +1,18 @@
 import { vi } from 'vitest'
-import type { 
-  IStorageService, 
-  IErrorService, 
-  ILogService, 
-  IConfigService 
+import type {
+  IStorageService,
+  IErrorService,
+  ILogService,
+  IConfigService
 } from '@/services/interfaces'
-import type { Project, FinancialModel, ActualsPeriodEntry } from '@/lib/db'
+import type {
+  Project,
+  FinancialModel,
+  ActualsPeriodEntry,
+  SpecialEventForecast,
+  SpecialEventActual,
+  SpecialEventMilestone
+} from '@/lib/db'
 
 // Mock Storage Service
 export const createMockStorageService = (): IStorageService => ({
@@ -63,13 +70,30 @@ export const createMockStorageService = (): IStorageService => ({
 
   // Actuals methods
   getProjectActuals: vi.fn().mockResolvedValue([]),
-  upsertActuals: vi.fn().mockImplementation((actual: Omit<ActualsPeriodEntry, 'id'>) => 
+  upsertActuals: vi.fn().mockImplementation((actual: Omit<ActualsPeriodEntry, 'id'>) =>
     Promise.resolve({
       id: `mock-actual-${Date.now()}`,
       ...actual,
     } as ActualsPeriodEntry)
   ),
   deleteActuals: vi.fn().mockResolvedValue(undefined),
+
+  // Special Event methods
+  createSpecialEventForecast: vi
+    .fn()
+    .mockImplementation((forecast: Partial<SpecialEventForecast>) =>
+      Promise.resolve({ id: `mock-forecast-${Date.now()}`, ...forecast } as SpecialEventForecast)
+    ),
+  createSpecialEventActual: vi
+    .fn()
+    .mockImplementation((actual: Partial<SpecialEventActual>) =>
+      Promise.resolve({ id: `mock-se-actual-${Date.now()}`, ...actual } as SpecialEventActual)
+    ),
+  updateSpecialEventMilestone: vi
+    .fn()
+    .mockImplementation((id: string, updates: Partial<SpecialEventMilestone>) =>
+      Promise.resolve({ id, project_id: 'mock-project-id', ...updates } as SpecialEventMilestone)
+    ),
 
   // Utility methods
   clearAllData: vi.fn().mockResolvedValue(undefined),
