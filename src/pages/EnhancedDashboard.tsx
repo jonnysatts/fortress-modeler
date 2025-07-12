@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, PlusCircle, TrendingUp, AlertTriangle, DollarSign, Target, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,21 +7,26 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pi
 import { useMyProjects } from "@/hooks/useProjects";
 import { usePortfolioAnalytics, usePerformanceChartData, useRiskAnalysis, useVarianceIndicators } from "@/hooks/usePortfolioAnalytics";
 import { KPICard, VarianceIndicator } from "@/components/dashboard/KPICard";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 const EnhancedDashboard = () => {
   const navigate = useNavigate();
   
   // Add error handling for all hooks
   const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useMyProjects();
-  const { data: analytics, isLoading: analyticsLoading, error: analyticsError } = usePortfolioAnalytics();
-  const { data: chartData = [], isLoading: chartLoading } = usePerformanceChartData();
-  const { riskData = [], totalRisk = 0, projectRisks = [] } = useRiskAnalysis();
+  const [eventFilter, setEventFilter] = useState<'all' | 'weekly' | 'special'>('all');
+  const { data: analytics, isLoading: analyticsLoading, error: analyticsError } = usePortfolioAnalytics(eventFilter);
+  const { data: chartData = [], isLoading: chartLoading } = usePerformanceChartData(eventFilter);
+  const { riskData = [], totalRisk = 0, projectRisks = [] } = useRiskAnalysis(eventFilter);
   const { 
     indicators = [], 
     dataCompleteness = 0, 
     projectsWithActuals = 0, 
     totalProjects = 0 
-  } = useVarianceIndicators();
+  } = useVarianceIndicators(eventFilter);
+
+  const filteredProjects = eventFilter === 'all' ? projects : projects.filter(p => p.event_type === eventFilter);
 
   // Handle errors
   if (projectsError || analyticsError) {
@@ -94,10 +99,25 @@ const EnhancedDashboard = () => {
             Real-time insights from {projectsWithActuals} of {totalProjects} projects with actual data
           </p>
         </div>
-        <Button onClick={() => navigate("/projects/new")} className="bg-fortress-emerald hover:bg-fortress-emerald/90">
-          <PlusCircle className="mr-2 h-4 w-4" />
-          New Project
-        </Button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Label className="text-sm">Event Type</Label>
+            <Select value={eventFilter} onValueChange={(v) => setEventFilter(v as any)}>
+              <SelectTrigger className="w-28 h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="special">Special</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={() => navigate("/projects/new")} className="bg-fortress-emerald hover:bg-fortress-emerald/90">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            New Project
+          </Button>
+        </div>
       </div>
 
       {/* Data Completeness Alert */}
@@ -346,9 +366,9 @@ const EnhancedDashboard = () => {
             <CardDescription>Your most recently created projects</CardDescription>
           </CardHeader>
           <CardContent>
-            {projects.length > 0 ? (
+            {filteredProjects.length > 0 ? (
               <ul className="space-y-2">
-                {projects.slice(0, 5).map((project) => (
+                {filteredProjects.slice(0, 5).map((project) => (
                   <li 
                     key={project.id} 
                     className="p-3 border rounded-md hover:bg-gray-50 cursor-pointer"
