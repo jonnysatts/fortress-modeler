@@ -27,7 +27,7 @@ const EditFinancialModel = () => {
   useEffect(() => {
     if (fetchedModel) {
       const fm = { ...fetchedModel };
-      if (fm.assumptions.metadata?.type === "WeeklyEvent") {
+      if (fm.assumptions.metadata?.type === "WeeklyEvent" || fm.assumptions.metadata?.type === "SpecialEvent") {
         if (!fm.assumptions.metadata.costs) {
           fm.assumptions.metadata.costs = {
             setupCosts: 0,
@@ -54,7 +54,7 @@ const EditFinancialModel = () => {
     );
   }
 
-  if (model.assumptions.metadata?.type === "WeeklyEvent") {
+  if (model.assumptions.metadata?.type === "WeeklyEvent" || model.assumptions.metadata?.type === "SpecialEvent") {
     return (
       <EventModelForm
         projectId={projectId!}

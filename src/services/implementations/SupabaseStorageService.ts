@@ -538,15 +538,36 @@ export class SupabaseStorageService implements IStorageService {
       }
       const newForecast = {
         project_id: forecastData.project_id,
+        // Revenue streams
+        forecast_ticket_sales: forecastData.forecast_ticket_sales || null,
         forecast_fnb_revenue: forecastData.forecast_fnb_revenue || null,
         forecast_fnb_cogs_pct: forecastData.forecast_fnb_cogs_pct || null,
         forecast_merch_revenue: forecastData.forecast_merch_revenue || null,
         forecast_merch_cogs_pct: forecastData.forecast_merch_cogs_pct || null,
         forecast_sponsorship_income: forecastData.forecast_sponsorship_income || null,
-        forecast_ticket_sales: forecastData.forecast_ticket_sales || null,
         forecast_other_income: forecastData.forecast_other_income || null,
-        forecast_total_costs: forecastData.forecast_total_costs || null,
-        notes: forecastData.notes || null,
+        // Cost breakdown
+        forecast_staffing_costs: forecastData.forecast_staffing_costs || null,
+        forecast_venue_costs: forecastData.forecast_venue_costs || null,
+        forecast_vendor_costs: forecastData.forecast_vendor_costs || null,
+        forecast_marketing_costs: forecastData.forecast_marketing_costs || null,
+        forecast_production_costs: forecastData.forecast_production_costs || null,
+        forecast_other_costs: forecastData.forecast_other_costs || null,
+        // Marketing details
+        marketing_email_budget: forecastData.marketing_email_budget || null,
+        marketing_social_budget: forecastData.marketing_social_budget || null,
+        marketing_influencer_budget: forecastData.marketing_influencer_budget || null,
+        marketing_paid_ads_budget: forecastData.marketing_paid_ads_budget || null,
+        marketing_content_budget: forecastData.marketing_content_budget || null,
+        marketing_strategy: forecastData.marketing_strategy || null,
+        // Event details
+        estimated_attendance: forecastData.estimated_attendance || null,
+        ticket_price: forecastData.ticket_price || null,
+        // Notes
+        revenue_notes: forecastData.revenue_notes || null,
+        cost_notes: forecastData.cost_notes || null,
+        marketing_notes: forecastData.marketing_notes || null,
+        general_notes: forecastData.general_notes || null,
       };
       const { data, error } = await supabase
         .from('special_event_forecasts')
@@ -570,15 +591,36 @@ export class SupabaseStorageService implements IStorageService {
         throw new NotFoundError(`Special event forecast with ID ${forecastId} not found`);
       }
       const updateData: any = {
+        // Revenue streams
+        forecast_ticket_sales: forecastData.forecast_ticket_sales,
         forecast_fnb_revenue: forecastData.forecast_fnb_revenue,
         forecast_fnb_cogs_pct: forecastData.forecast_fnb_cogs_pct,
         forecast_merch_revenue: forecastData.forecast_merch_revenue,
         forecast_merch_cogs_pct: forecastData.forecast_merch_cogs_pct,
         forecast_sponsorship_income: forecastData.forecast_sponsorship_income,
-        forecast_ticket_sales: forecastData.forecast_ticket_sales,
         forecast_other_income: forecastData.forecast_other_income,
-        forecast_total_costs: forecastData.forecast_total_costs,
-        notes: forecastData.notes,
+        // Cost breakdown
+        forecast_staffing_costs: forecastData.forecast_staffing_costs,
+        forecast_venue_costs: forecastData.forecast_venue_costs,
+        forecast_vendor_costs: forecastData.forecast_vendor_costs,
+        forecast_marketing_costs: forecastData.forecast_marketing_costs,
+        forecast_production_costs: forecastData.forecast_production_costs,
+        forecast_other_costs: forecastData.forecast_other_costs,
+        // Marketing details
+        marketing_email_budget: forecastData.marketing_email_budget,
+        marketing_social_budget: forecastData.marketing_social_budget,
+        marketing_influencer_budget: forecastData.marketing_influencer_budget,
+        marketing_paid_ads_budget: forecastData.marketing_paid_ads_budget,
+        marketing_content_budget: forecastData.marketing_content_budget,
+        marketing_strategy: forecastData.marketing_strategy,
+        // Event details
+        estimated_attendance: forecastData.estimated_attendance,
+        ticket_price: forecastData.ticket_price,
+        // Notes
+        revenue_notes: forecastData.revenue_notes,
+        cost_notes: forecastData.cost_notes,
+        marketing_notes: forecastData.marketing_notes,
+        general_notes: forecastData.general_notes,
       };
       const { data, error } = await supabase
         .from('special_event_forecasts')
@@ -673,23 +715,56 @@ export class SupabaseStorageService implements IStorageService {
       if (
         actualData.success_rating !== undefined &&
         actualData.success_rating !== null &&
-        (actualData.success_rating < 1 || actualData.success_rating > 5)
+        (actualData.success_rating < 1 || actualData.success_rating > 10)
       ) {
-        throw new ValidationError('Success rating must be between 1 and 5');
+        throw new ValidationError('Success rating must be between 1 and 10');
       }
       const newActual = {
         project_id: actualData.project_id,
+        // Actual revenue streams
+        actual_ticket_sales: actualData.actual_ticket_sales || null,
         actual_fnb_revenue: actualData.actual_fnb_revenue || null,
         actual_fnb_cogs: actualData.actual_fnb_cogs || null,
         actual_merch_revenue: actualData.actual_merch_revenue || null,
         actual_merch_cogs: actualData.actual_merch_cogs || null,
         actual_sponsorship_income: actualData.actual_sponsorship_income || null,
-        actual_ticket_sales: actualData.actual_ticket_sales || null,
         actual_other_income: actualData.actual_other_income || null,
-        actual_total_costs: actualData.actual_total_costs || null,
-        attendance: actualData.attendance || null,
-        notes: actualData.notes || null,
+        // Actual cost breakdown
+        actual_staffing_costs: actualData.actual_staffing_costs || null,
+        actual_venue_costs: actualData.actual_venue_costs || null,
+        actual_vendor_costs: actualData.actual_vendor_costs || null,
+        actual_marketing_costs: actualData.actual_marketing_costs || null,
+        actual_production_costs: actualData.actual_production_costs || null,
+        actual_other_costs: actualData.actual_other_costs || null,
+        // Marketing performance
+        marketing_email_performance: actualData.marketing_email_performance || null,
+        marketing_social_performance: actualData.marketing_social_performance || null,
+        marketing_influencer_performance: actualData.marketing_influencer_performance || null,
+        marketing_paid_ads_performance: actualData.marketing_paid_ads_performance || null,
+        marketing_content_performance: actualData.marketing_content_performance || null,
+        marketing_roi_notes: actualData.marketing_roi_notes || null,
+        // Event metrics
+        actual_attendance: actualData.actual_attendance || null,
+        attendance_breakdown: actualData.attendance_breakdown || null,
+        average_ticket_price: actualData.average_ticket_price || null,
+        // Success indicators
         success_rating: actualData.success_rating || null,
+        event_success_indicators: actualData.event_success_indicators || null,
+        challenges_faced: actualData.challenges_faced || null,
+        lessons_learned: actualData.lessons_learned || null,
+        recommendations_future: actualData.recommendations_future || null,
+        // Post-event analysis
+        customer_feedback_summary: actualData.customer_feedback_summary || null,
+        team_feedback: actualData.team_feedback || null,
+        vendor_feedback: actualData.vendor_feedback || null,
+        // Additional metrics
+        social_media_engagement: actualData.social_media_engagement || null,
+        press_coverage: actualData.press_coverage || null,
+        brand_impact_assessment: actualData.brand_impact_assessment || null,
+        // Notes
+        revenue_variance_notes: actualData.revenue_variance_notes || null,
+        cost_variance_notes: actualData.cost_variance_notes || null,
+        general_notes: actualData.general_notes || null,
       };
       const { data, error } = await supabase
         .from('special_event_actuals')
@@ -715,22 +790,55 @@ export class SupabaseStorageService implements IStorageService {
       if (
         actualData.success_rating !== undefined &&
         actualData.success_rating !== null &&
-        (actualData.success_rating < 1 || actualData.success_rating > 5)
+        (actualData.success_rating < 1 || actualData.success_rating > 10)
       ) {
-        throw new ValidationError('Success rating must be between 1 and 5');
+        throw new ValidationError('Success rating must be between 1 and 10');
       }
       const updateData: any = {
+        // Actual revenue streams
+        actual_ticket_sales: actualData.actual_ticket_sales,
         actual_fnb_revenue: actualData.actual_fnb_revenue,
         actual_fnb_cogs: actualData.actual_fnb_cogs,
         actual_merch_revenue: actualData.actual_merch_revenue,
         actual_merch_cogs: actualData.actual_merch_cogs,
         actual_sponsorship_income: actualData.actual_sponsorship_income,
-        actual_ticket_sales: actualData.actual_ticket_sales,
         actual_other_income: actualData.actual_other_income,
-        actual_total_costs: actualData.actual_total_costs,
-        attendance: actualData.attendance,
-        notes: actualData.notes,
+        // Actual cost breakdown
+        actual_staffing_costs: actualData.actual_staffing_costs,
+        actual_venue_costs: actualData.actual_venue_costs,
+        actual_vendor_costs: actualData.actual_vendor_costs,
+        actual_marketing_costs: actualData.actual_marketing_costs,
+        actual_production_costs: actualData.actual_production_costs,
+        actual_other_costs: actualData.actual_other_costs,
+        // Marketing performance
+        marketing_email_performance: actualData.marketing_email_performance,
+        marketing_social_performance: actualData.marketing_social_performance,
+        marketing_influencer_performance: actualData.marketing_influencer_performance,
+        marketing_paid_ads_performance: actualData.marketing_paid_ads_performance,
+        marketing_content_performance: actualData.marketing_content_performance,
+        marketing_roi_notes: actualData.marketing_roi_notes,
+        // Event metrics
+        actual_attendance: actualData.actual_attendance,
+        attendance_breakdown: actualData.attendance_breakdown,
+        average_ticket_price: actualData.average_ticket_price,
+        // Success indicators
         success_rating: actualData.success_rating,
+        event_success_indicators: actualData.event_success_indicators,
+        challenges_faced: actualData.challenges_faced,
+        lessons_learned: actualData.lessons_learned,
+        recommendations_future: actualData.recommendations_future,
+        // Post-event analysis
+        customer_feedback_summary: actualData.customer_feedback_summary,
+        team_feedback: actualData.team_feedback,
+        vendor_feedback: actualData.vendor_feedback,
+        // Additional metrics
+        social_media_engagement: actualData.social_media_engagement,
+        press_coverage: actualData.press_coverage,
+        brand_impact_assessment: actualData.brand_impact_assessment,
+        // Notes
+        revenue_variance_notes: actualData.revenue_variance_notes,
+        cost_variance_notes: actualData.cost_variance_notes,
+        general_notes: actualData.general_notes,
       };
       const { data, error } = await supabase
         .from('special_event_actuals')
@@ -1090,15 +1198,36 @@ export class SupabaseStorageService implements IStorageService {
     return {
       id: supabaseForecast.id,
       project_id: supabaseForecast.project_id,
+      // Revenue streams
+      forecast_ticket_sales: supabaseForecast.forecast_ticket_sales || undefined,
       forecast_fnb_revenue: supabaseForecast.forecast_fnb_revenue || undefined,
       forecast_fnb_cogs_pct: supabaseForecast.forecast_fnb_cogs_pct || undefined,
       forecast_merch_revenue: supabaseForecast.forecast_merch_revenue || undefined,
       forecast_merch_cogs_pct: supabaseForecast.forecast_merch_cogs_pct || undefined,
       forecast_sponsorship_income: supabaseForecast.forecast_sponsorship_income || undefined,
-      forecast_ticket_sales: supabaseForecast.forecast_ticket_sales || undefined,
       forecast_other_income: supabaseForecast.forecast_other_income || undefined,
-      forecast_total_costs: supabaseForecast.forecast_total_costs || undefined,
-      notes: supabaseForecast.notes || undefined,
+      // Cost breakdown
+      forecast_staffing_costs: supabaseForecast.forecast_staffing_costs || undefined,
+      forecast_venue_costs: supabaseForecast.forecast_venue_costs || undefined,
+      forecast_vendor_costs: supabaseForecast.forecast_vendor_costs || undefined,
+      forecast_marketing_costs: supabaseForecast.forecast_marketing_costs || undefined,
+      forecast_production_costs: supabaseForecast.forecast_production_costs || undefined,
+      forecast_other_costs: supabaseForecast.forecast_other_costs || undefined,
+      // Marketing details
+      marketing_email_budget: supabaseForecast.marketing_email_budget || undefined,
+      marketing_social_budget: supabaseForecast.marketing_social_budget || undefined,
+      marketing_influencer_budget: supabaseForecast.marketing_influencer_budget || undefined,
+      marketing_paid_ads_budget: supabaseForecast.marketing_paid_ads_budget || undefined,
+      marketing_content_budget: supabaseForecast.marketing_content_budget || undefined,
+      marketing_strategy: supabaseForecast.marketing_strategy || undefined,
+      // Event details
+      estimated_attendance: supabaseForecast.estimated_attendance || undefined,
+      ticket_price: supabaseForecast.ticket_price || undefined,
+      // Notes
+      revenue_notes: supabaseForecast.revenue_notes || undefined,
+      cost_notes: supabaseForecast.cost_notes || undefined,
+      marketing_notes: supabaseForecast.marketing_notes || undefined,
+      general_notes: supabaseForecast.general_notes || undefined,
       created_at: new Date(supabaseForecast.created_at),
     };
   }
@@ -1107,17 +1236,50 @@ export class SupabaseStorageService implements IStorageService {
     return {
       id: supabaseActual.id,
       project_id: supabaseActual.project_id,
+      // Actual revenue streams
+      actual_ticket_sales: supabaseActual.actual_ticket_sales || undefined,
       actual_fnb_revenue: supabaseActual.actual_fnb_revenue || undefined,
       actual_fnb_cogs: supabaseActual.actual_fnb_cogs || undefined,
       actual_merch_revenue: supabaseActual.actual_merch_revenue || undefined,
       actual_merch_cogs: supabaseActual.actual_merch_cogs || undefined,
       actual_sponsorship_income: supabaseActual.actual_sponsorship_income || undefined,
-      actual_ticket_sales: supabaseActual.actual_ticket_sales || undefined,
       actual_other_income: supabaseActual.actual_other_income || undefined,
-      actual_total_costs: supabaseActual.actual_total_costs || undefined,
-      attendance: supabaseActual.attendance || undefined,
-      notes: supabaseActual.notes || undefined,
+      // Actual cost breakdown
+      actual_staffing_costs: supabaseActual.actual_staffing_costs || undefined,
+      actual_venue_costs: supabaseActual.actual_venue_costs || undefined,
+      actual_vendor_costs: supabaseActual.actual_vendor_costs || undefined,
+      actual_marketing_costs: supabaseActual.actual_marketing_costs || undefined,
+      actual_production_costs: supabaseActual.actual_production_costs || undefined,
+      actual_other_costs: supabaseActual.actual_other_costs || undefined,
+      // Marketing performance
+      marketing_email_performance: supabaseActual.marketing_email_performance || undefined,
+      marketing_social_performance: supabaseActual.marketing_social_performance || undefined,
+      marketing_influencer_performance: supabaseActual.marketing_influencer_performance || undefined,
+      marketing_paid_ads_performance: supabaseActual.marketing_paid_ads_performance || undefined,
+      marketing_content_performance: supabaseActual.marketing_content_performance || undefined,
+      marketing_roi_notes: supabaseActual.marketing_roi_notes || undefined,
+      // Event metrics
+      actual_attendance: supabaseActual.actual_attendance || undefined,
+      attendance_breakdown: supabaseActual.attendance_breakdown || undefined,
+      average_ticket_price: supabaseActual.average_ticket_price || undefined,
+      // Success indicators
       success_rating: supabaseActual.success_rating || undefined,
+      event_success_indicators: supabaseActual.event_success_indicators || undefined,
+      challenges_faced: supabaseActual.challenges_faced || undefined,
+      lessons_learned: supabaseActual.lessons_learned || undefined,
+      recommendations_future: supabaseActual.recommendations_future || undefined,
+      // Post-event analysis
+      customer_feedback_summary: supabaseActual.customer_feedback_summary || undefined,
+      team_feedback: supabaseActual.team_feedback || undefined,
+      vendor_feedback: supabaseActual.vendor_feedback || undefined,
+      // Additional metrics
+      social_media_engagement: supabaseActual.social_media_engagement || undefined,
+      press_coverage: supabaseActual.press_coverage || undefined,
+      brand_impact_assessment: supabaseActual.brand_impact_assessment || undefined,
+      // Notes
+      revenue_variance_notes: supabaseActual.revenue_variance_notes || undefined,
+      cost_variance_notes: supabaseActual.cost_variance_notes || undefined,
+      general_notes: supabaseActual.general_notes || undefined,
       created_at: new Date(supabaseActual.created_at),
     };
   }

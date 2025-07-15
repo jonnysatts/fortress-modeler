@@ -28,6 +28,7 @@ import { useProject } from "@/hooks/useProjects";
 import { useCreateModel } from "@/hooks/useModels";
 import { toast } from "sonner";
 import EventModelForm from "./components/EventModelForm";
+import SpecialEventForecastForm from "@/components/events/SpecialEventForecastForm";
 
 // Default revenue assumption
 const defaultRevenueAssumption: RevenueAssumption = {
@@ -109,7 +110,7 @@ const NewFinancialModel = () => {
 
     try {
       // Handle submission based on product type
-      if (currentProject.productType === "WeeklyEvent") {
+      if (currentProject.productType === "WeeklyEvent" || currentProject.productType === "SpecialEvent") {
         // The event model form will handle its own submission
         return;
       }
@@ -166,7 +167,32 @@ const NewFinancialModel = () => {
     );
   }
 
-  // Check if this is a weekly event project
+  // Check project type and route to appropriate component
+  if (currentProject.productType === "SpecialEvent") {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(`/projects/${projectId}`)}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold text-fortress-blue">
+              Special Event Forecast
+            </h1>
+            <p className="text-muted-foreground">
+              Create forecasts for {currentProject.name}
+            </p>
+          </div>
+        </div>
+        <SpecialEventForecastForm projectId={projectId!} />
+      </div>
+    );
+  }
+
   if (currentProject.productType === "WeeklyEvent") {
     return (
       <EventModelForm
@@ -317,7 +343,7 @@ const NewFinancialModel = () => {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => appendRevenue(defaultRevenueAssumption)}
+                      onClick={() => appendRevenue({ ...defaultRevenueAssumption, frequency: "monthly" })}
                       className="mt-4"
                     >
                       Add Revenue Stream

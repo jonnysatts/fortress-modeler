@@ -109,8 +109,23 @@ export const useUpdateSpecialEventActual = () => {
       }
     },
     onSuccess: (updatedActual) => {
-      queryClient.invalidateQueries({ queryKey: ['specialEventActuals', updatedActual.project_id] });
-      queryClient.invalidateQueries({ queryKey: ['specialEventActuals', updatedActual.id] });
+      // Update cache directly instead of invalidating to prevent form reset
+      queryClient.setQueryData(
+        ['specialEventActuals', updatedActual.project_id],
+        (oldData: SpecialEventActual[] | undefined) => {
+          if (!oldData) return [updatedActual];
+          return oldData.map(actual => 
+            actual.id === updatedActual.id ? updatedActual : actual
+          );
+        }
+      );
+      
+      // Also update individual actual cache if it exists
+      queryClient.setQueryData(
+        ['specialEventActuals', updatedActual.id],
+        updatedActual
+      );
+      
       toast.success('Special event actual updated successfully!');
     },
     onError: (error) => {
@@ -447,8 +462,23 @@ export const useUpdateSpecialEventForecast = () => {
       }
     },
     onSuccess: (updatedForecast) => {
-      queryClient.invalidateQueries({ queryKey: ['specialEventForecasts', updatedForecast.project_id] });
-      queryClient.invalidateQueries({ queryKey: ['specialEventForecasts', updatedForecast.id] });
+      // Update cache directly instead of invalidating to prevent form reset
+      queryClient.setQueryData(
+        ['specialEventForecasts', updatedForecast.project_id],
+        (oldData: SpecialEventForecast[] | undefined) => {
+          if (!oldData) return [updatedForecast];
+          return oldData.map(forecast => 
+            forecast.id === updatedForecast.id ? updatedForecast : forecast
+          );
+        }
+      );
+      
+      // Also update individual forecast cache if it exists
+      queryClient.setQueryData(
+        ['specialEventForecasts', updatedForecast.id],
+        updatedForecast
+      );
+      
       toast.success('Special event forecast updated successfully!');
     },
     onError: (error) => {
