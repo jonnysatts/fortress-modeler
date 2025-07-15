@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { sanitizeNumericInput, sanitizeTextInput } from '@/lib/security';
 import { toast } from 'sonner';
-import { DollarSign, Users, Megaphone, Calculator, TrendingUp, Check, Loader2, AlertCircle, Save, Cloud } from 'lucide-react';
+import { DollarSign, Users, Megaphone, Calculator, TrendingUp } from 'lucide-react';
 
 interface SpecialEventForecastFormProps {
   projectId: string;
@@ -83,11 +83,6 @@ export const SpecialEventForecastForm: React.FC<SpecialEventForecastFormProps> =
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
   const [lastResetData, setLastResetData] = useState<any>(null);
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [lastSaveError, setLastSaveError] = useState<string | null>(null);
-  const [isAutoSaving, setIsAutoSaving] = useState(false);
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastAutoSaveDataRef = useRef<any>(null);
 
   // Calculate totals
   const totalRevenue = (watchedValues.forecast_ticket_sales || 0) +
@@ -112,78 +107,6 @@ export const SpecialEventForecastForm: React.FC<SpecialEventForecastFormProps> =
   const netProfit = totalRevenue - totalCosts;
   const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
-  // Auto-save function with debouncing
-  const autoSave = useCallback(async (data: ForecastFormData) => {
-    if (!existing || !existing.id) {
-      // Don't auto-save if no existing record
-      return;
-    }
-
-    try {
-      setIsAutoSaving(true);
-      console.log('🔄 [SpecialEventForecastForm] Auto-saving changes...', { id: existing.id });
-      
-      const sanitized: Partial<ForecastFormData> = Object.entries(data).reduce(
-        (acc, [key, value]) => {
-          if (typeof value === 'number') {
-            acc[key as keyof ForecastFormData] = sanitizeNumericInput(value) as any;
-          } else if (typeof value === 'string') {
-            acc[key as keyof ForecastFormData] = sanitizeTextInput(value) as any;
-          }
-          return acc;
-        },
-        {} as Partial<ForecastFormData>
-      );
-
-      const result = await updateForecast.mutateAsync({ id: existing.id, data: sanitized });
-      setLastResetData({ ...result });
-      lastAutoSaveDataRef.current = data;
-      
-      console.log('✅ [SpecialEventForecastForm] Auto-save successful');
-      setSaveStatus('saved');
-      
-      // Clear saved status after 3 seconds
-      setTimeout(() => setSaveStatus('idle'), 3000);
-      
-    } catch (error) {
-      console.error('❌ [SpecialEventForecastForm] Auto-save failed:', error);
-      setSaveStatus('error');
-      setLastSaveError(error instanceof Error ? error.message : 'Auto-save failed');
-      
-      // Clear error status after 5 seconds
-      setTimeout(() => setSaveStatus('idle'), 5000);
-    } finally {
-      setIsAutoSaving(false);
-    }
-  }, [existing, updateForecast]);
-
-  // Debounced auto-save effect
-  useEffect(() => {
-    if (!hasInitialized || !existing) return;
-
-    // Clear any existing timeout
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current);
-    }
-
-    // Check if the data has actually changed
-    const hasChanged = JSON.stringify(watchedValues) !== JSON.stringify(lastAutoSaveDataRef.current);
-    
-    if (hasChanged) {
-      // Set a new timeout for auto-save
-      autoSaveTimeoutRef.current = setTimeout(() => {
-        autoSave(watchedValues);
-      }, 2000); // 2 second debounce
-    }
-
-    // Cleanup function
-    return () => {
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current);
-      }
-    };
-  }, [watchedValues, hasInitialized, existing, autoSave]);
-
   // Only reset form when we have new data that's different from what we last reset with
   useEffect(() => {
     if (existing && (!hasInitialized || (existing.id !== lastResetData?.id))) {
@@ -191,7 +114,6 @@ export const SpecialEventForecastForm: React.FC<SpecialEventForecastFormProps> =
       form.reset(formData);
       setHasInitialized(true);
       setLastResetData(formData);
-      lastAutoSaveDataRef.current = formData;
     }
   }, [existing, form, hasInitialized, lastResetData]);
 
@@ -199,19 +121,11 @@ export const SpecialEventForecastForm: React.FC<SpecialEventForecastFormProps> =
   useEffect(() => {
     setHasInitialized(false);
     setIsSubmitting(false);
-    setIsAutoSaving(false);
-    setSaveStatus('idle');
-    setLastSaveError(null);
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current);
-    }
   }, [projectId]);
 
   const onSubmit = async (data: ForecastFormData) => {
     try {
       setIsSubmitting(true);
-      setSaveStatus('saving');
-      setLastSaveError(null);
       
       console.log('🔄 [SpecialEventForecastForm] Starting manual save...', { projectId, hasExisting: !!existing });
       
@@ -233,14 +147,12 @@ export const SpecialEventForecastForm: React.FC<SpecialEventForecastFormProps> =
         // Update our tracking data so we don't reset the form when the cache updates
         setLastResetData({ ...result });
         console.log('✅ [SpecialEventForecastForm] Forecast updated successfully');
-        setSaveStatus('saved');
         toast.success('Forecast updated successfully!');
       } else {
         console.log('🔄 [SpecialEventForecastForm] Creating new forecast...');
         const result = await createForecast.mutateAsync({ project_id: projectId, ...sanitized });
         setLastResetData({ ...result });
         console.log('✅ [SpecialEventForecastForm] Forecast created successfully');
-        setSaveStatus('saved');
         toast.success('Forecast created successfully!');
       }
       
@@ -253,9 +165,7 @@ export const SpecialEventForecastForm: React.FC<SpecialEventForecastFormProps> =
         hasExisting: !!existing
       });
       
-      setSaveStatus('error');
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      setLastSaveError(errorMessage);
       
       toast.error('Failed to save forecast', {
         description: errorMessage,
@@ -867,38 +777,6 @@ export const SpecialEventForecastForm: React.FC<SpecialEventForecastFormProps> =
         </TabsContent>
       </Tabs>
 
-      {/* Auto-save Status */}
-      {existing && (
-        <div className="flex items-center justify-between pt-4 border-t">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            {isAutoSaving && (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Auto-saving...</span>
-              </>
-            )}
-            {saveStatus === 'saved' && (
-              <>
-                <Check className="w-4 h-4 text-green-600" />
-                <span className="text-green-600">Saved</span>
-              </>
-            )}
-            {saveStatus === 'error' && (
-              <>
-                <AlertCircle className="w-4 h-4 text-red-600" />
-                <span className="text-red-600">Auto-save failed: {lastSaveError}</span>
-              </>
-            )}
-            {saveStatus === 'idle' && existing && (
-              <>
-                <Cloud className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-400">Auto-save on</span>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Action Buttons */}
       <div className="flex justify-end gap-4 pt-6">
         <Button
@@ -910,13 +788,13 @@ export const SpecialEventForecastForm: React.FC<SpecialEventForecastFormProps> =
         </Button>
         <Button 
           type="submit" 
-          disabled={createForecast.isPending || updateForecast.isPending}
+          disabled={createForecast.isPending || updateForecast.isPending || isSubmitting}
           className="bg-fortress-emerald hover:bg-fortress-emerald/90"
         >
-          {createForecast.isPending || updateForecast.isPending 
+          {createForecast.isPending || updateForecast.isPending || isSubmitting
             ? 'Saving...' 
             : existing 
-              ? (isAutoSaving ? 'Auto-saving...' : 'Save Changes') 
+              ? 'Update Forecast' 
               : 'Save Forecast'
           }
         </Button>
