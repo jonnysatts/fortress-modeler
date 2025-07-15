@@ -1,3 +1,7 @@
+// ⚠️  DEPRECATED: This service is deprecated and should not be used.
+// Use SupabaseStorageService via useProjects.ts hooks instead for consistent data persistence.
+// This ensures all special events operations use the same data model and field mappings.
+
 import { supabase } from '@/lib/supabase';
 import { 
   SpecialEvent, 

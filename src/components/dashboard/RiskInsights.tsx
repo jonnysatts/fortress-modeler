@@ -11,7 +11,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   AlertTriangle, 
   CheckCircle2, 
-  TrendingUp, 
   Shield, 
   Eye,
   ArrowRight

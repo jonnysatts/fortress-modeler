@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -22,7 +22,6 @@ import { sanitizeNumericInput, sanitizeTextInput } from '@/lib/security';
 import { toast } from 'sonner';
 import { 
   DollarSign, 
-  Users, 
   Megaphone, 
   Calculator, 
   TrendingUp, 
@@ -31,8 +30,11 @@ import {
   BarChart3,
   Target,
   Star,
-  Calendar,
-  MessageSquare
+  MessageSquare,
+  Loader2,
+  Check,
+  AlertCircle,
+  Cloud
 } from 'lucide-react';
 
 interface SpecialEventActualFormProps {
@@ -115,8 +117,14 @@ export const SpecialEventActualForm: React.FC<SpecialEventActualFormProps> = ({
   });
 
   const watchedValues = form.watch();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
   const [lastResetData, setLastResetData] = useState<any>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [lastSaveError, setLastSaveError] = useState<string | null>(null);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastAutoSaveDataRef = useRef<any>(null);
 
   // Calculate actuals
   const totalActualRevenue = (watchedValues.actual_ticket_sales || 0) +
@@ -164,6 +172,78 @@ export const SpecialEventActualForm: React.FC<SpecialEventActualFormProps> = ({
   const costVariancePercent = forecastCosts > 0 ? (costVariance / forecastCosts) * 100 : 0;
   const profitVariancePercent = forecastNetProfit !== 0 ? (profitVariance / Math.abs(forecastNetProfit)) * 100 : 0;
 
+  // Auto-save function with debouncing
+  const autoSave = useCallback(async (data: ActualFormData) => {
+    if (!existing || !existing.id) {
+      // Don't auto-save if no existing record
+      return;
+    }
+
+    try {
+      setIsAutoSaving(true);
+      console.log('🔄 [SpecialEventActualForm] Auto-saving changes...', { id: existing.id });
+      
+      const sanitized: Partial<ActualFormData> = Object.entries(data).reduce(
+        (acc, [key, value]) => {
+          if (typeof value === 'number') {
+            acc[key as keyof ActualFormData] = sanitizeNumericInput(value) as any;
+          } else if (typeof value === 'string') {
+            acc[key as keyof ActualFormData] = sanitizeTextInput(value) as any;
+          }
+          return acc;
+        },
+        {} as Partial<ActualFormData>
+      );
+
+      const result = await updateActual.mutateAsync({ id: existing.id, data: sanitized });
+      setLastResetData({ ...result });
+      lastAutoSaveDataRef.current = data;
+      
+      console.log('✅ [SpecialEventActualForm] Auto-save successful');
+      setSaveStatus('saved');
+      
+      // Clear saved status after 3 seconds
+      setTimeout(() => setSaveStatus('idle'), 3000);
+      
+    } catch (error) {
+      console.error('❌ [SpecialEventActualForm] Auto-save failed:', error);
+      setSaveStatus('error');
+      setLastSaveError(error instanceof Error ? error.message : 'Auto-save failed');
+      
+      // Clear error status after 5 seconds
+      setTimeout(() => setSaveStatus('idle'), 5000);
+    } finally {
+      setIsAutoSaving(false);
+    }
+  }, [existing, updateActual]);
+
+  // Debounced auto-save effect
+  useEffect(() => {
+    if (!hasInitialized || !existing) return;
+
+    // Clear any existing timeout
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    // Check if the data has actually changed
+    const hasChanged = JSON.stringify(watchedValues) !== JSON.stringify(lastAutoSaveDataRef.current);
+    
+    if (hasChanged) {
+      // Set a new timeout for auto-save
+      autoSaveTimeoutRef.current = setTimeout(() => {
+        autoSave(watchedValues);
+      }, 2000); // 2 second debounce
+    }
+
+    // Cleanup function
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [watchedValues, hasInitialized, existing, autoSave]);
+
   // Only reset form when we have new data that's different from what we last reset with
   useEffect(() => {
     if (existing && (!hasInitialized || (existing.id !== lastResetData?.id))) {
@@ -171,17 +251,30 @@ export const SpecialEventActualForm: React.FC<SpecialEventActualFormProps> = ({
       form.reset(formData);
       setHasInitialized(true);
       setLastResetData(formData);
+      lastAutoSaveDataRef.current = formData;
     }
   }, [existing, form, hasInitialized, lastResetData]);
 
   // Reset initialization flag on project change
   useEffect(() => {
     setHasInitialized(false);
-    setLastResetData(null);
+    setIsSubmitting(false);
+    setIsAutoSaving(false);
+    setSaveStatus('idle');
+    setLastSaveError(null);
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
   }, [projectId]);
 
   const onSubmit = async (data: ActualFormData) => {
     try {
+      setIsSubmitting(true);
+      setSaveStatus('saving');
+      setLastSaveError(null);
+      
+      console.log('🔄 [SpecialEventActualForm] Starting manual save...', { projectId, hasExisting: !!existing });
+      
       const sanitized: Partial<ActualFormData> = Object.entries(data).reduce(
         (acc, [key, value]) => {
           if (typeof value === 'number') {
@@ -195,22 +288,47 @@ export const SpecialEventActualForm: React.FC<SpecialEventActualFormProps> = ({
       );
 
       if (existing) {
+        console.log('🔄 [SpecialEventActualForm] Updating existing actuals...', existing.id);
         const result = await updateActual.mutateAsync({ id: existing.id, data: sanitized });
         // Update our tracking data so we don't reset the form when the cache updates
         setLastResetData({ ...result });
+        console.log('✅ [SpecialEventActualForm] Actuals updated successfully');
+        setSaveStatus('saved');
         toast.success('Actuals updated successfully!');
       } else {
+        console.log('🔄 [SpecialEventActualForm] Creating new actuals...');
         const result = await createActual.mutateAsync({ project_id: projectId, ...sanitized });
         setLastResetData({ ...result });
+        console.log('✅ [SpecialEventActualForm] Actuals created successfully');
+        setSaveStatus('saved');
         toast.success('Actuals submitted successfully!');
       }
       
       navigate(`/projects/${projectId}`);
     } catch (error) {
-      console.error('Error saving actuals:', error);
-      toast.error('Failed to save actuals', {
-        description: 'There was an error saving the special event actuals.',
+      console.error('❌ [SpecialEventActualForm] Manual save failed:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        projectId,
+        hasExisting: !!existing
       });
+      
+      setSaveStatus('error');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setLastSaveError(errorMessage);
+      
+      toast.error('Failed to save actuals', {
+        description: errorMessage,
+        action: {
+          label: 'Retry',
+          onClick: () => {
+            // Retry the save
+            onSubmit(data);
+          },
+        },
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1061,6 +1179,38 @@ export const SpecialEventActualForm: React.FC<SpecialEventActualFormProps> = ({
         </TabsContent>
       </Tabs>
 
+      {/* Auto-save Status */}
+      {existing && (
+        <div className="flex items-center justify-between pt-4 border-t">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            {isAutoSaving && (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Auto-saving...</span>
+              </>
+            )}
+            {saveStatus === 'saved' && (
+              <>
+                <Check className="w-4 h-4 text-green-600" />
+                <span className="text-green-600">Saved</span>
+              </>
+            )}
+            {saveStatus === 'error' && (
+              <>
+                <AlertCircle className="w-4 h-4 text-red-600" />
+                <span className="text-red-600">Auto-save failed: {lastSaveError}</span>
+              </>
+            )}
+            {saveStatus === 'idle' && existing && (
+              <>
+                <Cloud className="w-4 h-4 text-gray-400" />
+                <span className="text-gray-400">Auto-save on</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div className="flex justify-end gap-4 pt-6">
         <Button
@@ -1078,7 +1228,7 @@ export const SpecialEventActualForm: React.FC<SpecialEventActualFormProps> = ({
           {createActual.isPending || updateActual.isPending 
             ? 'Saving...' 
             : existing 
-              ? 'Update Actuals' 
+              ? (isAutoSaving ? 'Auto-saving...' : 'Save Changes') 
               : 'Submit Actuals'
           }
         </Button>

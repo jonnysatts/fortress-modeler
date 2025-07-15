@@ -64,8 +64,12 @@ export const useSpecialEventActuals = (projectId: string | undefined) => {
       }
     },
     enabled: !!projectId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 15 * 60 * 1000, // Increased to 15 minutes to prevent unwanted refetches
+    gcTime: 30 * 60 * 1000, // Keep cached data for 30 minutes
     refetchOnWindowFocus: false,
+    refetchOnMount: false, // Prevent refetch on component mount
+    refetchOnReconnect: false, // Prevent refetch on network reconnect
+    refetchInterval: false, // Disable automatic polling
     retry: 3,
   });
 };
@@ -179,8 +183,12 @@ export const useSpecialEventMilestones = (projectId: string | undefined) => {
       }
     },
     enabled: !!projectId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 15 * 60 * 1000, // Increased to 15 minutes to prevent unwanted refetches
+    gcTime: 30 * 60 * 1000, // Keep cached data for 30 minutes
     refetchOnWindowFocus: false,
+    refetchOnMount: false, // Prevent refetch on component mount
+    refetchOnReconnect: false, // Prevent refetch on network reconnect
+    refetchInterval: false, // Disable automatic polling
     retry: 3,
   });
 };
@@ -417,8 +425,12 @@ export const useSpecialEventForecasts = (projectId: string | undefined) => {
       }
     },
     enabled: !!projectId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 15 * 60 * 1000, // Increased to 15 minutes to prevent unwanted refetches
+    gcTime: 30 * 60 * 1000, // Keep cached data for 30 minutes
     refetchOnWindowFocus: false,
+    refetchOnMount: false, // Prevent refetch on component mount
+    refetchOnReconnect: false, // Prevent refetch on network reconnect
+    refetchInterval: false, // Disable automatic polling
     retry: 3,
   });
 };

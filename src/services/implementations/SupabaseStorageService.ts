@@ -586,42 +586,44 @@ export class SupabaseStorageService implements IStorageService {
   async updateSpecialEventForecast(forecastId: string, forecastData: Partial<SpecialEventForecast>): Promise<SpecialEventForecast> {
     try {
       console.log(`Updating special event forecast ${forecastId}`, { forecastData });
-      const existingForecast = await this.getSpecialEventForecast(forecastId);
-      if (!existingForecast) {
-        throw new NotFoundError(`Special event forecast with ID ${forecastId} not found`);
-      }
-      const updateData: any = {
-        // Revenue streams
-        forecast_ticket_sales: forecastData.forecast_ticket_sales,
-        forecast_fnb_revenue: forecastData.forecast_fnb_revenue,
-        forecast_fnb_cogs_pct: forecastData.forecast_fnb_cogs_pct,
-        forecast_merch_revenue: forecastData.forecast_merch_revenue,
-        forecast_merch_cogs_pct: forecastData.forecast_merch_cogs_pct,
-        forecast_sponsorship_income: forecastData.forecast_sponsorship_income,
-        forecast_other_income: forecastData.forecast_other_income,
-        // Cost breakdown
-        forecast_staffing_costs: forecastData.forecast_staffing_costs,
-        forecast_venue_costs: forecastData.forecast_venue_costs,
-        forecast_vendor_costs: forecastData.forecast_vendor_costs,
-        forecast_marketing_costs: forecastData.forecast_marketing_costs,
-        forecast_production_costs: forecastData.forecast_production_costs,
-        forecast_other_costs: forecastData.forecast_other_costs,
-        // Marketing details
-        marketing_email_budget: forecastData.marketing_email_budget,
-        marketing_social_budget: forecastData.marketing_social_budget,
-        marketing_influencer_budget: forecastData.marketing_influencer_budget,
-        marketing_paid_ads_budget: forecastData.marketing_paid_ads_budget,
-        marketing_content_budget: forecastData.marketing_content_budget,
-        marketing_strategy: forecastData.marketing_strategy,
-        // Event details
-        estimated_attendance: forecastData.estimated_attendance,
-        ticket_price: forecastData.ticket_price,
-        // Notes
-        revenue_notes: forecastData.revenue_notes,
-        cost_notes: forecastData.cost_notes,
-        marketing_notes: forecastData.marketing_notes,
-        general_notes: forecastData.general_notes,
-      };
+      
+      // Only include fields that are actually being updated (not undefined)
+      const updateData: any = {};
+      
+      // Revenue streams - only update if value provided
+      if (forecastData.forecast_ticket_sales !== undefined) updateData.forecast_ticket_sales = forecastData.forecast_ticket_sales;
+      if (forecastData.forecast_fnb_revenue !== undefined) updateData.forecast_fnb_revenue = forecastData.forecast_fnb_revenue;
+      if (forecastData.forecast_fnb_cogs_pct !== undefined) updateData.forecast_fnb_cogs_pct = forecastData.forecast_fnb_cogs_pct;
+      if (forecastData.forecast_merch_revenue !== undefined) updateData.forecast_merch_revenue = forecastData.forecast_merch_revenue;
+      if (forecastData.forecast_merch_cogs_pct !== undefined) updateData.forecast_merch_cogs_pct = forecastData.forecast_merch_cogs_pct;
+      if (forecastData.forecast_sponsorship_income !== undefined) updateData.forecast_sponsorship_income = forecastData.forecast_sponsorship_income;
+      if (forecastData.forecast_other_income !== undefined) updateData.forecast_other_income = forecastData.forecast_other_income;
+      
+      // Cost breakdown - only update if value provided
+      if (forecastData.forecast_staffing_costs !== undefined) updateData.forecast_staffing_costs = forecastData.forecast_staffing_costs;
+      if (forecastData.forecast_venue_costs !== undefined) updateData.forecast_venue_costs = forecastData.forecast_venue_costs;
+      if (forecastData.forecast_vendor_costs !== undefined) updateData.forecast_vendor_costs = forecastData.forecast_vendor_costs;
+      if (forecastData.forecast_marketing_costs !== undefined) updateData.forecast_marketing_costs = forecastData.forecast_marketing_costs;
+      if (forecastData.forecast_production_costs !== undefined) updateData.forecast_production_costs = forecastData.forecast_production_costs;
+      if (forecastData.forecast_other_costs !== undefined) updateData.forecast_other_costs = forecastData.forecast_other_costs;
+      
+      // Marketing details - only update if value provided
+      if (forecastData.marketing_email_budget !== undefined) updateData.marketing_email_budget = forecastData.marketing_email_budget;
+      if (forecastData.marketing_social_budget !== undefined) updateData.marketing_social_budget = forecastData.marketing_social_budget;
+      if (forecastData.marketing_influencer_budget !== undefined) updateData.marketing_influencer_budget = forecastData.marketing_influencer_budget;
+      if (forecastData.marketing_paid_ads_budget !== undefined) updateData.marketing_paid_ads_budget = forecastData.marketing_paid_ads_budget;
+      if (forecastData.marketing_content_budget !== undefined) updateData.marketing_content_budget = forecastData.marketing_content_budget;
+      if (forecastData.marketing_strategy !== undefined) updateData.marketing_strategy = forecastData.marketing_strategy;
+      
+      // Event details - only update if value provided
+      if (forecastData.estimated_attendance !== undefined) updateData.estimated_attendance = forecastData.estimated_attendance;
+      if (forecastData.ticket_price !== undefined) updateData.ticket_price = forecastData.ticket_price;
+      
+      // Notes - only update if value provided
+      if (forecastData.revenue_notes !== undefined) updateData.revenue_notes = forecastData.revenue_notes;
+      if (forecastData.cost_notes !== undefined) updateData.cost_notes = forecastData.cost_notes;
+      if (forecastData.marketing_notes !== undefined) updateData.marketing_notes = forecastData.marketing_notes;
+      if (forecastData.general_notes !== undefined) updateData.general_notes = forecastData.general_notes;
       const { data, error } = await supabase
         .from('special_event_forecasts')
         .update(updateData)
@@ -783,10 +785,7 @@ export class SupabaseStorageService implements IStorageService {
   async updateSpecialEventActual(actualId: string, actualData: Partial<SpecialEventActual>): Promise<SpecialEventActual> {
     try {
       console.log(`Updating special event actual ${actualId}`, { actualData });
-      const existingActual = await this.getSpecialEventActual(actualId);
-      if (!existingActual) {
-        throw new NotFoundError(`Special event actual with ID ${actualId} not found`);
-      }
+      
       if (
         actualData.success_rating !== undefined &&
         actualData.success_rating !== null &&
@@ -794,52 +793,60 @@ export class SupabaseStorageService implements IStorageService {
       ) {
         throw new ValidationError('Success rating must be between 1 and 10');
       }
-      const updateData: any = {
-        // Actual revenue streams
-        actual_ticket_sales: actualData.actual_ticket_sales,
-        actual_fnb_revenue: actualData.actual_fnb_revenue,
-        actual_fnb_cogs: actualData.actual_fnb_cogs,
-        actual_merch_revenue: actualData.actual_merch_revenue,
-        actual_merch_cogs: actualData.actual_merch_cogs,
-        actual_sponsorship_income: actualData.actual_sponsorship_income,
-        actual_other_income: actualData.actual_other_income,
-        // Actual cost breakdown
-        actual_staffing_costs: actualData.actual_staffing_costs,
-        actual_venue_costs: actualData.actual_venue_costs,
-        actual_vendor_costs: actualData.actual_vendor_costs,
-        actual_marketing_costs: actualData.actual_marketing_costs,
-        actual_production_costs: actualData.actual_production_costs,
-        actual_other_costs: actualData.actual_other_costs,
-        // Marketing performance
-        marketing_email_performance: actualData.marketing_email_performance,
-        marketing_social_performance: actualData.marketing_social_performance,
-        marketing_influencer_performance: actualData.marketing_influencer_performance,
-        marketing_paid_ads_performance: actualData.marketing_paid_ads_performance,
-        marketing_content_performance: actualData.marketing_content_performance,
-        marketing_roi_notes: actualData.marketing_roi_notes,
-        // Event metrics
-        actual_attendance: actualData.actual_attendance,
-        attendance_breakdown: actualData.attendance_breakdown,
-        average_ticket_price: actualData.average_ticket_price,
-        // Success indicators
-        success_rating: actualData.success_rating,
-        event_success_indicators: actualData.event_success_indicators,
-        challenges_faced: actualData.challenges_faced,
-        lessons_learned: actualData.lessons_learned,
-        recommendations_future: actualData.recommendations_future,
-        // Post-event analysis
-        customer_feedback_summary: actualData.customer_feedback_summary,
-        team_feedback: actualData.team_feedback,
-        vendor_feedback: actualData.vendor_feedback,
-        // Additional metrics
-        social_media_engagement: actualData.social_media_engagement,
-        press_coverage: actualData.press_coverage,
-        brand_impact_assessment: actualData.brand_impact_assessment,
-        // Notes
-        revenue_variance_notes: actualData.revenue_variance_notes,
-        cost_variance_notes: actualData.cost_variance_notes,
-        general_notes: actualData.general_notes,
-      };
+      // Only include fields that are actually being updated (not undefined)
+      const updateData: any = {};
+      
+      // Actual revenue streams - only update if value provided
+      if (actualData.actual_ticket_sales !== undefined) updateData.actual_ticket_sales = actualData.actual_ticket_sales;
+      if (actualData.actual_fnb_revenue !== undefined) updateData.actual_fnb_revenue = actualData.actual_fnb_revenue;
+      if (actualData.actual_fnb_cogs !== undefined) updateData.actual_fnb_cogs = actualData.actual_fnb_cogs;
+      if (actualData.actual_merch_revenue !== undefined) updateData.actual_merch_revenue = actualData.actual_merch_revenue;
+      if (actualData.actual_merch_cogs !== undefined) updateData.actual_merch_cogs = actualData.actual_merch_cogs;
+      if (actualData.actual_sponsorship_income !== undefined) updateData.actual_sponsorship_income = actualData.actual_sponsorship_income;
+      if (actualData.actual_other_income !== undefined) updateData.actual_other_income = actualData.actual_other_income;
+      
+      // Actual cost breakdown - only update if value provided
+      if (actualData.actual_staffing_costs !== undefined) updateData.actual_staffing_costs = actualData.actual_staffing_costs;
+      if (actualData.actual_venue_costs !== undefined) updateData.actual_venue_costs = actualData.actual_venue_costs;
+      if (actualData.actual_vendor_costs !== undefined) updateData.actual_vendor_costs = actualData.actual_vendor_costs;
+      if (actualData.actual_marketing_costs !== undefined) updateData.actual_marketing_costs = actualData.actual_marketing_costs;
+      if (actualData.actual_production_costs !== undefined) updateData.actual_production_costs = actualData.actual_production_costs;
+      if (actualData.actual_other_costs !== undefined) updateData.actual_other_costs = actualData.actual_other_costs;
+      
+      // Marketing performance - only update if value provided
+      if (actualData.marketing_email_performance !== undefined) updateData.marketing_email_performance = actualData.marketing_email_performance;
+      if (actualData.marketing_social_performance !== undefined) updateData.marketing_social_performance = actualData.marketing_social_performance;
+      if (actualData.marketing_influencer_performance !== undefined) updateData.marketing_influencer_performance = actualData.marketing_influencer_performance;
+      if (actualData.marketing_paid_ads_performance !== undefined) updateData.marketing_paid_ads_performance = actualData.marketing_paid_ads_performance;
+      if (actualData.marketing_content_performance !== undefined) updateData.marketing_content_performance = actualData.marketing_content_performance;
+      if (actualData.marketing_roi_notes !== undefined) updateData.marketing_roi_notes = actualData.marketing_roi_notes;
+      
+      // Event metrics - only update if value provided
+      if (actualData.actual_attendance !== undefined) updateData.actual_attendance = actualData.actual_attendance;
+      if (actualData.attendance_breakdown !== undefined) updateData.attendance_breakdown = actualData.attendance_breakdown;
+      if (actualData.average_ticket_price !== undefined) updateData.average_ticket_price = actualData.average_ticket_price;
+      
+      // Success indicators - only update if value provided
+      if (actualData.success_rating !== undefined) updateData.success_rating = actualData.success_rating;
+      if (actualData.event_success_indicators !== undefined) updateData.event_success_indicators = actualData.event_success_indicators;
+      if (actualData.challenges_faced !== undefined) updateData.challenges_faced = actualData.challenges_faced;
+      if (actualData.lessons_learned !== undefined) updateData.lessons_learned = actualData.lessons_learned;
+      if (actualData.recommendations_future !== undefined) updateData.recommendations_future = actualData.recommendations_future;
+      
+      // Post-event analysis - only update if value provided
+      if (actualData.customer_feedback_summary !== undefined) updateData.customer_feedback_summary = actualData.customer_feedback_summary;
+      if (actualData.team_feedback !== undefined) updateData.team_feedback = actualData.team_feedback;
+      if (actualData.vendor_feedback !== undefined) updateData.vendor_feedback = actualData.vendor_feedback;
+      
+      // Additional metrics - only update if value provided
+      if (actualData.social_media_engagement !== undefined) updateData.social_media_engagement = actualData.social_media_engagement;
+      if (actualData.press_coverage !== undefined) updateData.press_coverage = actualData.press_coverage;
+      if (actualData.brand_impact_assessment !== undefined) updateData.brand_impact_assessment = actualData.brand_impact_assessment;
+      
+      // Notes - only update if value provided
+      if (actualData.revenue_variance_notes !== undefined) updateData.revenue_variance_notes = actualData.revenue_variance_notes;
+      if (actualData.cost_variance_notes !== undefined) updateData.cost_variance_notes = actualData.cost_variance_notes;
+      if (actualData.general_notes !== undefined) updateData.general_notes = actualData.general_notes;
       const { data, error } = await supabase
         .from('special_event_actuals')
         .update(updateData)
@@ -1155,17 +1162,17 @@ export class SupabaseStorageService implements IStorageService {
     return {
       id: supabaseProject.id,
       name: supabaseProject.name,
-      description: supabaseProject.description || undefined,
+      description: supabaseProject.description ?? undefined,
       productType: supabaseProject.product_type,
-      targetAudience: supabaseProject.target_audience || undefined,
-      createdAt: new Date(supabaseProject.created_at),
-      updatedAt: new Date(supabaseProject.updated_at),
+      targetAudience: supabaseProject.target_audience ?? undefined,
+      createdAt: supabaseProject.created_at ? new Date(supabaseProject.created_at) : new Date(),
+      updatedAt: supabaseProject.updated_at ? new Date(supabaseProject.updated_at) : new Date(),
       timeline: this.mapSupabaseTimelineToTimeline(supabaseProject.timeline),
-      avatarImage: supabaseProject.avatar_image || undefined,
-      is_public: supabaseProject.is_public,
-      shared_by: supabaseProject.owner_email || undefined,
-      owner_email: supabaseProject.owner_email || undefined,
-      share_count: supabaseProject.share_count,
+      avatarImage: supabaseProject.avatar_image ?? undefined,
+      is_public: supabaseProject.is_public ?? false,
+      shared_by: supabaseProject.owner_email ?? undefined,
+      owner_email: supabaseProject.owner_email ?? undefined,
+      share_count: supabaseProject.share_count ?? 0,
       permission: 'owner', // Default for owner, will be overridden for shared projects
       event_type: (supabaseProject.event_type || 'weekly') as 'weekly' | 'special',
       event_date: supabaseProject.event_date ? new Date(supabaseProject.event_date) : undefined,
@@ -1180,8 +1187,8 @@ export class SupabaseStorageService implements IStorageService {
       name: supabaseModel.name,
       isPrimary: supabaseModel.is_primary || false,
       assumptions: supabaseModel.assumptions as any,
-      createdAt: new Date(supabaseModel.created_at),
-      updatedAt: new Date(supabaseModel.updated_at),
+      createdAt: supabaseModel.created_at ? new Date(supabaseModel.created_at) : new Date(),
+      updatedAt: supabaseModel.updated_at ? new Date(supabaseModel.updated_at) : new Date(),
     };
   }
 
@@ -1228,7 +1235,7 @@ export class SupabaseStorageService implements IStorageService {
       cost_notes: supabaseForecast.cost_notes || undefined,
       marketing_notes: supabaseForecast.marketing_notes || undefined,
       general_notes: supabaseForecast.general_notes || undefined,
-      created_at: new Date(supabaseForecast.created_at),
+      created_at: supabaseForecast.created_at ? new Date(supabaseForecast.created_at) : new Date(),
     };
   }
 
@@ -1237,50 +1244,50 @@ export class SupabaseStorageService implements IStorageService {
       id: supabaseActual.id,
       project_id: supabaseActual.project_id,
       // Actual revenue streams
-      actual_ticket_sales: supabaseActual.actual_ticket_sales || undefined,
-      actual_fnb_revenue: supabaseActual.actual_fnb_revenue || undefined,
-      actual_fnb_cogs: supabaseActual.actual_fnb_cogs || undefined,
-      actual_merch_revenue: supabaseActual.actual_merch_revenue || undefined,
-      actual_merch_cogs: supabaseActual.actual_merch_cogs || undefined,
-      actual_sponsorship_income: supabaseActual.actual_sponsorship_income || undefined,
-      actual_other_income: supabaseActual.actual_other_income || undefined,
+      actual_ticket_sales: supabaseActual.actual_ticket_sales ?? undefined,
+      actual_fnb_revenue: supabaseActual.actual_fnb_revenue ?? undefined,
+      actual_fnb_cogs: supabaseActual.actual_fnb_cogs ?? undefined,
+      actual_merch_revenue: supabaseActual.actual_merch_revenue ?? undefined,
+      actual_merch_cogs: supabaseActual.actual_merch_cogs ?? undefined,
+      actual_sponsorship_income: supabaseActual.actual_sponsorship_income ?? undefined,
+      actual_other_income: supabaseActual.actual_other_income ?? undefined,
       // Actual cost breakdown
-      actual_staffing_costs: supabaseActual.actual_staffing_costs || undefined,
-      actual_venue_costs: supabaseActual.actual_venue_costs || undefined,
-      actual_vendor_costs: supabaseActual.actual_vendor_costs || undefined,
-      actual_marketing_costs: supabaseActual.actual_marketing_costs || undefined,
-      actual_production_costs: supabaseActual.actual_production_costs || undefined,
-      actual_other_costs: supabaseActual.actual_other_costs || undefined,
+      actual_staffing_costs: supabaseActual.actual_staffing_costs ?? undefined,
+      actual_venue_costs: supabaseActual.actual_venue_costs ?? undefined,
+      actual_vendor_costs: supabaseActual.actual_vendor_costs ?? undefined,
+      actual_marketing_costs: supabaseActual.actual_marketing_costs ?? undefined,
+      actual_production_costs: supabaseActual.actual_production_costs ?? undefined,
+      actual_other_costs: supabaseActual.actual_other_costs ?? undefined,
       // Marketing performance
-      marketing_email_performance: supabaseActual.marketing_email_performance || undefined,
-      marketing_social_performance: supabaseActual.marketing_social_performance || undefined,
-      marketing_influencer_performance: supabaseActual.marketing_influencer_performance || undefined,
-      marketing_paid_ads_performance: supabaseActual.marketing_paid_ads_performance || undefined,
-      marketing_content_performance: supabaseActual.marketing_content_performance || undefined,
-      marketing_roi_notes: supabaseActual.marketing_roi_notes || undefined,
+      marketing_email_performance: supabaseActual.marketing_email_performance ?? undefined,
+      marketing_social_performance: supabaseActual.marketing_social_performance ?? undefined,
+      marketing_influencer_performance: supabaseActual.marketing_influencer_performance ?? undefined,
+      marketing_paid_ads_performance: supabaseActual.marketing_paid_ads_performance ?? undefined,
+      marketing_content_performance: supabaseActual.marketing_content_performance ?? undefined,
+      marketing_roi_notes: supabaseActual.marketing_roi_notes ?? undefined,
       // Event metrics
-      actual_attendance: supabaseActual.actual_attendance || undefined,
-      attendance_breakdown: supabaseActual.attendance_breakdown || undefined,
-      average_ticket_price: supabaseActual.average_ticket_price || undefined,
+      actual_attendance: supabaseActual.actual_attendance ?? undefined,
+      attendance_breakdown: supabaseActual.attendance_breakdown ?? undefined,
+      average_ticket_price: supabaseActual.average_ticket_price ?? undefined,
       // Success indicators
-      success_rating: supabaseActual.success_rating || undefined,
-      event_success_indicators: supabaseActual.event_success_indicators || undefined,
-      challenges_faced: supabaseActual.challenges_faced || undefined,
-      lessons_learned: supabaseActual.lessons_learned || undefined,
-      recommendations_future: supabaseActual.recommendations_future || undefined,
+      success_rating: supabaseActual.success_rating ?? undefined,
+      event_success_indicators: supabaseActual.event_success_indicators ?? undefined,
+      challenges_faced: supabaseActual.challenges_faced ?? undefined,
+      lessons_learned: supabaseActual.lessons_learned ?? undefined,
+      recommendations_future: supabaseActual.recommendations_future ?? undefined,
       // Post-event analysis
-      customer_feedback_summary: supabaseActual.customer_feedback_summary || undefined,
-      team_feedback: supabaseActual.team_feedback || undefined,
-      vendor_feedback: supabaseActual.vendor_feedback || undefined,
+      customer_feedback_summary: supabaseActual.customer_feedback_summary ?? undefined,
+      team_feedback: supabaseActual.team_feedback ?? undefined,
+      vendor_feedback: supabaseActual.vendor_feedback ?? undefined,
       // Additional metrics
-      social_media_engagement: supabaseActual.social_media_engagement || undefined,
-      press_coverage: supabaseActual.press_coverage || undefined,
-      brand_impact_assessment: supabaseActual.brand_impact_assessment || undefined,
+      social_media_engagement: supabaseActual.social_media_engagement ?? undefined,
+      press_coverage: supabaseActual.press_coverage ?? undefined,
+      brand_impact_assessment: supabaseActual.brand_impact_assessment ?? undefined,
       // Notes
-      revenue_variance_notes: supabaseActual.revenue_variance_notes || undefined,
-      cost_variance_notes: supabaseActual.cost_variance_notes || undefined,
-      general_notes: supabaseActual.general_notes || undefined,
-      created_at: new Date(supabaseActual.created_at),
+      revenue_variance_notes: supabaseActual.revenue_variance_notes ?? undefined,
+      cost_variance_notes: supabaseActual.cost_variance_notes ?? undefined,
+      general_notes: supabaseActual.general_notes ?? undefined,
+      created_at: supabaseActual.created_at ? new Date(supabaseActual.created_at) : new Date(),
     };
   }
 
@@ -1288,11 +1295,11 @@ export class SupabaseStorageService implements IStorageService {
     return {
       id: supabaseMilestone.id,
       project_id: supabaseMilestone.project_id,
-      milestone_label: supabaseMilestone.milestone_label || undefined,
+      milestone_label: supabaseMilestone.milestone_label ?? undefined,
       target_date: supabaseMilestone.target_date ? new Date(supabaseMilestone.target_date) : undefined,
-      completed: supabaseMilestone.completed || undefined,
-      assignee: supabaseMilestone.assignee || undefined,
-      notes: supabaseMilestone.notes || undefined,
+      completed: supabaseMilestone.completed ?? undefined,
+      assignee: supabaseMilestone.assignee ?? undefined,
+      notes: supabaseMilestone.notes ?? undefined,
     };
   }
 
