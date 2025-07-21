@@ -1,3 +1,4 @@
+// Enhanced SpecialEventActualForm.tsx with comprehensive COGS tracking
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,6 +19,8 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { sanitizeNumericInput, sanitizeTextInput } from '@/lib/security';
 import { toast } from 'sonner';
 import { 
@@ -30,23 +33,30 @@ import {
   BarChart3,
   Target,
   Star,
-  MessageSquare
+  MessageSquare,
+  Users
 } from 'lucide-react';
 
 interface SpecialEventActualFormProps {
   projectId: string;
 }
 
-// Enhanced schema for comprehensive actuals tracking
+// Enhanced schema for comprehensive actuals tracking with COGS
 const actualSchema = z.object({
   // Actual revenue streams
   actual_ticket_sales: z.number().min(0).optional(),
   actual_fnb_revenue: z.number().min(0).optional(),
-  actual_fnb_cogs: z.number().min(0).optional(),
   actual_merch_revenue: z.number().min(0).optional(),
-  actual_merch_cogs: z.number().min(0).optional(),
   actual_sponsorship_income: z.number().min(0).optional(),
   actual_other_income: z.number().min(0).optional(),
+  
+  // COGS configuration
+  use_forecast_fnb_cogs_pct: z.boolean().default(true),
+  use_forecast_merch_cogs_pct: z.boolean().default(true),
+  
+  // Manual COGS override
+  manual_fnb_cogs: z.number().min(0).optional(),
+  manual_merch_cogs: z.number().min(0).optional(),
   
   // Actual cost breakdown
   actual_staffing_costs: z.number().min(0).optional(),
@@ -56,6 +66,17 @@ const actualSchema = z.object({
   actual_production_costs: z.number().min(0).optional(),
   actual_other_costs: z.number().min(0).optional(),
   
+  // Event metrics
+  actual_attendance: z.number().min(0),
+  average_ticket_price: z.number().min(0).optional(),
+  
+  // Performance tracking
+  success_rating: z.number().min(1).max(10).optional(),
+  key_success_factors: z.string().max(1000).optional(),
+  challenges_faced: z.string().max(1000).optional(),
+  lessons_learned: z.string().max(1000).optional(),
+  recommendations_future: z.string().max(1000).optional(),
+  
   // Marketing performance
   marketing_email_performance: z.string().max(500).optional(),
   marketing_social_performance: z.string().max(500).optional(),
@@ -64,35 +85,33 @@ const actualSchema = z.object({
   marketing_content_performance: z.string().max(500).optional(),
   marketing_roi_notes: z.string().max(1000).optional(),
   
-  // Event metrics
-  actual_attendance: z.number().min(0).optional(),
-  attendance_breakdown: z.string().max(500).optional(),
-  average_ticket_price: z.number().min(0).optional(),
-  
-  // Success indicators
-  success_rating: z.number().min(1).max(10).optional(),
-  event_success_indicators: z.string().max(1000).optional(),
-  challenges_faced: z.string().max(1000).optional(),
-  lessons_learned: z.string().max(1000).optional(),
-  recommendations_future: z.string().max(1000).optional(),
-  
   // Post-event analysis
   customer_feedback_summary: z.string().max(1000).optional(),
   team_feedback: z.string().max(1000).optional(),
   vendor_feedback: z.string().max(1000).optional(),
   
-  // Additional metrics
-  social_media_engagement: z.string().max(500).optional(),
-  press_coverage: z.string().max(500).optional(),
-  brand_impact_assessment: z.string().max(1000).optional(),
-  
-  // Notes
+  // Variance notes
   revenue_variance_notes: z.string().max(500).optional(),
   cost_variance_notes: z.string().max(500).optional(),
   general_notes: z.string().max(1000).optional(),
 });
 
 type ActualFormData = z.infer<typeof actualSchema>;
+
+// Helper functions for COGS calculation
+const calculateCOGSFromForecast = (revenue: number, forecastPercentage: number): number => {
+  return Math.round(revenue * (forecastPercentage / 100));
+};
+
+const calculateGrossMargin = (revenue: number, cogs: number): number => {
+  return revenue > 0 ? ((revenue - cogs) / revenue) * 100 : 0;
+};
+
+const calculateVariance = (actual: number, forecast: number): { amount: number; percentage: number } => {
+  const amount = actual - forecast;
+  const percentage = forecast > 0 ? (amount / forecast) * 100 : 0;
+  return { amount, percentage };
+};
 
 export const SpecialEventActualForm: React.FC<SpecialEventActualFormProps> = ({
   projectId,
@@ -109,30 +128,61 @@ export const SpecialEventActualForm: React.FC<SpecialEventActualFormProps> = ({
 
   const form = useForm<ActualFormData>({
     resolver: zodResolver(actualSchema),
-    defaultValues: {},
+    defaultValues: {
+      use_forecast_fnb_cogs_pct: true,
+      use_forecast_merch_cogs_pct: true,
+    },
   });
 
   const watchedValues = form.watch();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
-  const [lastResetData, setLastResetData] = useState<any>(null);
 
-  // Calculate actuals
+  // Calculate actuals and metrics
   const totalActualRevenue = (watchedValues.actual_ticket_sales || 0) +
     (watchedValues.actual_fnb_revenue || 0) +
     (watchedValues.actual_merch_revenue || 0) +
     (watchedValues.actual_sponsorship_income || 0) +
     (watchedValues.actual_other_income || 0);
 
+  // Calculate COGS based on configuration
+  const calculatedFnBCogs = watchedValues.use_forecast_fnb_cogs_pct && forecast ? 
+    calculateCOGSFromForecast(watchedValues.actual_fnb_revenue || 0, forecast.forecast_fnb_cogs_pct || 30) :
+    (watchedValues.manual_fnb_cogs || 0);
+  
+  const calculatedMerchCogs = watchedValues.use_forecast_merch_cogs_pct && forecast ? 
+    calculateCOGSFromForecast(watchedValues.actual_merch_revenue || 0, forecast.forecast_merch_cogs_pct || 50) :
+    (watchedValues.manual_merch_cogs || 0);
+
   const totalActualCosts = (watchedValues.actual_staffing_costs || 0) +
     (watchedValues.actual_venue_costs || 0) +
     (watchedValues.actual_vendor_costs || 0) +
     (watchedValues.actual_marketing_costs || 0) +
     (watchedValues.actual_production_costs || 0) +
-    (watchedValues.actual_other_costs || 0);
+    (watchedValues.actual_other_costs || 0) +
+    calculatedFnBCogs +
+    calculatedMerchCogs;
 
   const actualNetProfit = totalActualRevenue - totalActualCosts;
   const actualProfitMargin = totalActualRevenue > 0 ? (actualNetProfit / totalActualRevenue) * 100 : 0;
+
+  // Calculate per-attendee metrics
+  const revenuePerAttendee = watchedValues.actual_attendance > 0 ? 
+    totalActualRevenue / watchedValues.actual_attendance : 0;
+  const costPerAttendee = watchedValues.actual_attendance > 0 ? 
+    totalActualCosts / watchedValues.actual_attendance : 0;
+  const profitPerAttendee = revenuePerAttendee - costPerAttendee;
+
+  // Calculate marketing efficiency
+  const marketingROI = watchedValues.actual_marketing_costs > 0 ? 
+    ((totalActualRevenue - watchedValues.actual_marketing_costs) / watchedValues.actual_marketing_costs) * 100 : 0;
+  
+  const customerAcquisitionCost = watchedValues.actual_marketing_costs > 0 && watchedValues.actual_attendance > 0 ?
+    watchedValues.actual_marketing_costs / watchedValues.actual_attendance : 0;
+
+  // Calculate gross margins
+  const fnbGrossMargin = calculateGrossMargin(watchedValues.actual_fnb_revenue || 0, calculatedFnBCogs);
+  const merchGrossMargin = calculateGrossMargin(watchedValues.actual_merch_revenue || 0, calculatedMerchCogs);
 
   // Calculate forecast comparison if available
   const forecastRevenue = forecast ? (
@@ -149,966 +199,974 @@ export const SpecialEventActualForm: React.FC<SpecialEventActualFormProps> = ({
     (forecast.forecast_vendor_costs || 0) +
     (forecast.forecast_marketing_costs || 0) +
     (forecast.forecast_production_costs || 0) +
-    (forecast.forecast_other_costs || 0)
+    (forecast.forecast_other_costs || 0) +
+    (forecast.calculated_fnb_cogs || 0) +
+    (forecast.calculated_merch_cogs || 0)
   ) : 0;
 
   const forecastNetProfit = forecastRevenue - forecastCosts;
 
   // Variance calculations
-  const revenueVariance = totalActualRevenue - forecastRevenue;
-  const costVariance = totalActualCosts - forecastCosts;
-  const profitVariance = actualNetProfit - forecastNetProfit;
+  const revenueVariance = calculateVariance(totalActualRevenue, forecastRevenue);
+  const costVariance = calculateVariance(totalActualCosts, forecastCosts);
+  const profitVariance = calculateVariance(actualNetProfit, forecastNetProfit);
+  const attendanceVariance = forecast?.estimated_attendance ? 
+    calculateVariance(watchedValues.actual_attendance, forecast.estimated_attendance) : 
+    { amount: 0, percentage: 0 };
 
-  const revenueVariancePercent = forecastRevenue > 0 ? (revenueVariance / forecastRevenue) * 100 : 0;
-  const costVariancePercent = forecastCosts > 0 ? (costVariance / forecastCosts) * 100 : 0;
-  const profitVariancePercent = forecastNetProfit !== 0 ? (profitVariance / Math.abs(forecastNetProfit)) * 100 : 0;
+  // COGS variance calculations
+  const fnbCogsVariance = forecast?.calculated_fnb_cogs ? 
+    calculateVariance(calculatedFnBCogs, forecast.calculated_fnb_cogs) : 
+    { amount: 0, percentage: 0 };
+  
+  const merchCogsVariance = forecast?.calculated_merch_cogs ? 
+    calculateVariance(calculatedMerchCogs, forecast.calculated_merch_cogs) : 
+    { amount: 0, percentage: 0 };
 
-  // Only reset form when we have new data that's different from what we last reset with
+  // Load existing data
   useEffect(() => {
-    if (existing && (!hasInitialized || (existing.id !== lastResetData?.id))) {
-      const formData = { ...existing };
-      form.reset(formData);
+    if (existing && !hasInitialized) {
+      const resetData = {
+        actual_ticket_sales: existing.actual_ticket_sales || undefined,
+        actual_fnb_revenue: existing.actual_fnb_revenue || undefined,
+        actual_merch_revenue: existing.actual_merch_revenue || undefined,
+        actual_sponsorship_income: existing.actual_sponsorship_income || undefined,
+        actual_other_income: existing.actual_other_income || undefined,
+        
+        use_forecast_fnb_cogs_pct: existing.use_forecast_fnb_cogs_pct ?? true,
+        use_forecast_merch_cogs_pct: existing.use_forecast_merch_cogs_pct ?? true,
+        manual_fnb_cogs: existing.manual_fnb_cogs || undefined,
+        manual_merch_cogs: existing.manual_merch_cogs || undefined,
+        
+        actual_staffing_costs: existing.actual_staffing_costs || undefined,
+        actual_venue_costs: existing.actual_venue_costs || undefined,
+        actual_vendor_costs: existing.actual_vendor_costs || undefined,
+        actual_marketing_costs: existing.actual_marketing_costs || undefined,
+        actual_production_costs: existing.actual_production_costs || undefined,
+        actual_other_costs: existing.actual_other_costs || undefined,
+        
+        actual_attendance: existing.actual_attendance || 0,
+        average_ticket_price: existing.average_ticket_price || undefined,
+        
+        success_rating: existing.success_rating || undefined,
+        key_success_factors: existing.key_success_factors || undefined,
+        challenges_faced: existing.challenges_faced || undefined,
+        lessons_learned: existing.lessons_learned || undefined,
+        recommendations_future: existing.recommendations_future || undefined,
+        
+        marketing_email_performance: existing.marketing_email_performance || undefined,
+        marketing_social_performance: existing.marketing_social_performance || undefined,
+        marketing_influencer_performance: existing.marketing_influencer_performance || undefined,
+        marketing_paid_ads_performance: existing.marketing_paid_ads_performance || undefined,
+        marketing_content_performance: existing.marketing_content_performance || undefined,
+        marketing_roi_notes: existing.marketing_roi_notes || undefined,
+        
+        customer_feedback_summary: existing.customer_feedback_summary || undefined,
+        team_feedback: existing.team_feedback || undefined,
+        vendor_feedback: existing.vendor_feedback || undefined,
+        
+        revenue_variance_notes: existing.revenue_variance_notes || undefined,
+        cost_variance_notes: existing.cost_variance_notes || undefined,
+        general_notes: existing.general_notes || undefined,
+      };
+
+      form.reset(resetData);
       setHasInitialized(true);
-      setLastResetData(formData);
     }
-  }, [existing, form, hasInitialized, lastResetData]);
+  }, [existing, form, hasInitialized]);
 
-  // Reset initialization flag on project change
-  useEffect(() => {
-    setHasInitialized(false);
-    setIsSubmitting(false);
-  }, [projectId]);
-
-  const onSubmit = async (data: ActualFormData) => {
+  const handleSubmit = async (data: ActualFormData) => {
     try {
       setIsSubmitting(true);
-      
-      console.log('🔄 [SpecialEventActualForm] Starting manual save...', { projectId, hasExisting: !!existing });
-      
-      const sanitized: Partial<ActualFormData> = Object.entries(data).reduce(
-        (acc, [key, value]) => {
-          if (typeof value === 'number') {
-            acc[key as keyof ActualFormData] = sanitizeNumericInput(value) as any;
-          } else if (typeof value === 'string') {
-            acc[key as keyof ActualFormData] = sanitizeTextInput(value) as any;
-          }
-          return acc;
-        },
-        {} as Partial<ActualFormData>
-      );
+
+      // Prepare data with calculated metrics
+      const submitData = {
+        ...data,
+        calculated_fnb_cogs: calculatedFnBCogs,
+        calculated_merch_cogs: calculatedMerchCogs,
+        revenue_per_attendee: revenuePerAttendee,
+        cost_per_attendee: costPerAttendee,
+        profit_per_attendee: profitPerAttendee,
+        marketing_roi: marketingROI,
+        fnb_gross_margin_percentage: fnbGrossMargin,
+        merchandise_gross_margin_percentage: merchGrossMargin,
+        fnb_cogs_variance: fnbCogsVariance.amount,
+        merch_cogs_variance: merchCogsVariance.amount,
+      };
 
       if (existing) {
-        console.log('🔄 [SpecialEventActualForm] Updating existing actuals...', existing.id);
-        const result = await updateActual.mutateAsync({ id: existing.id, data: sanitized });
-        // Update our tracking data so we don't reset the form when the cache updates
-        setLastResetData({ ...result });
-        console.log('✅ [SpecialEventActualForm] Actuals updated successfully');
-        toast.success('Actuals updated successfully!');
+        await updateActual.mutateAsync({
+          actualId: existing.id,
+          data: submitData,
+        });
+        toast.success('Actuals updated successfully');
       } else {
-        console.log('🔄 [SpecialEventActualForm] Creating new actuals...');
-        const result = await createActual.mutateAsync({ project_id: projectId, ...sanitized });
-        setLastResetData({ ...result });
-        console.log('✅ [SpecialEventActualForm] Actuals created successfully');
-        toast.success('Actuals submitted successfully!');
+        await createActual.mutateAsync({
+          projectId,
+          data: submitData,
+        });
+        toast.success('Actuals created successfully');
       }
-      
-      navigate(`/projects/${projectId}`);
     } catch (error) {
-      console.error('❌ [SpecialEventActualForm] Manual save failed:', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-        projectId,
-        hasExisting: !!existing
-      });
-      
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      
-      toast.error('Failed to save actuals', {
-        description: errorMessage,
-        action: {
-          label: 'Retry',
-          onClick: () => {
-            // Retry the save
-            onSubmit(data);
-          },
-        },
-      });
+      console.error('Error saving actuals:', error);
+      toast.error('Failed to save actuals');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const formatCurrency = (amount: number) => `$${amount.toLocaleString()}`;
-  const formatVariance = (variance: number, percent: number) => {
-    const sign = variance >= 0 ? '+' : '';
-    const color = variance >= 0 ? 'text-green-600' : 'text-red-600';
-    return (
-      <span className={color}>
-        {sign}{formatCurrency(variance)} ({sign}{percent.toFixed(1)}%)
-      </span>
-    );
-  };
-
-  const getVarianceIcon = (variance: number) => {
-    if (variance > 0) return <TrendingUp className="w-4 h-4 text-green-600" />;
-    if (variance < 0) return <AlertTriangle className="w-4 h-4 text-red-600" />;
-    return <CheckCircle className="w-4 h-4 text-blue-600" />;
-  };
-
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-      {existing && (
-        <Alert>
-          <CheckCircle className="h-4 w-4" />
-          <AlertDescription>
-            Actuals have been submitted for this event. You can still update them if needed.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="overview" className="flex items-center gap-1">
-            <BarChart3 className="w-4 h-4" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="revenue" className="flex items-center gap-1">
-            <DollarSign className="w-4 h-4" />
-            Revenue
-          </TabsTrigger>
-          <TabsTrigger value="costs" className="flex items-center gap-1">
-            <Calculator className="w-4 h-4" />
-            Costs
-          </TabsTrigger>
-          <TabsTrigger value="marketing" className="flex items-center gap-1">
-            <Megaphone className="w-4 h-4" />
-            Marketing
-          </TabsTrigger>
-          <TabsTrigger value="success" className="flex items-center gap-1">
-            <Target className="w-4 h-4" />
-            Success
-          </TabsTrigger>
-          <TabsTrigger value="feedback" className="flex items-center gap-1">
-            <MessageSquare className="w-4 h-4" />
-            Feedback
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5" />
-                Event Performance Overview
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">
-                    {formatCurrency(totalActualRevenue)}
-                  </div>
-                  <div className="text-sm text-green-600">Actual Revenue</div>
-                  {forecast && (
-                    <div className="text-xs text-gray-600 mt-1">
-                      vs {formatCurrency(forecastRevenue)} forecast
-                    </div>
-                  )}
-                </div>
-                <div className="text-center p-4 bg-red-50 rounded-lg">
-                  <div className="text-2xl font-bold text-red-600">
-                    {formatCurrency(totalActualCosts)}
-                  </div>
-                  <div className="text-sm text-red-600">Actual Costs</div>
-                  {forecast && (
-                    <div className="text-xs text-gray-600 mt-1">
-                      vs {formatCurrency(forecastCosts)} forecast
-                    </div>
-                  )}
-                </div>
-                <div className={`text-center p-4 rounded-lg ${actualNetProfit >= 0 ? 'bg-blue-50' : 'bg-orange-50'}`}>
-                  <div className={`text-2xl font-bold ${actualNetProfit >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
-                    {formatCurrency(actualNetProfit)}
-                  </div>
-                  <div className={`text-sm ${actualNetProfit >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
-                    Net Profit
-                  </div>
-                  {forecast && (
-                    <div className="text-xs text-gray-600 mt-1">
-                      vs {formatCurrency(forecastNetProfit)} forecast
-                    </div>
-                  )}
-                </div>
+    <div className="max-w-6xl mx-auto p-6 space-y-6">
+      {/* Enhanced KPI Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Revenue</p>
+                <p className="text-2xl font-bold text-green-600">${totalActualRevenue.toLocaleString()}</p>
               </div>
+              <DollarSign className="w-8 h-8 text-green-500" />
+            </div>
+            <div className="mt-2">
+              <Badge variant={revenueVariance.percentage > 0 ? 'default' : 'destructive'}>
+                {revenueVariance.percentage > 0 ? '+' : ''}{revenueVariance.percentage.toFixed(1)}% vs forecast
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
 
-              {forecast && (
-                <>
-                  <Separator className="my-6" />
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Net Profit</p>
+                <p className={`text-2xl font-bold ${actualNetProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  ${actualNetProfit.toLocaleString()}
+                </p>
+              </div>
+              <TrendingUp className="w-8 h-8 text-blue-500" />
+            </div>
+            <div className="mt-2">
+              <Badge variant="outline">
+                {actualProfitMargin.toFixed(1)}% margin
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Revenue/Attendee</p>
+                <p className="text-2xl font-bold text-blue-600">${revenuePerAttendee.toFixed(0)}</p>
+              </div>
+              <Users className="w-8 h-8 text-purple-500" />
+            </div>
+            <div className="mt-2">
+              <Badge variant={attendanceVariance.percentage > -10 ? 'default' : 'destructive'}>
+                {attendanceVariance.percentage > 0 ? '+' : ''}{attendanceVariance.percentage.toFixed(1)}% attendance
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Marketing ROI</p>
+                <p className={`text-2xl font-bold ${marketingROI > 100 ? 'text-green-600' : marketingROI > 0 ? 'text-yellow-600' : 'text-red-600'}`}>
+                  {marketingROI.toFixed(0)}%
+                </p>
+              </div>
+              <Megaphone className="w-8 h-8 text-orange-500" />
+            </div>
+            <div className="mt-2">
+              <Badge variant="outline">
+                ${customerAcquisitionCost.toFixed(0)} CAC
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="revenue">Revenue</TabsTrigger>
+            <TabsTrigger value="cogs">COGS</TabsTrigger>
+            <TabsTrigger value="costs">Costs</TabsTrigger>
+            <TabsTrigger value="marketing">Marketing</TabsTrigger>
+            <TabsTrigger value="analysis">Analysis</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Event Performance Overview</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Key Event Metrics */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="actual_attendance">Actual Attendance *</Label>
+                    <Input
+                      id="actual_attendance"
+                      type="number"
+                      {...form.register('actual_attendance', { 
+                        setValueAs: v => v === '' ? 0 : Number(v) 
+                      })}
+                      className="text-right"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="average_ticket_price">Average Ticket Price</Label>
+                    <Input
+                      id="average_ticket_price"
+                      type="number"
+                      step="0.01"
+                      {...form.register('average_ticket_price', { 
+                        setValueAs: v => v === '' ? undefined : Number(v) 
+                      })}
+                      className="text-right"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="success_rating">Success Rating (1-10)</Label>
+                    <Input
+                      id="success_rating"
+                      type="number"
+                      min="1"
+                      max="10"
+                      {...form.register('success_rating', { 
+                        setValueAs: v => v === '' ? undefined : Number(v) 
+                      })}
+                      className="text-right"
+                    />
+                  </div>
+                </div>
+
+                {/* Performance Metrics Display */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Forecast vs Actual Analysis</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <Card className="p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          {getVarianceIcon(revenueVariance)}
-                          <h4 className="font-semibold">Revenue Variance</h4>
-                        </div>
-                        <div className="text-lg">
-                          {formatVariance(revenueVariance, revenueVariancePercent)}
-                        </div>
-                        <Progress 
-                          value={Math.min(Math.abs(revenueVariancePercent), 100)} 
-                          className="mt-2"
-                        />
-                      </Card>
-                      
-                      <Card className="p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          {getVarianceIcon(-costVariance)}
-                          <h4 className="font-semibold">Cost Variance</h4>
-                        </div>
-                        <div className="text-lg">
-                          {formatVariance(costVariance, costVariancePercent)}
-                        </div>
-                        <Progress 
-                          value={Math.min(Math.abs(costVariancePercent), 100)} 
-                          className="mt-2"
-                        />
-                      </Card>
-                      
-                      <Card className="p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          {getVarianceIcon(profitVariance)}
-                          <h4 className="font-semibold">Profit Variance</h4>
-                        </div>
-                        <div className="text-lg">
-                          {formatVariance(profitVariance, profitVariancePercent)}
-                        </div>
-                        <Progress 
-                          value={Math.min(Math.abs(profitVariancePercent), 100)} 
-                          className="mt-2"
-                        />
-                      </Card>
+                    <h4 className="font-medium">Financial Performance</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Revenue per attendee:</span>
+                        <span className="font-medium">${revenuePerAttendee.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Cost per attendee:</span>
+                        <span className="font-medium">${costPerAttendee.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Profit per attendee:</span>
+                        <span className={`font-medium ${profitPerAttendee >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          ${profitPerAttendee.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Total COGS:</span>
+                        <span className="font-medium">${(calculatedFnBCogs + calculatedMerchCogs).toLocaleString()}</span>
+                      </div>
                     </div>
                   </div>
-                </>
-              )}
 
-              <Separator className="my-6" />
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Event Metrics</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span>Actual Attendance:</span>
-                      <Badge variant="secondary">
-                        {watchedValues.actual_attendance || 0} people
-                      </Badge>
-                    </div>
-                    {forecast?.estimated_attendance && (
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Variance vs Forecast</h4>
+                    <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span>Attendance vs Forecast:</span>
-                        <Badge variant={
-                          (watchedValues.actual_attendance || 0) >= forecast.estimated_attendance 
-                            ? "default" 
-                            : "destructive"
-                        }>
-                          {((watchedValues.actual_attendance || 0) - forecast.estimated_attendance)} people
+                        <span className="text-gray-600">Revenue variance:</span>
+                        <Badge variant={revenueVariance.percentage >= 0 ? 'default' : 'destructive'}>
+                          {revenueVariance.percentage > 0 ? '+' : ''}{revenueVariance.percentage.toFixed(1)}%
                         </Badge>
                       </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span>Profit Margin:</span>
-                      <Badge variant="outline">{actualProfitMargin.toFixed(1)}%</Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Revenue per Attendee:</span>
-                      <Badge variant="secondary">
-                        {watchedValues.actual_attendance ? formatCurrency(totalActualRevenue / watchedValues.actual_attendance) : '$0'}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Success Rating</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium" htmlFor="success_rating">
-                        Overall Success Rating (1-10)
-                      </label>
-                      <Input 
-                        id="success_rating" 
-                        type="number" 
-                        min="1" 
-                        max="10"
-                        step="1"
-                        placeholder="Rate from 1-10"
-                        {...form.register('success_rating', { valueAsNumber: true })} 
-                      />
-                    </div>
-                    {watchedValues.success_rating && (
-                      <div className="flex items-center gap-2">
-                        {[...Array(10)].map((_, i) => (
-                          <Star 
-                            key={i} 
-                            className={`w-5 h-5 ${
-                              i < watchedValues.success_rating! 
-                                ? 'text-yellow-400 fill-yellow-400' 
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        ))}
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Cost variance:</span>
+                        <Badge variant={costVariance.percentage <= 0 ? 'default' : 'destructive'}>
+                          {costVariance.percentage > 0 ? '+' : ''}{costVariance.percentage.toFixed(1)}%
+                        </Badge>
                       </div>
-                    )}
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Profit variance:</span>
+                        <Badge variant={profitVariance.percentage >= 0 ? 'default' : 'destructive'}>
+                          {profitVariance.percentage > 0 ? '+' : ''}{profitVariance.percentage.toFixed(1)}%
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Attendance variance:</span>
+                        <Badge variant={attendanceVariance.percentage >= -5 ? 'default' : 'destructive'}>
+                          {attendanceVariance.percentage > 0 ? '+' : ''}{attendanceVariance.percentage.toFixed(1)}%
+                        </Badge>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        {/* Revenue Tab */}
-        <TabsContent value="revenue" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5" />
-                Actual Revenue Streams
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Primary Revenue</h3>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="actual_ticket_sales">
-                      Actual Ticket Sales
-                    </label>
-                    <Input 
-                      id="actual_ticket_sales" 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="0.00"
-                      {...form.register('actual_ticket_sales', { valueAsNumber: true })} 
+          <TabsContent value="revenue" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Actual Revenue Streams</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="actual_ticket_sales">Actual Ticket Sales</Label>
+                    <Input
+                      id="actual_ticket_sales"
+                      type="number"
+                      {...form.register('actual_ticket_sales', { 
+                        setValueAs: v => v === '' ? undefined : Number(v) 
+                      })}
+                      className="text-right"
                     />
                     {forecast?.forecast_ticket_sales && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Forecast: {formatCurrency(forecast.forecast_ticket_sales)}
+                      <p className="text-xs text-gray-500">
+                        Forecast: ${forecast.forecast_ticket_sales.toLocaleString()}
                       </p>
                     )}
                   </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="actual_fnb_revenue">
-                      Actual F&B Revenue
-                    </label>
-                    <Input 
-                      id="actual_fnb_revenue" 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="0.00"
-                      {...form.register('actual_fnb_revenue', { valueAsNumber: true })} 
+
+                  <div className="space-y-2">
+                    <Label htmlFor="actual_fnb_revenue">Actual F&B Revenue</Label>
+                    <Input
+                      id="actual_fnb_revenue"
+                      type="number"
+                      {...form.register('actual_fnb_revenue', { 
+                        setValueAs: v => v === '' ? undefined : Number(v) 
+                      })}
+                      className="text-right"
                     />
                     {forecast?.forecast_fnb_revenue && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Forecast: {formatCurrency(forecast.forecast_fnb_revenue)}
+                      <p className="text-xs text-gray-500">
+                        Forecast: ${forecast.forecast_fnb_revenue.toLocaleString()}
                       </p>
                     )}
                   </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="actual_fnb_cogs">
-                      Actual F&B COGS
-                    </label>
-                    <Input 
-                      id="actual_fnb_cogs" 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="0.00"
-                      {...form.register('actual_fnb_cogs', { valueAsNumber: true })} 
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="actual_merch_revenue">
-                      Actual Merchandise Revenue
-                    </label>
-                    <Input 
-                      id="actual_merch_revenue" 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="0.00"
-                      {...form.register('actual_merch_revenue', { valueAsNumber: true })} 
+
+                  <div className="space-y-2">
+                    <Label htmlFor="actual_merch_revenue">Actual Merchandise Revenue</Label>
+                    <Input
+                      id="actual_merch_revenue"
+                      type="number"
+                      {...form.register('actual_merch_revenue', { 
+                        setValueAs: v => v === '' ? undefined : Number(v) 
+                      })}
+                      className="text-right"
                     />
                     {forecast?.forecast_merch_revenue && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Forecast: {formatCurrency(forecast.forecast_merch_revenue)}
+                      <p className="text-xs text-gray-500">
+                        Forecast: ${forecast.forecast_merch_revenue.toLocaleString()}
                       </p>
                     )}
                   </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="actual_merch_cogs">
-                      Actual Merchandise COGS
-                    </label>
-                    <Input 
-                      id="actual_merch_cogs" 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="0.00"
-                      {...form.register('actual_merch_cogs', { valueAsNumber: true })} 
-                    />
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Additional Revenue</h3>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="actual_sponsorship_income">
-                      Actual Sponsorship Income
-                    </label>
-                    <Input 
-                      id="actual_sponsorship_income" 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="0.00"
-                      {...form.register('actual_sponsorship_income', { valueAsNumber: true })} 
+
+                  <div className="space-y-2">
+                    <Label htmlFor="actual_sponsorship_income">Actual Sponsorship Income</Label>
+                    <Input
+                      id="actual_sponsorship_income"
+                      type="number"
+                      {...form.register('actual_sponsorship_income', { 
+                        setValueAs: v => v === '' ? undefined : Number(v) 
+                      })}
+                      className="text-right"
                     />
                     {forecast?.forecast_sponsorship_income && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Forecast: {formatCurrency(forecast.forecast_sponsorship_income)}
+                      <p className="text-xs text-gray-500">
+                        Forecast: ${forecast.forecast_sponsorship_income.toLocaleString()}
                       </p>
                     )}
                   </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="actual_other_income">
-                      Other Actual Income
-                    </label>
-                    <Input 
-                      id="actual_other_income" 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="0.00"
-                      {...form.register('actual_other_income', { valueAsNumber: true })} 
+
+                  <div className="space-y-2">
+                    <Label htmlFor="actual_other_income">Actual Other Income</Label>
+                    <Input
+                      id="actual_other_income"
+                      type="number"
+                      {...form.register('actual_other_income', { 
+                        setValueAs: v => v === '' ? undefined : Number(v) 
+                      })}
+                      className="text-right"
                     />
-                    {forecast?.forecast_other_income && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Forecast: {formatCurrency(forecast.forecast_other_income)}
-                      </p>
+                  </div>
+
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-green-800">Total Actual Revenue</h4>
+                    <p className="text-2xl font-bold text-green-600">${totalActualRevenue.toLocaleString()}</p>
+                    {forecastRevenue > 0 && (
+                      <Badge variant={revenueVariance.percentage >= 0 ? 'default' : 'destructive'} className="mt-2">
+                        {revenueVariance.percentage > 0 ? '+' : ''}{revenueVariance.percentage.toFixed(1)}% vs forecast
+                      </Badge>
                     )}
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="revenue_variance_notes">Revenue Variance Notes</Label>
+                  <Textarea
+                    id="revenue_variance_notes"
+                    {...form.register('revenue_variance_notes')}
+                    placeholder="Explain any significant revenue variances from forecast..."
+                    rows={2}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="cogs" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Cost of Goods Sold (COGS) Tracking</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* F&B COGS */}
+                <div className="border rounded-lg p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">F&B COGS</h4>
+                    <Badge variant={fnbGrossMargin > 60 ? 'default' : fnbGrossMargin > 45 ? 'secondary' : 'destructive'}>
+                      {fnbGrossMargin.toFixed(1)}% gross margin
+                    </Badge>
+                  </div>
                   
-                  <div className="p-4 bg-green-50 rounded-lg">
-                    <h4 className="font-semibold text-green-800">Total Actual Revenue</h4>
-                    <div className="text-2xl font-bold text-green-600">
-                      {formatCurrency(totalActualRevenue)}
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={watchedValues.use_forecast_fnb_cogs_pct}
+                      onCheckedChange={(checked) => form.setValue('use_forecast_fnb_cogs_pct', checked)}
+                    />
+                    <Label>Use forecast percentage ({forecast?.forecast_fnb_cogs_pct || 30}%)</Label>
+                  </div>
+
+                  {watchedValues.use_forecast_fnb_cogs_pct ? (
+                    <div className="space-y-2">
+                      <div className="text-sm">
+                        <span className="text-gray-600">F&B Revenue: </span>
+                        <span className="font-medium">${(watchedValues.actual_fnb_revenue || 0).toLocaleString()}</span>
+                        <span className="text-gray-600 ml-4">COGS Percentage: </span>
+                        <span className="font-medium">{forecast?.forecast_fnb_cogs_pct || 30}%</span>
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-gray-600">Calculated COGS: </span>
+                        <span className="font-medium text-orange-600">${calculatedFnBCogs.toLocaleString()}</span>
+                      </div>
+                      {fnbCogsVariance.amount !== 0 && (
+                        <div className="text-sm">
+                          <span className="text-gray-600">Variance vs forecast: </span>
+                          <Badge variant={fnbCogsVariance.percentage <= 5 ? 'default' : 'destructive'}>
+                            {fnbCogsVariance.percentage > 0 ? '+' : ''}{fnbCogsVariance.percentage.toFixed(1)}%
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label>Manual F&B COGS</Label>
+                      <Input
+                        type="number"
+                        {...form.register('manual_fnb_cogs', { 
+                          setValueAs: v => v === '' ? undefined : Number(v) 
+                        })}
+                        className="text-right"
+                        placeholder="Enter actual F&B COGS"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Merchandise COGS */}
+                <div className="border rounded-lg p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Merchandise COGS</h4>
+                    <Badge variant={merchGrossMargin > 45 ? 'default' : merchGrossMargin > 30 ? 'secondary' : 'destructive'}>
+                      {merchGrossMargin.toFixed(1)}% gross margin
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={watchedValues.use_forecast_merch_cogs_pct}
+                      onCheckedChange={(checked) => form.setValue('use_forecast_merch_cogs_pct', checked)}
+                    />
+                    <Label>Use forecast percentage ({forecast?.forecast_merch_cogs_pct || 50}%)</Label>
+                  </div>
+
+                  {watchedValues.use_forecast_merch_cogs_pct ? (
+                    <div className="space-y-2">
+                      <div className="text-sm">
+                        <span className="text-gray-600">Merchandise Revenue: </span>
+                        <span className="font-medium">${(watchedValues.actual_merch_revenue || 0).toLocaleString()}</span>
+                        <span className="text-gray-600 ml-4">COGS Percentage: </span>
+                        <span className="font-medium">{forecast?.forecast_merch_cogs_pct || 50}%</span>
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-gray-600">Calculated COGS: </span>
+                        <span className="font-medium text-orange-600">${calculatedMerchCogs.toLocaleString()}</span>
+                      </div>
+                      {merchCogsVariance.amount !== 0 && (
+                        <div className="text-sm">
+                          <span className="text-gray-600">Variance vs forecast: </span>
+                          <Badge variant={merchCogsVariance.percentage <= 5 ? 'default' : 'destructive'}>
+                            {merchCogsVariance.percentage > 0 ? '+' : ''}{merchCogsVariance.percentage.toFixed(1)}%
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label>Manual Merchandise COGS</Label>
+                      <Input
+                        type="number"
+                        {...form.register('manual_merch_cogs', { 
+                          setValueAs: v => v === '' ? undefined : Number(v) 
+                        })}
+                        className="text-right"
+                        placeholder="Enter actual merchandise COGS"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* COGS Summary */}
+                <div className="bg-orange-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-orange-800 mb-2">Total COGS Summary</h4>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">F&B COGS:</span>
+                      <p className="font-medium">${calculatedFnBCogs.toLocaleString()}</p>
+                      <p className="text-xs text-gray-500">{fnbGrossMargin.toFixed(1)}% margin</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Merchandise COGS:</span>
+                      <p className="font-medium">${calculatedMerchCogs.toLocaleString()}</p>
+                      <p className="text-xs text-gray-500">{merchGrossMargin.toFixed(1)}% margin</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Total COGS:</span>
+                      <p className="font-bold text-orange-600">${(calculatedFnBCogs + calculatedMerchCogs).toLocaleString()}</p>
+                      <p className="text-xs text-gray-500">
+                        {totalActualRevenue > 0 ? ((calculatedFnBCogs + calculatedMerchCogs) / totalActualRevenue * 100).toFixed(1) : 0}% of revenue
+                      </p>
                     </div>
                   </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="revenue_variance_notes">
-                      Revenue Variance Notes
-                    </label>
-                    <Textarea 
-                      id="revenue_variance_notes" 
-                      placeholder="Explain any significant variances from forecast..."
-                      {...form.register('revenue_variance_notes')} 
-                    />
-                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        {/* Costs Tab */}
-        <TabsContent value="costs" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calculator className="w-5 h-5" />
-                Actual Costs Breakdown
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Operational Costs</h3>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="actual_staffing_costs">
-                      Actual Staffing Costs
-                    </label>
-                    <Input 
-                      id="actual_staffing_costs" 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="0.00"
-                      {...form.register('actual_staffing_costs', { valueAsNumber: true })} 
-                    />
-                    {forecast?.forecast_staffing_costs && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Forecast: {formatCurrency(forecast.forecast_staffing_costs)}
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="actual_venue_costs">
-                      Actual Venue & Setup Costs
-                    </label>
-                    <Input 
-                      id="actual_venue_costs" 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="0.00"
-                      {...form.register('actual_venue_costs', { valueAsNumber: true })} 
-                    />
-                    {forecast?.forecast_venue_costs && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Forecast: {formatCurrency(forecast.forecast_venue_costs)}
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="actual_vendor_costs">
-                      Actual External Vendor Costs
-                    </label>
-                    <Input 
-                      id="actual_vendor_costs" 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="0.00"
-                      {...form.register('actual_vendor_costs', { valueAsNumber: true })} 
-                    />
-                    {forecast?.forecast_vendor_costs && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Forecast: {formatCurrency(forecast.forecast_vendor_costs)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Additional Costs</h3>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="actual_marketing_costs">
-                      Actual Marketing Costs
-                    </label>
-                    <Input 
-                      id="actual_marketing_costs" 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="0.00"
-                      {...form.register('actual_marketing_costs', { valueAsNumber: true })} 
-                    />
-                    {forecast?.forecast_marketing_costs && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Forecast: {formatCurrency(forecast.forecast_marketing_costs)}
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="actual_production_costs">
-                      Actual Production Costs
-                    </label>
-                    <Input 
-                      id="actual_production_costs" 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="0.00"
-                      {...form.register('actual_production_costs', { valueAsNumber: true })} 
-                    />
-                    {forecast?.forecast_production_costs && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Forecast: {formatCurrency(forecast.forecast_production_costs)}
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="actual_other_costs">
-                      Other Actual Costs
-                    </label>
-                    <Input 
-                      id="actual_other_costs" 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="0.00"
-                      {...form.register('actual_other_costs', { valueAsNumber: true })} 
-                    />
-                  </div>
-                  
-                  <div className="p-4 bg-red-50 rounded-lg">
-                    <h4 className="font-semibold text-red-800">Total Actual Costs</h4>
-                    <div className="text-2xl font-bold text-red-600">
-                      {formatCurrency(totalActualCosts)}
+          <TabsContent value="costs" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Actual Cost Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Operational Costs</h4>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="actual_staffing_costs">Actual Staffing Costs</Label>
+                      <Input
+                        id="actual_staffing_costs"
+                        type="number"
+                        {...form.register('actual_staffing_costs', { 
+                          setValueAs: v => v === '' ? undefined : Number(v) 
+                        })}
+                        className="text-right"
+                      />
+                      {forecast?.forecast_staffing_costs && (
+                        <p className="text-xs text-gray-500">
+                          Forecast: ${forecast.forecast_staffing_costs.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="actual_venue_costs">Actual Venue & Setup Costs</Label>
+                      <Input
+                        id="actual_venue_costs"
+                        type="number"
+                        {...form.register('actual_venue_costs', { 
+                          setValueAs: v => v === '' ? undefined : Number(v) 
+                        })}
+                        className="text-right"
+                      />
+                      {forecast?.forecast_venue_costs && (
+                        <p className="text-xs text-gray-500">
+                          Forecast: ${forecast.forecast_venue_costs.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="actual_vendor_costs">Actual External Vendor Costs</Label>
+                      <Input
+                        id="actual_vendor_costs"
+                        type="number"
+                        {...form.register('actual_vendor_costs', { 
+                          setValueAs: v => v === '' ? undefined : Number(v) 
+                        })}
+                        className="text-right"
+                      />
+                      {forecast?.forecast_vendor_costs && (
+                        <p className="text-xs text-gray-500">
+                          Forecast: ${forecast.forecast_vendor_costs.toLocaleString()}
+                        </p>
+                      )}
                     </div>
                   </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="cost_variance_notes">
-                      Cost Variance Notes
-                    </label>
-                    <Textarea 
-                      id="cost_variance_notes" 
-                      placeholder="Explain any significant cost variances..."
-                      {...form.register('cost_variance_notes')} 
-                    />
+
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Additional Costs</h4>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="actual_marketing_costs">Actual Marketing Costs</Label>
+                      <Input
+                        id="actual_marketing_costs"
+                        type="number"
+                        {...form.register('actual_marketing_costs', { 
+                          setValueAs: v => v === '' ? undefined : Number(v) 
+                        })}
+                        className="text-right"
+                      />
+                      {forecast?.forecast_marketing_costs && (
+                        <p className="text-xs text-gray-500">
+                          Forecast: ${forecast.forecast_marketing_costs.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="actual_production_costs">Actual Production Costs</Label>
+                      <Input
+                        id="actual_production_costs"
+                        type="number"
+                        {...form.register('actual_production_costs', { 
+                          setValueAs: v => v === '' ? undefined : Number(v) 
+                        })}
+                        className="text-right"
+                      />
+                      {forecast?.forecast_production_costs && (
+                        <p className="text-xs text-gray-500">
+                          Forecast: ${forecast.forecast_production_costs.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="actual_other_costs">Actual Other Costs</Label>
+                      <Input
+                        id="actual_other_costs"
+                        type="number"
+                        {...form.register('actual_other_costs', { 
+                          setValueAs: v => v === '' ? undefined : Number(v) 
+                        })}
+                        className="text-right"
+                      />
+                      {forecast?.forecast_other_costs && (
+                        <p className="text-xs text-gray-500">
+                          Forecast: ${forecast.forecast_other_costs.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="bg-red-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-red-800">Total Actual Costs</h4>
+                      <p className="text-sm text-gray-600 mb-1">Including COGS</p>
+                      <p className="text-2xl font-bold text-red-600">${totalActualCosts.toLocaleString()}</p>
+                      {forecastCosts > 0 && (
+                        <Badge variant={costVariance.percentage <= 0 ? 'default' : 'destructive'} className="mt-2">
+                          {costVariance.percentage > 0 ? '+' : ''}{costVariance.percentage.toFixed(1)}% vs forecast
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        {/* Marketing Tab */}
-        <TabsContent value="marketing" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Megaphone className="w-5 h-5" />
-                Marketing Performance Analysis
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Channel Performance</h3>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="marketing_email_performance">
-                      Email Marketing Performance
-                    </label>
-                    <Textarea 
-                      id="marketing_email_performance" 
+                <div className="space-y-2">
+                  <Label htmlFor="cost_variance_notes">Cost Variance Notes</Label>
+                  <Textarea
+                    id="cost_variance_notes"
+                    {...form.register('cost_variance_notes')}
+                    placeholder="Explain any significant cost variances..."
+                    rows={2}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="marketing" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Marketing Performance</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Marketing ROI Summary */}
+                <div className="bg-blue-50 p-4 rounded-lg mb-4">
+                  <h4 className="font-medium text-blue-800 mb-2">Marketing Efficiency Summary</h4>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">Marketing ROI:</span>
+                      <p className={`text-xl font-bold ${marketingROI > 200 ? 'text-green-600' : marketingROI > 100 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {marketingROI.toFixed(0)}%
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Customer Acquisition Cost:</span>
+                      <p className="text-xl font-bold text-blue-600">${customerAcquisitionCost.toFixed(0)}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Marketing Cost per Attendee:</span>
+                      <p className="text-xl font-bold text-purple-600">
+                        ${watchedValues.actual_attendance > 0 ? ((watchedValues.actual_marketing_costs || 0) / watchedValues.actual_attendance).toFixed(0) : 0}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Marketing Channel Performance */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="marketing_email_performance">Email Marketing Performance</Label>
+                    <Textarea
+                      id="marketing_email_performance"
+                      {...form.register('marketing_email_performance')}
                       placeholder="Open rates, click rates, conversions..."
-                      {...form.register('marketing_email_performance')} 
+                      rows={2}
                     />
                   </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="marketing_social_performance">
-                      Social Media Performance
-                    </label>
-                    <Textarea 
-                      id="marketing_social_performance" 
-                      placeholder="Reach, engagement, shares, comments..."
-                      {...form.register('marketing_social_performance')} 
+
+                  <div className="space-y-2">
+                    <Label htmlFor="marketing_social_performance">Social Media Performance</Label>
+                    <Textarea
+                      id="marketing_social_performance"
+                      {...form.register('marketing_social_performance')}
+                      placeholder="Reach, engagement, conversions..."
+                      rows={2}
                     />
                   </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="marketing_paid_ads_performance">
-                      Paid Advertising Performance
-                    </label>
-                    <Textarea 
-                      id="marketing_paid_ads_performance" 
+
+                  <div className="space-y-2">
+                    <Label htmlFor="marketing_influencer_performance">Influencer Marketing Performance</Label>
+                    <Textarea
+                      id="marketing_influencer_performance"
+                      {...form.register('marketing_influencer_performance')}
+                      placeholder="Reach, engagement, attributed sales..."
+                      rows={2}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="marketing_paid_ads_performance">Paid Advertising Performance</Label>
+                    <Textarea
+                      id="marketing_paid_ads_performance"
+                      {...form.register('marketing_paid_ads_performance')}
                       placeholder="CTR, CPC, conversions, ROAS..."
-                      {...form.register('marketing_paid_ads_performance')} 
+                      rows={2}
                     />
                   </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="marketing_influencer_performance">
-                      Influencer Campaign Performance
-                    </label>
-                    <Textarea 
-                      id="marketing_influencer_performance" 
-                      placeholder="Reach, engagement, attribution..."
-                      {...form.register('marketing_influencer_performance')} 
-                    />
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Content & ROI Analysis</h3>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="marketing_content_performance">
-                      Content Performance
-                    </label>
-                    <Textarea 
-                      id="marketing_content_performance" 
-                      placeholder="Video views, photo engagement, content virality..."
-                      {...form.register('marketing_content_performance')} 
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="social_media_engagement">
-                      Social Media Engagement Summary
-                    </label>
-                    <Textarea 
-                      id="social_media_engagement" 
-                      placeholder="Overall social media metrics and highlights..."
-                      {...form.register('social_media_engagement')} 
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="press_coverage">
-                      Press & Media Coverage
-                    </label>
-                    <Textarea 
-                      id="press_coverage" 
-                      placeholder="Media mentions, coverage value, key stories..."
-                      {...form.register('press_coverage')} 
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="marketing_roi_notes">
-                      Marketing ROI & Attribution Notes
-                    </label>
-                    <Textarea 
-                      id="marketing_roi_notes" 
-                      rows={4}
-                      placeholder="Overall marketing effectiveness, attribution analysis, recommendations..."
-                      {...form.register('marketing_roi_notes')} 
-                    />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        {/* Success Tab */}
-        <TabsContent value="success" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="w-5 h-5" />
-                Success Metrics & Analysis
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Event Metrics</h3>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="actual_attendance">
-                      Actual Attendance
-                    </label>
-                    <Input 
-                      id="actual_attendance" 
-                      type="number" 
-                      step="1" 
-                      min="0"
-                      placeholder="0"
-                      {...form.register('actual_attendance', { valueAsNumber: true })} 
+                  <div className="space-y-2">
+                    <Label htmlFor="marketing_content_performance">Content Performance</Label>
+                    <Textarea
+                      id="marketing_content_performance"
+                      {...form.register('marketing_content_performance')}
+                      placeholder="Views, shares, engagement..."
+                      rows={2}
                     />
                   </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="attendance_breakdown">
-                      Attendance Breakdown
-                    </label>
-                    <Textarea 
-                      id="attendance_breakdown" 
-                      placeholder="Demographics, ticket types, VIP vs general admission..."
-                      {...form.register('attendance_breakdown')} 
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="average_ticket_price">
-                      Average Ticket Price Achieved
-                    </label>
-                    <Input 
-                      id="average_ticket_price" 
-                      type="number" 
-                      step="0.01" 
-                      min="0"
-                      placeholder="0.00"
-                      {...form.register('average_ticket_price', { valueAsNumber: true })} 
+
+                  <div className="space-y-2">
+                    <Label htmlFor="marketing_roi_notes">Marketing ROI Notes</Label>
+                    <Textarea
+                      id="marketing_roi_notes"
+                      {...form.register('marketing_roi_notes')}
+                      placeholder="Overall marketing insights and learnings..."
+                      rows={2}
                     />
                   </div>
                 </div>
-                
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Success Evaluation</h3>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="event_success_indicators">
-                      Event Success Indicators
-                    </label>
-                    <Textarea 
-                      id="event_success_indicators" 
-                      rows={4}
-                      placeholder="What made this event successful? Key achievements, milestones hit..."
-                      {...form.register('event_success_indicators')} 
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="analysis" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Post-Event Analysis</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Performance Indicators */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="text-center p-4 border rounded-lg">
+                    <h4 className="font-medium text-sm text-gray-600">Revenue vs Forecast</h4>
+                    <p className={`text-2xl font-bold ${revenueVariance.percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {revenueVariance.percentage > 0 ? '+' : ''}{revenueVariance.percentage.toFixed(1)}%
+                    </p>
+                    <Progress 
+                      value={Math.min(Math.abs(revenueVariance.percentage), 100)} 
+                      className="mt-2"
                     />
                   </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="brand_impact_assessment">
-                      Brand Impact Assessment
-                    </label>
-                    <Textarea 
-                      id="brand_impact_assessment" 
-                      rows={4}
-                      placeholder="How did this event impact the brand? Reputation, awareness, community..."
-                      {...form.register('brand_impact_assessment')} 
+
+                  <div className="text-center p-4 border rounded-lg">
+                    <h4 className="font-medium text-sm text-gray-600">Profit Margin</h4>
+                    <p className={`text-2xl font-bold ${actualProfitMargin >= 20 ? 'text-green-600' : actualProfitMargin >= 10 ? 'text-yellow-600' : 'text-red-600'}`}>
+                      {actualProfitMargin.toFixed(1)}%
+                    </p>
+                    <Progress 
+                      value={Math.min(actualProfitMargin, 100)} 
+                      className="mt-2"
+                    />
+                  </div>
+
+                  <div className="text-center p-4 border rounded-lg">
+                    <h4 className="font-medium text-sm text-gray-600">Marketing ROI</h4>
+                    <p className={`text-2xl font-bold ${marketingROI >= 200 ? 'text-green-600' : marketingROI >= 100 ? 'text-yellow-600' : 'text-red-600'}`}>
+                      {marketingROI.toFixed(0)}%
+                    </p>
+                    <Progress 
+                      value={Math.min(marketingROI / 4, 100)} 
+                      className="mt-2"
                     />
                   </div>
                 </div>
-              </div>
-              
-              <Separator />
-              
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Challenges & Learnings</h3>
-                
+
+                {/* Success Factors and Learnings */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="challenges_faced">
-                      Challenges Faced
-                    </label>
-                    <Textarea 
-                      id="challenges_faced" 
-                      rows={4}
-                      placeholder="What challenges arose during planning or execution?"
-                      {...form.register('challenges_faced')} 
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="lessons_learned">
-                      Lessons Learned
-                    </label>
-                    <Textarea 
-                      id="lessons_learned" 
-                      rows={4}
-                      placeholder="Key takeaways and insights for future events"
-                      {...form.register('lessons_learned')} 
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="text-sm font-medium" htmlFor="recommendations_future">
-                    Recommendations for Future Events
-                  </label>
-                  <Textarea 
-                    id="recommendations_future" 
-                    rows={4}
-                    placeholder="Specific recommendations and improvements for future special events"
-                    {...form.register('recommendations_future')} 
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="key_success_factors">Key Success Factors</Label>
+                      <Textarea
+                        id="key_success_factors"
+                        {...form.register('key_success_factors')}
+                        placeholder="What went well? What drove success?"
+                        rows={3}
+                      />
+                    </div>
 
-        {/* Feedback Tab */}
-        <TabsContent value="feedback" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5" />
-                Feedback & Post-Event Analysis
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Stakeholder Feedback</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="customer_feedback_summary">
-                      Customer Feedback Summary
-                    </label>
-                    <Textarea 
-                      id="customer_feedback_summary" 
-                      rows={5}
-                      placeholder="Summary of attendee feedback, reviews, surveys..."
-                      {...form.register('customer_feedback_summary')} 
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="team_feedback">
-                      Team Feedback
-                    </label>
-                    <Textarea 
-                      id="team_feedback" 
-                      rows={5}
-                      placeholder="Feedback from staff, volunteers, internal team..."
-                      {...form.register('team_feedback')} 
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="text-sm font-medium" htmlFor="vendor_feedback">
-                    Vendor & Partner Feedback
-                  </label>
-                  <Textarea 
-                    id="vendor_feedback" 
-                    rows={4}
-                    placeholder="Feedback from vendors, sponsors, external partners..."
-                    {...form.register('vendor_feedback')} 
-                  />
-                </div>
-              </div>
-              
-              <Separator />
-              
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Final Notes</h3>
-                <div>
-                  <label className="text-sm font-medium" htmlFor="general_notes">
-                    General Post-Event Notes
-                  </label>
-                  <Textarea 
-                    id="general_notes" 
-                    rows={6}
-                    placeholder="Any additional observations, thoughts, or notes about the event..."
-                    {...form.register('general_notes')} 
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                    <div className="space-y-2">
+                      <Label htmlFor="lessons_learned">Lessons Learned</Label>
+                      <Textarea
+                        id="lessons_learned"
+                        {...form.register('lessons_learned')}
+                        placeholder="Key insights and takeaways..."
+                        rows={3}
+                      />
+                    </div>
 
-      {/* Action Buttons */}
-      <div className="flex justify-end gap-4 pt-6">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => navigate(`/projects/${projectId}`)}
-        >
-          Cancel
-        </Button>
-        <Button 
-          type="submit" 
-          disabled={createActual.isPending || updateActual.isPending || isSubmitting}
-          className="bg-fortress-emerald hover:bg-fortress-emerald/90"
-        >
-          {createActual.isPending || updateActual.isPending || isSubmitting
-            ? 'Saving...' 
-            : existing 
-              ? 'Update Actuals' 
-              : 'Submit Actuals'
-          }
-        </Button>
-      </div>
-    </form>
+                    <div className="space-y-2">
+                      <Label htmlFor="recommendations_future">Recommendations for Future Events</Label>
+                      <Textarea
+                        id="recommendations_future"
+                        {...form.register('recommendations_future')}
+                        placeholder="What would you do differently next time?"
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="challenges_faced">Challenges Faced</Label>
+                      <Textarea
+                        id="challenges_faced"
+                        {...form.register('challenges_faced')}
+                        placeholder="What obstacles or issues arose?"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="customer_feedback_summary">Customer Feedback Summary</Label>
+                      <Textarea
+                        id="customer_feedback_summary"
+                        {...form.register('customer_feedback_summary')}
+                        placeholder="Key themes from customer feedback..."
+                        rows={3}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="team_feedback">Team Feedback</Label>
+                      <Textarea
+                        id="team_feedback"
+                        {...form.register('team_feedback')}
+                        placeholder="Feedback from staff and team members..."
+                        rows={2}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="vendor_feedback">Vendor Feedback</Label>
+                      <Textarea
+                        id="vendor_feedback"
+                        {...form.register('vendor_feedback')}
+                        placeholder="Feedback from vendors and partners..."
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Performance Insights */}
+                <Alert>
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Performance Insights:</strong>
+                    <ul className="mt-2 space-y-1 list-disc list-inside text-sm">
+                      {actualProfitMargin > 25 && <li>Excellent profit margin indicates strong pricing strategy and cost control</li>}
+                      {revenueVariance.percentage > 10 && <li>Revenue significantly exceeded forecast - consider scaling successful strategies</li>}
+                      {marketingROI > 300 && <li>Outstanding marketing ROI - current channels are highly effective</li>}
+                      {fnbGrossMargin > 65 && <li>Strong F&B margins suggest good supplier management</li>}
+                      {merchGrossMargin > 50 && <li>Healthy merchandise margins indicate good product mix</li>}
+                      {customerAcquisitionCost < 20 && <li>Low customer acquisition cost indicates efficient marketing</li>}
+                      {profitPerAttendee > 50 && <li>Strong per-attendee profitability suggests good event economics</li>}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+
+                <div className="space-y-2">
+                  <Label htmlFor="general_notes">General Notes</Label>
+                  <Textarea
+                    id="general_notes"
+                    {...form.register('general_notes')}
+                    placeholder="Any additional notes or observations..."
+                    rows={3}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        <div className="flex justify-between items-center">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate(-1)}
+          >
+            Cancel
+          </Button>
+          
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="min-w-32"
+          >
+            {isSubmitting ? 'Saving...' : existing ? 'Update Actuals' : 'Submit Actuals'}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 };
-
-export default SpecialEventActualForm;

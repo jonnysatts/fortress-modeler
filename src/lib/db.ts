@@ -32,17 +32,26 @@ export interface Project {
   event_end_date?: Date;
 }
 
+// Enhanced Special Event Forecast with COGS standardization
 export interface SpecialEventForecast {
   id: string;
   project_id: string;
-  // Revenue streams
+  
+  // Revenue streams with COGS support
   forecast_ticket_sales?: number;
   forecast_fnb_revenue?: number;
-  forecast_fnb_cogs_pct?: number;
+  forecast_fnb_cogs_pct?: number;      // NEW: F&B COGS percentage (default 30%)
+  use_automatic_fnb_cogs?: boolean;    // NEW: Toggle for automatic F&B COGS calculation
+  calculated_fnb_cogs?: number;        // NEW: Calculated F&B COGS amount
+  
   forecast_merch_revenue?: number;
-  forecast_merch_cogs_pct?: number;
+  forecast_merch_cogs_pct?: number;    // NEW: Merchandise COGS percentage (default 50%)
+  use_automatic_merch_cogs?: boolean;  // NEW: Toggle for automatic Merchandise COGS calculation
+  calculated_merch_cogs?: number;      // NEW: Calculated Merchandise COGS amount
+  
   forecast_sponsorship_income?: number;
   forecast_other_income?: number;
+  
   // Cost breakdown
   forecast_staffing_costs?: number;
   forecast_venue_costs?: number;
@@ -50,35 +59,49 @@ export interface SpecialEventForecast {
   forecast_marketing_costs?: number;
   forecast_production_costs?: number;
   forecast_other_costs?: number;
-  // Marketing details
+  
+  // Enhanced marketing details
   marketing_email_budget?: number;
   marketing_social_budget?: number;
   marketing_influencer_budget?: number;
   marketing_paid_ads_budget?: number;
   marketing_content_budget?: number;
   marketing_strategy?: string;
+  
   // Event details
   estimated_attendance?: number;
   ticket_price?: number;
+  
   // Notes
   revenue_notes?: string;
   cost_notes?: string;
   marketing_notes?: string;
   general_notes?: string;
+  
   created_at: Date;
+  updated_at?: Date;
 }
 
+// Enhanced Special Event Actual with comprehensive tracking
 export interface SpecialEventActual {
   id: string;
   project_id: string;
-  // Actual revenue streams
+  
+  // Actual revenue streams with COGS tracking
   actual_ticket_sales?: number;
   actual_fnb_revenue?: number;
-  actual_fnb_cogs?: number;
+  actual_fnb_cogs?: number;             // Actual F&B COGS amount
+  use_forecast_fnb_cogs_pct?: boolean;  // NEW: Use forecast COGS percentage or manual override
+  calculated_fnb_cogs?: number;         // NEW: Calculated F&B COGS using forecast percentage
+  
   actual_merch_revenue?: number;
-  actual_merch_cogs?: number;
+  actual_merch_cogs?: number;           // Actual Merchandise COGS amount
+  use_forecast_merch_cogs_pct?: boolean; // NEW: Use forecast COGS percentage or manual override
+  calculated_merch_cogs?: number;       // NEW: Calculated Merchandise COGS using forecast percentage
+  
   actual_sponsorship_income?: number;
   actual_other_income?: number;
+  
   // Actual cost breakdown
   actual_staffing_costs?: number;
   actual_venue_costs?: number;
@@ -86,36 +109,49 @@ export interface SpecialEventActual {
   actual_marketing_costs?: number;
   actual_production_costs?: number;
   actual_other_costs?: number;
-  // Marketing performance
+  
+  // Enhanced metrics
+  actual_attendance?: number;
+  revenue_per_attendee?: number;        // NEW: Calculated revenue per attendee
+  cost_per_attendee?: number;           // NEW: Calculated cost per attendee  
+  marketing_roi?: number;               // NEW: Marketing return on investment percentage
+  
+  // Marketing performance tracking
   marketing_email_performance?: string;
   marketing_social_performance?: string;
   marketing_influencer_performance?: string;
   marketing_paid_ads_performance?: string;
   marketing_content_performance?: string;
   marketing_roi_notes?: string;
+  
   // Event metrics
-  actual_attendance?: number;
   attendance_breakdown?: string;
   average_ticket_price?: number;
+  
   // Success indicators
   success_rating?: number;
   event_success_indicators?: string;
   challenges_faced?: string;
   lessons_learned?: string;
   recommendations_future?: string;
+  
   // Post-event analysis
   customer_feedback_summary?: string;
   team_feedback?: string;
   vendor_feedback?: string;
+  
   // Additional metrics
   social_media_engagement?: string;
   press_coverage?: string;
   brand_impact_assessment?: string;
-  // Notes
+  
+  // Variance analysis notes
   revenue_variance_notes?: string;
   cost_variance_notes?: string;
   general_notes?: string;
+  
   created_at: Date;
+  updated_at?: Date;
 }
 
 export interface SpecialEventMilestone {
@@ -342,6 +378,7 @@ export class FortressDB extends Dexie {
       specialEventMilestones: '&id, project_id'
     });
 
+    // Version 9: Enhanced Special Events with COGS standardization
     this.version(9).stores({
       projects: '&id, name, productType, createdAt, updatedAt, event_type, event_date, event_end_date',
       financialModels: '&id, projectId, name, createdAt, updatedAt',
@@ -349,9 +386,76 @@ export class FortressDB extends Dexie {
       risks: '&id, projectId, type, likelihood, impact, status',
       scenarios: '&id, projectId, modelId, name, createdAt',
       actuals: '&id, &[projectId+period], projectId, period',
-      specialEventForecasts: '&id, project_id',
-      specialEventActuals: '&id, project_id',
+      specialEventForecasts: '&id, project_id, use_automatic_fnb_cogs, use_automatic_merch_cogs',
+      specialEventActuals: '&id, project_id, use_forecast_fnb_cogs_pct, use_forecast_merch_cogs_pct',
       specialEventMilestones: '&id, project_id'
+    });
+
+    // Version 10: COGS Enhancement - Add COGS standardization fields
+    this.version(10).stores({
+      projects: '&id, name, productType, createdAt, updatedAt, event_type, event_date, event_end_date',
+      financialModels: '&id, projectId, name, createdAt, updatedAt',
+      actualPerformance: '&id, projectId, date',
+      risks: '&id, projectId, type, likelihood, impact, status',
+      scenarios: '&id, projectId, modelId, name, createdAt',
+      actuals: '&id, &[projectId+period], projectId, period',
+      specialEventForecasts: '&id, project_id, use_automatic_fnb_cogs, use_automatic_merch_cogs, forecast_fnb_cogs_pct, forecast_merch_cogs_pct',
+      specialEventActuals: '&id, project_id, use_forecast_fnb_cogs_pct, use_forecast_merch_cogs_pct, revenue_per_attendee, cost_per_attendee, marketing_roi',
+      specialEventMilestones: '&id, project_id'
+    }).upgrade(async tx => {
+      console.log('🔧 Upgrading to version 10: Adding COGS standardization fields');
+      
+      try {
+        // Update existing forecasts with default COGS settings
+        const forecasts = await tx.table('specialEventForecasts').toArray();
+        for (const forecast of forecasts) {
+          await tx.table('specialEventForecasts').update(forecast.id, {
+            use_automatic_fnb_cogs: true,
+            forecast_fnb_cogs_pct: 30.00,
+            use_automatic_merch_cogs: true,
+            forecast_merch_cogs_pct: 50.00,
+            updated_at: new Date()
+          });
+        }
+        
+        // Update existing actuals with default COGS tracking settings
+        const actuals = await tx.table('specialEventActuals').toArray();
+        for (const actual of actuals) {
+          // Calculate enhanced metrics if we have the data
+          const revenuePerAttendee = actual.actual_attendance && actual.actual_attendance > 0 
+            ? ((actual.actual_ticket_sales || 0) + (actual.actual_fnb_revenue || 0) + 
+               (actual.actual_merch_revenue || 0) + (actual.actual_sponsorship_income || 0)) / actual.actual_attendance
+            : undefined;
+            
+          const totalCosts = (actual.actual_staffing_costs || 0) + (actual.actual_venue_costs || 0) + 
+                            (actual.actual_vendor_costs || 0) + (actual.actual_marketing_costs || 0) + 
+                            (actual.actual_production_costs || 0) + (actual.actual_other_costs || 0);
+                            
+          const costPerAttendee = actual.actual_attendance && actual.actual_attendance > 0 
+            ? totalCosts / actual.actual_attendance
+            : undefined;
+            
+          const marketingROI = actual.actual_marketing_costs && actual.actual_marketing_costs > 0
+            ? (((actual.actual_ticket_sales || 0) + (actual.actual_fnb_revenue || 0) + 
+                (actual.actual_merch_revenue || 0) + (actual.actual_sponsorship_income || 0)) - totalCosts) 
+              / actual.actual_marketing_costs * 100
+            : undefined;
+          
+          await tx.table('specialEventActuals').update(actual.id, {
+            use_forecast_fnb_cogs_pct: true,
+            use_forecast_merch_cogs_pct: true,
+            revenue_per_attendee: revenuePerAttendee,
+            cost_per_attendee: costPerAttendee,
+            marketing_roi: marketingROI,
+            updated_at: new Date()
+          });
+        }
+        
+        console.log('✅ Successfully added COGS standardization features');
+      } catch (error) {
+        console.error('❌ COGS enhancement migration failed:', error);
+        throw error;
+      }
     });
 
     this.version(4).stores({
@@ -535,6 +639,99 @@ export const upsertActualsPeriod = async (actualEntry: Omit<ActualsPeriodEntry, 
     const id = crypto.randomUUID();
     await db.actuals.add({ ...actualEntry, id, projectId: searchId } as ActualsPeriodEntry);
     return id;
+  }
+};
+
+// Enhanced Special Event operations with COGS support
+export const getSpecialEventForecasts = async (projectId: string): Promise<SpecialEventForecast[]> => {
+  try {
+    const project = await getProject(projectId);
+    const searchId = project?.id ?? projectId;
+    return await db.specialEventForecasts.where('project_id').equals(searchId).toArray();
+  } catch (error) {
+    logError(error, 'getSpecialEventForecasts');
+    throw new DatabaseError(`Failed to get special event forecasts for project ${projectId}`, error);
+  }
+};
+
+export const createSpecialEventForecast = async (forecast: Omit<SpecialEventForecast, 'id' | 'created_at'>): Promise<string> => {
+  try {
+    const id = crypto.randomUUID();
+    const timestamp = new Date();
+    
+    // Set default COGS values if not provided
+    const forecastWithDefaults = {
+      ...forecast,
+      id,
+      created_at: timestamp,
+      use_automatic_fnb_cogs: forecast.use_automatic_fnb_cogs ?? true,
+      forecast_fnb_cogs_pct: forecast.forecast_fnb_cogs_pct ?? 30,
+      use_automatic_merch_cogs: forecast.use_automatic_merch_cogs ?? true,
+      forecast_merch_cogs_pct: forecast.forecast_merch_cogs_pct ?? 50,
+    };
+    
+    await db.specialEventForecasts.add(forecastWithDefaults);
+    return id;
+  } catch (error) {
+    logError(error, 'createSpecialEventForecast');
+    throw new DatabaseError('Failed to create special event forecast', error);
+  }
+};
+
+export const updateSpecialEventForecast = async (id: string, updates: Partial<SpecialEventForecast>): Promise<void> => {
+  try {
+    await db.specialEventForecasts.update(id, { 
+      ...updates, 
+      updated_at: new Date() 
+    });
+  } catch (error) {
+    logError(error, 'updateSpecialEventForecast');
+    throw new DatabaseError(`Failed to update special event forecast ${id}`, error);
+  }
+};
+
+export const getSpecialEventActuals = async (projectId: string): Promise<SpecialEventActual[]> => {
+  try {
+    const project = await getProject(projectId);
+    const searchId = project?.id ?? projectId;
+    return await db.specialEventActuals.where('project_id').equals(searchId).toArray();
+  } catch (error) {
+    logError(error, 'getSpecialEventActuals');
+    throw new DatabaseError(`Failed to get special event actuals for project ${projectId}`, error);
+  }
+};
+
+export const createSpecialEventActual = async (actual: Omit<SpecialEventActual, 'id' | 'created_at'>): Promise<string> => {
+  try {
+    const id = crypto.randomUUID();
+    const timestamp = new Date();
+    
+    // Set default COGS tracking values if not provided
+    const actualWithDefaults = {
+      ...actual,
+      id,
+      created_at: timestamp,
+      use_forecast_fnb_cogs_pct: actual.use_forecast_fnb_cogs_pct ?? true,
+      use_forecast_merch_cogs_pct: actual.use_forecast_merch_cogs_pct ?? true,
+    };
+    
+    await db.specialEventActuals.add(actualWithDefaults);
+    return id;
+  } catch (error) {
+    logError(error, 'createSpecialEventActual');
+    throw new DatabaseError('Failed to create special event actual', error);
+  }
+};
+
+export const updateSpecialEventActual = async (id: string, updates: Partial<SpecialEventActual>): Promise<void> => {
+  try {
+    await db.specialEventActuals.update(id, { 
+      ...updates, 
+      updated_at: new Date() 
+    });
+  } catch (error) {
+    logError(error, 'updateSpecialEventActual');
+    throw new DatabaseError(`Failed to update special event actual ${id}`, error);
   }
 };
 
