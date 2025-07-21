@@ -872,3 +872,4 @@ export const SpecialEventForecastForm: React.FC<SpecialEventForecastFormProps> =
     </div>
   );
 };
+export default SpecialEventForecastForm;
