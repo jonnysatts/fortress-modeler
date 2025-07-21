@@ -225,15 +225,15 @@ export const SpecialEventForecastForm: React.FC<SpecialEventForecastFormProps> =
       };
 
       if (existing) {
-        await updateForecast.mutateAsync({
-          forecastId: existing.id,
-          data: submitData,
+        await updateForecast.mutateAsync({ 
+          id: existing.id, 
+          data: submitData 
         });
         toast.success('Forecast updated successfully');
       } else {
         await createForecast.mutateAsync({
-          projectId,
-          data: submitData,
+          project_id: projectId,
+          ...submitData,
         });
         toast.success('Forecast created successfully');
       }
