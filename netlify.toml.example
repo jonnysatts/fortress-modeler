@@ -1,0 +1,18 @@
+[build]
+  publish = "dist"
+  command = "npm run build"
+
+# Environment variables are configured in Netlify UI
+# Go to Site settings → Build & deploy → Environment variables
+# 
+# Required variables:
+# - VITE_API_URL
+# - VITE_GOOGLE_CLIENT_ID  
+# - VITE_SUPABASE_URL
+# - VITE_SUPABASE_ANON_KEY
+# - VITE_USE_SUPABASE_BACKEND
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
