@@ -37,6 +37,9 @@ server/.env.bak
 # Files with embedded credentials
 netlify.toml
 
+# Rich Text Format files (prefer Markdown)
+*.rtf
+
 # Deployment files containing secrets
 # server/cloudbuild.yaml
 deploy-frontend.md

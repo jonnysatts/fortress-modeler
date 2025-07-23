@@ -11,9 +11,16 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-PROJECT_ID="yield-dashboard"
-SERVICE_NAME="fortress-modeler-backend"
-REGION="australia-southeast2"
+# Configuration - can be overridden by environment variables
+PROJECT_ID="${GCP_PROJECT_ID:-yield-dashboard}"
+SERVICE_NAME="${SERVICE_NAME:-fortress-modeler-backend}"
+REGION="${GCP_REGION:-australia-southeast2}"
+
+# Validate required configuration
+if [ -z "$PROJECT_ID" ]; then
+    echo -e "${RED}❌ PROJECT_ID not set. Use GCP_PROJECT_ID environment variable or set in script${NC}"
+    exit 1
+fi
 
 # Check if gcloud is installed
 if ! command -v gcloud &> /dev/null; then
