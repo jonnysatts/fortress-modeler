@@ -26,10 +26,19 @@ dist-ssr
 # Environment files - NEVER commit these
 .env
 .env.*
+.env.production
+.env.staging
+.env.local
 server/.env
 server/.env.*
 server/.env.production
 server/.env.bak
+
+# Files with embedded credentials
+netlify.toml
+
+# Rich Text Format files (prefer Markdown)
+*.rtf
 
 # Deployment files containing secrets
 # server/cloudbuild.yaml
