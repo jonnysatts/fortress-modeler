@@ -41,3 +41,6 @@ OAUTH_DEBUGGING.md
 temp-files/
 *.tmp
 *.temp
+
+# RTF files (can cause terminal display issues)
+*.rtf
