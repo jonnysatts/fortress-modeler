@@ -6,7 +6,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "main": "electron/main.js",
+  "main": "index.js",
   "scripts": {
     "predev": "npx tsx scripts/check-deps.ts",
     "prebuild": "npx tsx scripts/check-deps.ts",

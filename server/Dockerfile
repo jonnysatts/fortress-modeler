@@ -49,5 +49,9 @@ USER nodejs
 # Expose the application port
 EXPOSE 8080
 
+# Health check for Cloud Run
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
 # Set the entrypoint to the startup script
 ENTRYPOINT ["./startup.sh"]

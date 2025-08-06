@@ -7,7 +7,7 @@
  */
 
 export const appConfig = {
-  // Supabase Configuration
+  // Supabase Configuration - Using the correct active project
   supabase: {
     url: 'https://issmshemlkrucmxcvibs.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlzc21zaGVtbGtydWNteGN2aWJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIxMzM1MzAsImV4cCI6MjA2NzcwOTUzMH0.xhxwSFCNSsG4Q1xta4L_uLKlnSHZfp7N3wXW0E3fOdg'
