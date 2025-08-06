@@ -53,3 +53,20 @@ temp-files/
 
 # RTF files (can cause terminal display issues)
 *.rtf
+
+# CRITICAL - Never commit these
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.cert
+secrets/
+credentials/
+
+# Config files with potential secrets
+netlify.toml
+vercel.json
+app.config.ts
+src/config/*.ts
+!src/config/*.example.ts
