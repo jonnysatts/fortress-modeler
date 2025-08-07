@@ -32,7 +32,7 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
       persistSession: true,
       detectSessionInUrl: true,
       storage: window.localStorage,
-      storageKey: 'sb-jjearfzmvmpohbebcnju-auth-token',
+      storageKey: 'sb-issmshemlkrucmxcvibs-auth-token',
     },
     realtime: {
       params: {
@@ -46,8 +46,8 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
 export const auth = {
   // Sign in with Google OAuth
   async signInWithGoogle() {
-    // Use /login as the redirect URL for better UX
-    const redirectUrl = `${window.location.origin}/login`;
+    // Use /auth/callback as the redirect URL for OAuth flow
+    const redirectUrl = `${window.location.origin}/auth/callback`;
     console.log('🚀 signInWithGoogle called:', {
       provider: 'google',
       redirectTo: redirectUrl,

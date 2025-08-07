@@ -71,10 +71,10 @@ export class SupabaseStorageService implements IStorageService {
         email: user.email
       });
 
-      // Use the new RLS-safe function instead of direct table query
+      // Use the RPC function which now exists
       console.log('🔍 [SupabaseStorageService] Calling get_user_projects() function...');
       const { data, error } = await supabase
-        .rpc('get_user_projects' as any) as { data: GetUserProjectsResult[] | null, error: any };
+        .rpc('get_user_projects');
 
       console.log('🔍 [SupabaseStorageService] Project fetch result:', {
         dataCount: data?.length || 0,
@@ -96,10 +96,8 @@ export class SupabaseStorageService implements IStorageService {
       }
 
       const projects = (data || []).map((project) => {
-        // The get_user_projects function returns project_id instead of id
-        // Map it back to id for consistent interface
-        const mappedProject = { ...project, id: project.project_id };
-        return this.mapSupabaseProjectToProject(mappedProject);
+        // RPC function returns the project directly
+        return this.mapSupabaseProjectToProject(project);
       });
       console.log('✅ [SupabaseStorageService] Successfully mapped projects:', projects.length);
       return projects;
@@ -1370,21 +1368,43 @@ export class SupabaseStorageService implements IStorageService {
         return [];
       }
 
-      // Use the new get_shared_projects() function to avoid RLS issues
+      // Query project_shares table directly instead of using missing RPC function
       const { data, error } = await supabase
-        .rpc('get_shared_projects' as any) as { data: any[] | null, error: any };
+        .from('project_shares')
+        .select(`
+          project_id,
+          permission,
+          projects!inner (
+            id,
+            name,
+            description,
+            product_type,
+            target_audience,
+            created_at,
+            updated_at,
+            timeline,
+            avatar_image,
+            is_public,
+            owner_email,
+            share_count,
+            event_type,
+            event_date,
+            event_end_date
+          )
+        `)
+        .eq('user_email', user.email)
+        .is('projects.deleted_at', null)
+        .order('projects.updated_at', { ascending: false });
 
       if (error) {
         console.error('❌ [SupabaseStorageService] Shared projects fetch error:', error);
-        throw handleSupabaseError(error);
+        // Don't throw, just return empty array for now
+        return [];
       }
 
-      const projects = (data || []).map((project) => {
-        const mappedProject = this.mapSupabaseProjectToProject(project);
-        // Add permission from the function result
-        if (project.permission) {
-          mappedProject.permission = project.permission as 'owner' | 'view' | 'edit';
-        }
+      const projects = (data || []).map((share: any) => {
+        const mappedProject = this.mapSupabaseProjectToProject(share.projects);
+        mappedProject.permission = share.permission as 'owner' | 'view' | 'edit';
         return mappedProject;
       });
       
