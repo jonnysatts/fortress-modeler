@@ -4,6 +4,37 @@
 
 Fortress Modeler Cloud is a comprehensive business planning and financial analytics platform designed for product managers, business analysts, and strategic planners. Built with modern web technologies, it provides sophisticated financial modeling, risk management, performance analytics, and collaborative planning capabilities.
 
+## 🚀 Live Deployment
+
+- **Production URL**: https://fortress-modeler.netlify.app
+- **Authentication**: Google OAuth
+- **Backend**: Supabase Cloud
+- **Status**: ✅ Live and Operational
+
+## 📁 Project Structure
+
+```
+fortress-modeler-cloud/
+├── src/                    # Application source code
+│   ├── components/         # React components
+│   ├── hooks/             # Custom React hooks
+│   ├── services/          # Business logic and API services
+│   ├── lib/               # Utilities and configurations
+│   └── types/             # TypeScript type definitions
+├── docs/                   # Documentation
+│   ├── deployment/        # Deployment guides and notes
+│   ├── troubleshooting/   # Debugging documentation
+│   ├── architecture/      # System design docs
+│   └── sql/              # Database schemas
+├── scripts/               # Utility scripts
+│   ├── oauth/            # OAuth configuration
+│   ├── database/         # Database management
+│   ├── deployment/       # Deployment automation
+│   └── testing/          # Test utilities
+├── public/                # Static assets
+└── supabase/             # Supabase configuration
+```
+
 ## 🎯 What Fortress Modeler Cloud Is
 
 **Not just a financial calculator** - Fortress Modeler Cloud is a complete business planning ecosystem that enables organizations to:
