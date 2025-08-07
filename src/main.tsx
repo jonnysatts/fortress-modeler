@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SupabaseAuthProvider } from './hooks/useSupabaseAuth';
 import { bootstrapServices } from './services/bootstrap';
 import App from './App';
+import './lib/debug-env'; // Debug environment variables
 
 // 🚨 CRITICAL FIX: Initialize service layer
 console.log('🔧 Initializing service layer...');
