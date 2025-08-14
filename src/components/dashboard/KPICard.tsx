@@ -23,7 +23,7 @@ export const KPICard: React.FC<KPICardProps> = ({
   projectedValue,
   variance,
   icon,
-  formatValue = (v) => v.toLocaleString(),
+  formatValue = (v) => `$${Math.round(v).toLocaleString()}`,
   showVariance = true,
   hasActualData = true,
   periodsCompared = 1
@@ -117,7 +117,7 @@ export const VarianceIndicator: React.FC<VarianceIndicatorProps> = ({
   actual,
   projected,
   status,
-  formatValue = (v) => `$${v.toLocaleString()}`
+  formatValue = (v) => `$${Math.round(v).toLocaleString()}`
 }) => {
   const isNeutral = Math.abs(variance) < 1;
   

@@ -141,7 +141,7 @@ const Dashboard = () => {
             projectedValue={portfolioMetrics.totalProjectedRevenue}
             variance={portfolioMetrics.revenueVariance}
             icon={<DollarSign className="h-8 w-8 text-fortress-emerald" />}
-            formatValue={(v) => `$${v.toLocaleString()}`}
+            formatValue={(v) => `$${Math.round(v).toLocaleString()}`}
             hasActualData={hasActuals}
             periodsCompared={portfolioMetrics.totalPeriodsWithActuals}
           />
@@ -156,7 +156,7 @@ const Dashboard = () => {
             projectedValue={portfolioMetrics.totalProjectedCosts}
             variance={portfolioMetrics.costVariance}
             icon={<TrendingDown className="h-8 w-8 text-red-500" />}
-            formatValue={(v) => `$${v.toLocaleString()}`}
+            formatValue={(v) => `$${Math.round(v).toLocaleString()}`}
             hasActualData={hasActuals}
             periodsCompared={portfolioMetrics.totalPeriodsWithActuals}
           />
@@ -171,7 +171,7 @@ const Dashboard = () => {
             projectedValue={portfolioMetrics.totalProjectedProfit}
             variance={portfolioMetrics.profitVariance}
             icon={<TrendingUp className="h-8 w-8 text-fortress-emerald" />}
-            formatValue={(v) => `$${v.toLocaleString()}`}
+            formatValue={(v) => `$${Math.round(v).toLocaleString()}`}
             hasActualData={hasActuals}
             periodsCompared={portfolioMetrics.totalPeriodsWithActuals}
           />
@@ -334,7 +334,7 @@ const Dashboard = () => {
                   <YAxis />
                   <Tooltip 
                     formatter={(value, name) => [
-                      `$${value?.toLocaleString() || 0}`, 
+                      `$${Math.round(Number(value) || 0).toLocaleString()}`, 
                       name === 'actual' ? 'Actual Revenue' : 'Projected Revenue'
                     ]} 
                     contentStyle={{ 
@@ -386,8 +386,8 @@ const Dashboard = () => {
                   <div className="flex-1">
                     <h3 className="font-medium">{project.projectName}</h3>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>Revenue: ${project.actualRevenue.toLocaleString()}</span>
-                      <span>Profit: ${project.actualProfit.toLocaleString()}</span>
+                      <span>Revenue: ${Math.round(project.actualRevenue).toLocaleString()}</span>
+                      <span>Profit: ${Math.round(project.actualProfit).toLocaleString()}</span>
                       {project.hasActuals && (
                         <span className={`font-medium ${project.revenueVariance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {project.revenueVariance >= 0 ? '+' : ''}{project.revenueVariance.toFixed(1)}% variance

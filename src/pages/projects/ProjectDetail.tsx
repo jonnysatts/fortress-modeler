@@ -22,6 +22,8 @@ import { toast } from "sonner";
 import { useProject, useDeleteProject, useSpecialEventForecasts, useSpecialEventActuals } from "@/hooks/useProjects";
 import { useModelsForProject } from "@/hooks/useModels";
 import { useActualsForProject } from "@/hooks/useActuals";
+import { useQueryClient } from "@tanstack/react-query";
+import { ImprovedExportButton } from "@/components/export/ImprovedExportButton";
 import { FinancialModel } from '@/lib/db';
 import {
   Table,
@@ -84,6 +86,7 @@ const ProjectDetail = () => {
     const [reportLoading, setReportLoading] = useState(false);
 
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useSupabaseAuth();
 
   const { data: project, isLoading: projectLoading, error: projectError } = useProject(projectId);
@@ -117,8 +120,8 @@ const ProjectDetail = () => {
     try {
       await setPrimaryFinancialModel(modelId);
       toast.success('Primary model updated successfully');
-      // Trigger a refetch of models to get updated isPrimary flags
-      window.location.reload(); // Simple approach - could use query invalidation instead
+      // Invalidate and refetch models to get updated isPrimary flags
+      await queryClient.invalidateQueries({ queryKey: ['models', projectId] });
     } catch (error) {
       console.error('Failed to set primary model:', error);
       toast.error('Failed to update primary model');
@@ -175,16 +178,46 @@ const ProjectDetail = () => {
     });
   };
 
-  const handlePdfReport = async () => {
+  const handlePdfReport = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     if (!project) return;
     setReportLoading(true);
     try {
-      const { ReportService } = await import('@/services/ReportService');
-      await ReportService.generateSingleEventPDF({
+      const { UnifiedExportService } = await import('@/services/UnifiedExportService');
+      const exportService = new UnifiedExportService();
+      
+      // Get the primary model for export
+      const primaryModel = financialModels.find(m => m.isPrimary) || financialModels[0];
+      
+      const result = await exportService.export({
         project,
-        forecast: specialForecasts[0],
-        actual: specialActuals[0],
+        models: financialModels,
+        actuals: actualsData,
+        primaryModel,
+      }, {
+        format: 'pdf',
+        template: 'executive',
+        sections: {
+          summary: true,
+          financials: true,
+          scenarios: financialModels.length > 1,
+          performance: actualsData.length > 0,
+          risks: false,
+          appendix: false,
+        },
       });
+      
+      if (result.success && result.data && result.filename) {
+        UnifiedExportService.downloadFile(
+          result.data,
+          result.filename,
+          'application/pdf'
+        );
+        toast.success('PDF report generated successfully');
+      } else {
+        throw new Error(result.error || 'Failed to generate PDF');
+      }
     } catch (error) {
       console.error('Report generation failed:', error);
       toast.error('Failed to generate report');
@@ -193,16 +226,38 @@ const ProjectDetail = () => {
     }
   };
 
-  const handleCsvReport = async () => {
+  const handleCsvReport = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     if (!project) return;
     setReportLoading(true);
     try {
-      const { ReportService } = await import('@/services/ReportService');
-      ReportService.generateSingleEventCSV({
+      const { UnifiedExportService } = await import('@/services/UnifiedExportService');
+      const exportService = new UnifiedExportService();
+      
+      // Get the primary model for export
+      const primaryModel = financialModels.find(m => m.isPrimary) || financialModels[0];
+      
+      const result = await exportService.export({
         project,
-        forecast: specialForecasts[0],
-        actual: specialActuals[0],
+        models: financialModels,
+        actuals: actualsData,
+        primaryModel,
+      }, {
+        format: 'csv',
+        template: 'detailed',
       });
+      
+      if (result.success && result.data && result.filename) {
+        UnifiedExportService.downloadFile(
+          result.data,
+          result.filename,
+          'text/csv'
+        );
+        toast.success('CSV report generated successfully');
+      } else {
+        throw new Error(result.error || 'Failed to generate CSV');
+      }
     } catch (error) {
       console.error('CSV generation failed:', error);
       toast.error('Failed to generate report');
@@ -249,6 +304,7 @@ const ProjectDetail = () => {
         </div>
         <div className="flex space-x-2 self-start sm:self-center">
           <Button 
+            type="button"
             onClick={() => navigate(`/projects/${projectId}/models/new`)}
             className="bg-fortress-emerald hover:bg-fortress-emerald/90"
             size="sm"
@@ -257,26 +313,27 @@ const ProjectDetail = () => {
             New Scenario
           </Button>
           {isCloudModeEnabled() && (
-            <Button variant="outline" size="sm" onClick={() => setShareModalOpen(true)}>
+            <Button type="button" variant="outline" size="sm" onClick={() => setShareModalOpen(true)}>
               <Share2 className="mr-1 h-4 w-4" />
               Share
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/edit`)}>
+          <Button type="button" variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/edit`)}>
             <Edit className="mr-1 h-4 w-4" />
             Edit
           </Button>
-          <Button variant="outline" size="sm" onClick={handlePdfReport} disabled={reportLoading}>
-            <Download className="mr-1 h-4 w-4" />
-            PDF Report
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleCsvReport} disabled={reportLoading}>
-            <Download className="mr-1 h-4 w-4" />
-            CSV Report
-          </Button>
+          <ImprovedExportButton 
+            project={project}
+            models={financialModels}
+            actuals={actualsData}
+            primaryModel={financialModels.find(m => m.isPrimary) || financialModels[0]}
+            variant="outline"
+            size="sm"
+            showLabel={true}
+          />
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm">
+              <Button type="button" variant="destructive" size="sm">
                 <Trash2 className="mr-1 h-4 w-4" />
                 Delete
               </Button>
