@@ -139,14 +139,12 @@ export class SupabaseStorageService implements IStorageService {
       await this.ensureProfileExists(user);
 
       console.log('🚀 [SupabaseStorageService] Step 4: Building project object...');
-      const newProject = {
+      const newProject: Record<string, any> = {
         user_id: user.id,
         name: projectData.name,
         description: projectData.description || null,
         product_type: projectData.productType,
         target_audience: projectData.targetAudience || null,
-        data: this.mapProjectDataToSupabase(projectData),
-        timeline: this.mapTimelineToSupabase(projectData.timeline),
         avatar_image: projectData.avatarImage || null,
         is_public: projectData.is_public || false,
         owner_email: user.email || null,
@@ -155,6 +153,11 @@ export class SupabaseStorageService implements IStorageService {
         event_date: projectData.event_date?.toISOString() || null,
         event_end_date: projectData.event_end_date?.toISOString() || null,
       };
+
+      const timelinePayload = this.mapTimelineToSupabase(projectData.timeline);
+      if (timelinePayload !== undefined) {
+        newProject.timeline = timelinePayload;
+      }
 
       console.log('🚀 [SupabaseStorageService] Step 5: Inserting project into Supabase...');
       const { data, error } = await supabase
@@ -198,16 +201,13 @@ export class SupabaseStorageService implements IStorageService {
       if (projectData.targetAudience !== undefined) updateData.target_audience = projectData.targetAudience;
       if (projectData.avatarImage !== undefined) updateData.avatar_image = projectData.avatarImage;
       if (projectData.is_public !== undefined) updateData.is_public = projectData.is_public;
-      if (projectData.timeline !== undefined) updateData.timeline = this.mapTimelineToSupabase(projectData.timeline);
+      if (projectData.timeline !== undefined) {
+        const timelinePayload = this.mapTimelineToSupabase(projectData.timeline);
+        updateData.timeline = timelinePayload ?? null;
+      }
       if (projectData.event_type !== undefined) updateData.event_type = projectData.event_type;
       if (projectData.event_date !== undefined) updateData.event_date = projectData.event_date?.toISOString() || null;
       if (projectData.event_end_date !== undefined) updateData.event_end_date = projectData.event_end_date?.toISOString() || null;
-      
-      // Merge additional data
-      if (Object.keys(projectData).some(key => !['id', 'createdAt', 'updatedAt', 'name', 'description', 'productType', 'targetAudience', 'avatarImage', 'is_public', 'timeline'].includes(key))) {
-        updateData.data = this.mapProjectDataToSupabase(projectData);
-      }
-
       const { data, error } = await supabase
         .from('projects')
         .update(updateData)
@@ -1338,18 +1338,16 @@ export class SupabaseStorageService implements IStorageService {
     };
   }
 
-  private mapProjectDataToSupabase(projectData: any): any {
-    // Extract known fields and put everything else in data JSONB
-    const { id, name, description, productType, targetAudience, createdAt, updatedAt, timeline, avatarImage, is_public, shared_by, owner_email, share_count, permission, ...extraData } = projectData;
-    return extraData;
-  }
-
   private mapTimelineToSupabase(timeline: any): any {
-    if (!timeline) return {};
-    return {
-      startDate: timeline.startDate?.toISOString?.() || timeline.startDate,
-      endDate: timeline.endDate?.toISOString?.() || timeline.endDate,
-    };
+    if (!timeline) return undefined;
+    const startDate = timeline.startDate?.toISOString?.() || timeline.startDate;
+    const endDate = timeline.endDate?.toISOString?.() || timeline.endDate;
+
+    const payload: Record<string, any> = {};
+    if (startDate) payload.startDate = startDate;
+    if (endDate) payload.endDate = endDate;
+
+    return Object.keys(payload).length > 0 ? payload : undefined;
   }
 
   private mapSupabaseTimelineToTimeline(timeline: any): any {
@@ -1405,47 +1403,56 @@ export class SupabaseStorageService implements IStorageService {
         return [];
       }
 
-      // Query project_shares table directly instead of using missing RPC function
-      const { data, error } = await supabase
-        .from('project_shares')
-        .select(`
-          project_id,
-          permission,
-          projects!inner (
-            id,
-            name,
-            description,
-            product_type,
-            target_audience,
-            created_at,
-            updated_at,
-            timeline,
-            avatar_image,
-            is_public,
-            owner_email,
-            share_count,
-            event_type,
-            event_date,
-            event_end_date
-          )
-        `)
-        .eq('shared_with_email', user.email)
-        .is('projects.deleted_at', null)
-        .order('projects.updated_at', { ascending: false });
+      const fetchShared = async (column: 'shared_with_email' | 'user_email') => {
+        return supabase
+          .from('project_shares')
+          .select(`
+            project_id,
+            permission,
+            projects!inner (
+              id,
+              name,
+              description,
+              product_type,
+              target_audience,
+              created_at,
+              updated_at,
+              timeline,
+              avatar_image,
+              is_public,
+              owner_email,
+              share_count,
+              event_type,
+              event_date,
+              event_end_date,
+              deleted_at
+            )
+          `)
+          .eq(column, user.email)
+          .order('projects.updated_at', { ascending: false });
+      };
+
+      let { data, error } = await fetchShared('shared_with_email');
+
+      if (error && error.message?.includes('shared_with_email')) {
+        console.warn('⚠️ [SupabaseStorageService] shared_with_email column missing, retrying with user_email');
+        ({ data, error } = await fetchShared('user_email'));
+      }
 
       if (error) {
         console.error('❌ [SupabaseStorageService] Shared projects fetch error:', error);
-        // Don't throw, just return empty array for now
         return [];
       }
 
-      const projects = (data || []).map((share: any) => {
-        const projectPayload: SupabaseProjectLike = {
-          ...share.projects,
-          permission: share.permission,
-        };
-        return this.mapSupabaseProjectToProject(projectPayload, user.id);
-      });
+      const projects = (data || [])
+        .filter((share: any) => !share?.projects?.deleted_at)
+        .map((share: any) => {
+          const projectPayload: SupabaseProjectLike = {
+            ...share.projects,
+            permission: share.permission,
+          };
+          return this.mapSupabaseProjectToProject(projectPayload, user.id);
+        });
       
       console.log('✅ [SupabaseStorageService] Successfully fetched shared projects:', projects.length);
       return projects;
