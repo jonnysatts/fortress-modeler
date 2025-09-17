@@ -1,0 +1,446 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Enhanced Fortress Modeler Design System */
+@layer base {
+  :root {
+    /* Core Semantic Colors */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 210 45% 20%; /* Fortress Blue */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 94%;
+    --secondary-foreground: 210 45% 20%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 94%;
+    --accent-foreground: 210 45% 20%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 210 45% 20%;
+    --radius: 0.75rem;
+
+    /* Financial Data Visualization Colors */
+    --success: 142.1 76.2% 36.3%; /* Emerald */
+    --success-foreground: 210 40% 98%;
+    --warning: 47.9 95.8% 53.1%; /* Amber */
+    --warning-foreground: 26 83.3% 14.1%;
+    --error: 0 72.2% 50.6%;
+    --error-foreground: 210 40% 98%;
+    --info: 211.7 96.4% 78.4%; /* Light Blue */
+    --info-foreground: 210 45% 20%;
+
+    /* Financial Chart Palette */
+    --chart-profit: 142.1 76.2% 36.3%; /* Green for profits */
+    --chart-loss: 0 72.2% 50.6%; /* Red for losses */
+    --chart-revenue: 217.2 91.2% 59.8%; /* Blue for revenue */
+    --chart-expense: 27.8 87.8% 67.1%; /* Orange for expenses */
+    --chart-asset: 262.1 83.3% 57.8%; /* Purple for assets */
+    --chart-liability: 346.8 77.2% 49.8%; /* Pink for liabilities */
+    --chart-equity: 142.1 70.6% 45.3%; /* Darker green for equity */
+    --chart-neutral: 215.4 16.3% 46.9%; /* Gray for neutral */
+
+    /* Enterprise UI Enhancements */
+    --sidebar-background: 210 47% 11%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 210 45% 20%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 210 40% 14%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 210 40% 18%;
+    --sidebar-ring: 210 45% 20%;
+
+    /* Data Table Enhancements */
+    --table-header-bg: 210 20% 98%;
+    --table-hover-bg: 210 40% 96%;
+    --table-selected-bg: 210 45% 92%;
+    --table-border: 214.3 31.8% 91.4%;
+
+    /* Status Indicators */
+    --status-active: 142.1 76.2% 36.3%;
+    --status-inactive: 215.4 16.3% 46.9%;
+    --status-pending: 47.9 95.8% 53.1%;
+    --status-critical: 0 72.2% 50.6%;
+    --status-stable: 211.7 96.4% 78.4%;
+
+    /* Typography Scale */
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.25rem;
+    --font-size-2xl: 1.5rem;
+    --font-size-3xl: 1.875rem;
+    --font-size-4xl: 2.25rem;
+
+    /* Enhanced Spacing Scale for Financial Data */
+    --spacing-tight: 0.25rem;
+    --spacing-xs: 0.5rem;
+    --spacing-sm: 0.75rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-2xl: 2.5rem;
+    --spacing-3xl: 3rem;
+
+    /* Shadow System for Depth */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  }
+
+  .dark {
+    /* Dark Mode Overrides */
+    --background: 210 47% 11%;
+    --foreground: 210 40% 98%;
+    --card: 210 45% 13%;
+    --card-foreground: 210 40% 98%;
+    --popover: 210 45% 13%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%; /* Brighter blue for dark mode */
+    --primary-foreground: 210 47% 11%;
+    --secondary: 210 40% 18%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 210 40% 15%;
+    --muted-foreground: 215.4 16.3% 65%;
+    --accent: 210 40% 18%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 210 40% 18%;
+    --input: 210 40% 18%;
+    --ring: 217.2 91.2% 59.8%;
+
+    /* Dark Mode Chart Colors */
+    --chart-profit: 142.1 70.6% 45.3%;
+    --chart-loss: 0 84.2% 60.2%;
+    --chart-revenue: 217.2 91.2% 59.8%;
+    --chart-expense: 27.8 87.8% 67.1%;
+    --chart-asset: 262.1 83.3% 67.8%;
+    --chart-liability: 346.8 77.2% 59.8%;
+    --chart-equity: 142.1 76.2% 50%;
+    --chart-neutral: 215.4 16.3% 65%;
+
+    /* Dark Mode Table */
+    --table-header-bg: 210 40% 15%;
+    --table-hover-bg: 210 40% 18%;
+    --table-selected-bg: 210 40% 22%;
+    --table-border: 210 40% 18%;
+  }
+}
+
+/* Base Typography */
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.6;
+  }
+
+  /* Enhanced Typography for Financial Data */
+  .text-financial {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-variant-numeric: tabular-nums;
+    @apply tracking-tight;
+  }
+
+  .text-currency {
+    @apply text-financial font-medium;
+  }
+
+  .text-percentage {
+    @apply text-financial text-sm;
+  }
+
+  /* Semantic Text Colors for Financial Data */
+  .text-profit {
+    color: hsl(var(--chart-profit));
+  }
+
+  .text-loss {
+    color: hsl(var(--chart-loss));
+  }
+
+  .text-neutral-financial {
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Enhanced Headings */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  h1 {
+    @apply text-4xl lg:text-5xl;
+    line-height: 1.1;
+  }
+
+  h2 {
+    @apply text-3xl lg:text-4xl;
+    line-height: 1.2;
+  }
+
+  h3 {
+    @apply text-2xl lg:text-3xl;
+    line-height: 1.3;
+  }
+
+  h4 {
+    @apply text-xl lg:text-2xl;
+    line-height: 1.4;
+  }
+
+  h5 {
+    @apply text-lg lg:text-xl;
+    line-height: 1.5;
+  }
+
+  h6 {
+    @apply text-base lg:text-lg;
+    line-height: 1.6;
+  }
+}
+
+/* Enterprise Component Enhancements */
+@layer components {
+  /* Enhanced Cards for Financial Data */
+  .card-financial {
+    @apply relative overflow-hidden rounded-lg border bg-card shadow-sm transition-all duration-200;
+  }
+
+  .card-financial:hover {
+    @apply shadow-md;
+    transform: translateY(-1px);
+  }
+
+  .card-financial-header {
+    @apply flex items-center justify-between border-b bg-muted/20 px-6 py-4;
+  }
+
+  .card-financial-content {
+    @apply p-6;
+  }
+
+  /* Enhanced Data Tables */
+  .table-financial {
+    @apply w-full border-collapse text-sm;
+  }
+
+  .table-financial thead {
+    @apply bg-[hsl(var(--table-header-bg))] text-left;
+  }
+
+  .table-financial th {
+    @apply border-b border-[hsl(var(--table-border))] px-4 py-3 font-semibold text-foreground;
+  }
+
+  .table-financial td {
+    @apply border-b border-[hsl(var(--table-border))] px-4 py-3;
+  }
+
+  .table-financial tbody tr:hover {
+    @apply bg-[hsl(var(--table-hover-bg))];
+  }
+
+  .table-financial tbody tr[data-selected="true"] {
+    @apply bg-[hsl(var(--table-selected-bg))];
+  }
+
+  /* Status Badges */
+  .badge-status-active {
+    @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300;
+  }
+
+  .badge-status-inactive {
+    @apply bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300;
+  }
+
+  .badge-status-pending {
+    @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300;
+  }
+
+  .badge-status-critical {
+    @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300;
+  }
+
+  /* Enhanced Form Controls */
+  .input-financial {
+    @apply text-financial;
+  }
+
+  .input-currency::before {
+    content: "$";
+    @apply absolute left-3 text-muted-foreground;
+  }
+
+  .input-percentage::after {
+    content: "%";
+    @apply absolute right-3 text-muted-foreground;
+  }
+
+  /* Chart Container Enhancements */
+  .chart-container {
+    @apply relative rounded-lg border bg-card p-6;
+  }
+
+  .chart-container .recharts-tooltip-wrapper {
+    @apply drop-shadow-xl;
+  }
+
+  .chart-container .recharts-tooltip-content {
+    @apply rounded-lg border-0 bg-popover text-popover-foreground shadow-lg;
+  }
+
+  /* Dashboard Grid System */
+  .dashboard-grid {
+    @apply grid gap-6;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+
+  .dashboard-grid-dense {
+    @apply grid gap-4;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+
+  /* Metric Display Components */
+  .metric-card {
+    @apply card-financial;
+  }
+
+  .metric-value {
+    @apply text-2xl font-bold text-financial;
+  }
+
+  .metric-change {
+    @apply text-sm font-medium;
+  }
+
+  .metric-change.positive {
+    @apply text-profit;
+  }
+
+  .metric-change.negative {
+    @apply text-loss;
+  }
+
+  .metric-change.neutral {
+    @apply text-neutral-financial;
+  }
+
+  /* Loading States */
+  .skeleton {
+    @apply animate-pulse rounded-md bg-muted;
+  }
+
+  .skeleton-text {
+    @apply skeleton h-4;
+  }
+
+  .skeleton-title {
+    @apply skeleton h-6;
+  }
+
+  .skeleton-chart {
+    @apply skeleton aspect-video;
+  }
+
+  /* Utility Classes for Financial UI */
+  .border-financial {
+    @apply border-[hsl(var(--table-border))];
+  }
+
+  .bg-financial-header {
+    @apply bg-[hsl(var(--table-header-bg))];
+  }
+
+  .bg-financial-hover {
+    @apply bg-[hsl(var(--table-hover-bg))];
+  }
+
+  .text-financial-muted {
+    @apply text-muted-foreground;
+  }
+
+  /* Responsive Enhancements */
+  @media (max-width: 768px) {
+    .card-financial-header {
+      @apply px-4 py-3;
+    }
+
+    .card-financial-content {
+      @apply p-4;
+    }
+
+    .table-financial th,
+    .table-financial td {
+      @apply px-2 py-2 text-xs;
+    }
+
+    .metric-value {
+      @apply text-xl;
+    }
+  }
+}
+
+/* Print Optimizations for Financial Reports */
+@media print {
+  .card-financial {
+    @apply break-inside-avoid shadow-none;
+  }
+
+  .table-financial {
+    @apply text-black;
+  }
+
+  .chart-container {
+    @apply break-inside-avoid;
+  }
+
+  /* Hide interactive elements when printing */
+  .no-print {
+    @apply hidden;
+  }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  :root {
+    --border: 0 0% 0%;
+    --ring: 0 0% 0%;
+  }
+
+  .dark {
+    --border: 0 0% 100%;
+    --ring: 0 0% 100%;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .card-financial:hover {
+    transform: none;
+  }
+
+  .skeleton {
+    @apply animate-none;
+  }
+
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

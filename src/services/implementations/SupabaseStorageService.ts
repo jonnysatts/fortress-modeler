@@ -5,6 +5,10 @@ import { supabase, handleSupabaseError } from '@/lib/supabase';
 import { Database } from '@/lib/database.types';
 import { DatabaseError, NotFoundError, ValidationError } from '@/lib/errors';
 type SupabaseProject = Database['public']['Tables']['projects']['Row'];
+type SupabaseProjectLike = SupabaseProject & {
+  project_id?: string;
+  permission?: string | null;
+};
 type SupabaseModel = Database['public']['Tables']['financial_models']['Row'];
 type SupabaseActualEntry = Database['public']['Tables']['actuals_period_entries']['Row'];
 type SupabaseSpecialEventForecast = Database['public']['Tables']['special_event_forecasts']['Row'];
@@ -52,7 +56,15 @@ export class SupabaseStorageService implements IStorageService {
         throw handleSupabaseError(error);
       }
 
-      return this.mapSupabaseProjectToProject(data);
+      let currentUserId: string | undefined;
+      try {
+        const user = await this.getCurrentUser();
+        currentUserId = user.id;
+      } catch (authError) {
+        console.warn('⚠️ [SupabaseStorageService] getProject: unable to resolve current user, continuing with minimal permissions', authError);
+      }
+
+      return this.mapSupabaseProjectToProject(data as SupabaseProjectLike, currentUserId);
     } catch (error) {
       if (error instanceof ValidationError) throw error;
       console.error('SupabaseStorageService.getProject error:', error);
@@ -96,8 +108,8 @@ export class SupabaseStorageService implements IStorageService {
       }
 
       const projects = (data || []).map((project) => {
-        // RPC function returns the project directly
-        return this.mapSupabaseProjectToProject(project);
+        // RPC function returns the project directly (with project_id)
+        return this.mapSupabaseProjectToProject(project as SupabaseProjectLike, user.id);
       });
       console.log('✅ [SupabaseStorageService] Successfully mapped projects:', projects.length);
       return projects;
@@ -157,7 +169,7 @@ export class SupabaseStorageService implements IStorageService {
         throw handleSupabaseError(error);
       }
 
-      const createdProject = this.mapSupabaseProjectToProject(data);
+      const createdProject = this.mapSupabaseProjectToProject(data, user.id);
       console.log('Project created successfully:', createdProject.id);
       return createdProject;
     } catch (error) {
@@ -175,6 +187,8 @@ export class SupabaseStorageService implements IStorageService {
       if (!existingProject) {
         throw new NotFoundError(`Project with ID ${projectId} not found`);
       }
+
+      const user = await this.getCurrentUser();
 
       const updateData: any = {};
       
@@ -205,7 +219,7 @@ export class SupabaseStorageService implements IStorageService {
         throw handleSupabaseError(error);
       }
 
-      const updatedProject = this.mapSupabaseProjectToProject(data);
+      const updatedProject = this.mapSupabaseProjectToProject(data, user.id);
       console.log('Project updated successfully', { projectId });
       return updatedProject;
     } catch (error) {
@@ -1156,9 +1170,32 @@ export class SupabaseStorageService implements IStorageService {
   // MAPPING FUNCTIONS
   // ==================================================
 
-  private mapSupabaseProjectToProject(supabaseProject: SupabaseProject): Project {
+  private mapSupabaseProjectToProject(supabaseProject: SupabaseProjectLike, currentUserId?: string): Project {
+    const projectId = supabaseProject.id ?? supabaseProject.project_id;
+    if (!projectId) {
+      throw new ValidationError('Project record is missing an id');
+    }
+
+    const ownerId = (supabaseProject as any).user_id as string | undefined;
+    const rawPermission = (supabaseProject.permission ?? null) as string | null;
+
+    let permission: 'owner' | 'view' | 'edit' = 'view';
+    if (rawPermission === 'edit' || rawPermission === 'view') {
+      permission = rawPermission;
+    } else if (currentUserId && ownerId && ownerId === currentUserId) {
+      permission = 'owner';
+    } else if (!currentUserId && rawPermission === null && !supabaseProject.is_public) {
+      // Fallback: when current user is unknown but permission not provided,
+      // assume owner to preserve existing behaviour for direct table reads.
+      permission = 'owner';
+    }
+
+    if (supabaseProject.is_public && permission !== 'owner' && permission !== 'edit') {
+      permission = 'view';
+    }
+
     return {
-      id: supabaseProject.id,
+      id: projectId,
       name: supabaseProject.name,
       description: supabaseProject.description ?? undefined,
       productType: supabaseProject.product_type,
@@ -1171,7 +1208,7 @@ export class SupabaseStorageService implements IStorageService {
       shared_by: supabaseProject.owner_email ?? undefined,
       owner_email: supabaseProject.owner_email ?? undefined,
       share_count: supabaseProject.share_count ?? 0,
-      permission: 'owner', // Default for owner, will be overridden for shared projects
+      permission,
       event_type: (supabaseProject.event_type || 'weekly') as 'weekly' | 'special',
       event_date: supabaseProject.event_date ? new Date(supabaseProject.event_date) : undefined,
       event_end_date: supabaseProject.event_end_date ? new Date(supabaseProject.event_end_date) : undefined,
@@ -1392,7 +1429,7 @@ export class SupabaseStorageService implements IStorageService {
             event_end_date
           )
         `)
-        .eq('user_email', user.email)
+        .eq('shared_with_email', user.email)
         .is('projects.deleted_at', null)
         .order('projects.updated_at', { ascending: false });
 
@@ -1403,9 +1440,11 @@ export class SupabaseStorageService implements IStorageService {
       }
 
       const projects = (data || []).map((share: any) => {
-        const mappedProject = this.mapSupabaseProjectToProject(share.projects);
-        mappedProject.permission = share.permission as 'owner' | 'view' | 'edit';
-        return mappedProject;
+        const projectPayload: SupabaseProjectLike = {
+          ...share.projects,
+          permission: share.permission,
+        };
+        return this.mapSupabaseProjectToProject(projectPayload, user.id);
       });
       
       console.log('✅ [SupabaseStorageService] Successfully fetched shared projects:', projects.length);

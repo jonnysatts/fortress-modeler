@@ -137,13 +137,14 @@ export default function AuthCallback() {
         }
       } catch (error) {
         console.error('Auth callback error:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
         setStatus('error');
-        setMessage(error instanceof Error ? error.message : 'Authentication failed');
-        
-        // Redirect to dashboard after error
+        setMessage(errorMessage);
+
+        // Surface the error on the login screen instead of silently redirecting
         setTimeout(() => {
-          navigate('/');
-        }, 5000);
+          navigate(`/login?error=${encodeURIComponent(errorMessage)}`, { replace: true });
+        }, 4000);
       }
     };
 
