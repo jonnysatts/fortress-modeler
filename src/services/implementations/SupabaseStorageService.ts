@@ -1429,7 +1429,7 @@ export class SupabaseStorageService implements IStorageService {
             )
           `)
           .eq(column, user.email)
-          .order('projects.updated_at', { ascending: false });
+          .order('updated_at', { ascending: false, foreignTable: 'projects' });
       };
 
       let { data, error } = await fetchShared('shared_with_email');
