@@ -81,7 +81,7 @@ export async function testConnection(): Promise<{ success: boolean; error?: stri
   try {
     const start = Date.now();
     const db = getDatabase();
-    const result = await db.query('SELECT NOW() as current_time, version() as version');
+    await db.query('SELECT NOW() as current_time, version() as version');
     const latency = Date.now() - start;
     
     return {

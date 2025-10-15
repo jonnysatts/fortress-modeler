@@ -1,7 +1,7 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { FinancialModelService } from '../services/financial-model.service';
 import { ProjectService } from '../services/project.service';
-import { authenticateToken, AuthRequest, rateLimitByUser } from '../middleware/auth.middleware';
+import { authenticateToken, AuthRequest, rateLimitByUser } from '../auth/auth.middleware';
 import { ModelAssumptions, ResultsCache } from '../types/models';
 
 const router = Router();

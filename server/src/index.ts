@@ -36,15 +36,19 @@ app.use(helmet({
 }));
 
 // CORS configuration
-const allowedOrigins = [
-  'https://fortress-modeler-frontend-pqiu2rcyqq-km.a.run.app',
+const defaultOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
-  'http://localhost:8083',
-  'https://fortress-modeler-frontend-928130924917.australia-southeast2.run.app',
-  'https://fortress-modeler.vercel.app',
-  'https://fortress-modeler.netlify.app'
+  'http://localhost:8081',
 ];
+
+const allowedOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',')
+  : defaultOrigins;
+
+if (process.env.NODE_ENV !== 'production') {
+  console.log('CORS Allowed Origins:', allowedOrigins);
+}
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -226,7 +230,7 @@ interface ServerError extends Error {
 }
 
 // Error handling middleware
-app.use((error: ServerError, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((error: ServerError, req: express.Request, res: express.Response) => {
   console.error('Server error:', error);
   
   res.status(error.status || 500).json({
@@ -261,7 +265,7 @@ process.on('SIGTERM', async () => {
 });
 
 // Start server
-const server = app.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log('🚀 Fortress Modeler Server - Phase 3');
   console.log('====================================');
   console.log(`✅ Server running on port ${PORT}`);

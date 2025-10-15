@@ -34,7 +34,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { db, FinancialModel } from '@/lib/db';
 import { useCreateModel, useUpdateModel } from '@/hooks/useModels';
 
@@ -245,9 +245,7 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
       onCancel();
     } catch (error) {
       console.error("Error saving event model:", error);
-      toast({
-        variant: "destructive",
-        title: existingModel ? "Failed to update model" : "Failed to create model",
+      toast.error(existingModel ? "Failed to update model" : "Failed to create model", {
         description: "There was an error saving your weekly event model.",
       });
     }

@@ -47,9 +47,6 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: mode === 'production' ? {
-        // Disable code splitting for production to avoid React context issues
-        manualChunks: undefined,
-        inlineDynamicImports: true,
         entryFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash][extname]',
       } : {

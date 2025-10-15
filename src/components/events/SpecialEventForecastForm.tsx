@@ -15,20 +15,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { sanitizeNumericInput, sanitizeTextInput } from '@/lib/security';
 import { toast } from 'sonner';
 import { 
   DollarSign, 
-  Users, 
-  Megaphone, 
   Calculator, 
   TrendingUp,
-  AlertTriangle,
-  CheckCircle
+  AlertTriangle
 } from 'lucide-react';
 
 interface SpecialEventForecastFormProps {

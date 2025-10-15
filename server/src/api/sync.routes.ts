@@ -1,6 +1,6 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { SyncService } from '../services/sync.service';
-import { authenticateToken, AuthRequest, rateLimitByUser } from '../middleware/auth.middleware';
+import { authenticateToken, AuthRequest, rateLimitByUser } from '../auth/auth.middleware';
 
 const router = Router();
 

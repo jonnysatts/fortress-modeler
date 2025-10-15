@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { lazy, Suspense } from "react";
@@ -51,7 +50,6 @@ const App = () => {
 
   return (
     <TooltipProvider>
-        <Toaster />
         <Sonner />
         <ErrorBoundary context="App">
           <BrowserRouter>

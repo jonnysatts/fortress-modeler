@@ -19,7 +19,7 @@ async function testDatabase() {
   try {
     // Test 1: Database Connection
     console.log('\n1️⃣ Testing database connection...');
-    const pool = initializeDatabase();
+    initializeDatabase();
     const connectionTest = await testConnection();
     
     if (connectionTest.success) {
