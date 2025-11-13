@@ -52,7 +52,7 @@ const Dashboard = () => {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-fortress-blue">Dashboard</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-fortress-blue">Dashboard</h1>
         </div>
         <div className="animate-pulse space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -70,7 +70,7 @@ const Dashboard = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-bold text-fortress-blue">Dashboard</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-fortress-blue">Dashboard</h1>
           {hasActuals && (
             <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs font-medium">
               <Target className="h-3 w-3" />
@@ -326,7 +326,7 @@ const Dashboard = () => {
             <CardTitle>Actual vs Projected Performance</CardTitle>
             <CardDescription>Revenue comparison over time</CardDescription>
           </CardHeader>
-          <CardContent className="h-80">
+          <CardContent className="h-64 sm:h-80">
             {chartData && chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData}>

@@ -236,7 +236,7 @@ const ProjectDetail = () => {
             </AvatarFallback>
           </Avatar>
           <div>
-            <h1 className="text-3xl font-bold text-fortress-blue">{project.name}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-fortress-blue">{project.name}</h1>
             <div className="flex items-center mt-1 space-x-2">
               <Badge variant="outline" className="text-fortress-blue border-fortress-blue">
                 {project.productType}
