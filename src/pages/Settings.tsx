@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Trash2, FileText, FileSpreadsheet, Presentation } from "lucide-react";
+import { Download, Trash2, FileText, FileSpreadsheet, Presentation, Settings as SettingsIcon } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { getProjects, db } from "@/lib/db";
 import { exportToExcel, exportToPDF } from "@/lib/export";
@@ -20,6 +21,7 @@ import { SupabaseStorageService } from "@/services/implementations/SupabaseStora
 import { devLog } from "@/lib/devLog";
 
 const Settings = () => {
+  const navigate = useNavigate();
   const [darkMode, setDarkMode] = useState(false);
   const [backupReminders, setBackupReminders] = useState(true);
   const [backupFrequency, setBackupFrequency] = useState("weekly");
@@ -233,6 +235,31 @@ const Settings = () => {
       <h1 className="text-3xl font-bold text-fortress-blue">Settings</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Category Management</CardTitle>
+            <CardDescription>
+              Configure event types, cost categories, and frequencies
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Customize the event types, cost categories, and frequencies available throughout the application.
+                Add your own custom categories without needing code changes.
+              </p>
+              <Button
+                onClick={() => navigate('/categories')}
+                className="w-full"
+                variant="default"
+              >
+                <SettingsIcon className="mr-2 h-4 w-4" />
+                Manage Categories
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Appearance</CardTitle>
