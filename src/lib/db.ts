@@ -1,7 +1,8 @@
 import Dexie, { Table } from 'dexie';
 import { MarketingSetup, ActualsPeriodEntry, ModelMetadata } from '@/types/models';
 import { DatabaseError, NotFoundError, ValidationError, logError } from './errors';
-import { getDemoData } from './demo-data';
+// Demo data removed as part of Phase 1 cleanup
+// import { getDemoData } from './demo-data';
 import config from './config';
 import { isUUID } from './utils';
 import { isCloudModeEnabled } from '@/config/app.config';
@@ -888,33 +889,9 @@ export const setPrimaryFinancialModel = async (modelId: string): Promise<void> =
 
 export const addDemoData = async (): Promise<void> => {
   try {
-    // Only add demo data if enabled in config
-    if (!config.enableDemoData) {
-      return;
-    }
-
-    const projectCount = await db.projects.count();
-    if (projectCount > 0) return;
-
-    const demoData = getDemoData();
-    const timestamp = new Date();
-    
-    // Add demo project
-    const projectId = await db.projects.add({
-      ...demoData.project,
-      id: crypto.randomUUID(), // Add id here
-      createdAt: timestamp,
-      updatedAt: timestamp
-    });
-
-    // Add demo financial model
-    await db.financialModels.add({
-      ...demoData.financialModel,
-      id: crypto.randomUUID(), // Add id here
-      projectId,
-      createdAt: timestamp,
-      updatedAt: timestamp
-    });
+    // Demo data functionality removed as part of Phase 1 cleanup
+    // Demo data loading has been disabled
+    return;
 
     if (config.isDevelopment) {
       console.log('Demo data added successfully');
