@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, memo } from "react";
 import { FinancialModel } from "@/lib/db";
 import {
   AreaChart,
@@ -13,6 +13,7 @@ import {
 import FinancialMatrix from "./FinancialMatrix";
 import { TrendDataPoint } from "@/types/trends";
 import { formatCurrency } from "@/lib/utils";
+import { performanceMonitor } from "@/lib/performance";
 
 interface RevenueTrendsProps {
   model: FinancialModel;
@@ -26,6 +27,7 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
   const timeUnit = isWeeklyEvent ? "Week" : "Month";
 
   const trendData: TrendDataPoint[] = useMemo(() => {
+    performanceMonitor.startTimer('RevenueTrends:calculation');
     try {
       const data: TrendDataPoint[] = [];
       if (!model?.assumptions?.revenue || !model?.assumptions?.metadata) return [];
@@ -132,9 +134,11 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
           data.push(point);
         }
       }
+      performanceMonitor.endTimer('RevenueTrends:calculation');
       return data;
     } catch (error) {
       console.error("Error calculating revenue trends:", error);
+      performanceMonitor.endTimer('RevenueTrends:calculation');
       return [];
     }
   }, [model, timePoints]);
@@ -247,4 +251,4 @@ const RevenueTrends = ({ model, combinedData, setCombinedData }: RevenueTrendsPr
   );
 };
 
-export default RevenueTrends;
+export default memo(RevenueTrends);

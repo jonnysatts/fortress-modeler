@@ -1,23 +1,27 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { Project, FinancialModel } from './db';
-import { 
-  performFinancialAnalysis, 
-  generateCashFlowProjections, 
-  performScenarioAnalysis,
-  FinancialMetrics,
-  CashFlowPeriod,
-  ScenarioAnalysis 
-} from './financial-calculations';
 import { formatCurrency } from './utils';
+import { EnhancedExportSystem } from './exports/EnhancedExportSystem';
+import type { ProjectData } from './exports/core/EnhancedPDFGenerator';
+
+export interface RevenueProjection {
+  period: number;
+  amount: number;
+  source: string;
+}
+
+export interface CostBreakdown {
+  category: string;
+  amount: number;
+  percentage: number;
+}
 
 export interface ProductReportData {
   project: Project;
   models: FinancialModel[];
   productSummary: ProductSummary;
-  revenueProjections: any[];
-  costBreakdown: any[];
+  revenueProjections: RevenueProjection[];
+  costBreakdown: CostBreakdown[];
 }
 
 export interface ProductSummary {
@@ -470,7 +474,90 @@ export async function prepareBoardReadyData(
   return prepareProductReportData(project, models);
 }
 
-// Legacy function name for backward compatibility  
+// Transform data for enhanced export system
+function transformProductDataToProject(data: ProductReportData): ProjectData {
+  const primaryModel = data.models[0];
+  
+  // Create a scenario from the product data
+  const scenarios = [{
+    name: 'Primary Model',
+    label: 'Realistic' as const,
+    projectedRevenue: data.revenueProjections.reduce((sum, proj) => sum + proj.amount, 0),
+    projectedExpenses: data.costBreakdown.reduce((sum, cost) => sum + cost.amount, 0),
+    netProfit: data.revenueProjections.reduce((sum, proj) => sum + proj.amount, 0) - 
+              data.costBreakdown.reduce((sum, cost) => sum + cost.amount, 0),
+    roi: 0, // Will be calculated
+    breakEvenMonth: 0,
+    cashFlow: [],
+    riskLevel: 'Medium' as const,
+  }];
+
+  // Calculate ROI
+  scenarios[0].roi = scenarios[0].projectedRevenue > 0 ? 
+    (scenarios[0].netProfit / scenarios[0].projectedRevenue) * 100 : 0;
+
+  return {
+    id: data.project.id,
+    name: data.project.name,
+    description: data.productSummary.productOverview,
+    models: data.models,
+    scenarios,
+    analysis: {
+      totalRevenue: scenarios[0].projectedRevenue,
+      totalCosts: scenarios[0].projectedExpenses,
+      netProfit: scenarios[0].netProfit,
+      roi: scenarios[0].roi,
+      breakEvenMonth: scenarios[0].breakEvenMonth,
+    },
+    summary: {
+      overview: data.productSummary.productOverview,
+      keyMetrics: data.productSummary.keyMetrics,
+      recommendations: data.productSummary.recommendations,
+    },
+    assumptions: primaryModel?.assumptions,
+  };
+}
+
+// Enhanced board-ready export with fallback
 export async function exportBoardReadyPDF(data: ProductReportData): Promise<void> {
-  return exportProductPDF(data);
+  try {
+    console.log('Attempting enhanced board PDF export...');
+    const exportSystem = new EnhancedExportSystem();
+    const projectData = transformProductDataToProject(data);
+    
+    const results = await exportSystem.exportProject(projectData, {
+      format: 'PDF',
+      template: 'board',
+      includeCharts: true,
+      includeScenarioComparison: true,
+      includeRiskAnalysis: false,
+      colorScheme: 'fortress',
+      pageSize: 'Letter',
+      orientation: 'Portrait',
+      companyName: 'Fortress Financial',
+      author: 'Product Analysis Team',
+    });
+
+    if (results.pdf?.success && results.pdf.data) {
+      // Create download
+      const blob = new Blob([results.pdf.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = results.pdf.filename || `${data.project.name}_Board_Report.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      console.log('Enhanced board PDF export successful');
+    } else {
+      throw new Error(results.pdf?.error || 'Enhanced board PDF generation failed');
+    }
+    
+    exportSystem.cleanup();
+  } catch (error) {
+    console.error('Enhanced board PDF export failed, falling back to legacy:', error);
+    // Fallback to legacy export
+    return exportProductPDF(data);
+  }
 }

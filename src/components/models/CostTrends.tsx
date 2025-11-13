@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, memo } from "react";
 import { FinancialModel, CostAssumption } from "@/lib/db";
 import {
   AreaChart,
@@ -398,4 +398,4 @@ const CostTrends = ({
   );
 };
 
-export default CostTrends;
+export default memo(CostTrends);

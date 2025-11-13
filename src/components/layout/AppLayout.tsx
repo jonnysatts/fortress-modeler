@@ -4,24 +4,33 @@ import Sidebar from "./Sidebar";
 import { Toaster } from "@/components/ui/toaster";
 import { addDemoData } from "@/lib/db";
 import { config } from "@/lib/config";
-import { useAuth } from "@/hooks/useAuth";
-import useStore from "@/store/useStore";
+import { useSupabaseAuth as useAuth } from "@/hooks/useSupabaseAuth";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { isCloudModeEnabled } from "@/config/app.config";
 
 const AppLayout = () => {
   const [initializing, setInitializing] = useState(true);
-  const loadProjects = useStore((state) => state.loadProjects);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { user } = useAuth();
+  
+  // Enable keyboard shortcuts
+  useKeyboardShortcuts();
 
-  // Initialize the database and load projects
+  // Initialize the database
   useEffect(() => {
     const init = async () => {
       try {
-        // Only add demo data if not using cloud sync or user is not authenticated
-        if (!config.useCloudSync || !user) {
-          await addDemoData(); // Add demo data if the database is empty
+        // Only initialize IndexedDB in local mode
+        const isCloudMode = isCloudModeEnabled();
+        
+        if (!isCloudMode) {
+          console.log('💾 Initializing IndexedDB for local mode');
+          // Add demo data if the database is empty (local-only mode)
+          await addDemoData();
+        } else {
+          console.log('🌤️ Cloud mode enabled, skipping IndexedDB initialization');
         }
-        await loadProjects();
+        // No need to load projects here - components will load their own data via React Query
       } catch (error) {
         console.error("Error initializing app:", error);
       } finally {
@@ -30,7 +39,9 @@ const AppLayout = () => {
     };
 
     init();
-  }, [loadProjects, user]);
+    // This effect should run when the user's auth state changes,
+    // as that determines which projects to load.
+  }, [user]);
 
   const toggleSidebar = () => {
     setIsSidebarCollapsed(!isSidebarCollapsed);

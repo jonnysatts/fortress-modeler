@@ -1,12 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { NavLink } from "react-router-dom";
-import { Home, FolderKanban, LineChart, ShieldAlert, Settings, ChevronsLeft, ChevronsRight, Cloud, CloudOff, User, LogOut, RefreshCw } from "lucide-react";
+import { Home, FolderKanban, LineChart, Settings, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { config } from "@/lib/config";
-import { useAuth } from "@/hooks/useAuth";
-import useStore from "@/store/useStore";
 
 // Define props interface
 interface SidebarProps {
@@ -15,44 +11,13 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
-  const { user, logout, isAuthenticated } = useAuth();
-  const { syncWithCloud } = useStore();
-  const [isSyncing, setIsSyncing] = useState(false);
-
   const navItems = [
-    // The Dashboard route is the index route at "/" so the sidebar link should
-    // navigate to the root path
     { name: "Dashboard", path: "/", icon: Home },
     { name: "Projects", path: "/projects", icon: FolderKanban },
-    // Add other top-level sections if needed
-    // { name: "Performance", path: "/performance", icon: LineChart },
-    // { name: "Risk Management", path: "/risk", icon: ShieldAlert },
     { name: "Settings", path: "/settings", icon: Settings },
   ];
 
-  const handleSync = async () => {
-    if (isSyncing) return;
-    
-    try {
-      setIsSyncing(true);
-      await syncWithCloud();
-    } catch (error) {
-      console.error('Sync failed:', error);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (error) {
-      console.error('Logout failed:', error);
-    }
-  };
-
   return (
-    // Adjust width based on collapsed state
     <aside 
       className={cn(
           "flex flex-col h-screen bg-gray-800 text-gray-100 transition-all duration-300 ease-in-out",
@@ -61,9 +26,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
     >
       <div className="flex items-center justify-center h-16 border-b border-gray-700">
         <span className={cn("font-bold text-xl", isCollapsed && "hidden")}>Fortress</span>
-        {/* Optional: Show small logo when collapsed */}
-         <LineChart className={cn("h-6 w-6", !isCollapsed && "hidden")} />
+        <LineChart className={cn("h-6 w-6", !isCollapsed && "hidden")} />
       </div>
+      
       <nav className="flex-1 px-2 py-4 space-y-2">
         {navItems.map((item) => (
           <NavLink
@@ -84,78 +49,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
           </NavLink>
         ))}
       </nav>
-      {/* Cloud Sync & User Section */}
-      <div className="mt-auto border-t border-gray-700">
-        {config.useCloudSync && (
-          <div className="p-4 space-y-2">
-            {/* Sync Status */}
-            <div className={cn("flex items-center", isCollapsed ? "justify-center" : "justify-between")}>
-              {!isCollapsed && (
-                <div className="flex items-center space-x-2">
-                  {isAuthenticated ? (
-                    <Cloud className="h-4 w-4 text-green-400" />
-                  ) : (
-                    <CloudOff className="h-4 w-4 text-red-400" />
-                  )}
-                  <span className="text-xs text-gray-400">
-                    {isAuthenticated ? 'Cloud Connected' : 'Offline Mode'}
-                  </span>
-                </div>
-              )}
-              
-              {isAuthenticated && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleSync}
-                  disabled={isSyncing}
-                  className="text-gray-300 hover:bg-gray-700 hover:text-white p-1"
-                >
-                  <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
-                  {!isCollapsed && <span className="ml-1 text-xs">Sync</span>}
-                </Button>
-              )}
-            </div>
 
-            {/* User Info */}
-            {isAuthenticated && user && !isCollapsed && (
-              <div className="text-xs text-gray-400 truncate">
-                <div className="flex items-center space-x-2">
-                  <User className="h-3 w-3" />
-                  <span className="truncate">{user.email}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Logout Button */}
-            {isAuthenticated && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleLogout}
-                className={cn(
-                  "text-gray-300 hover:bg-gray-700 hover:text-white",
-                  isCollapsed ? "w-full justify-center p-1" : "w-full justify-start"
-                )}
-              >
-                <LogOut className="h-4 w-4" />
-                {!isCollapsed && <span className="ml-2 text-xs">Logout</span>}
-              </Button>
-            )}
-          </div>
-        )}
-
-        {/* Collapse Toggle Button */}
-        <div className="p-4">
-          <Button 
-             variant="ghost" 
-             className="w-full justify-center text-gray-300 hover:bg-gray-700 hover:text-white"
-             onClick={toggleSidebar}
-          >
-             {isCollapsed ? <ChevronsRight size={20} /> : <ChevronsLeft size={20} />}
-             <span className="sr-only">{isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}</span>
-          </Button>
-        </div>
+      {/* Collapse Toggle Button */}
+      <div className="mt-auto p-4 border-t border-gray-700">
+        <Button 
+           variant="ghost" 
+           className="w-full justify-center text-gray-300 hover:bg-gray-700 hover:text-white"
+           onClick={toggleSidebar}
+        >
+           {isCollapsed ? <ChevronsRight size={20} /> : <ChevronsLeft size={20} />}
+           <span className="sr-only">{isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}</span>
+        </Button>
       </div>
     </aside>
   );

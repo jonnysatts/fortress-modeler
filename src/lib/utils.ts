@@ -1,7 +1,7 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 
-export function cn(...inputs: ClassValue[]) {
+export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs))
 }
 
@@ -34,4 +34,52 @@ export const formatVariance = (variance: number | undefined, forecast: number | 
   const sign = variance > 0 ? '+' : '';
   
   return `${sign}${formattedAmount}${percentageString}`;
+};
+
+export const formatDate = (date: Date | string | undefined | null): string => {
+  if (!date) return 'N/A';
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  // Check if the date is valid
+  if (isNaN(dateObj.getTime())) return 'Invalid Date';
+  
+  return dateObj.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+};
+
+export const formatDateRange = (
+  start: Date | string | undefined | null,
+  end?: Date | string | null
+): string => {
+  if (!start) return 'N/A';
+
+  const startDate = typeof start === 'string' ? new Date(start) : start;
+  const endDate = end ? (typeof end === 'string' ? new Date(end) : end) : null;
+
+  if (!endDate || startDate.getTime() === endDate.getTime()) {
+    return formatDate(startDate);
+  }
+
+  const sameYear = startDate.getFullYear() === endDate.getFullYear();
+  const startFormat = startDate.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: sameYear ? undefined : 'numeric',
+  });
+  const endFormat = endDate.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  return `${startFormat} - ${endFormat}`;
+};
+
+export const isUUID = (id: string | number): id is string => {
+  const str = typeof id === 'string' ? id : '';
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(str);
 };

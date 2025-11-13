@@ -7,18 +7,20 @@ import {
   getDatabaseHealth, 
   closeDatabase 
 } from './db/connection';
-import { handleCorsOptions } from './middleware/auth.middleware';
-import authRoutes from './api/auth.routes';
 import projectRoutes from './api/projects.routes';
 import syncRoutes from './api/sync.routes';
 import modelRoutes from './api/models.routes';
+import maintenanceRoutes from './api/maintenance.routes';
+import { SecretsService } from './services/secrets.service';
 
 // Load environment variables
 dotenv.config();
 
+// Initialize secrets service
+SecretsService.initialize();
+
 const app = express();
 const PORT = process.env.PORT || 8080;
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 // Security middleware
 app.use(helmet({
@@ -35,12 +37,11 @@ app.use(helmet({
 
 // CORS configuration
 const allowedOrigins = [
-  CLIENT_URL,
+  'https://fortress-modeler-frontend-pqiu2rcyqq-km.a.run.app',
   'http://localhost:3000',
   'http://localhost:5173',
   'http://localhost:8083',
   'https://fortress-modeler-frontend-928130924917.australia-southeast2.run.app',
-  'https://fortress-modeler-frontend-pqiu2rcyqq-km.a.run.app',
   'https://fortress-modeler.vercel.app',
   'https://fortress-modeler.netlify.app'
 ];
@@ -60,9 +61,6 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
 }));
-
-// Handle CORS preflight
-app.use(handleCorsOptions);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -104,7 +102,6 @@ app.get('/', (req, res) => {
     documentation: {
       health: '/health',
       detailedHealth: '/health/detailed',
-      authentication: '/api/auth/*',
       projects: '/api/projects/*',
       models: '/api/models/*',
       sync: '/api/sync/*'
@@ -121,7 +118,13 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     service: 'fortress-modeler-server',
     version: '3.0.0',
-    phase: 'Phase 3 - Project Sync & Cloud Storage'
+    phase: 'Phase 3 - Project Sync & Cloud Storage',
+    env: {
+      hasGoogleClientId: !!process.env.GOOGLE_CLIENT_ID,
+      hasGoogleClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
+      hasClientUrl: !!process.env.CLIENT_URL,
+      clientUrl: process.env.CLIENT_URL || 'not-set'
+    }
   });
 });
 
@@ -138,18 +141,22 @@ app.get('/health/detailed', async (req, res) => {
     environment: {
       node_env: process.env.NODE_ENV || 'development',
       port: PORT,
-      client_url: CLIENT_URL,
+      client_url: 'from-secrets',
       status: 'configured'
     },
     database: {
       status: 'unknown',
-      latency: null as any,
-      connections: null as any,
-      error: null as any
+      latency: null as number | null,
+      connections: null as {
+        total: number;
+        idle: number;
+        waiting: number;
+      } | null,
+      error: null as string | null
     },
     auth: {
-      google_oauth: process.env.GOOGLE_CLIENT_ID ? 'configured' : 'not_configured',
-      jwt_secret: process.env.JWT_SECRET ? 'configured' : 'not_configured',
+      google_oauth: 'from-secrets',
+      jwt_secret: 'from-secrets',
       status: 'ready'
     },
     components: {
@@ -182,10 +189,10 @@ app.get('/health/detailed', async (req, res) => {
 });
 
 // API Routes
-app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/models', modelRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -197,14 +204,6 @@ app.use('*', (req, res) => {
     available_endpoints: [
       'GET /health',
       'GET /health/detailed',
-      'GET /api/auth/google',
-      'POST /api/auth/google/callback',
-      'POST /api/auth/verify',
-      'POST /api/auth/refresh',
-      'GET /api/auth/me',
-      'PATCH /api/auth/me',
-      'POST /api/auth/logout',
-      'DELETE /api/auth/account',
       'GET /api/projects',
       'POST /api/projects',
       'GET /api/projects/:id',
@@ -222,8 +221,12 @@ app.use('*', (req, res) => {
   });
 });
 
+interface ServerError extends Error {
+  status?: number;
+}
+
 // Error handling middleware
-app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((error: ServerError, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Server error:', error);
   
   res.status(error.status || 500).json({
@@ -262,19 +265,13 @@ const server = app.listen(PORT, () => {
   console.log('🚀 Fortress Modeler Server - Phase 3');
   console.log('====================================');
   console.log(`✅ Server running on port ${PORT}`);
-  console.log(`🌐 Client URL: ${CLIENT_URL}`);
+  console.log('🌐 Client URL: Loaded from Google Secrets Manager');
   console.log(`💾 Database: ${dbInitialized ? 'Connected' : 'Not connected'}`);
-  console.log(`🔐 Authentication: ${process.env.GOOGLE_CLIENT_ID ? 'Configured' : 'Not configured'}`);
+  console.log('🔐 Authentication: Loaded from Google Secrets Manager');
   console.log('');
   console.log('📋 Available endpoints:');
   console.log('  GET  /health           - Basic health check');
   console.log('  GET  /health/detailed  - Detailed system status');
-  console.log('');
-  console.log('  🔐 Authentication:');
-  console.log('  GET  /api/auth/google  - Get Google OAuth URL');
-  console.log('  POST /api/auth/google/callback - Handle OAuth callback');
-  console.log('  POST /api/auth/verify  - Verify JWT token');
-  console.log('  GET  /api/auth/me     - Get user profile');
   console.log('');
   console.log('  📁 Projects:');
   console.log('  GET  /api/projects     - Get all user projects');
@@ -298,13 +295,9 @@ const server = app.listen(PORT, () => {
   console.log('');
   console.log('🔧 Configuration:');
   console.log(`  DATABASE_URL: ${process.env.DATABASE_URL ? 'Set' : 'Not set'}`);
-  console.log(`  GOOGLE_CLIENT_ID: ${process.env.GOOGLE_CLIENT_ID ? 'Set' : 'Not set'}`);
-  console.log(`  JWT_SECRET: ${process.env.JWT_SECRET ? 'Set' : 'Not set'}`);
+  console.log('  GOOGLE_CLIENT_ID: Loaded from Google Secrets Manager');
+  console.log('  JWT_SECRET: Loaded from Google Secrets Manager');
   console.log('');
-  
-  if (!process.env.GOOGLE_CLIENT_ID) {
-    console.log('⚠️  Google OAuth not configured - update GOOGLE_CLIENT_ID in .env');
-  }
   
   if (!dbInitialized) {
     console.log('⚠️  Database not connected - run "npm run db:setup" and "npm run db:migrate"');

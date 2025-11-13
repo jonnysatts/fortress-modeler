@@ -39,7 +39,8 @@ export const prepareRevenueDataForWeek = (weekDataPoint: TrendDataPoint | null):
       // Attempt to map safeName back to original name if possible, or use key
       // This part might need refinement depending on exact keys in weekDataPoint
       const name = key.replace(/([A-Z])/g, ' $1').trim(); // Simple split for potential safeName
-      revenueStreams.push({ name: name, value: weekDataPoint[key] });
+      const value = typeof weekDataPoint[key] === 'number' ? weekDataPoint[key] : parseFloat(String(weekDataPoint[key])) || 0;
+      revenueStreams.push({ name: name, value: value });
     }
   }
 
@@ -69,10 +70,11 @@ export const prepareCostDataForWeek = (weekDataPoint: TrendDataPoint | null, mod
     const costType = baseCost.type?.toLowerCase() || "recurring";
     
     // Only add if value is > 0 for cleaner breakdown
-    if (weeklyValue > 0) {
+    const numericValue = typeof weeklyValue === 'number' ? weeklyValue : parseFloat(String(weeklyValue)) || 0;
+    if (numericValue > 0) {
         costItems.push({
           name: baseCost.name,
-          value: weeklyValue,
+          value: numericValue,
           type: costType.charAt(0).toUpperCase() + costType.slice(1),
         });
     }
@@ -80,10 +82,11 @@ export const prepareCostDataForWeek = (weekDataPoint: TrendDataPoint | null, mod
 
   // Add Marketing Budget if it exists and is > 0
   const marketingBudgetCost = weekDataPoint.MarketingBudget || 0;
-  if (marketingBudgetCost > 0) {
+  const numericMarketingCost = typeof marketingBudgetCost === 'number' ? marketingBudgetCost : parseFloat(String(marketingBudgetCost)) || 0;
+  if (numericMarketingCost > 0) {
       costItems.push({
           name: "Marketing Budget",
-          value: marketingBudgetCost,
+          value: numericMarketingCost,
           type: "Recurring", // Treat marketing budget as recurring for categorization
       });
   }
@@ -115,17 +118,19 @@ export const prepareTypeCategorizedDataForWeek = (weekDataPoint: TrendDataPoint 
   model.assumptions.costs.forEach(baseCost => {
     const safeName = baseCost.name.replace(/[^a-zA-Z0-9]/g, "");
     const weeklyValue = weekDataPoint[safeName] || 0;
+    const numericValue = typeof weeklyValue === 'number' ? weeklyValue : parseFloat(String(weeklyValue)) || 0;
     const costType = (baseCost.type || "recurring").toLowerCase();
 
-    if (typeCategories[costType] && weeklyValue > 0) {
-      typeCategories[costType].value += weeklyValue;
+    if (typeCategories[costType] && numericValue > 0) {
+      typeCategories[costType].value += numericValue;
     }
   });
 
   // Add Marketing Budget to the appropriate category (Recurring)
   const marketingBudgetCost = weekDataPoint.MarketingBudget || 0;
-  if (marketingBudgetCost > 0) {
-      typeCategories.recurring.value += marketingBudgetCost;
+  const numericMarketingCost = typeof marketingBudgetCost === 'number' ? marketingBudgetCost : parseFloat(String(marketingBudgetCost)) || 0;
+  if (numericMarketingCost > 0) {
+      typeCategories.recurring.value += numericMarketingCost;
   }
 
   return Object.values(typeCategories).filter(category => category.value > 0);

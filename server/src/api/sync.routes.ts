@@ -218,15 +218,24 @@ router.post('/resolve-conflict', async (req: AuthRequest, res: Response) => {
       return;
     }
     
-    // TODO: Implement conflict resolution logic
-    // This would require storing conflicts in a separate table
-    // and implementing resolution strategies
-    
-    res.json({
-      message: 'Conflict resolution not yet implemented',
+    const resolved = await SyncService.resolveConflict(
+      req.userId,
       conflict_id,
-      resolution,
-      status: 'pending_implementation'
+      resolution as 'use_server' | 'use_client' | 'merge',
+      resolved_data
+    );
+
+    if (!resolved) {
+      res.status(404).json({
+        error: 'Conflict not found or already resolved',
+        code: 'CONFLICT_NOT_FOUND'
+      });
+      return;
+    }
+
+    res.json({
+      message: 'Conflict resolved',
+      conflict: resolved
     });
     
   } catch (error) {

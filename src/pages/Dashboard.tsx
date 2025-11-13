@@ -1,165 +1,360 @@
 
-import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, PlusCircle, TrendingUp, AlertTriangle } from "lucide-react";
+import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { BarChart3, PlusCircle, TrendingUp, AlertTriangle, Target, DollarSign, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
-import useStore from "@/store/useStore";
-import { config } from "@/lib/config";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { usePortfolioAnalytics, usePerformanceChartData, useVarianceIndicators } from "@/hooks/usePortfolioAnalytics";
+import { KPICard, VarianceIndicator } from "@/components/dashboard/KPICard";
+import { ForecastAccuracyCard } from "@/components/dashboard/ForecastAccuracyCard";
+import { PortfolioHealthSummary } from "@/components/dashboard/ProjectHealthCard";
+import { VarianceTrendSummary } from "@/components/dashboard/VarianceTrendChart";
+import { RiskInsights } from "@/components/dashboard/RiskInsights";
+import { useMyProjects } from "@/hooks/useProjects";
+import { useForecastAccuracy } from "@/hooks/useForecastAccuracy";
+import { useProjectHealth } from "@/hooks/useProjectHealth";
+import { useVarianceTrends } from "@/hooks/useVarianceTrends";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 const Dashboard = () => {
-  const { projects, loadProjects } = useStore();
   const navigate = useNavigate();
+  const { data: projects = [], isLoading: projectsLoading } = useMyProjects();
 
-  useEffect(() => {
-    loadProjects();
-  }, [loadProjects]);
+  const [eventFilter, setEventFilter] = useState<'all' | 'weekly' | 'special'>('all');
 
-  // Filter out UUID projects if cloud sync is disabled
-  const availableProjects = config.useCloudSync 
-    ? projects 
-    : projects.filter(project => typeof project.id === 'number');
+  // Use enhanced analytics hooks
+  const { data: analytics, isLoading: analyticsLoading, error: analyticsError } = usePortfolioAnalytics(eventFilter);
+  const { data: chartData, isLoading: chartLoading } = usePerformanceChartData(eventFilter);
+  const { indicators, dataCompleteness, projectsWithActuals, totalProjects } = useVarianceIndicators(eventFilter);
+  const { data: forecastAccuracy, isLoading: forecastLoading, error: forecastError } = useForecastAccuracy();
+  const { data: projectHealth, isLoading: healthLoading } = useProjectHealth();
+  const { data: varianceTrends, isLoading: varianceLoading } = useVarianceTrends();
 
-  // Calculate real metrics from actual project data
-  const calculateTotalRevenue = () => {
-    if (availableProjects.length === 0) return 0;
-    return availableProjects.reduce((total, project) => {
-      // Sum up revenue from all financial models in the project
-      const projectRevenue = project.financialModels?.reduce((projectTotal, model) => {
-        return projectTotal + (model.monthlyRevenue * 12 || 0);
-      }, 0) || 0;
-      return total + projectRevenue;
-    }, 0);
-  };
+  const isLoading = projectsLoading || analyticsLoading;
 
-  const calculateActiveRisks = () => {
-    if (availableProjects.length === 0) return 0;
-    return availableProjects.reduce((total, project) => {
-      // Count financial models with high costs or low profit margins as risks
-      const projectRisks = project.financialModels?.filter(model => {
-        const profitMargin = model.monthlyRevenue ? 
-          ((model.monthlyRevenue - model.monthlyCosts) / model.monthlyRevenue) * 100 : 0;
-        return profitMargin < 20 || model.monthlyCosts > 10000;
-      }).length || 0;
-      return total + projectRisks;
-    }, 0);
-  };
+  const filteredProjects = eventFilter === 'all' ? projects : projects.filter(p => p.event_type === eventFilter);
 
-  const generatePerformanceData = () => {
-    if (availableProjects.length === 0) return [];
-    // Generate last 6 months of data based on project creation dates and models
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    return months.map((month, index) => {
-      const monthRevenue = availableProjects.reduce((total, project) => {
-        const modelRevenue = project.financialModels?.reduce((modelTotal, model) => {
-          return modelTotal + (model.monthlyRevenue || 0);
-        }, 0) || 0;
-        return total + modelRevenue;
-      }, 0);
-      return { name: month, value: Math.round(monthRevenue * (0.8 + Math.random() * 0.4)) };
-    });
-  };
+  // Get metrics from analytics service
+  const portfolioMetrics = analytics?.portfolioMetrics;
+  const hasActuals = (portfolioMetrics?.projectsWithActuals || 0) > 0;
+  
+  // Get the first project with actuals or the most recent project for risk navigation
+  const primaryProject = filteredProjects.find(p =>
+    analytics?.projectPerformance?.find(perf => perf.projectId === p.id && perf.hasActuals)
+  ) || filteredProjects[0];
 
-  const generateRiskData = () => {
-    if (availableProjects.length === 0) return [];
-    const riskCategories = ['Financial', 'Operational', 'Strategic', 'Regulatory'];
-    return riskCategories.map(category => {
-      const risks = Math.floor(Math.random() * calculateActiveRisks() / 2) + 1;
-      return { name: category, value: risks };
-    }).filter(item => item.value > 0);
-  };
-
-  const totalRevenue = calculateTotalRevenue();
-  const activeRisks = calculateActiveRisks();
-  const performanceData = generatePerformanceData();
-  const riskData = generateRiskData();
-
-  const COLORS = ['#1A2942', '#3E5C89', '#10B981', '#334155'];
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-fortress-blue">Dashboard</h1>
+        </div>
+        <div className="animate-pulse space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-muted rounded h-32" />
+            ))}
+          </div>
+          <div className="bg-muted rounded h-64" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-fortress-blue">Dashboard</h1>
-        <Button onClick={() => navigate("/projects/new")} className="bg-fortress-emerald hover:bg-fortress-emerald/90">
-          <PlusCircle className="mr-2 h-4 w-4" />
-          New Project
-        </Button>
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-fortress-blue">Dashboard</h1>
+          {hasActuals && (
+            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs font-medium">
+              <Target className="h-3 w-3" />
+              Actual Data Available ({dataCompleteness?.toFixed(0)}% complete)
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Label className="text-sm">Event Type</Label>
+            <Select value={eventFilter} onValueChange={(v) => setEventFilter(v as any)}>
+              <SelectTrigger className="w-28 h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="special">Special</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={() => navigate("/projects/new")} className="bg-fortress-emerald hover:bg-fortress-emerald/90">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            New Project
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Data Completeness Alert */}
+      {portfolioMetrics && dataCompleteness !== undefined && dataCompleteness < 50 && totalProjects > 0 && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Only {projectsWithActuals} of {totalProjects} projects have actual data. 
+            Add performance data to see variance insights and trends.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* Projects KPI */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Total Projects</CardTitle>
+            <CardTitle className="text-lg font-medium flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-fortress-emerald" />
+              Total Projects
+            </CardTitle>
             <CardDescription>Currently active projects</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-3xl font-bold">{availableProjects.length}</div>
-              <BarChart3 className="h-8 w-8 text-fortress-emerald" />
+              <div className="text-3xl font-bold">{filteredProjects.length}</div>
+              {hasActuals && (
+                <div className="text-xs text-green-600">
+                  {projectsWithActuals} with actuals
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Total Revenue (YTD)</CardTitle>
-            <CardDescription>Across all projects</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-3xl font-bold">
-                {totalRevenue > 0 ? `$${totalRevenue.toLocaleString()}` : '$0'}
-              </div>
-              <TrendingUp className="h-8 w-8 text-fortress-emerald" />
-            </div>
-          </CardContent>
-        </Card>
+        {/* Revenue KPI */}
+        {portfolioMetrics && (
+          <KPICard
+            title="Revenue"
+            description={hasActuals ? "Actual vs projected revenue" : "Projected revenue"}
+            value={hasActuals ? portfolioMetrics.totalActualRevenue : portfolioMetrics.totalProjectedRevenue}
+            projectedValue={portfolioMetrics.totalProjectedRevenue}
+            variance={portfolioMetrics.revenueVariance}
+            icon={<DollarSign className="h-8 w-8 text-fortress-emerald" />}
+            formatValue={(v) => `$${v.toLocaleString()}`}
+            hasActualData={hasActuals}
+            periodsCompared={portfolioMetrics.totalPeriodsWithActuals}
+          />
+        )}
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Active Risks</CardTitle>
-            <CardDescription>Identified risks across projects</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-3xl font-bold">{activeRisks}</div>
-              <AlertTriangle className="h-8 w-8 text-amber-500" />
-            </div>
-          </CardContent>
-        </Card>
+        {/* Costs KPI */}
+        {portfolioMetrics && (
+          <KPICard
+            title="Costs"
+            description={hasActuals ? "Actual vs projected costs" : "Projected costs"}
+            value={hasActuals ? portfolioMetrics.totalActualCosts : portfolioMetrics.totalProjectedCosts}
+            projectedValue={portfolioMetrics.totalProjectedCosts}
+            variance={portfolioMetrics.costVariance}
+            icon={<TrendingDown className="h-8 w-8 text-red-500" />}
+            formatValue={(v) => `$${v.toLocaleString()}`}
+            hasActualData={hasActuals}
+            periodsCompared={portfolioMetrics.totalPeriodsWithActuals}
+          />
+        )}
+
+        {/* Profit KPI */}
+        {portfolioMetrics && (
+          <KPICard
+            title="Profit"
+            description={hasActuals ? "Actual vs projected profit" : "Projected profit"}
+            value={hasActuals ? portfolioMetrics.totalActualProfit : portfolioMetrics.totalProjectedProfit}
+            projectedValue={portfolioMetrics.totalProjectedProfit}
+            variance={portfolioMetrics.profitVariance}
+            icon={<TrendingUp className="h-8 w-8 text-fortress-emerald" />}
+            formatValue={(v) => `$${v.toLocaleString()}`}
+            hasActualData={hasActuals}
+            periodsCompared={portfolioMetrics.totalPeriodsWithActuals}
+          />
+        )}
       </div>
+
+      {/* Variance Indicators Section */}
+      {hasActuals && indicators.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Performance vs Projections</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {indicators.map((indicator, index) => (
+              <VarianceIndicator
+                key={index}
+                metric={indicator.metric}
+                variance={indicator.variance}
+                actual={indicator.actual}
+                projected={indicator.projected}
+                status={indicator.status}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Forecast Accuracy Section */}
+      {hasActuals && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-1">
+            {forecastLoading ? (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg font-medium">Forecast Accuracy</CardTitle>
+                  <CardDescription>Loading accuracy metrics...</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="animate-pulse space-y-4">
+                    <div className="h-12 bg-muted rounded"></div>
+                    <div className="h-2 bg-muted rounded"></div>
+                    <div className="space-y-2">
+                      <div className="h-4 bg-muted rounded w-3/4"></div>
+                      <div className="h-4 bg-muted rounded w-1/2"></div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : forecastError ? (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg font-medium">Forecast Accuracy</CardTitle>
+                  <CardDescription>Unable to load accuracy data</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm text-muted-foreground">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 inline mr-2" />
+                    Failed to calculate forecast accuracy. Please try refreshing the page.
+                  </div>
+                </CardContent>
+              </Card>
+            ) : forecastAccuracy && forecastAccuracy.projectsAnalyzed > 0 ? (
+              <ForecastAccuracyCard
+                overallMAPE={forecastAccuracy.overallMAPE}
+                accuracyTrend={forecastAccuracy.accuracyTrend}
+                confidenceScore={forecastAccuracy.confidenceScore}
+                projectsAnalyzed={forecastAccuracy.projectsAnalyzed}
+                projectsWithPoorAccuracy={forecastAccuracy.projectsWithPoorAccuracy}
+              />
+            ) : null}
+          </div>
+          <div className="md:col-span-2">
+            {/* Variance Trends Summary */}
+            {varianceTrends && varianceTrends.varianceTrends.length > 0 && (
+              <VarianceTrendSummary
+                varianceTrends={varianceTrends.varianceTrends}
+                title="Variance Trends"
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Advanced Analytics Section - Phase A2 & A3 */}
+      {hasActuals && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Project Health Summary */}
+          {projectHealth && (
+            <PortfolioHealthSummary
+              healthScores={projectHealth.healthScores}
+              title="Portfolio Health"
+            />
+          )}
+          
+          {/* Space for additional analytics */}
+          <div className="space-y-4">
+            {projectHealth && projectHealth.allInsights.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg font-medium">Key Insights</CardTitle>
+                  <CardDescription>
+                    Critical insights across your portfolio
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {projectHealth.allInsights.slice(0, 3).map((insight, index) => (
+                      <div 
+                        key={index}
+                        className={cn(
+                          "p-3 rounded-lg border-l-4",
+                          insight.severity === 'high' ? "border-red-500 bg-red-50" :
+                          insight.severity === 'medium' ? "border-yellow-500 bg-yellow-50" :
+                          "border-blue-500 bg-blue-50"
+                        )}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-sm">{insight.title}</h4>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {insight.description}
+                            </p>
+                          </div>
+                          <Badge 
+                            variant="outline"
+                            className={cn(
+                              "text-xs ml-2",
+                              insight.severity === 'high' ? "border-red-500 text-red-700" :
+                              insight.severity === 'medium' ? "border-yellow-500 text-yellow-700" :
+                              "border-blue-500 text-blue-700"
+                            )}
+                          >
+                            {insight.severity}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                    {projectHealth.allInsights.length > 3 && (
+                      <p className="text-xs text-muted-foreground text-center">
+                        +{projectHealth.allInsights.length - 3} more insights available
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card className="col-span-1">
           <CardHeader>
-            <CardTitle>Recent Performance</CardTitle>
-            <CardDescription>Revenue over the last 6 months</CardDescription>
+            <CardTitle>Actual vs Projected Performance</CardTitle>
+            <CardDescription>Revenue comparison over time</CardDescription>
           </CardHeader>
           <CardContent className="h-80">
-            {performanceData.length > 0 && performanceData.some(d => d.value > 0) ? (
+            {chartData && chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={performanceData}>
+                <BarChart data={chartData}>
                   <XAxis dataKey="name" />
                   <YAxis />
                   <Tooltip 
-                    formatter={(value) => [`$${value}`, 'Revenue']} 
+                    formatter={(value, name) => [
+                      `$${value?.toLocaleString() || 0}`, 
+                      name === 'actual' ? 'Actual Revenue' : 'Projected Revenue'
+                    ]} 
                     contentStyle={{ 
                       backgroundColor: '#f8fafc', 
                       border: '1px solid #e2e8f0',
                       borderRadius: '6px'
                     }}
                   />
-                  <Bar dataKey="value" fill="#10B981" radius={[4, 4, 0, 0]} />
+                  <Legend />
+                  <Bar dataKey="projected" fill="#94A3B8" name="Projected" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="actual" fill="#10B981" name="Actual" radius={[2, 2, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-center">
                 <div>
                   <BarChart3 className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-muted-foreground">No revenue data yet</p>
+                  <p className="text-muted-foreground">No performance data yet</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Create projects with financial models to see performance charts
+                    Add actual performance data to see variance charts
                   </p>
                 </div>
               </div>
@@ -167,99 +362,58 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>Risk Distribution</CardTitle>
-            <CardDescription>By category across all projects</CardDescription>
-          </CardHeader>
-          <CardContent className="h-80">
-            {riskData.length > 0 && activeRisks > 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="w-full h-full flex flex-col">
-                  <div className="flex-1">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={riskData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          {riskData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip 
-                          formatter={(value) => [`${value} risks`, '']} 
-                          contentStyle={{ 
-                            backgroundColor: '#f8fafc', 
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '6px' 
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="flex justify-center gap-4 mt-4">
-                    {riskData.map((entry, index) => (
-                      <div key={`legend-${index}`} className="flex items-center">
-                        <div
-                          className="w-3 h-3 mr-1"
-                          style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                        ></div>
-                        <span className="text-xs">{entry.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-center">
-                <div>
-                  <AlertTriangle className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-muted-foreground">No risks identified</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Risk analysis will appear as you add financial models to your projects
-                  </p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <RiskInsights 
+          className="col-span-1" 
+          primaryProjectId={primaryProject?.id}
+        />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Revenue Forecast</CardTitle>
-          <CardDescription>Projected vs actual revenue for the next 6 months</CardDescription>
-        </CardHeader>
-        <CardContent className="h-80">
-          {availableProjects.length > 0 && totalRevenue > 0 ? (
-            <div className="flex items-center justify-center h-full text-center">
-              <div>
-                <TrendingUp className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-muted-foreground">Forecasting coming soon</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Advanced forecasting features will be available based on your project data
-                </p>
-              </div>
+      {/* Project Performance Summary */}
+      {analytics?.projectPerformance && analytics.projectPerformance.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Project Performance Summary</CardTitle>
+            <CardDescription>Individual project metrics and variance analysis</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {analytics.projectPerformance.slice(0, 5).map((project) => (
+                <div 
+                  key={project.projectId}
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                  onClick={() => navigate(`/projects/${project.projectId}`)}
+                >
+                  <div className="flex-1">
+                    <h3 className="font-medium">{project.projectName}</h3>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span>Revenue: ${project.actualRevenue.toLocaleString()}</span>
+                      <span>Profit: ${project.actualProfit.toLocaleString()}</span>
+                      {project.hasActuals && (
+                        <span className={`font-medium ${project.revenueVariance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {project.revenueVariance >= 0 ? '+' : ''}{project.revenueVariance.toFixed(1)}% variance
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {project.hasActuals ? (
+                      <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs">
+                        <Target className="h-3 w-3" />
+                        {project.periodsWithData} periods
+                      </div>
+                    ) : (
+                      <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-100 text-amber-800 text-xs">
+                        <AlertTriangle className="h-3 w-3" />
+                        No actuals
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-          ) : (
-            <div className="flex items-center justify-center h-full text-center">
-              <div>
-                <TrendingUp className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-muted-foreground">No data for forecasting</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Create projects with financial models to enable revenue forecasting
-                </p>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
@@ -268,16 +422,13 @@ const Dashboard = () => {
             <CardDescription>Your most recently created projects</CardDescription>
           </CardHeader>
           <CardContent>
-            {availableProjects.length > 0 ? (
+            {filteredProjects.length > 0 ? (
               <ul className="space-y-2">
-                {availableProjects.slice(0, 5).map((project) => (
+                {filteredProjects.slice(0, 5).map((project) => (
                   <li 
                     key={project.id} 
                     className="p-3 border rounded-md hover:bg-gray-50 cursor-pointer"
-                    onClick={() => {
-                      useStore.getState().setCurrentProject(project);
-                      navigate(`/projects/${project.id}`);
-                    }}
+                    onClick={() => navigate(`/projects/${project.id}`)}
                   >
                     <div className="flex justify-between items-center">
                       <div>
@@ -308,24 +459,44 @@ const Dashboard = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Data Backup Reminder</CardTitle>
-            <CardDescription>It's important to regularly export your data</CardDescription>
+            <CardTitle>Analytics Status</CardTitle>
+            <CardDescription>Portfolio data quality and completeness</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="bg-amber-50 border border-amber-200 rounded-md p-4 mb-4">
-              <div className="flex items-start">
-                <AlertTriangle className="h-5 w-5 text-amber-500 mr-2 mt-0.5" />
-                <div>
-                  <h4 className="font-medium text-amber-800">Never backed up</h4>
-                  <p className="text-sm text-amber-700">
-                    You haven't exported your data yet. We recommend doing this regularly to prevent data loss.
-                  </p>
+            {portfolioMetrics ? (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Data Completeness</span>
+                  <span className="font-medium">{dataCompleteness?.toFixed(0)}%</span>
                 </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-fortress-emerald h-2 rounded-full" 
+                    style={{ width: `${dataCompleteness}%` }}
+                  ></div>
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{projectsWithActuals} projects with actual data</span>
+                  <span>{totalProjects} total projects</span>
+                </div>
+                {dataCompleteness && dataCompleteness < 50 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
+                    <div className="flex items-start">
+                      <AlertTriangle className="h-4 w-4 text-amber-500 mr-2 mt-0.5" />
+                      <div>
+                        <p className="text-sm text-amber-700">
+                          Add actual performance data to see variance insights and improved analytics.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-            <Button variant="outline" className="w-full">
-              Export All Data
-            </Button>
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-muted-foreground">Loading analytics...</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -49,7 +49,7 @@ fi
 echo "🚀 Launching Fortress Financial Modeler..."
 echo "The app will open in your default browser"
 echo ""
-echo "📍 Local URL: http://localhost:8080"
+echo "📍 Local URL: http://localhost:8081"
 echo "🔄 Hot reload is enabled for development"
 echo ""
 echo "❌ To stop the server, press Ctrl+C in this terminal"
@@ -59,10 +59,10 @@ echo ""
 # Try to open browser automatically
 if command -v xdg-open &> /dev/null; then
     # Linux
-    sleep 3 && xdg-open http://localhost:8080 &
+    sleep 3 && xdg-open http://localhost:8081 &
 elif command -v open &> /dev/null; then
     # macOS (backup)
-    sleep 3 && open http://localhost:8080 &
+    sleep 3 && open http://localhost:8081 &
 fi
 
 # Start the development server

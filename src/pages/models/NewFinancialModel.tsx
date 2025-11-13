@@ -1,8 +1,7 @@
-import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +14,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+
 import {
   Select,
   SelectContent,
@@ -24,31 +23,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { db, getProject, RevenueAssumption, CostAssumption } from "@/lib/db";
-import useStore from "@/store/useStore";
-import { toast } from "@/hooks/use-toast";
+import { RevenueAssumption, CostAssumption } from "@/lib/db";
+import { useProject } from "@/hooks/useProjects";
+import { useCreateModel } from "@/hooks/useModels";
+import { toast } from "sonner";
 import EventModelForm from "./components/EventModelForm";
-
-// Schema for form validation
-const formSchema = z.object({
-  name: z.string().min(1, "Model name is required"),
-  growthModelType: z.enum(["linear", "exponential", "seasonal"], {
-    required_error: "Please select a growth model type",
-  }),
-  growthRate: z.coerce
-    .number()
-    .min(0, "Growth rate must be positive")
-    .default(0.1),
-  seasonalFactors: z.string().optional(),
-});
-
-type FormValues = z.infer<typeof formSchema>;
+import SpecialEventForecastForm from "@/components/events/SpecialEventForecastForm";
+import { useActiveFrequencies, useActiveCostCategories } from "@/hooks/useCategories";
 
 // Default revenue assumption
 const defaultRevenueAssumption: RevenueAssumption = {
   name: "",
   value: 0,
-  type: "recurring", // Now explicitly using the union type
+  type: "recurring",
   frequency: "monthly",
 };
 
@@ -56,27 +43,43 @@ const defaultRevenueAssumption: RevenueAssumption = {
 const defaultCostAssumption: CostAssumption = {
   name: "",
   value: 0,
-  type: "fixed", // Now explicitly using the union type
+  type: "fixed",
   category: "operations",
 };
+
+// Zod schemas for validation
+const revenueAssumptionSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  value: z.coerce.number().min(0, "Value must be positive"),
+  type: z.enum(["recurring", "fixed", "variable"]),
+  frequency: z.enum(["monthly", "quarterly", "annually", "one-time"]),
+});
+
+const costAssumptionSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  value: z.coerce.number().min(0, "Value must be positive"),
+  type: z.enum(["recurring", "fixed", "variable"]),
+  category: z.enum(["staffing", "marketing", "operations", "other"]),
+});
+
+const formSchema = z.object({
+  name: z.string().min(1, "Model name is required"),
+  growthModelType: z.enum(["linear", "exponential", "seasonal"]),
+  growthRate: z.coerce.number().min(0, "Growth rate must be positive").default(0.1),
+  seasonalFactors: z.string().optional(),
+  revenueAssumptions: z.array(revenueAssumptionSchema).min(1, "At least one revenue stream is required."),
+  costAssumptions: z.array(costAssumptionSchema).min(1, "At least one cost is required."),
+});
+
+type FormValues = z.infer<typeof formSchema>;
 
 const NewFinancialModel = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { currentProject, loadProjectById } = useStore();
-  const [revenueAssumptions, setRevenueAssumptions] = useState<RevenueAssumption[]>([
-    { ...defaultRevenueAssumption, name: "Monthly Subscription" },
-  ]);
-  const [costAssumptions, setCostAssumptions] = useState<CostAssumption[]>([
-    { ...defaultCostAssumption, name: "Cloud Infrastructure" },
-  ]);
-
-  // Load project if not already loaded
-  useEffect(() => {
-    if (projectId && (!currentProject || currentProject.id !== Number(projectId))) {
-      loadProjectById(Number(projectId));
-    }
-  }, [projectId, currentProject, loadProjectById]);
+  const { data: currentProject, isLoading: projectLoading } = useProject(projectId);
+  const createModel = useCreateModel();
+  const { data: frequencies = [], isLoading: frequenciesLoading } = useActiveFrequencies();
+  const { data: costCategories = [], isLoading: costCategoriesLoading } = useActiveCostCategories();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -85,15 +88,32 @@ const NewFinancialModel = () => {
       growthModelType: "linear",
       growthRate: 0.1,
       seasonalFactors: "",
+      revenueAssumptions: [{ ...defaultRevenueAssumption, name: "Monthly Subscription" }],
+      costAssumptions: [{ ...defaultCostAssumption, name: "Cloud Infrastructure" }],
     },
   });
 
+  const { fields: revenueFields, append: appendRevenue, remove: removeRevenue } = useFieldArray({
+    control: form.control,
+    name: "revenueAssumptions",
+  });
+
+  const { fields: costFields, append: appendCost, remove: removeCost } = useFieldArray({
+    control: form.control,
+    name: "costAssumptions",
+  });
+
   const onSubmit = async (data: FormValues) => {
-    if (!projectId || !currentProject) return;
+    if (!projectId || projectLoading || !currentProject || !currentProject.id) {
+      toast.error("Project not loaded", {
+        description: "Could not create a model because the project data is missing.",
+      });
+      return;
+    }
 
     try {
       // Handle submission based on product type
-      if (currentProject.productType === "WeeklyEvent") {
+      if (currentProject.productType === "WeeklyEvent" || currentProject.productType === "SpecialEvent") {
         // The event model form will handle its own submission
         return;
       }
@@ -108,9 +128,7 @@ const NewFinancialModel = () => {
             .filter((factor) => !isNaN(factor));
         } catch (error) {
           console.error("Error parsing seasonal factors:", error);
-          toast({
-            variant: "destructive",
-            title: "Invalid seasonal factors",
+          toast.error("Invalid seasonal factors", {
             description:
               "Please enter valid numbers separated by commas (e.g., 1.1, 0.9, 1.2, 0.8).",
           });
@@ -125,96 +143,26 @@ const NewFinancialModel = () => {
         seasonalFactors: seasonalFactorsArray,
       };
 
-      // Create new financial model
-      const modelId = await db.financialModels.add({
-        projectId: parseInt(projectId),
+      await createModel.mutateAsync({
+        projectId: currentProject.id,
         name: data.name,
         assumptions: {
-          revenue: revenueAssumptions,
-          costs: costAssumptions,
+          revenue: data.revenueAssumptions,
+          costs: data.costAssumptions,
           growthModel,
         },
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-
-      toast({
-        title: "Financial model created",
-        description: `Successfully created "${data.name}" model.`,
       });
 
       navigate(`/projects/${projectId}`);
     } catch (error) {
       console.error("Error creating financial model:", error);
-      toast({
-        variant: "destructive",
-        title: "Failed to create model",
+      toast.error("Failed to create model", {
         description: "There was an error creating the financial model.",
       });
     }
   };
 
-  // Handle revenue assumption changes
-  const handleRevenueChange = (
-    index: number,
-    field: string,
-    value: string | number
-  ) => {
-    const updated = [...revenueAssumptions];
-    if (field === 'type' && (value === 'fixed' || value === 'variable' || value === 'recurring')) {
-      updated[index] = { ...updated[index], [field]: value };
-    } else if (field === 'frequency' && (value === 'monthly' || value === 'quarterly' || value === 'annually' || value === 'one-time')) {
-      updated[index] = { ...updated[index], [field]: value };
-    } else {
-      updated[index] = { ...updated[index], [field]: value };
-    }
-    setRevenueAssumptions(updated);
-  };
-
-  // Add a new revenue assumption
-  const addRevenueAssumption = () => {
-    setRevenueAssumptions([...revenueAssumptions, { ...defaultRevenueAssumption }]);
-  };
-
-  // Remove a revenue assumption
-  const removeRevenueAssumption = (index: number) => {
-    if (revenueAssumptions.length > 1) {
-      setRevenueAssumptions(
-        revenueAssumptions.filter((_, i) => i !== index)
-      );
-    }
-  };
-
-  // Handle cost assumption changes
-  const handleCostChange = (
-    index: number,
-    field: string,
-    value: string | number
-  ) => {
-    const updated = [...costAssumptions];
-    if (field === 'type' && (value === 'fixed' || value === 'variable' || value === 'recurring')) {
-      updated[index] = { ...updated[index], [field]: value };
-    } else if (field === 'category' && (value === 'staffing' || value === 'marketing' || value === 'operations' || value === 'other')) {
-      updated[index] = { ...updated[index], [field]: value };
-    } else {
-      updated[index] = { ...updated[index], [field]: value };
-    }
-    setCostAssumptions(updated);
-  };
-
-  // Add a new cost assumption
-  const addCostAssumption = () => {
-    setCostAssumptions([...costAssumptions, { ...defaultCostAssumption }]);
-  };
-
-  // Remove a cost assumption
-  const removeCostAssumption = (index: number) => {
-    if (costAssumptions.length > 1) {
-      setCostAssumptions(costAssumptions.filter((_, i) => i !== index));
-    }
-  };
-
-  if (!currentProject) {
+  if (projectLoading || !currentProject) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="h-10 w-10 border-4 border-fortress-emerald border-t-transparent rounded-full animate-spin"></div>
@@ -222,12 +170,37 @@ const NewFinancialModel = () => {
     );
   }
 
-  // Check if this is a weekly event project
+  // Check project type and route to appropriate component
+  if (currentProject.productType === "SpecialEvent") {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(`/projects/${projectId}`)}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold text-fortress-blue">
+              Special Event Forecast
+            </h1>
+            <p className="text-muted-foreground">
+              Create forecasts for {currentProject.name}
+            </p>
+          </div>
+        </div>
+        <SpecialEventForecastForm projectId={projectId!} />
+      </div>
+    );
+  }
+
   if (currentProject.productType === "WeeklyEvent") {
     return (
-      <EventModelForm 
-        projectId={Number(projectId)} 
-        projectName={currentProject.name} 
+      <EventModelForm
+        projectId={projectId!}
+        projectName={currentProject.name}
         onCancel={() => navigate(`/projects/${projectId}`)}
       />
     );
@@ -246,10 +219,10 @@ const NewFinancialModel = () => {
         </Button>
         <div>
           <h1 className="text-3xl font-bold text-fortress-blue">
-            New Financial Model
+            New Financial Scenario
           </h1>
           <p className="text-muted-foreground">
-            Create a financial model for {currentProject.name}
+            Create a financial scenario for {currentProject.name}
           </p>
         </div>
       </div>
@@ -258,7 +231,7 @@ const NewFinancialModel = () => {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           <Card>
             <CardHeader>
-              <CardTitle>Model Information</CardTitle>
+              <CardTitle>Scenario Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <FormField
@@ -266,9 +239,9 @@ const NewFinancialModel = () => {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Model Name</FormLabel>
+                    <FormLabel>Scenario Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Base Financial Model" {...field} />
+                      <Input placeholder="Base Financial Scenario" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -281,7 +254,7 @@ const NewFinancialModel = () => {
             <TabsList className="grid grid-cols-3 mb-4">
               <TabsTrigger value="revenue">Revenue Assumptions</TabsTrigger>
               <TabsTrigger value="costs">Cost Assumptions</TabsTrigger>
-              <TabsTrigger value="growth">Growth Model</TabsTrigger>
+              <TabsTrigger value="growth">Growth Scenario</TabsTrigger>
             </TabsList>
 
             <TabsContent value="revenue" className="space-y-4">
@@ -291,84 +264,79 @@ const NewFinancialModel = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
-                    {revenueAssumptions.map((assumption, index) => (
+                    {revenueFields.map((field, index) => (
                       <div
-                        key={index}
+                        key={field.id}
                         className="grid grid-cols-1 md:grid-cols-4 gap-4 pb-4 border-b"
                       >
-                        <div>
-                          <FormLabel>Name</FormLabel>
-                          <Input
-                            value={assumption.name}
-                            onChange={(e) =>
-                              handleRevenueChange(index, "name", e.target.value)
-                            }
-                            placeholder="Subscription Fee"
-                          />
-                        </div>
-
-                        <div>
-                          <FormLabel>Value ($)</FormLabel>
-                          <Input
-                            type="number"
-                            value={assumption.value}
-                            onChange={(e) =>
-                              handleRevenueChange(
-                                index,
-                                "value",
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            placeholder="99.99"
-                          />
-                        </div>
-
-                        <div>
-                          <FormLabel>Type</FormLabel>
-                          <Select
-                            value={assumption.type}
-                            onValueChange={(value) =>
-                              handleRevenueChange(index, "type", value)
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="fixed">Fixed</SelectItem>
-                              <SelectItem value="variable">Variable</SelectItem>
-                              <SelectItem value="recurring">Recurring</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div>
-                          <FormLabel>Frequency</FormLabel>
-                          <Select
-                            value={assumption.frequency}
-                            onValueChange={(value) =>
-                              handleRevenueChange(index, "frequency", value)
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select frequency" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="monthly">Monthly</SelectItem>
-                              <SelectItem value="quarterly">Quarterly</SelectItem>
-                              <SelectItem value="annually">Annually</SelectItem>
-                              <SelectItem value="one-time">One-time</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        <FormField
+                          control={form.control}
+                          name={`revenueAssumptions.${index}.name`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Name</FormLabel>
+                              <FormControl><Input placeholder="Subscription Fee" {...field} /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`revenueAssumptions.${index}.value`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Value ($)</FormLabel>
+                              <FormControl><Input type="number" placeholder="99.99" {...field} /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`revenueAssumptions.${index}.type`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Type</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
+                                <SelectContent>
+                                  <SelectItem value="recurring">Recurring</SelectItem>
+                                  <SelectItem value="variable">Variable</SelectItem>
+                                  <SelectItem value="fixed">Fixed</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`revenueAssumptions.${index}.frequency`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Frequency</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={frequenciesLoading}>
+                                <FormControl><SelectTrigger><SelectValue placeholder={frequenciesLoading ? "Loading..." : "Select frequency"} /></SelectTrigger></FormControl>
+                                <SelectContent>
+                                  {frequencies.map((freq) => (
+                                    <SelectItem key={freq.value} value={freq.value}>
+                                      {freq.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
                         <div className="flex justify-end col-span-1 md:col-span-4">
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => removeRevenueAssumption(index)}
-                            disabled={revenueAssumptions.length <= 1}
+                            onClick={() => removeRevenue(index)}
+                            disabled={revenueFields.length <= 1}
                             className="text-red-500"
                           >
                             Remove
@@ -376,11 +344,10 @@ const NewFinancialModel = () => {
                         </div>
                       </div>
                     ))}
-
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={addRevenueAssumption}
+                      onClick={() => appendRevenue({ ...defaultRevenueAssumption, frequency: "monthly" })}
                       className="mt-4"
                     >
                       Add Revenue Stream
@@ -397,84 +364,79 @@ const NewFinancialModel = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
-                    {costAssumptions.map((assumption, index) => (
+                    {costFields.map((field, index) => (
                       <div
-                        key={index}
+                        key={field.id}
                         className="grid grid-cols-1 md:grid-cols-4 gap-4 pb-4 border-b"
                       >
-                        <div>
-                          <FormLabel>Name</FormLabel>
-                          <Input
-                            value={assumption.name}
-                            onChange={(e) =>
-                              handleCostChange(index, "name", e.target.value)
-                            }
-                            placeholder="Server Costs"
-                          />
-                        </div>
-
-                        <div>
-                          <FormLabel>Value ($)</FormLabel>
-                          <Input
-                            type="number"
-                            value={assumption.value}
-                            onChange={(e) =>
-                              handleCostChange(
-                                index,
-                                "value",
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            placeholder="500"
-                          />
-                        </div>
-
-                        <div>
-                          <FormLabel>Type</FormLabel>
-                          <Select
-                            value={assumption.type}
-                            onValueChange={(value) =>
-                              handleCostChange(index, "type", value)
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="fixed">Fixed</SelectItem>
-                              <SelectItem value="variable">Variable</SelectItem>
-                              <SelectItem value="recurring">Recurring</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div>
-                          <FormLabel>Category</FormLabel>
-                          <Select
-                            value={assumption.category}
-                            onValueChange={(value) =>
-                              handleCostChange(index, "category", value)
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="staffing">Staffing</SelectItem>
-                              <SelectItem value="marketing">Marketing</SelectItem>
-                              <SelectItem value="operations">Operations</SelectItem>
-                              <SelectItem value="other">Other</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        <FormField
+                          control={form.control}
+                          name={`costAssumptions.${index}.name`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Name</FormLabel>
+                              <FormControl><Input placeholder="Server Costs" {...field} /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`costAssumptions.${index}.value`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Value ($)</FormLabel>
+                              <FormControl><Input type="number" placeholder="500" {...field} /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`costAssumptions.${index}.type`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Type</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
+                                <SelectContent>
+                                  <SelectItem value="recurring">Recurring</SelectItem>
+                                  <SelectItem value="variable">Variable</SelectItem>
+                                  <SelectItem value="fixed">Fixed</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`costAssumptions.${index}.category`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Category</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={costCategoriesLoading}>
+                                <FormControl><SelectTrigger><SelectValue placeholder={costCategoriesLoading ? "Loading..." : "Select category"} /></SelectTrigger></FormControl>
+                                <SelectContent>
+                                  {costCategories.map((category) => (
+                                    <SelectItem key={category.value} value={category.value}>
+                                      {category.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
                         <div className="flex justify-end col-span-1 md:col-span-4">
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => removeCostAssumption(index)}
-                            disabled={costAssumptions.length <= 1}
+                            onClick={() => removeCost(index)}
+                            disabled={costFields.length <= 1}
                             className="text-red-500"
                           >
                             Remove
@@ -482,11 +444,10 @@ const NewFinancialModel = () => {
                         </div>
                       </div>
                     ))}
-
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={addCostAssumption}
+                      onClick={() => appendCost(defaultCostAssumption)}
                       className="mt-4"
                     >
                       Add Cost
@@ -499,7 +460,7 @@ const NewFinancialModel = () => {
             <TabsContent value="growth" className="space-y-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>Growth Model</CardTitle>
+                  <CardTitle>Growth Scenario</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <FormField
@@ -507,14 +468,14 @@ const NewFinancialModel = () => {
                     name="growthModelType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Growth Model Type</FormLabel>
+                        <FormLabel>Growth Scenario Type</FormLabel>
                         <Select
                           onValueChange={field.onChange}
                           defaultValue={field.value}
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select a growth model" />
+                              <SelectValue placeholder="Select a growth scenario" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -586,7 +547,7 @@ const NewFinancialModel = () => {
             </Button>
             <Button type="submit" className="bg-fortress-emerald hover:bg-fortress-emerald/90">
               <Save className="mr-2 h-4 w-4" />
-              Save Model
+              Save Scenario
             </Button>
           </div>
         </form>

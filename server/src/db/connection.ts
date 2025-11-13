@@ -1,4 +1,4 @@
-import { Pool, PoolClient } from 'pg';
+import { Pool, PoolClient, QueryResult } from 'pg';
 import fs from 'fs';
 import path from 'path';
 
@@ -22,22 +22,42 @@ export function initializeDatabase(config?: DatabaseConfig): Pool {
     return pool;
   }
 
-  const dbConfig: DatabaseConfig = config || (
-    process.env.DB_HOST ? {
-      host: process.env.DB_HOST,
+  let dbConfig: DatabaseConfig;
+
+  // Production environment (Google Cloud Run with Cloud SQL)
+  if (process.env.NODE_ENV === 'production' && process.env.CLOUD_SQL_CONNECTION_NAME) {
+    console.log('🚀 Initializing database for production (Cloud SQL)');
+    dbConfig = {
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
+      host: `/cloudsql/${process.env.CLOUD_SQL_CONNECTION_NAME}`, // Use Unix socket
       max: 20,
-      ssl: false, // Cloud SQL proxy handles SSL
-    } : {
+    };
+  } 
+  // Development environment (local with DATABASE_URL)
+  else if (process.env.DATABASE_URL) {
+    console.log('🚀 Initializing database for development (DATABASE_URL)');
+    dbConfig = {
       connectionString: process.env.DATABASE_URL,
       max: 20,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-    }
-  );
+      ssl: false, // Assuming local dev doesn't use SSL
+    };
+  }
+  // Fallback or custom config
+  else {
+    console.log('🚀 Initializing database with custom or default config');
+    dbConfig = config || {
+      host: process.env.DB_HOST || 'localhost',
+      user: process.env.DB_USER || 'postgres',
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME || 'fortress-modeler',
+      port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 5432,
+      max: 20,
+    };
+  }
 
-  pool = new Pool(dbConfig as any);
+  pool = new Pool(dbConfig);
   
   // Handle pool errors
   pool.on('error', (err) => {
@@ -108,7 +128,7 @@ export async function runMigrations(): Promise<{ success: boolean; error?: strin
 }
 
 // Query helper with error handling
-export async function query(text: string, params?: any[]): Promise<any> {
+export async function query<T = any>(text: string, params?: (string | number | boolean | null)[]): Promise<QueryResult<T>> {
   const db = getDatabase();
   try {
     const start = Date.now();

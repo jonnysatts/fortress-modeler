@@ -3,8 +3,11 @@
   command = "npm run build"
 
 [build.environment]
-  VITE_API_URL = "https://fortress-modeler-backend-928130924917.australia-southeast2.run.app"
+  VITE_API_URL = "https://fortress-modeler-backend-pqiu2rcyqq-km.a.run.app"
   VITE_GOOGLE_CLIENT_ID = "928130924917-fcu6m854ua2ajutk3eu191okl4f29uqv.apps.googleusercontent.com"
+  VITE_SUPABASE_URL = "https://issmshemlkrucmxcvibs.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlzc21zaGVtbGtydWNteGN2aWJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIxMzM1MzAsImV4cCI6MjA2NzcwOTUzMH0.xhxwSFCNSsG4Q1xta4L_uLKlnSHZfp7N3wXW0E3fOdg"
+  VITE_USE_SUPABASE_BACKEND = "true"
 
 [[redirects]]
   from = "/*"

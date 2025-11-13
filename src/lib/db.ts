@@ -1,12 +1,16 @@
 import Dexie, { Table } from 'dexie';
 import { MarketingSetup, ActualsPeriodEntry, ModelMetadata } from '@/types/models';
 import { DatabaseError, NotFoundError, ValidationError, logError } from './errors';
-import { getDemoData } from './demo-data';
+// Demo data removed as part of Phase 1 cleanup
+// import { getDemoData } from './demo-data';
 import config from './config';
+import { isUUID } from './utils';
+import { isCloudModeEnabled } from '@/config/app.config';
+import { getSupabaseStorageService } from '@/services/singleton';
 
 // Define interfaces for our database tables
 export interface Project {
-  id?: number | string;
+  id: string; // UUID primary key
   name: string;
   description?: string;
   productType: string;
@@ -18,12 +22,154 @@ export interface Project {
     endDate?: Date;
   };
   avatarImage?: string;
+  // Sharing and visibility fields
+  is_public?: boolean;
+  shared_by?: string;
+  owner_email?: string;
+  share_count?: number;
+  permission?: 'owner' | 'view' | 'edit';
+  event_type?: 'weekly' | 'special';
+  event_date?: Date;
+  event_end_date?: Date;
+}
+
+// Enhanced Special Event Forecast with COGS standardization
+export interface SpecialEventForecast {
+  id: string;
+  project_id: string;
+  
+  // Revenue streams with COGS support
+  forecast_ticket_sales?: number;
+  forecast_fnb_revenue?: number;
+  forecast_fnb_cogs_pct?: number;      // NEW: F&B COGS percentage (default 30%)
+  use_automatic_fnb_cogs?: boolean;    // NEW: Toggle for automatic F&B COGS calculation
+  calculated_fnb_cogs?: number;        // NEW: Calculated F&B COGS amount
+  
+  forecast_merch_revenue?: number;
+  forecast_merch_cogs_pct?: number;    // NEW: Merchandise COGS percentage (default 50%)
+  use_automatic_merch_cogs?: boolean;  // NEW: Toggle for automatic Merchandise COGS calculation
+  calculated_merch_cogs?: number;      // NEW: Calculated Merchandise COGS amount
+  
+  forecast_sponsorship_income?: number;
+  forecast_other_income?: number;
+  
+  // Cost breakdown
+  forecast_staffing_costs?: number;
+  forecast_venue_costs?: number;
+  forecast_vendor_costs?: number;
+  forecast_marketing_costs?: number;
+  forecast_production_costs?: number;
+  forecast_other_costs?: number;
+  
+  // Enhanced marketing details
+  marketing_email_budget?: number;
+  marketing_social_budget?: number;
+  marketing_influencer_budget?: number;
+  marketing_paid_ads_budget?: number;
+  marketing_content_budget?: number;
+  marketing_strategy?: string;
+  
+  // Event details
+  estimated_attendance?: number;
+  ticket_price?: number;
+  
+  // Notes
+  revenue_notes?: string;
+  cost_notes?: string;
+  marketing_notes?: string;
+  general_notes?: string;
+  
+  created_at: Date;
+  updated_at?: Date;
+}
+
+// Enhanced Special Event Actual with comprehensive tracking
+export interface SpecialEventActual {
+  id: string;
+  project_id: string;
+  
+  // Actual revenue streams with COGS tracking
+  actual_ticket_sales?: number;
+  actual_fnb_revenue?: number;
+  actual_fnb_cogs?: number;             // Actual F&B COGS amount
+  use_forecast_fnb_cogs_pct?: boolean;  // NEW: Use forecast COGS percentage or manual override
+  calculated_fnb_cogs?: number;         // NEW: Calculated F&B COGS using forecast percentage
+  
+  actual_merch_revenue?: number;
+  actual_merch_cogs?: number;           // Actual Merchandise COGS amount
+  use_forecast_merch_cogs_pct?: boolean; // NEW: Use forecast COGS percentage or manual override
+  calculated_merch_cogs?: number;       // NEW: Calculated Merchandise COGS using forecast percentage
+  
+  actual_sponsorship_income?: number;
+  actual_other_income?: number;
+  
+  // Actual cost breakdown
+  actual_staffing_costs?: number;
+  actual_venue_costs?: number;
+  actual_vendor_costs?: number;
+  actual_marketing_costs?: number;
+  actual_production_costs?: number;
+  actual_other_costs?: number;
+  
+  // Enhanced metrics
+  actual_attendance?: number;
+  revenue_per_attendee?: number;        // NEW: Calculated revenue per attendee
+  cost_per_attendee?: number;           // NEW: Calculated cost per attendee  
+  marketing_roi?: number;               // NEW: Marketing return on investment percentage
+  
+  // Marketing performance tracking
+  marketing_email_performance?: string;
+  marketing_social_performance?: string;
+  marketing_influencer_performance?: string;
+  marketing_paid_ads_performance?: string;
+  marketing_content_performance?: string;
+  marketing_roi_notes?: string;
+  
+  // Event metrics
+  attendance_breakdown?: string;
+  average_ticket_price?: number;
+  
+  // Success indicators
+  success_rating?: number;
+  event_success_indicators?: string;
+  challenges_faced?: string;
+  lessons_learned?: string;
+  recommendations_future?: string;
+  
+  // Post-event analysis
+  customer_feedback_summary?: string;
+  team_feedback?: string;
+  vendor_feedback?: string;
+  
+  // Additional metrics
+  social_media_engagement?: string;
+  press_coverage?: string;
+  brand_impact_assessment?: string;
+  
+  // Variance analysis notes
+  revenue_variance_notes?: string;
+  cost_variance_notes?: string;
+  general_notes?: string;
+  
+  created_at: Date;
+  updated_at?: Date;
+}
+
+export interface SpecialEventMilestone {
+  id: string;
+  project_id: string;
+  milestone_label?: string;
+  target_date?: Date;
+  completed?: boolean;
+  assignee?: string;
+  notes?: string;
 }
 
 export interface FinancialModel {
-  id?: number;
-  projectId: number;
+  id: string; // UUID primary key
+  projectId: string; // Project UUID reference
   name: string;
+  isPrimary?: boolean; // Whether this model is used for dashboard projections
   assumptions: {
     revenue: RevenueAssumption[];
     costs: CostAssumption[];
@@ -39,7 +185,7 @@ export interface RevenueAssumption {
   name: string;
   value: number;
   type: 'fixed' | 'variable' | 'recurring';
-  frequency?: 'weekly' | 'monthly' | 'quarterly' | 'annually' | 'one-time';
+  frequency?: 'monthly' | 'quarterly' | 'annually' | 'one-time';
 }
 
 export interface CostAssumption {
@@ -59,8 +205,8 @@ export interface GrowthModel {
 }
 
 export interface ActualPerformance {
-  id?: number;
-  projectId: number;
+  id: string; // UUID primary key
+  projectId: string; // Project UUID reference
   date: Date;
   metrics: {
     [key: string]: number;
@@ -69,8 +215,8 @@ export interface ActualPerformance {
 }
 
 export interface Risk {
-  id?: number;
-  projectId: number;
+  id: string; // UUID primary key
+  projectId: string; // Project UUID reference
   name: string;
   type: 'financial' | 'operational' | 'strategic' | 'regulatory' | 'other';
   likelihood: 'low' | 'medium' | 'high';
@@ -82,9 +228,9 @@ export interface Risk {
 }
 
 export interface Scenario {
-  id?: number;
-  projectId: number;
-  modelId: number;
+  id: string; // UUID primary key
+  projectId: string; // Project UUID reference
+  modelId: string; // Model UUID reference
   name: string;
   description?: string;
   assumptions: {
@@ -96,24 +242,232 @@ export interface Scenario {
 }
 
 export class FortressDB extends Dexie {
-  projects!: Table<Project, number>;
-  financialModels!: Table<FinancialModel, number>;
-  actualPerformance!: Table<ActualPerformance, number>;
-  risks!: Table<Risk, number>;
-  scenarios!: Table<Scenario, number>;
-  actuals!: Table<ActualsPeriodEntry, number>;
+  projects!: Table<Project, string>;
+  financialModels!: Table<FinancialModel, string>;
+  actualPerformance!: Table<ActualPerformance, string>;
+  risks!: Table<Risk, string>;
+  scenarios!: Table<Scenario, string>;
+  actuals!: Table<ActualsPeriodEntry, string>;
+  specialEventForecasts!: Table<SpecialEventForecast, string>;
+  specialEventActuals!: Table<SpecialEventActual, string>;
+  specialEventMilestones!: Table<SpecialEventMilestone, string>;
 
   constructor() {
     super('FortressDB');
-    this.version(3).stores({
+
+    this.version(5).stores({
+      projects: '++id, &uuid, name, productType, createdAt, updatedAt',
+      financialModels: '++id, &uuid, projectId, name, createdAt, updatedAt',
+      actualPerformance: '++id, projectId, date',
+      risks: '++id, projectId, type, likelihood, impact, status',
+      scenarios: '++id, projectId, modelId, name, createdAt',
+      actuals: '++id, &[projectId+period], projectId, period'
+    });
+
+    this.version(6).stores({
+      projects: '++id, &uuid, name, productType, createdAt, updatedAt',
+      financialModels: '++id, &uuid, projectId, name, createdAt, updatedAt',
+      actualPerformance: '++id, projectId, date',
+      risks: '++id, projectId, type, likelihood, impact, status',
+      scenarios: '++id, projectId, modelId, name, createdAt',
+      actuals: '++id, &[projectId+period], projectId, period'
+    }).upgrade(async tx => {
+      console.log('🔧 Upgrading to version 6: Ensuring UUID consistency');
+      
+      // Fix any projects missing UUID field
+      const projectsToFix = await tx.table('projects').toArray();
+      for (const project of projectsToFix) {
+        if (!project.uuid) {
+          await tx.table('projects').update(project.id!, {
+            uuid: crypto.randomUUID()
+          });
+        }
+      }
+      
+      // Fix any models missing UUID field
+      const modelsToFix = await tx.table('financialModels').toArray();
+      for (const model of modelsToFix) {
+        if (!model.uuid) {
+          await tx.table('financialModels').update(model.id!, {
+            uuid: crypto.randomUUID()
+          });
+        }
+      }
+    });
+
+    this.version(7).stores({
+      projects: '&id, name, productType, createdAt, updatedAt',
+      financialModels: '&id, projectId, name, createdAt, updatedAt',
+      actualPerformance: '&id, projectId, date',
+      risks: '&id, projectId, type, likelihood, impact, status',
+      scenarios: '&id, projectId, modelId, name, createdAt',
+      actuals: '&id, &[projectId+period], projectId, period'
+    }).upgrade(async tx => {
+      console.log('🔧 Upgrading to version 7: Converting to UUID-only primary keys');
+      
+      try {
+        // Migrate projects: use uuid as new id
+        const projects = await tx.table('projects').toArray();
+        await tx.table('projects').clear();
+        
+        for (const project of projects) {
+          const newProject = {
+            ...project,
+            id: project.uuid || crypto.randomUUID()
+          };
+          delete newProject.uuid; // Remove old uuid field
+          await tx.table('projects').add(newProject);
+        }
+        
+        // Migrate financial models: use uuid as new id, update projectId references
+        const models = await tx.table('financialModels').toArray();
+        await tx.table('financialModels').clear();
+        
+        for (const model of models) {
+          // Find the project this model belongs to
+          const project = projects.find(p => p.id === model.projectId);
+          const newModel = {
+            ...model,
+            id: model.uuid || crypto.randomUUID(),
+            projectId: project?.uuid || project?.id || model.projectId
+          };
+          delete newModel.uuid; // Remove old uuid field
+          await tx.table('financialModels').add(newModel);
+        }
+        
+        // Migrate other tables - generate UUIDs for all records
+        const tables = ['actualPerformance', 'risks', 'scenarios', 'actuals'];
+        for (const tableName of tables) {
+          const records = await tx.table(tableName).toArray();
+          await tx.table(tableName).clear();
+          
+          for (const record of records) {
+            // Find the project this record belongs to
+            const project = projects.find(p => p.id === record.projectId);
+            const newRecord = {
+              ...record,
+              id: crypto.randomUUID(),
+              projectId: project?.uuid || project?.id || record.projectId
+            };
+            
+            // Update modelId for scenarios if it exists
+            if (tableName === 'scenarios' && record.modelId) {
+              const model = models.find(m => m.id === record.modelId);
+              newRecord.modelId = model?.uuid || model?.id || record.modelId;
+            }
+            
+            await tx.table(tableName).add(newRecord);
+          }
+        }
+        
+        console.log('✅ Successfully migrated to UUID-only schema');
+      } catch (error) {
+        console.error('❌ Migration failed:', error);
+        throw error;
+      }
+    });
+
+    this.version(8).stores({
+      projects: '&id, name, productType, createdAt, updatedAt, event_type, event_date, event_end_date',
+      financialModels: '&id, projectId, name, createdAt, updatedAt',
+      actualPerformance: '&id, projectId, date',
+      risks: '&id, projectId, type, likelihood, impact, status',
+      scenarios: '&id, projectId, modelId, name, createdAt',
+      actuals: '&id, &[projectId+period], projectId, period',
+      specialEventForecasts: '&id, project_id',
+      specialEventActuals: '&id, project_id',
+      specialEventMilestones: '&id, project_id'
+    });
+
+    // Version 9: Enhanced Special Events with COGS standardization
+    this.version(9).stores({
+      projects: '&id, name, productType, createdAt, updatedAt, event_type, event_date, event_end_date',
+      financialModels: '&id, projectId, name, createdAt, updatedAt',
+      actualPerformance: '&id, projectId, date',
+      risks: '&id, projectId, type, likelihood, impact, status',
+      scenarios: '&id, projectId, modelId, name, createdAt',
+      actuals: '&id, &[projectId+period], projectId, period',
+      specialEventForecasts: '&id, project_id, use_automatic_fnb_cogs, use_automatic_merch_cogs',
+      specialEventActuals: '&id, project_id, use_forecast_fnb_cogs_pct, use_forecast_merch_cogs_pct',
+      specialEventMilestones: '&id, project_id'
+    });
+
+    // Version 10: COGS Enhancement - Add COGS standardization fields
+    this.version(10).stores({
+      projects: '&id, name, productType, createdAt, updatedAt, event_type, event_date, event_end_date',
+      financialModels: '&id, projectId, name, createdAt, updatedAt',
+      actualPerformance: '&id, projectId, date',
+      risks: '&id, projectId, type, likelihood, impact, status',
+      scenarios: '&id, projectId, modelId, name, createdAt',
+      actuals: '&id, &[projectId+period], projectId, period',
+      specialEventForecasts: '&id, project_id, use_automatic_fnb_cogs, use_automatic_merch_cogs, forecast_fnb_cogs_pct, forecast_merch_cogs_pct',
+      specialEventActuals: '&id, project_id, use_forecast_fnb_cogs_pct, use_forecast_merch_cogs_pct, revenue_per_attendee, cost_per_attendee, marketing_roi',
+      specialEventMilestones: '&id, project_id'
+    }).upgrade(async tx => {
+      console.log('🔧 Upgrading to version 10: Adding COGS standardization fields');
+      
+      try {
+        // Update existing forecasts with default COGS settings
+        const forecasts = await tx.table('specialEventForecasts').toArray();
+        for (const forecast of forecasts) {
+          await tx.table('specialEventForecasts').update(forecast.id, {
+            use_automatic_fnb_cogs: true,
+            forecast_fnb_cogs_pct: 30.00,
+            use_automatic_merch_cogs: true,
+            forecast_merch_cogs_pct: 50.00,
+            updated_at: new Date()
+          });
+        }
+        
+        // Update existing actuals with default COGS tracking settings
+        const actuals = await tx.table('specialEventActuals').toArray();
+        for (const actual of actuals) {
+          // Calculate enhanced metrics if we have the data
+          const revenuePerAttendee = actual.actual_attendance && actual.actual_attendance > 0 
+            ? ((actual.actual_ticket_sales || 0) + (actual.actual_fnb_revenue || 0) + 
+               (actual.actual_merch_revenue || 0) + (actual.actual_sponsorship_income || 0)) / actual.actual_attendance
+            : undefined;
+            
+          const totalCosts = (actual.actual_staffing_costs || 0) + (actual.actual_venue_costs || 0) + 
+                            (actual.actual_vendor_costs || 0) + (actual.actual_marketing_costs || 0) + 
+                            (actual.actual_production_costs || 0) + (actual.actual_other_costs || 0);
+                            
+          const costPerAttendee = actual.actual_attendance && actual.actual_attendance > 0 
+            ? totalCosts / actual.actual_attendance
+            : undefined;
+            
+          const marketingROI = actual.actual_marketing_costs && actual.actual_marketing_costs > 0
+            ? (((actual.actual_ticket_sales || 0) + (actual.actual_fnb_revenue || 0) + 
+                (actual.actual_merch_revenue || 0) + (actual.actual_sponsorship_income || 0)) - totalCosts) 
+              / actual.actual_marketing_costs * 100
+            : undefined;
+          
+          await tx.table('specialEventActuals').update(actual.id, {
+            use_forecast_fnb_cogs_pct: true,
+            use_forecast_merch_cogs_pct: true,
+            revenue_per_attendee: revenuePerAttendee,
+            cost_per_attendee: costPerAttendee,
+            marketing_roi: marketingROI,
+            updated_at: new Date()
+          });
+        }
+        
+        console.log('✅ Successfully added COGS standardization features');
+      } catch (error) {
+        console.error('❌ COGS enhancement migration failed:', error);
+        throw error;
+      }
+    });
+
+    this.version(4).stores({
       projects: '++id, name, productType, createdAt, updatedAt',
-      financialModels: '++id, projectId, name, createdAt, updatedAt',
+      financialModels: '++id, &uuid, projectId, name, createdAt, updatedAt',
       actualPerformance: '++id, projectId, date',
       risks: '++id, projectId, type, likelihood, impact, status',
       scenarios: '++id, projectId, modelId, name, createdAt',
       actuals: '++id, &[projectId+period], projectId, period'
     }).upgrade(tx => {
-// Upgrade handler for schema version 3: Changes index for 'actuals' table from modelId+period to projectId+period
+// Upgrade handler for schema version 4: Adds uuid to financialModels
     });
     
     this.version(2).stores({
@@ -146,22 +500,22 @@ export const getProjects = async (): Promise<Project[]> => {
   }
 };
 
-export const getProject = async (id: number | string): Promise<Project | undefined> => {
+export const getProject = async (
+  id: string,
+): Promise<Project | undefined> => {
   try {
-    const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
-    if (!idNum || isNaN(idNum) || idNum <= 0) {
-      throw new ValidationError('Invalid project ID provided');
-    }
-    const project = await db.projects.get(idNum);
-    return project;
+    console.log('🔧 getProject called with UUID:', id);
+    
+    const result = await db.projects.get(id);
+    console.log('🔧 Found project:', result);
+    return result;
   } catch (error) {
-    if (error instanceof ValidationError) throw error;
     logError(error, 'getProject');
     throw new DatabaseError(`Failed to fetch project with ID ${id}`, error);
   }
 };
 
-export const createProject = async (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<number> => {
+export const createProject = async (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
   try {
     if (!project.name?.trim()) {
       throw new ValidationError('Project name is required');
@@ -171,13 +525,19 @@ export const createProject = async (project: Omit<Project, 'id' | 'createdAt' | 
     }
     
     const timestamp = new Date();
-    const projectId = await db.projects.add({
+    const id = crypto.randomUUID();
+    
+    console.log('🔧 Creating project with UUID:', id);
+    
+    await db.projects.add({
       ...project,
+      id, // UUID as primary key
       createdAt: timestamp,
       updatedAt: timestamp
     });
     
-    return projectId;
+    console.log('🔧 Project created with UUID:', id);
+    return id;
   } catch (error) {
     if (error instanceof ValidationError) throw error;
     logError(error, 'createProject');
@@ -185,24 +545,20 @@ export const createProject = async (project: Omit<Project, 'id' | 'createdAt' | 
   }
 };
 
-export const updateProject = async (id: number | string, project: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>): Promise<number> => {
+export const updateProject = async (id: string, projectData: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>): Promise<string> => {
   try {
-    const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
-    if (!idNum || isNaN(idNum) || idNum <= 0) {
-      throw new ValidationError('Invalid project ID provided');
-    }
-
-    const existingProject = await db.projects.get(idNum);
-    if (!existingProject) {
+    const existingProject = await getProject(id);
+    if (!existingProject || !existingProject.id) {
       throw new NotFoundError(`Project with ID ${id} not found`);
     }
+    const projectId = existingProject.id;
 
-    const updatedCount = await db.projects.update(idNum, { ...project, updatedAt: new Date() });
+    const updatedCount = await db.projects.update(projectId, { ...projectData, updatedAt: new Date() });
     if (updatedCount === 0) {
-      throw new DatabaseError('Failed to update project - no changes made');
+      // No error, but can be useful to know no changes were made.
     }
 
-    return idNum;
+    return projectId;
   } catch (error) {
     if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
     logError(error, 'updateProject');
@@ -210,26 +566,25 @@ export const updateProject = async (id: number | string, project: Partial<Omit<P
   }
 };
 
-export const deleteProject = async (id: number | string): Promise<void> => {
+export const deleteProject = async (id: string): Promise<void> => {
   try {
-    const idNum = typeof id === 'string' ? parseInt(id, 10) : id;
-    if (!idNum || isNaN(idNum) || idNum <= 0) {
-      throw new ValidationError('Invalid project ID provided');
-    }
-
-    const existingProject = await db.projects.get(idNum);
-    if (!existingProject) {
+    const existingProject = await getProject(id);
+    if (!existingProject || !existingProject.id) {
       throw new NotFoundError(`Project with ID ${id} not found`);
     }
+    const projectId = existingProject.id;
 
     // Use transaction for atomicity
-    await db.transaction('rw', [db.projects, db.financialModels, db.actualPerformance, db.risks, db.scenarios, db.actuals], async () => {
-      await db.projects.delete(idNum);
-      await db.financialModels.where('projectId').equals(idNum).delete();
-      await db.actualPerformance.where('projectId').equals(idNum).delete();
-      await db.risks.where('projectId').equals(idNum).delete();
-      await db.scenarios.where('projectId').equals(idNum).delete();
-      await db.actuals.where('projectId').equals(idNum).delete();
+    await db.transaction('rw', [db.projects, db.financialModels, db.actualPerformance, db.risks, db.scenarios, db.actuals, db.specialEventForecasts, db.specialEventActuals, db.specialEventMilestones], async () => {
+      await db.projects.delete(projectId);
+      await db.financialModels.where('projectId').equals(projectId).delete();
+      await db.actualPerformance.where('projectId').equals(projectId).delete();
+      await db.risks.where('projectId').equals(projectId).delete();
+      await db.scenarios.where('projectId').equals(projectId).delete();
+      await db.actuals.where('projectId').equals(projectId).delete();
+      await db.specialEventForecasts.where('project_id').equals(projectId).delete();
+      await db.specialEventActuals.where('project_id').equals(projectId).delete();
+      await db.specialEventMilestones.where('project_id').equals(projectId).delete();
     });
   } catch (error) {
     if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
@@ -238,38 +593,158 @@ export const deleteProject = async (id: number | string): Promise<void> => {
   }
 };
 
-export const getModelsForProject = async (projectId: number | string): Promise<FinancialModel[]> => {
-  const idNum = typeof projectId === 'string' ? parseInt(projectId, 10) : projectId;
-  if (!idNum || isNaN(idNum) || idNum <= 0) {
-    throw new ValidationError('Invalid project ID provided');
+export const getModelsForProject = async (projectId: string): Promise<FinancialModel[]> => {
+  try {
+    console.log('🔧 getModelsForProject called with:', projectId, 'type:', typeof projectId);
+    
+    // First, get the project to understand its actual stored ID
+    const project = await getProject(projectId);
+    if (!project) {
+      console.log('🔧 Project not found:', projectId);
+      return [];
+    }
+    
+    console.log('🔧 Found project:', project.id);
+    
+    // Search models by the project's ID
+    const models = await db.financialModels.where('projectId').equals(project.id).toArray();
+    
+    console.log('🔧 Models found:', models.length);
+    
+    return models;
+  } catch (error) {
+    logError(error, 'getModelsForProject');
+    throw new DatabaseError(`Failed to get models for project ${projectId}`, error);
   }
-  return await db.financialModels.where('projectId').equals(idNum).toArray();
 };
 
-export const getActualsForProject = async (projectId: number): Promise<ActualsPeriodEntry[]> => {
-  return await db.actuals.where({ projectId: projectId }).toArray();
+export const getActualsForProject = async (projectId: string): Promise<ActualsPeriodEntry[]> => {
+  const project = await getProject(projectId);
+  const searchId = project?.id ?? projectId;
+  return db.actuals.where({ projectId: searchId }).toArray();
 };
 
-export const upsertActualsPeriod = async (actualEntry: Omit<ActualsPeriodEntry, 'id'>): Promise<number> => {
-  const existing = await db.actuals.get({ 
-    projectId: actualEntry.projectId, 
-    period: actualEntry.period 
+export const upsertActualsPeriod = async (actualEntry: Omit<ActualsPeriodEntry, 'id'>): Promise<string> => {
+  const project = await getProject(actualEntry.projectId);
+  const searchId = project?.id ?? actualEntry.projectId;
+
+  const existing = await db.actuals.get({
+    projectId: searchId,
+    period: actualEntry.period
   });
-  
+
   if (existing?.id) {
-    await db.actuals.update(existing.id, actualEntry);
+    await db.actuals.update(existing.id, { ...actualEntry, projectId: searchId });
     return existing.id;
   } else {
-    return await db.actuals.add(actualEntry as ActualsPeriodEntry);
+    const id = crypto.randomUUID();
+    await db.actuals.add({ ...actualEntry, id, projectId: searchId } as ActualsPeriodEntry);
+    return id;
+  }
+};
+
+// Enhanced Special Event operations with COGS support
+export const getSpecialEventForecasts = async (projectId: string): Promise<SpecialEventForecast[]> => {
+  try {
+    const project = await getProject(projectId);
+    const searchId = project?.id ?? projectId;
+    return await db.specialEventForecasts.where('project_id').equals(searchId).toArray();
+  } catch (error) {
+    logError(error, 'getSpecialEventForecasts');
+    throw new DatabaseError(`Failed to get special event forecasts for project ${projectId}`, error);
+  }
+};
+
+export const createSpecialEventForecast = async (forecast: Omit<SpecialEventForecast, 'id' | 'created_at'>): Promise<string> => {
+  try {
+    const id = crypto.randomUUID();
+    const timestamp = new Date();
+    
+    // Set default COGS values if not provided
+    const forecastWithDefaults = {
+      ...forecast,
+      id,
+      created_at: timestamp,
+      use_automatic_fnb_cogs: forecast.use_automatic_fnb_cogs ?? true,
+      forecast_fnb_cogs_pct: forecast.forecast_fnb_cogs_pct ?? 30,
+      use_automatic_merch_cogs: forecast.use_automatic_merch_cogs ?? true,
+      forecast_merch_cogs_pct: forecast.forecast_merch_cogs_pct ?? 50,
+    };
+    
+    await db.specialEventForecasts.add(forecastWithDefaults);
+    return id;
+  } catch (error) {
+    logError(error, 'createSpecialEventForecast');
+    throw new DatabaseError('Failed to create special event forecast', error);
+  }
+};
+
+export const updateSpecialEventForecast = async (id: string, updates: Partial<SpecialEventForecast>): Promise<void> => {
+  try {
+    await db.specialEventForecasts.update(id, { 
+      ...updates, 
+      updated_at: new Date() 
+    });
+  } catch (error) {
+    logError(error, 'updateSpecialEventForecast');
+    throw new DatabaseError(`Failed to update special event forecast ${id}`, error);
+  }
+};
+
+export const getSpecialEventActuals = async (projectId: string): Promise<SpecialEventActual[]> => {
+  try {
+    const project = await getProject(projectId);
+    const searchId = project?.id ?? projectId;
+    return await db.specialEventActuals.where('project_id').equals(searchId).toArray();
+  } catch (error) {
+    logError(error, 'getSpecialEventActuals');
+    throw new DatabaseError(`Failed to get special event actuals for project ${projectId}`, error);
+  }
+};
+
+export const createSpecialEventActual = async (actual: Omit<SpecialEventActual, 'id' | 'created_at'>): Promise<string> => {
+  try {
+    const id = crypto.randomUUID();
+    const timestamp = new Date();
+    
+    // Set default COGS tracking values if not provided
+    const actualWithDefaults = {
+      ...actual,
+      id,
+      created_at: timestamp,
+      use_forecast_fnb_cogs_pct: actual.use_forecast_fnb_cogs_pct ?? true,
+      use_forecast_merch_cogs_pct: actual.use_forecast_merch_cogs_pct ?? true,
+    };
+    
+    await db.specialEventActuals.add(actualWithDefaults);
+    return id;
+  } catch (error) {
+    logError(error, 'createSpecialEventActual');
+    throw new DatabaseError('Failed to create special event actual', error);
+  }
+};
+
+export const updateSpecialEventActual = async (id: string, updates: Partial<SpecialEventActual>): Promise<void> => {
+  try {
+    await db.specialEventActuals.update(id, { 
+      ...updates, 
+      updated_at: new Date() 
+    });
+  } catch (error) {
+    logError(error, 'updateSpecialEventActual');
+    throw new DatabaseError(`Failed to update special event actual ${id}`, error);
   }
 };
 
 // Financial Model operations
-export const getModelById = async (id: number): Promise<FinancialModel | undefined> => {
+export const getModelById = async (
+  id: string,
+): Promise<FinancialModel | undefined> => {
   try {
-    if (!id || isNaN(id) || id <= 0) {
+    if (!id?.trim()) {
       throw new ValidationError('Invalid model ID provided');
     }
+    
     return await db.financialModels.get(id);
   } catch (error) {
     if (error instanceof ValidationError) throw error;
@@ -278,23 +753,27 @@ export const getModelById = async (id: number): Promise<FinancialModel | undefin
   }
 };
 
-export const addFinancialModel = async (model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>): Promise<number> => {
+export const addFinancialModel = async (model: Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
   try {
-    if (!model.projectId || isNaN(model.projectId) || model.projectId <= 0) {
-      throw new ValidationError('Invalid project ID provided');
+    // Validate project ID
+    if (!model.projectId?.trim()) {
+      throw new ValidationError('Project ID is required');
     }
     if (!model.name?.trim()) {
       throw new ValidationError('Model name is required');
     }
 
     const timestamp = new Date();
-    const modelId = await db.financialModels.add({
+    const id = crypto.randomUUID();
+    
+    await db.financialModels.add({
       ...model,
+      id,
       createdAt: timestamp,
       updatedAt: timestamp,
     });
 
-    return modelId;
+    return id;
   } catch (error) {
     if (error instanceof ValidationError) throw error;
     logError(error, 'addFinancialModel');
@@ -302,23 +781,25 @@ export const addFinancialModel = async (model: Omit<FinancialModel, 'id' | 'crea
   }
 };
 
-export const updateFinancialModel = async (id: number, updates: Partial<Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>>): Promise<number> => {
+export const updateFinancialModel = async (
+  id: string,
+  updates: Partial<Omit<FinancialModel, 'id' | 'createdAt' | 'updatedAt'>>,
+): Promise<string> => {
   try {
-    if (!id || isNaN(id) || id <= 0) {
-      throw new ValidationError('Invalid model ID provided');
-    }
-
-    const existingModel = await db.financialModels.get(id);
-    if (!existingModel) {
+    const model = await getModelById(id);
+    if (!model || !model.id) {
       throw new NotFoundError(`Financial model with ID ${id} not found`);
     }
 
-    const updatedCount = await db.financialModels.update(id, { ...updates, updatedAt: new Date() });
+    const updatedCount = await db.financialModels.update(model.id, {
+      ...updates,
+      updatedAt: new Date(),
+    });
     if (updatedCount === 0) {
-      throw new DatabaseError('Failed to update financial model - no changes made');
+      // No error, but can be useful to know no changes were made.
     }
 
-    return id;
+    return model.id;
   } catch (error) {
     if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
     logError(error, 'updateFinancialModel');
@@ -326,18 +807,14 @@ export const updateFinancialModel = async (id: number, updates: Partial<Omit<Fin
   }
 };
 
-export const deleteFinancialModel = async (id: number): Promise<void> => {
+export const deleteFinancialModel = async (id: string): Promise<void> => {
   try {
-    if (!id || isNaN(id) || id <= 0) {
-      throw new ValidationError('Invalid model ID provided');
-    }
-
-    const existingModel = await db.financialModels.get(id);
-    if (!existingModel) {
+    const model = await getModelById(id);
+    if (!model || !model.id) {
       throw new NotFoundError(`Financial model with ID ${id} not found`);
     }
 
-    await db.financialModels.delete(id);
+    await db.financialModels.delete(model.id);
   } catch (error) {
     if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
     logError(error, 'deleteFinancialModel');
@@ -345,33 +822,76 @@ export const deleteFinancialModel = async (id: number): Promise<void> => {
   }
 };
 
-export const addDemoData = async (): Promise<void> => {
+// Set a model as primary for dashboard projections
+export const setPrimaryFinancialModel = async (modelId: string): Promise<void> => {
   try {
-    // Only add demo data if enabled in config
-    if (!config.enableDemoData) {
-      return;
+    if (!modelId?.trim()) {
+      throw new ValidationError('Invalid model ID provided');
     }
 
-    const projectCount = await db.projects.count();
-    if (projectCount > 0) return;
+    const cloudMode = isCloudModeEnabled();
 
-    const demoData = getDemoData();
-    const timestamp = new Date();
-    
-    // Add demo project
-    const projectId = await db.projects.add({
-      ...demoData.project,
-      createdAt: timestamp,
-      updatedAt: timestamp
-    });
+    if (cloudMode) {
+      // Use Supabase for cloud mode
+      const supabaseStorage = getSupabaseStorageService();
+      
+      // Get the model to find its project
+      const model = await supabaseStorage.getModel(modelId);
+      if (!model) {
+        throw new NotFoundError(`Financial model with ID ${modelId} not found`);
+      }
 
-    // Add demo financial model
-    await db.financialModels.add({
-      ...demoData.financialModel,
-      projectId,
-      createdAt: timestamp,
-      updatedAt: timestamp
-    });
+      // Get all models for the project
+      const projectModels = await supabaseStorage.getModelsForProject(model.projectId);
+      
+      // Update all models: unset existing primary and set new primary
+      for (const projectModel of projectModels) {
+        if (projectModel.id === modelId) {
+          await supabaseStorage.updateModel(projectModel.id, { 
+            ...projectModel, 
+            isPrimary: true 
+          });
+        } else if (projectModel.isPrimary) {
+          await supabaseStorage.updateModel(projectModel.id, { 
+            ...projectModel, 
+            isPrimary: false 
+          });
+        }
+      }
+      
+      console.log(`✅ Set model ${model.name} as primary for project ${model.projectId} (Supabase)`);
+    } else {
+      // Use IndexedDB for local mode
+      const model = await getModelById(modelId);
+      if (!model) {
+        throw new NotFoundError(`Financial model with ID ${modelId} not found`);
+      }
+
+      // First, unset any existing primary model for this project
+      const projectModels = await getModelsForProject(model.projectId);
+      for (const projectModel of projectModels) {
+        if (projectModel.isPrimary) {
+          await db.financialModels.update(projectModel.id, { isPrimary: false });
+        }
+      }
+
+      // Set the specified model as primary
+      await db.financialModels.update(modelId, { isPrimary: true });
+      
+      console.log(`✅ Set model ${model.name} as primary for project ${model.projectId} (IndexedDB)`);
+    }
+  } catch (error) {
+    if (error instanceof ValidationError || error instanceof NotFoundError) throw error;
+    logError(error, 'setPrimaryFinancialModel');
+    throw new DatabaseError(`Failed to set primary financial model with ID ${modelId}`, error);
+  }
+};
+
+export const addDemoData = async (): Promise<void> => {
+  try {
+    // Demo data functionality removed as part of Phase 1 cleanup
+    // Demo data loading has been disabled
+    return;
 
     if (config.isDevelopment) {
       console.log('Demo data added successfully');

@@ -1,4 +1,4 @@
-import { useState, useEffect, ChangeEvent } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -14,10 +14,11 @@ import { ArrowLeft, CalendarIcon, Check } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { toast } from "@/hooks/use-toast";
-import useStore from "@/store/useStore";
+import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
-import { getProject, updateProject } from "@/lib/db"; // Import get/update project functions
+import { useProject, useUpdateProject } from "@/hooks/useProjects";
+import { useImageUpload } from "@/hooks/useImageUpload";
+import { productTypes } from "@/lib/constants";
 
 // Schema likely same as NewProject
 const formSchema = z.object({
@@ -30,21 +31,13 @@ const formSchema = z.object({
 });
 type FormValues = z.infer<typeof formSchema>;
 
-const productTypes = [
-  { value: "SaaS", label: "SaaS Product" },
-  { value: "WeeklyEvent", label: "Weekly Event" },
-  { value: "DigitalProduct", label: "Digital Product" },
-  { value: "PhysicalGood", label: "Physical Good" },
-  { value: "ConsultingProject", label: "Consulting Project" },
-];
-
 const EditProject = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [avatarDataUrl, setAvatarDataUrl] = useState<string | undefined>(undefined);
+  const { preview: avatarPreview, dataUrl: avatarDataUrl, handleImageChange, removeImage, setInitialImage } = useImageUpload();
+  const { data: project, isLoading: projectLoading } = useProject(projectId);
+  const updateProjectMutation = useUpdateProject();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -59,94 +52,43 @@ const EditProject = () => {
 
   // Load existing project data
   useEffect(() => {
-    if (!projectId) {
-      navigate("/projects");
-      return;
+    if (!project) return;
+    form.reset({
+      name: project.name,
+      description: project.description || "",
+      productType: project.productType,
+      targetAudience: project.targetAudience || "",
+      startDate: project.timeline?.startDate ? new Date(project.timeline.startDate) : new Date(),
+      endDate: project.timeline?.endDate ? new Date(project.timeline.endDate) : undefined,
+    });
+    if (project.avatarImage) {
+      setInitialImage(project.avatarImage);
     }
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        const project = await getProject(parseInt(projectId));
-        if (project) {
-          form.reset({
-            name: project.name,
-            description: project.description || "",
-            productType: project.productType,
-            targetAudience: project.targetAudience || "",
-            startDate: project.timeline?.startDate ? new Date(project.timeline.startDate) : new Date(),
-            endDate: project.timeline?.endDate ? new Date(project.timeline.endDate) : undefined,
-          });
-          if (project.avatarImage) {
-            setAvatarPreview(project.avatarImage);
-            setAvatarDataUrl(project.avatarImage);
-          }
-        } else {
-          toast({ variant: "destructive", title: "Project not found" });
-          navigate("/projects");
-        }
-      } catch (err) {
-        toast({ variant: "destructive", title: "Error loading project" });
-        navigate("/projects");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadData();
-  }, [projectId, navigate, form]);
-
-  // Avatar handling (same as NewProject)
-  const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        toast({ variant: 'destructive', title: 'Invalid File Type', description: 'Please select an image file.'});
-        return;
-      }
-      if (file.size > 2 * 1024 * 1024) { // 2MB limit
-         toast({ variant: 'destructive', title: 'File Too Large', description: 'Image size should not exceed 2MB.'});
-         return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        setAvatarPreview(result);
-        setAvatarDataUrl(result);
-      };
-      reader.onerror = () => {
-        toast({ variant: 'destructive', title: 'Error Reading File', description: 'Could not read the selected image.'});
-        setAvatarPreview(null);
-        setAvatarDataUrl(undefined);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  }, [project, form, setInitialImage]);
 
   // Submit handler (uses updateProject)
   const onSubmit = async (data: FormValues) => {
     if (!projectId) return;
     setIsSubmitting(true);
     try {
-      await updateProject(parseInt(projectId), {
-        name: data.name,
-        description: data.description,
-        productType: data.productType,
-        targetAudience: data.targetAudience,
-        timeline: {
-          startDate: data.startDate,
-          endDate: data.endDate,
+      await updateProjectMutation.mutateAsync({
+        id: projectId,
+        data: {
+          name: data.name,
+          description: data.description,
+          productType: data.productType,
+          targetAudience: data.targetAudience,
+          timeline: {
+            startDate: data.startDate,
+            endDate: data.endDate,
+          },
+          avatarImage: avatarDataUrl,
         },
-        avatarImage: avatarDataUrl, // Include avatar data
       });
-      toast({
-        title: "Project updated!",
-        description: `${data.name} has been updated successfully.`,
-      });
-      navigate(`/projects/${projectId}`); // Navigate back to project detail
+      navigate(`/projects/${projectId}`);
     } catch (error) {
       console.error("Error updating project:", error);
-      toast({
-        variant: "destructive",
-        title: "Failed to update project",
+      toast.error("Failed to update project", {
         description: "There was an error updating your project. Please try again.",
       });
     } finally {
@@ -154,7 +96,7 @@ const EditProject = () => {
     }
   };
 
-  if (isLoading) {
+  if (projectLoading) {
     return <div className="flex justify-center items-center min-h-[60vh]">
              <div className="h-10 w-10 border-4 border-fortress-emerald border-t-transparent rounded-full animate-spin"></div>
            </div>;
@@ -245,7 +187,16 @@ const EditProject = () => {
                       <FormLabel>Start Date</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus className={cn("p-3 pointer-events-auto")} /></PopoverContent>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            specialDays={project?.event_type === 'special' && project.event_date ? [project.event_date] : []}
+                            initialFocus
+                            className={cn("p-3 pointer-events-auto")}
+                          />
+                        </PopoverContent>
                       </Popover>
                       <FormDescription>Project start date.</FormDescription>
                       <FormMessage />
@@ -260,7 +211,17 @@ const EditProject = () => {
                       <FormLabel>End Date (Optional)</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value || undefined} onSelect={field.onChange} disabled={(date) => date < form.getValues("startDate")} initialFocus className={cn("p-3 pointer-events-auto")} /></PopoverContent>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value || undefined}
+                            onSelect={field.onChange}
+                            disabled={(date) => date < form.getValues("startDate")}
+                            specialDays={project?.event_type === 'special' && project.event_date ? [project.event_date] : []}
+                            initialFocus
+                            className={cn("p-3 pointer-events-auto")}
+                          />
+                        </PopoverContent>
                       </Popover>
                       <FormDescription>Project end date.</FormDescription>
                       <FormMessage />
@@ -274,8 +235,8 @@ const EditProject = () => {
                  {avatarPreview && (
                     <div className="mt-4">
                       <Label>Preview:</Label>
-                      <img src={avatarPreview} alt="Avatar Preview" className="mt-2 w-24 h-24 object-cover rounded-md border" />
-                      <Button variant="ghost" size="sm" className="mt-2 text-xs" onClick={() => { /* ... remove image logic ... */ }}>
+                      <img src={avatarPreview} alt="Avatar Preview" className="mt-2 w-24 h-24 object-cover rounded-md border" /> 
+                      <Button variant="ghost" size="sm" className="mt-2 text-xs" onClick={removeImage}>
                         Remove Image
                       </Button>
                     </div>

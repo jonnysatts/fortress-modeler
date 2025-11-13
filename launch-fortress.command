@@ -44,7 +44,7 @@ fi
 echo "🚀 Launching Fortress Financial Modeler..."
 echo "The app will open in your default browser"
 echo ""
-echo "📍 Local URL: http://localhost:8080"
+echo "📍 Local URL: http://localhost:8081"
 echo "🔄 Hot reload is enabled for development"
 echo ""
 echo "❌ To stop the server, press Ctrl+C in this terminal"

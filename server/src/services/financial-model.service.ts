@@ -19,14 +19,14 @@ export interface CreateModelData {
   project_id: string;
   local_id?: number;
   name: string;
-  assumptions?: any;
-  results_cache?: any;
+  assumptions?: ModelAssumptions;
+  results_cache?: ResultsCache;
 }
 
 export interface UpdateModelData {
   name?: string;
-  assumptions?: any;
-  results_cache?: any;
+  assumptions?: ModelAssumptions;
+  results_cache?: ResultsCache;
 }
 
 export interface SyncModelData extends CreateModelData {
@@ -51,8 +51,8 @@ export class FinancialModelService {
     }
     
     const sql = `
-      INSERT INTO financial_models (project_id, user_id, local_id, name, assumptions, results_cache)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO financial_models (project_id, user_id, local_id, name, model_data)
+      VALUES ($1, $2, $3, $4, $5)
       RETURNING *;
     `;
     
@@ -61,8 +61,10 @@ export class FinancialModelService {
       userId,
       modelData.local_id || null,
       modelData.name,
-      JSON.stringify(modelData.assumptions || {}),
-      JSON.stringify(modelData.results_cache || {})
+      JSON.stringify({
+        assumptions: modelData.assumptions || {},
+        results_cache: modelData.results_cache || {}
+      })
     ];
     
     const result = await query(sql, values);
@@ -128,7 +130,7 @@ export class FinancialModelService {
     updateData: UpdateModelData
   ): Promise<FinancialModel | null> {
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: (string | number | ModelAssumptions | ResultsCache)[] = [];
     let paramCount = 1;
     
     if (updateData.name !== undefined) {
@@ -339,7 +341,7 @@ export class FinancialModelService {
     const projectResult = await query(projectSql, [userId]);
     const byProject: { [projectId: string]: number } = {};
     
-    projectResult.rows.forEach((row: any) => {
+    projectResult.rows.forEach((row: { project_id: string; count: string }) => {
       byProject[row.project_id] = parseInt(row.count);
     });
     

@@ -1,10 +1,10 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, lazy, Suspense } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, BarChart3, ChartLine, Edit, Trash2, Megaphone } from "lucide-react";
+import { ArrowLeft, BarChart3, ChartLine, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,32 +17,68 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { FinancialModel, db } from "@/lib/db";
-import useStore from "@/store/useStore";
-import { toast } from "@/hooks/use-toast";
-import ModelProjections from "@/components/models/ModelProjections";
-import RevenueTrends from "@/components/models/RevenueTrends";
-import CostTrends from "@/components/models/CostTrends";
-import CategoryBreakdown from "@/components/models/CategoryBreakdown";
-import FinancialMatrix from "@/components/models/FinancialMatrix";
-import FinancialAnalysis from "@/components/models/FinancialAnalysis";
-import { calculateTotalRevenue, calculateTotalCosts } from "@/lib/financialCalculations";
+import { SupabaseStorageService } from "@/services/implementations/SupabaseStorageService";
+import { useProject } from "@/hooks/useProjects";
+import { useModel, useDeleteModel, useModelsForProject } from "@/hooks/useModels";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+import { isCloudModeEnabled } from "@/config/app.config";
+
+// Lazy load heavy chart components
+const ModelProjections = lazy(() => import("@/components/models/ModelProjections"));
+const RevenueTrends = lazy(() => import("@/components/models/RevenueTrends"));
+const CostTrends = lazy(() => import("@/components/models/CostTrends"));
+const CategoryBreakdown = lazy(() => import("@/components/models/CategoryBreakdown"));
+const FinancialMatrix = lazy(() => import("@/components/models/FinancialMatrix"));
+const FinancialAnalysis = lazy(() => import("@/components/models/FinancialAnalysis"));
+
 import ModelOverview from "@/components/models/ModelOverview";
 import { MarketingChannelsForm } from "@/components/models/MarketingChannelsForm";
-import { ModelAssumptions, MarketingSetup, RevenueStream, CostCategory } from "@/types/models";
+import { Breadcrumb } from "@/components/navigation/Breadcrumb";
+import { useBreadcrumbs } from "@/hooks/useBreadcrumbs";
+import { ModelAssumptions } from "@/types/models";
 import { TrendDataPoint } from "@/types/trends";
+import { formatDate } from "@/lib/utils";
+
+// Loading component for lazy-loaded components
+const ComponentLoader = ({ message = "Loading..." }: { message?: string }) => (
+  <div className="min-h-[200px] flex items-center justify-center">
+    <div className="animate-pulse space-y-4 w-full">
+      <div className="h-4 bg-muted rounded w-48" />
+      <div className="space-y-2">
+        <div className="h-32 bg-muted rounded" />
+        <div className="grid grid-cols-3 gap-4">
+          <div className="h-20 bg-muted rounded" />
+          <div className="h-20 bg-muted rounded" />
+          <div className="h-20 bg-muted rounded" />
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 const FinancialModelDetail = () => {
   const { projectId, modelId } = useParams<{ projectId: string; modelId: string }>();
   const navigate = useNavigate();
   
-  // --- Call ALL hooks at the top level --- 
-  const [loading, setLoading] = useState(true);
+  // --- Call ALL hooks at the top level ---
   const [model, setModel] = useState<FinancialModel | null>(null);
-  const { loadProjectById, currentProject, setCurrentProject } = useStore();
+  // Note: Not using any Zustand store functions to avoid infinite loops
   const [revenueData, setRevenueData] = useState<TrendDataPoint[]>([]);
   const [costData, setCostData] = useState<TrendDataPoint[]>([]);
   const [combinedFinancialData, setCombinedFinancialData] = useState<TrendDataPoint[]>([]);
   const [isFinancialDataReady, setIsFinancialDataReady] = useState<boolean>(false);
+
+  const { data: project, isLoading: projectLoading } = useProject(projectId);
+  const { data: fetchedModel, isLoading: modelLoading } = useModel(modelId);
+  const { data: allModels = [] } = useModelsForProject(projectId);
+  const deleteModel = useDeleteModel();
   
   // Memoize assumption props (call unconditionally)
   const assumptions = model?.assumptions;
@@ -52,63 +88,63 @@ const FinancialModelDetail = () => {
   const memoizedGrowthModel = useMemo(() => assumptions?.growthModel, [assumptions?.growthModel]);
   const isWeeklyEvent = useMemo(() => memoizedMetadata?.type === "WeeklyEvent", [memoizedMetadata]);
 
+  // Breadcrumb navigation
+  const breadcrumbs = useBreadcrumbs({
+    projectId: projectId,
+    projectName: project?.name,
+    modelId: modelId,
+    modelName: model?.name,
+  });
+
   // Callbacks (call unconditionally)
   const updateModelAssumptions = useCallback(async (updatedFields: Partial<ModelAssumptions>) => {
-    
-    if (!model || !model.id) {
-        return;
-    }
-    
-    try {
-      const currentAssumptions = model?.assumptions || { 
-          revenue: [], 
-          costs: [], 
-          growthModel: { type: 'linear', rate: 0 }, 
-          marketing: { channels: [] }
+    setModel(prevModel => {
+      if (!prevModel || !prevModel.id) {
+        toast.error("Error", { description: "Cannot update a model that is not loaded." });
+        return prevModel;
+      }
+
+      // Deep merge the new fields into the existing assumptions
+      const newAssumptions: ModelAssumptions = {
+        ...prevModel.assumptions,
+        ...updatedFields,
+        // Ensure nested objects are merged, not replaced
+        marketing: {
+          ...prevModel.assumptions.marketing,
+          ...updatedFields.marketing,
+        },
       };
 
-      const newAssumptions = { ...currentAssumptions, ...updatedFields };
-
-      if (updatedFields.marketing) {
-         newAssumptions.marketing = {
-            channels: [],
-            ...currentAssumptions.marketing,
-            ...updatedFields.marketing,
-         };
-      }
+      // Perform the database update using cloud/local switching
+      const saveAssumptions = async () => {
+        
+        try {
+          if (isCloudModeEnabled()) {
+            console.log('🌤️ Updating model assumptions in Supabase');
+            const supabaseStorage = new SupabaseStorageService();
+            await supabaseStorage.updateModel(prevModel.id, {
+              assumptions: newAssumptions
+            });
+          } else {
+            console.log('💾 Updating model assumptions in IndexedDB');
+            await db.financialModels.update(prevModel.id, {
+              assumptions: newAssumptions,
+              updatedAt: new Date()
+            });
+          }
+          toast.success("Assumptions Updated", { description: "Your changes have been saved." });
+        } catch (error) {
+          console.error("[FinancialModelDetail] Error saving assumptions:", error);
+          toast.error("Error Saving", { description: "Could not save your changes." });
+        }
+      };
       
-      if (!newAssumptions.revenue) newAssumptions.revenue = [];
-      if (!newAssumptions.costs) newAssumptions.costs = [];
-      if (!newAssumptions.growthModel) newAssumptions.growthModel = { type: 'linear', rate: 0 };
-      if (!newAssumptions.marketing) newAssumptions.marketing = { channels: [] };
-      if (!newAssumptions.marketing.channels) newAssumptions.marketing.channels = [];
+      saveAssumptions();
 
-      // Normalize marketing object
-      if (newAssumptions.marketing) {
-          /* no-op */
-      }
-      
-      const assumptionsToSave = newAssumptions as FinancialModel['assumptions'];
-
-
-      await db.financialModels.update(model.id, {
-          assumptions: assumptionsToSave,
-          updatedAt: new Date()
-      });
-
-      setModel(prevModel => prevModel ? { 
-          ...prevModel, 
-          assumptions: assumptionsToSave, 
-          updatedAt: new Date() 
-      } : null);
-      
-      toast({ title: "Assumptions Updated", description: "Marketing changes saved." });
-      
-    } catch (error) {
-      console.error("[FinancialModelDetail] Error saving assumptions:", error);
-      toast({ variant: "destructive", title: "Error Saving", description: "Could not save marketing changes." });
-    }
-  }, [model]); // Dependency might need refinement if model reference changes too often
+      // Return the new state immediately for a responsive UI
+      return { ...prevModel, assumptions: newAssumptions, updatedAt: new Date() };
+    });
+  }, []); // This callback is now stable and has no dependencies.
 
   const combineFinancialData = useCallback(() => {
     if (revenueData.length === 0 || costData.length === 0) {
@@ -166,89 +202,34 @@ const FinancialModelDetail = () => {
       setIsFinancialDataReady(true);
     } catch (error) {
       console.error("Error combining financial data:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
+      toast.error("Error", {
         description: "There was a problem combining financial data.",
       });
     }
   }, [revenueData, costData]);
 
   const handleDeleteModel = useCallback(async () => {
-    // Ensure modelId is defined before attempting delete
-    if (!modelId) {
-        toast({ variant: "destructive", title: "Error", description: "Model ID is missing, cannot delete." });
-        return;
+    if (!modelId || !projectId) {
+      toast.error("Error", { description: "Model ID is missing, cannot delete." });
+      return;
     }
     try {
-      await db.financialModels.delete(parseInt(modelId));
-      toast({ title: "Model deleted", description: "The financial model has been successfully deleted." });
+      await deleteModel.mutateAsync({ modelId, projectId });
       navigate(`/projects/${projectId}`);
     } catch (error) {
       console.error("Error deleting model:", error);
-      toast({ variant: "destructive", title: "Error deleting model", description: "There was an error deleting the financial model." });
+      toast.error("Error deleting model", {
+        description: error instanceof Error ? error.message : "An unknown error occurred."
+      });
     }
-  }, [modelId, projectId, navigate]);
+  }, [modelId, projectId, navigate, deleteModel]);
 
   // Effects (call unconditionally)
   useEffect(() => {
-    let isMounted = true; // Flag to prevent state updates on unmounted component
-    const loadModelData = async () => {
-      if (!projectId || !modelId) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Missing project or model ID",
-        });
-        navigate("/projects");
-        return;
-      }
-
-      setLoading(true);
-      try {
-        if (!currentProject || currentProject.id !== parseInt(projectId)) {
-          const project = await loadProjectById(parseInt(projectId));
-          if (!project) {
-            toast({
-              variant: "destructive",
-              title: "Project not found",
-              description: "The requested project could not be found.",
-            });
-            navigate("/projects");
-            return;
-          }
-          setCurrentProject(project);
-        }
-
-        const financialModel = await db.financialModels.get(parseInt(modelId));
-        if (isMounted) {
-          if (financialModel) {
-            setModel(financialModel);
-          } else {
-            toast({
-              variant: "destructive",
-              title: "Model not found",
-              description: "The requested financial model could not be found.",
-            });
-            navigate(`/projects/${projectId}`);
-          }
-        }
-      } catch (error) {
-        console.error("Error loading financial model:", error);
-        toast({
-          variant: "destructive",
-          title: "Error loading model",
-          description: "There was an error loading the financial model.",
-        });
-        navigate(`/projects/${projectId}`);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    loadModelData();
-    return () => { isMounted = false; }; // Cleanup function
-  }, [projectId, modelId, navigate, currentProject, loadProjectById, setCurrentProject]); // Dependencies
+    if (fetchedModel) {
+      setModel(fetchedModel);
+    }
+  }, [fetchedModel]);
 
   useEffect(() => {
     if (revenueData.length > 0 && costData.length > 0) {
@@ -256,24 +237,10 @@ const FinancialModelDetail = () => {
     }
   }, [revenueData, costData, combineFinancialData]);
 
-  // Helper functions (can be defined here)
-  const formatDate = (dateString: string | Date | undefined): string => {
-    if (!dateString) return "N/A";
-    try {
-        // Handle both string and Date objects
-        const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
-        if (isNaN(date.getTime())) return "Invalid Date"; 
-        return date.toLocaleDateString("en-US", {
-            year: "numeric", month: "short", day: "numeric",
-        });
-    } catch (error) {
-        console.error("Error formatting date:", dateString, error);
-        return "Error Date";
-    }
-  };
+  const loading = projectLoading || modelLoading || !model;
 
   // --- Conditional Returns (AFTER all hooks) --- 
-  if (loading || !currentProject) { // Check currentProject as well for header info
+  if (loading) { // Only check loading state
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
          <div className="h-10 w-10 border-4 border-fortress-emerald border-t-transparent rounded-full animate-spin"></div>
@@ -305,11 +272,38 @@ const FinancialModelDetail = () => {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb Navigation */}
+      <Breadcrumb items={breadcrumbs} />
+      
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-         <div className="flex items-start gap-2">
-            <Button variant="ghost" size="icon" onClick={() => navigate(`/projects/${projectId}`)}><ArrowLeft className="h-4 w-4" /></Button>
-            <div>
-               <h1 className="text-3xl font-bold text-fortress-blue">{model.name}</h1>
+         <div className="flex items-start gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate(`/projects/${projectId}`)}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex-1">
+               <div className="flex items-center gap-4 mb-2">
+                 <h1 className="text-3xl font-bold text-fortress-blue">{model.name}</h1>
+                 {allModels.length > 1 && (
+                   <div className="flex items-center gap-2">
+                     <span className="text-sm text-muted-foreground">Model:</span>
+                     <Select 
+                       value={modelId} 
+                       onValueChange={(newModelId) => navigate(`/projects/${projectId}/models/${newModelId}`)}
+                     >
+                       <SelectTrigger className="w-48">
+                         <SelectValue />
+                       </SelectTrigger>
+                       <SelectContent>
+                         {allModels.map((m) => (
+                           <SelectItem key={m.id} value={m.id}>
+                             {m.name}
+                           </SelectItem>
+                         ))}
+                       </SelectContent>
+                     </Select>
+                   </div>
+                 )}
+               </div>
                <p className="text-muted-foreground">
                  Created on {formatDate(model.createdAt)} • Last updated on{" "}
                  {formatDate(model.updatedAt)}
@@ -317,7 +311,7 @@ const FinancialModelDetail = () => {
             </div>
          </div>
           <div className="flex space-x-2">
-            <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/models/${model.id}/edit`)} disabled={!model.id}><Edit className="mr-1 h-4 w-4" /> Edit</Button>
+            <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/models/${model.id}/edit`)} disabled={!model.id}><Edit className="mr-1 h-4 w-4" /> Edit Scenario</Button>
             <AlertDialog>
                <AlertDialogTrigger asChild><Button variant="destructive" size="sm" disabled={!model.id}><Trash2 className="mr-1 h-4 w-4" /> Delete</Button></AlertDialogTrigger>
                <AlertDialogContent>
@@ -337,96 +331,163 @@ const FinancialModelDetail = () => {
       <Tabs defaultValue="overview" className="space-y-4">
          <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="analysis">Financial Analysis</TabsTrigger>
-            <TabsTrigger value="marketing">Marketing</TabsTrigger>
-            <TabsTrigger value="financial-matrix">Financial Matrix</TabsTrigger>
-            <TabsTrigger value="trends">Trends</TabsTrigger>
-            <TabsTrigger value="breakdown">Breakdown</TabsTrigger>
+            <TabsTrigger value="setup">Setup</TabsTrigger>
             <TabsTrigger value="projections">Projections</TabsTrigger>
+            <TabsTrigger value="analysis">Analysis</TabsTrigger>
+            <TabsTrigger value="track-actuals">Track Actuals</TabsTrigger>
          </TabsList>
 
          <TabsContent value="overview" className="space-y-4">
            <ModelOverview model={model} projectId={projectId} /> 
          </TabsContent>
 
-         <TabsContent value="analysis" className="space-y-4">
-           <FinancialAnalysis model={model} isWeekly={isWeeklyEvent} />
+         <TabsContent value="setup" className="space-y-4">
+           <Card>
+             <CardHeader>
+               <CardTitle>Scenario Setup & Assumptions</CardTitle>
+             </CardHeader>
+             <CardContent>
+               <div className="space-y-6">
+                 <div>
+                   <h3 className="text-lg font-semibold mb-4">Marketing Configuration</h3>
+                   <MarketingChannelsForm
+                     marketingSetup={memoizedMarketingSetup}
+                     updateAssumptions={updateModelAssumptions}
+                     modelTimeUnit={isWeeklyEvent ? 'Week' : 'Month'}
+                     metadata={memoizedMetadata}
+                   />
+                 </div>
+                 {/* Future: Add other assumption forms here */}
+               </div>
+             </CardContent>
+           </Card>
          </TabsContent>
 
-         <TabsContent value="marketing">
-           <MarketingChannelsForm
-             marketingSetup={memoizedMarketingSetup}
-             updateAssumptions={updateModelAssumptions}
-             modelTimeUnit={isWeeklyEvent ? 'Week' : 'Month'}
-             metadata={memoizedMetadata}
-           />
+         <TabsContent value="projections" className="space-y-6">
+           <Card>
+             <CardHeader>
+               <CardTitle className="flex items-center">
+                 <BarChart3 className="mr-2 h-5 w-5" />
+                 Financial Matrix
+               </CardTitle>
+             </CardHeader>
+             <CardContent>
+               {isFinancialDataReady ? (
+                 <Suspense fallback={<ComponentLoader message="Loading financial matrix..." />}>
+                   <FinancialMatrix 
+                     model={model} 
+                     trendData={combinedFinancialData} 
+                     combinedView={true}
+                   />
+                 </Suspense>
+               ) : (
+                 <div className="text-center py-10 text-muted-foreground">Loading financial data...</div> 
+               )}
+             </CardContent>
+           </Card>
+           
+           <Card>
+             <CardHeader>
+               <CardTitle>Financial Projections</CardTitle>
+             </CardHeader>
+             <CardContent>
+               <Suspense fallback={<ComponentLoader message="Loading projections..." />}>
+                 <ModelProjections model={model} />
+               </Suspense>
+             </CardContent>
+           </Card>
          </TabsContent>
 
-         <TabsContent value="financial-matrix">
+         <TabsContent value="analysis" className="space-y-6">
+           <Card>
+             <CardHeader>
+               <CardTitle>Financial Analysis</CardTitle>
+             </CardHeader>
+             <CardContent>
+               <Suspense fallback={<ComponentLoader message="Loading financial analysis..." />}>
+                 <FinancialAnalysis model={model} isWeekly={isWeeklyEvent} />
+               </Suspense>
+             </CardContent>
+           </Card>
+           
+           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
              <Card>
-               <CardHeader><CardTitle className="flex items-center"><BarChart3 className="mr-2 h-5 w-5" />Combined Financial Matrix</CardTitle></CardHeader>
+               <CardHeader>
+                 <CardTitle className="flex items-center">
+                   <ChartLine className="mr-2 h-5 w-5" />
+                   Revenue Trends
+                 </CardTitle>
+               </CardHeader>
                <CardContent>
-                  {isFinancialDataReady ? (
-                     <FinancialMatrix 
-                       model={model} 
-                       trendData={combinedFinancialData} 
-                       combinedView={true}
-                     />
-                  ) : (
-                     <div className="text-center py-10 text-muted-foreground">Loading financial data...</div> 
-                  )}
+                 <Suspense fallback={<ComponentLoader message="Loading revenue trends..." />}>
+                   <RevenueTrends model={model} setCombinedData={setRevenueData} />
+                 </Suspense>
                </CardContent>
              </Card>
-         </TabsContent>
-
-         <TabsContent value="trends">
-           <div className="space-y-8">
+             
              <Card>
-                <CardHeader><CardTitle className="flex items-center"><ChartLine className="mr-2 h-5 w-5" />Revenue Trends Over Time</CardTitle></CardHeader>
-                <CardContent>
-                   <RevenueTrends model={model} setCombinedData={setRevenueData} />
-                </CardContent>
-             </Card>
-             <Card>
-                <CardHeader><CardTitle className="flex items-center"><ChartLine className="mr-2 h-5 w-5" />Cost Trends Over Time</CardTitle></CardHeader>
-                <CardContent>
+               <CardHeader>
+                 <CardTitle className="flex items-center">
+                   <ChartLine className="mr-2 h-5 w-5" />
+                   Cost Trends
+                 </CardTitle>
+               </CardHeader>
+               <CardContent>
+                 <Suspense fallback={<ComponentLoader message="Loading cost trends..." />}>
                    <CostTrends 
-                      costs={memoizedCosts}
-                      marketingSetup={memoizedMarketingSetup}
-                      metadata={memoizedMetadata}
-                      growthModel={memoizedGrowthModel}
-                      model={model} 
-                      onUpdateCostData={setCostData} 
+                     costs={memoizedCosts}
+                     marketingSetup={memoizedMarketingSetup}
+                     metadata={memoizedMetadata}
+                     growthModel={memoizedGrowthModel}
+                     model={model} 
+                     onUpdateCostData={setCostData} 
                    />
-                </CardContent>
+                 </Suspense>
+               </CardContent>
              </Card>
            </div>
+           
+           <Card>
+             <CardHeader>
+               <CardTitle>Category Breakdown</CardTitle>
+             </CardHeader>
+             <CardContent>
+               {isFinancialDataReady ? (
+                 <Suspense fallback={<ComponentLoader message="Loading category breakdown..." />}>
+                   <CategoryBreakdown 
+                     model={model} 
+                     revenueTrendData={revenueData}
+                     costTrendData={costData}
+                   />
+                 </Suspense>
+               ) : (
+                 <div className="text-center py-10 text-muted-foreground">Loading breakdown data...</div> 
+               )}
+             </CardContent>
+           </Card>
          </TabsContent>
-
-          <TabsContent value="breakdown">
-             <Card>
-               <CardHeader><CardTitle>Category Breakdown</CardTitle></CardHeader>
-               <CardContent>
-                  {isFinancialDataReady ? (
-                     <CategoryBreakdown 
-                        model={model} 
-                        revenueTrendData={revenueData}
-                        costTrendData={costData}
-                     />
-                  ) : (
-                     <div className="text-center py-10 text-muted-foreground">Loading breakdown data...</div> 
-                  )}
-               </CardContent>
-             </Card>
-         </TabsContent>
-
-          <TabsContent value="projections">
-             <Card>
-               <CardHeader><CardTitle>Financial Projections</CardTitle></CardHeader>
-               <CardContent>
-                  <ModelProjections model={model} />
-               </CardContent>
-             </Card>
+         
+         <TabsContent value="track-actuals" className="space-y-4">
+           <Card>
+             <CardHeader>
+               <CardTitle>Scenario Performance Tracking</CardTitle>
+             </CardHeader>
+             <CardContent>
+               <p className="text-muted-foreground mb-4">
+                 Track actual performance data for this specific scenario. For project-level performance tracking across all scenarios, 
+                 <span className="text-fortress-blue cursor-pointer hover:underline" onClick={() => navigate(`/projects/${projectId}?tab=performance`)}>
+                   go to the project's Track Performance tab
+                 </span>.
+               </p>
+               <div className="text-center py-10 text-muted-foreground">
+                 <div className="mb-4">
+                   <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                 </div>
+                 <p>Scenario-specific actuals tracking coming soon...</p>
+                 <p className="text-sm mt-2">For now, use the project-level performance tracking.</p>
+               </div>
+             </CardContent>
+           </Card>
          </TabsContent>
       </Tabs>
     </div>

@@ -1,4 +1,4 @@
-import { useState, ChangeEvent } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -14,36 +14,43 @@ import { ArrowLeft, CalendarIcon, Check } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { toast } from "@/hooks/use-toast";
-import useStore from "@/store/useStore";
+import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
+import { useImageUpload } from "@/hooks/useImageUpload";
+import { productTypes } from "@/lib/constants";
+import { useCreateProject } from "@/hooks/useProjects";
+import { useActiveEventTypes } from "@/hooks/useCategories";
 
-const formSchema = z.object({
-  name: z.string().min(3, "Project name must be at least 3 characters"),
-  description: z.string().optional(),
-  productType: z.string().min(1, "Please select a product type"),
-  targetAudience: z.string().optional(),
-  startDate: z.date(),
-  endDate: z.date().optional(),
-});
+const formSchema = z
+  .object({
+    name: z.string().min(3, "Project name must be at least 3 characters"),
+    description: z.string().optional(),
+    productType: z.string().min(1, "Please select a product type"),
+    targetAudience: z.string().optional(),
+    startDate: z.date(),
+    endDate: z.date().optional(),
+    eventType: z.enum(["weekly", "special"]).default("weekly"),
+    eventDate: z.date().optional(),
+    eventEndDate: z.date().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.eventType === "special" && !data.eventDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["eventDate"],
+        message: "Event date is required for special events",
+      });
+    }
+  });
 
 type FormValues = z.infer<typeof formSchema>;
 
-const productTypes = [
-  { value: "SaaS", label: "SaaS Product" },
-  { value: "WeeklyEvent", label: "Weekly Event" },
-  { value: "DigitalProduct", label: "Digital Product" },
-  { value: "PhysicalGood", label: "Physical Good" },
-  { value: "ConsultingProject", label: "Consulting Project" },
-];
-
 const NewProject = () => {
   const navigate = useNavigate();
-  const { addProject } = useStore();
+  const createProjectMutation = useCreateProject();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [avatarDataUrl, setAvatarDataUrl] = useState<string | undefined>(undefined);
-
+  const { preview: avatarPreview, dataUrl: avatarDataUrl, handleImageChange, removeImage } = useImageUpload();
+  const { data: eventTypes = [], isLoading: eventTypesLoading } = useActiveEventTypes();
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -52,40 +59,16 @@ const NewProject = () => {
       productType: "",
       targetAudience: "",
       startDate: new Date(),
+      eventType: "weekly",
     },
   });
 
-  const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        toast({ variant: 'destructive', title: 'Invalid File Type', description: 'Please select an image file.'});
-        return;
-      }
-      if (file.size > 2 * 1024 * 1024) {
-         toast({ variant: 'destructive', title: 'File Too Large', description: 'Image size should not exceed 2MB.'});
-         return;
-      }
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        setAvatarPreview(result);
-        setAvatarDataUrl(result);
-      };
-      reader.onerror = () => {
-        toast({ variant: 'destructive', title: 'Error Reading File', description: 'Could not read the selected image.'});
-        setAvatarPreview(null);
-        setAvatarDataUrl(undefined);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  const eventType = form.watch("eventType");
 
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
     try {
-      const projectId = await addProject({
+      const createdProject = await createProjectMutation.mutateAsync({
         name: data.name,
         description: data.description,
         productType: data.productType,
@@ -95,21 +78,25 @@ const NewProject = () => {
           endDate: data.endDate,
         },
         avatarImage: avatarDataUrl,
+        event_type: data.eventType,
+        event_date: data.eventDate,
+        event_end_date: data.eventEndDate,
       });
       
-      toast({
-        title: "Project created!",
-        description: `${data.name} has been created successfully.`,
-      });
-      
-      navigate(`/projects/${projectId}`);
+      if (createdProject && createdProject.id) {
+        navigate(`/projects/${createdProject.id}`);
+      } else {
+        // If creation failed or didn't return an ID, go back to the list.
+        navigate('/projects');
+      }
     } catch (error) {
       console.error("Error creating project:", error);
-      toast({
-        variant: "destructive",
-        title: "Failed to create project",
-        description: "There was an error creating your project. Please try again.",
-      });
+      // The useCreateProject hook already shows toast messages, but we'll add a fallback
+      if (!createProjectMutation.isError) {
+        toast.error("Failed to create project", {
+          description: "There was an error creating your project. Please try again.",
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -194,6 +181,34 @@ const NewProject = () => {
                     </Select>
                     <FormDescription>
                       The type of product will determine relevant financial metrics and KPIs.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="eventType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Event Type</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value} disabled={eventTypesLoading}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={eventTypesLoading ? "Loading event types..." : "Select event type"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {eventTypes.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Choose "Special Event" for one-off events with unique dates.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -306,6 +321,96 @@ const NewProject = () => {
                 />
               </div>
 
+              {eventType === "special" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="eventDate"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Event Date</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                {field.value ? (
+                                  format(field.value, "PPP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              initialFocus
+                              className={cn("p-3 pointer-events-auto")}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormDescription>Date of the special event.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="eventEndDate"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Event End Date (Optional)</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                {field.value ? (
+                                  format(field.value, "PPP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value || undefined}
+                              onSelect={field.onChange}
+                              disabled={(date) =>
+                                date < (form.getValues("eventDate") || new Date(0))}
+                              initialFocus
+                              className={cn("p-3 pointer-events-auto")}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormDescription>
+                          Optional end date if the event spans multiple days.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+
               <div>
                 <Label htmlFor="avatar-upload">Project Avatar (Optional)</Label>
                 <Input 
@@ -319,17 +424,7 @@ const NewProject = () => {
                   <div className="mt-4">
                     <Label>Preview:</Label>
                     <img src={avatarPreview} alt="Avatar Preview" className="mt-2 w-24 h-24 object-cover rounded-md border" />
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="mt-2 text-xs" 
-                      onClick={() => { 
-                        setAvatarPreview(null); 
-                        setAvatarDataUrl(undefined); 
-                        const fileInput = document.getElementById('avatar-upload') as HTMLInputElement;
-                        if (fileInput) fileInput.value = "";
-                      }}
-                    >
+                    <Button variant="ghost" size="sm" className="mt-2 text-xs" onClick={removeImage}>
                       Remove Image
                     </Button>
                   </div>
@@ -347,10 +442,10 @@ const NewProject = () => {
                 </Button>
                 <Button 
                   type="submit" 
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || createProjectMutation.isPending}
                   className="bg-fortress-emerald hover:bg-fortress-emerald/90"
                 >
-                  {isSubmitting ? (
+                  {(isSubmitting || createProjectMutation.isPending) ? (
                     <span className="flex items-center gap-1">
                       <span className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                       Creating...

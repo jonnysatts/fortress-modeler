@@ -1,4 +1,3 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -7,8 +6,9 @@ import { lazy, Suspense } from "react";
 import AppLayout from "./components/layout/AppLayout";
 import AppLoader from "./components/AppLoader";
 import { useAppLoader } from "./hooks/useAppLoader";
-import { AuthProvider } from "./hooks/useAuth";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { PerformanceMonitorWidget } from "./components/PerformanceMonitor";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 // Lazy load components for code splitting
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -20,9 +20,11 @@ const NewFinancialModel = lazy(() => import("./pages/models/NewFinancialModel"))
 const FinancialModelDetail = lazy(() => import("./pages/models/FinancialModelDetail"));
 const EditFinancialModel = lazy(() => import("./pages/models/EditFinancialModel"));
 const Settings = lazy(() => import("./pages/Settings"));
+const CategoryManagement = lazy(() => import("./pages/CategoryManagement"));
+const RisksOverview = lazy(() => import("./pages/RisksOverview").then(module => ({ default: module.RisksOverview })));
+const AuthCallback = lazy(() => import("./pages/auth/AuthCallback"));
+const Login = lazy(() => import("./pages/Login").then(module => ({ default: module.Login })));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const Login = lazy(() => import("./pages/Login"));
-const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 
 // Loading component for Suspense
 const PageLoader = () => (
@@ -40,56 +42,50 @@ const PageLoader = () => (
   </div>
 );
 
-const queryClient = new QueryClient();
 
 const App = () => {
-  console.log('App component rendering...');
   const { isLoading, currentMessage, progress } = useAppLoader();
-  console.log('App loader state:', { isLoading, currentMessage, progress });
 
   if (isLoading) {
-    console.log('Showing app loader');
     return <AppLoader message={currentMessage} progress={progress} />;
   }
 
-  console.log('App loader finished, showing main app');
-
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <Toaster />
-          <Sonner />
+    <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <ErrorBoundary context="App">
           <BrowserRouter>
             <Suspense fallback={<PageLoader />}>
               <Routes>
-                {/* Public routes */}
-                <Route path="/login" element={<Login />} />
-                <Route path="/auth/callback" element={<AuthCallback />} />
-                
-                {/* Protected routes */}
-                <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-                  <Route index element={<Dashboard />} />
-                  <Route path="dashboard" element={<Dashboard />} />
-                  <Route path="projects" element={<ProjectsList />} />
-                  <Route path="projects/new" element={<NewProject />} />
-                  <Route path="projects/:projectId" element={<ProjectDetail />} />
-                  <Route path="projects/:projectId/edit" element={<EditProject />} />
-                  <Route path="projects/:projectId/models/new" element={<NewFinancialModel />} />
-                  <Route path="projects/:projectId/models/:modelId" element={<FinancialModelDetail />} />
-                  <Route path="projects/:projectId/models/:modelId/edit" element={<EditFinancialModel />} />
-                  <Route path="modeling" element={<Dashboard />} />
-                  <Route path="performance" element={<Dashboard />} />
-                  <Route path="risks" element={<Dashboard />} />
-                  <Route path="settings" element={<Settings />} />
-                </Route>
-                <Route path="*" element={<NotFound />} />
+              {/* Auth routes - must be outside protected routes */}
+              <Route path="login" element={<Login />} />
+              <Route path="auth/callback" element={<AuthCallback />} />
+              
+              {/* Protected routes */}
+              <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+                <Route index element={<Dashboard />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="projects" element={<ProjectsList />} />
+                <Route path="projects/new" element={<NewProject />} />
+                <Route path="projects/:projectId" element={<ProjectDetail />} />
+                <Route path="projects/:projectId/edit" element={<EditProject />} />
+                <Route path="projects/:projectId/models/new" element={<NewFinancialModel />} />
+                <Route path="projects/:projectId/models/:modelId" element={<FinancialModelDetail />} />
+                <Route path="projects/:projectId/models/:modelId/edit" element={<EditFinancialModel />} />
+                <Route path="modeling" element={<Dashboard />} />
+                <Route path="performance" element={<Dashboard />} />
+                <Route path="risks" element={<RisksOverview />} />
+                <Route path="settings" element={<Settings />} />
+                <Route path="categories" element={<CategoryManagement />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
           </BrowserRouter>
-        </AuthProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+        </ErrorBoundary>
+        <PerformanceMonitorWidget />
+    </TooltipProvider>
   );
 };
 

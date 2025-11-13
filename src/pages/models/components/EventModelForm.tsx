@@ -1,8 +1,13 @@
-import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { ArrowLeft, Save, PlusCircle, MinusCircle } from 'lucide-react';
+import { ArrowLeft, Save, PlusCircle } from 'lucide-react';
+import { 
+  calculateWeeklyRevenue, 
+  calculateFbCOGS,
+  weeklyRevenueToAssumptions,
+  type PerCustomerRevenue 
+} from '@/lib/weekly-revenue-calculator';
 import { 
   Form, 
   FormControl, 
@@ -31,6 +36,8 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
 import { db, FinancialModel } from '@/lib/db';
+import { useCreateModel, useUpdateModel } from '@/hooks/useModels';
+import { useActiveCostCategories } from '@/hooks/useCategories';
 
 interface PerCustomerRevenue {
   ticketPrice: number;
@@ -92,7 +99,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 interface EventModelFormProps {
-  projectId: number;
+  projectId: number | string;
   projectName: string;
   existingModel?: FinancialModel;
   onCancel: () => void;
@@ -100,6 +107,9 @@ interface EventModelFormProps {
 
 const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: EventModelFormProps) => {
   const eventMetadata = existingModel?.assumptions.metadata;
+  const createModelMutation = useCreateModel();
+  const updateModelMutation = useUpdateModel();
+  const { data: costCategories = [] } = useActiveCostCategories();
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -167,39 +177,16 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
   const watchFbCOGSPercent = form.watch("costs.fbCOGSPercent");
   const watchUseCustomerSpendGrowth = form.watch("growth.useCustomerSpendGrowth");
 
-  const calculateWeeklyRevenue = () => {
-    return {
-      ticketSales: watchInitialAttendance * watchPerCustomer.ticketPrice,
-      fbSales: watchInitialAttendance * watchPerCustomer.fbSpend,
-      merchandiseSales: watchInitialAttendance * watchPerCustomer.merchandiseSpend,
-      onlineSales: watchInitialAttendance * watchPerCustomer.onlineSpend,
-      miscRevenue: watchInitialAttendance * watchPerCustomer.miscSpend,
-    };
-  };
-
-  const weeklyRevenue = calculateWeeklyRevenue();
-  
-  const fbCOGS = (weeklyRevenue.fbSales * watchFbCOGSPercent) / 100;
+  const weeklyRevenue = calculateWeeklyRevenue(watchInitialAttendance, watchPerCustomer);
+  const fbCOGS = calculateFbCOGS(weeklyRevenue.fbSales, watchFbCOGSPercent);
 
   const onSubmit = async (data: FormValues) => {
     try {
-      const weeklyRevenue = {
-        ticketSales: data.initialWeeklyAttendance * data.perCustomer.ticketPrice,
-        fbSales: data.initialWeeklyAttendance * data.perCustomer.fbSpend, 
-        merchandiseSales: data.initialWeeklyAttendance * data.perCustomer.merchandiseSpend,
-        onlineSales: data.initialWeeklyAttendance * data.perCustomer.onlineSpend,
-        miscRevenue: data.initialWeeklyAttendance * data.perCustomer.miscSpend,
-      };
-
-      const revenueAssumptions = [
-        { name: "Ticket Sales", value: weeklyRevenue.ticketSales, type: "recurring" as const, frequency: "weekly" as const },
-        { name: "F&B Sales", value: weeklyRevenue.fbSales, type: "recurring" as const, frequency: "weekly" as const },
-        { name: "Merchandise Sales", value: weeklyRevenue.merchandiseSales, type: "recurring" as const, frequency: "weekly" as const },
-        { name: "Online Sales", value: weeklyRevenue.onlineSales, type: "recurring" as const, frequency: "weekly" as const },
-        { name: "Miscellaneous Revenue", value: weeklyRevenue.miscRevenue, type: "recurring" as const, frequency: "weekly" as const },
-      ];
+      const weeklyRevenue = calculateWeeklyRevenue(data.initialWeeklyAttendance, data.perCustomer);
+      const revenueAssumptions = weeklyRevenueToAssumptions(weeklyRevenue);
 
       const setupCostType = data.costs.spreadSetupCosts ? "recurring" as const : "fixed" as const;
+      const fbCOGS = calculateFbCOGS(weeklyRevenue.fbSales, data.costs.fbCOGSPercent);
       
       const costAssumptions = [
         { name: "Setup Costs", value: data.costs.setupCosts, type: setupCostType, category: "operations" as const },
@@ -233,7 +220,6 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
       };
 
       const modelData = {
-        projectId,
         name: data.name,
         assumptions: {
           revenue: revenueAssumptions,
@@ -241,26 +227,20 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
           growthModel,
           metadata: eventMetadata,
         },
-        updatedAt: new Date(),
       };
 
-
-      if (existingModel) {
-        await db.financialModels.update(existingModel.id, modelData);
-        
-        toast({
-          title: "Event model updated",
-          description: `Successfully updated "${data.name}" weekly event model.`,
+      if (existingModel && existingModel.id) {
+        // Update existing model
+        await updateModelMutation.mutateAsync({
+          id: existingModel.id,
+          projectId,
+          data: { ...modelData, projectId }
         });
       } else {
-        await db.financialModels.add({
+        // Create new model
+        await createModelMutation.mutateAsync({
           ...modelData,
-          createdAt: new Date(),
-        });
-        
-        toast({
-          title: "Event model created",
-          description: `Successfully created "${data.name}" weekly event model.`,
+          projectId
         });
       }
 

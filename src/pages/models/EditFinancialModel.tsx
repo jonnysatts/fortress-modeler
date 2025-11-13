@@ -1,96 +1,52 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "@/hooks/use-toast";
-import { FinancialModel, db } from "@/lib/db";
-import useStore from "@/store/useStore";
+import { toast } from "sonner";
+import { FinancialModel } from "@/lib/db";
 import EventModelForm from "./components/EventModelForm";
+import { useProject } from "@/hooks/useProjects";
+import { useModel } from "@/hooks/useModels";
 
 const EditFinancialModel = () => {
   const { projectId, modelId } = useParams<{ projectId: string; modelId: string }>();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
   const [model, setModel] = useState<FinancialModel | null>(null);
-  const { loadProjectById, currentProject } = useStore();
+  const [projectName, setProjectName] = useState<string>("");
+
+  const { data: project, isLoading: projectLoading } = useProject(projectId);
+  const { data: fetchedModel, isLoading: modelLoading } = useModel(modelId);
 
   useEffect(() => {
-    const loadData = async () => {
-      if (!projectId || !modelId) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Missing project or model ID",
-        });
-        navigate("/projects");
-        return;
-      }
+    if (project) {
+      setProjectName(project.name);
+    }
+  }, [project]);
 
-      setLoading(true);
-      try {
-        // Load the project if it's not already loaded
-        if (!currentProject || currentProject.id !== parseInt(projectId)) {
-          const project = await loadProjectById(parseInt(projectId));
-          if (!project) {
-            toast({
-              variant: "destructive",
-              title: "Project not found",
-              description: "The requested project could not be found.",
-            });
-            navigate("/projects");
-            return;
-          }
+  useEffect(() => {
+    if (fetchedModel) {
+      const fm = { ...fetchedModel };
+      if (fm.assumptions.metadata?.type === "WeeklyEvent" || fm.assumptions.metadata?.type === "SpecialEvent") {
+        if (!fm.assumptions.metadata.costs) {
+          fm.assumptions.metadata.costs = {
+            setupCosts: 0,
+            spreadSetupCosts: false,
+            fbCOGSPercent: 30,
+            staffCount: 0,
+            staffCostPerPerson: 0,
+            managementCosts: 0,
+          };
         }
-
-        // Load the financial model
-        const financialModel = await db.financialModels.get(parseInt(modelId));
-        if (financialModel) {
-          // Ensure proper formatting of model metadata
-          if (financialModel.assumptions.metadata?.type === "WeeklyEvent") {
-            // Ensure costs object exists
-            if (!financialModel.assumptions.metadata.costs) {
-              financialModel.assumptions.metadata.costs = {
-                setupCosts: 0,
-                spreadSetupCosts: false,
-                fbCOGSPercent: 30,
-                staffCount: 0,
-                staffCostPerPerson: 0,
-                managementCosts: 0
-              };
-            }
-            
-            // Ensure spreadSetupCosts is a boolean
-            financialModel.assumptions.metadata.costs.spreadSetupCosts = 
-              !!financialModel.assumptions.metadata.costs.spreadSetupCosts;
-          }
-          
-          setModel(financialModel);
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Model not found",
-            description: "The requested financial model could not be found.",
-          });
-          navigate(`/projects/${projectId}`);
-        }
-      } catch (error) {
-        console.error("Error loading financial model:", error);
-        toast({
-          variant: "destructive",
-          title: "Error loading model",
-          description: "There was an error loading the financial model.",
-        });
-        navigate(`/projects/${projectId}`);
-      } finally {
-        setLoading(false);
+        fm.assumptions.metadata.costs.spreadSetupCosts = !!fm.assumptions.metadata.costs.spreadSetupCosts;
       }
-    };
+      setModel(fm);
+    }
+  }, [fetchedModel]);
 
-    loadData();
-  }, [projectId, modelId, navigate, currentProject, loadProjectById]);
+  const loading = projectLoading || modelLoading || !model;
 
-  if (loading || !model || !currentProject) {
+  if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="h-10 w-10 border-4 border-fortress-emerald border-t-transparent rounded-full animate-spin"></div>
@@ -98,11 +54,11 @@ const EditFinancialModel = () => {
     );
   }
 
-  if (model.assumptions.metadata?.type === "WeeklyEvent") {
+  if (model.assumptions.metadata?.type === "WeeklyEvent" || model.assumptions.metadata?.type === "SpecialEvent") {
     return (
-      <EventModelForm 
-        projectId={Number(projectId)}
-        projectName={currentProject.name}
+      <EventModelForm
+        projectId={projectId!}
+        projectName={projectName}
         existingModel={model}
         onCancel={() => navigate(`/projects/${projectId}/models/${modelId}`)}
       />
@@ -124,25 +80,25 @@ const EditFinancialModel = () => {
             Edit: {model.name}
           </h1>
           <p className="text-muted-foreground">
-            Edit financial model for {currentProject.name}
+            Edit financial scenario for {projectName}
           </p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Edit Model</CardTitle>
+          <CardTitle>Edit Scenario</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-center py-6">
-            Editor for standard financial models is under development. 
-            Please return to the model view.
+            Editor for standard financial scenarios is under development. 
+            Please return to the scenario view.
           </p>
           <div className="flex justify-center mt-4">
             <Button 
               onClick={() => navigate(`/projects/${projectId}/models/${modelId}`)}
             >
-              Return to Model
+              Return to Scenario
             </Button>
           </div>
         </CardContent>

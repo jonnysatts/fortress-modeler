@@ -1,15 +1,43 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
+import { visualizer } from "rollup-plugin-visualizer";
+import viteCompression from "vite-plugin-compression";
 import path from "path";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "::",
-    port: 8080,
+    host: "0.0.0.0",
+    port: 8081,
+    open: true, // Automatically open browser
+    strictPort: true, // Fail if port 8081 is not available
   },
   plugins: [
     react(),
+    // Bundle analyzer - generates bundle-analysis.html
+    visualizer({
+      filename: 'dist/bundle-analysis.html',
+      open: false,
+      gzipSize: true,
+      brotliSize: true,
+    }),
+    // Gzip compression for production
+    ...(mode === 'production' ? [
+      viteCompression({
+        algorithm: 'gzip',
+        ext: '.gz',
+        threshold: 1024,
+        compressionOptions: { level: 9 },
+        deleteOriginFile: false,
+      }),
+      viteCompression({
+        algorithm: 'brotliCompress',
+        ext: '.br',
+        threshold: 1024,
+        compressionOptions: { level: 11 },
+        deleteOriginFile: false,
+      })
+    ] : []),
   ],
   resolve: {
     alias: {
@@ -18,39 +46,24 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     rollupOptions: {
-      output: {
-        manualChunks: {
-          // Vendor libraries
-          vendor: ['react', 'react-dom'],
-          router: ['react-router-dom'],
-          
-          // UI libraries
-          ui: [
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-select',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-accordion',
-            '@radix-ui/react-alert-dialog',
-            '@radix-ui/react-toast'
-          ],
-          
-          // Chart libraries
-          charts: ['recharts'],
-          
-          // Database and state
-          database: ['dexie'],
-          state: ['zustand', '@tanstack/react-query'],
-          
-          // Form handling
-          forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
-          
-          // Utilities
-          utils: ['date-fns', 'lucide-react', 'clsx', 'tailwind-merge']
-        }
+      output: mode === 'production' ? {
+        // Disable code splitting for production to avoid React context issues
+        manualChunks: undefined,
+        inlineDynamicImports: true,
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
+      } : {
+        chunkFileNames: 'assets/[name].js',
+        entryFileNames: 'assets/[name].js',
+        assetFileNames: 'assets/[name][extname]',
       }
     },
-    chunkSizeWarningLimit: 1000,
-    sourcemap: mode === 'development'
+    chunkSizeWarningLimit: 800,
+    sourcemap: mode === 'development',
+    minify: mode === 'production' ? 'esbuild' : false,
+    target: 'es2020',
+    // Asset optimization
+    assetsInlineLimit: 4096, // Assets < 4kb will be inlined as base64
+    cssCodeSplit: true, // Enable CSS code splitting
   }
 }));

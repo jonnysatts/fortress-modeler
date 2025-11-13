@@ -2,12 +2,13 @@ import { Router, Request, Response } from 'express';
 import { ProjectService } from '../services/project.service';
 import { FinancialModelService } from '../services/financial-model.service';
 import { authenticateToken, AuthRequest, rateLimitByUser } from '../middleware/auth.middleware';
+import { ProjectData } from '../types/common';
 
 const router = Router();
 
 // Apply authentication to all project routes
 router.use(authenticateToken);
-router.use(rateLimitByUser(120)); // 120 requests per minute for authenticated users
+router.use(rateLimitByUser(300)); // 300 requests per minute for authenticated users
 
 // GET /projects - Get all user projects
 router.get('/', async (req: AuthRequest, res: Response) => {
@@ -34,6 +35,35 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     console.error('Get projects error:', error);
     res.status(500).json({
       error: 'Failed to fetch projects',
+      code: 'FETCH_ERROR'
+    });
+  }
+});
+
+// POST /projects - Create new project
+// GET /projects/public - Get all public projects
+router.get('/public', async (req: AuthRequest, res: Response) => {
+  try {
+    const projects = await ProjectService.getPublicProjects();
+    res.json({ projects, count: projects.length });
+  } catch (error) {
+    console.error('Get public projects error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch public projects',
+      code: 'FETCH_ERROR'
+    });
+  }
+});
+
+// GET /projects/shared - Get projects shared with the user
+router.get('/shared', async (req: AuthRequest, res: Response) => {
+  try {
+    const projects = await ProjectService.getSharedProjectsForUser(req.userId);
+    res.json({ projects, count: projects.length });
+  } catch (error) {
+    console.error('Get shared projects error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch shared projects',
       code: 'FETCH_ERROR'
     });
   }
@@ -113,13 +143,21 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
+interface UpdateProjectData {
+  name?: string;
+  description?: string;
+  product_type?: string;
+  target_audience?: string;
+  data?: ProjectData;
+}
+
 // PUT /projects/:id - Update project
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { name, description, product_type, target_audience, data } = req.body;
     
-    const updateData: any = {};
+    const updateData: UpdateProjectData = {};
     
     if (name !== undefined) {
       if (name.trim().length === 0) {
@@ -323,6 +361,34 @@ router.post('/:id/models', async (req: AuthRequest, res: Response) => {
         code: 'CREATE_ERROR'
       });
     }
+  }
+});
+
+// GET /projects/:id/actuals - Get project actuals data
+router.get('/:id/actuals', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    // Verify project exists and user has access
+    const project = await ProjectService.getProjectById(req.userId, id);
+    if (!project) {
+      res.status(404).json({
+        error: 'Project not found',
+        code: 'PROJECT_NOT_FOUND'
+      });
+      return;
+    }
+    
+    // For now, return empty array as actuals functionality is not implemented
+    // TODO: Implement actuals service when needed
+    res.json([]);
+    
+  } catch (error) {
+    console.error('Get project actuals error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch project actuals',
+      code: 'FETCH_ERROR'
+    });
   }
 });
 

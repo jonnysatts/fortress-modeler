@@ -5,109 +5,138 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Trash2, FileText, FileSpreadsheet, Presentation } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { Download, Trash2, FileText, FileSpreadsheet, Presentation, Settings as SettingsIcon, Loader2, Check } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { getProjects, db } from "@/lib/db";
 import { exportToExcel, exportToPDF } from "@/lib/export";
 import { exportEnhancedExcel } from "@/lib/enhanced-excel-export";
 import { exportBoardReadyPDF, prepareBoardReadyData } from "@/lib/board-ready-export";
 import { exportSimpleExcel, exportSimplePDF } from "@/lib/simple-export";
 import { performFinancialAnalysis, generateCashFlowProjections } from "@/lib/financial-calculations";
-import useStore from "@/store/useStore";
+import { isCloudModeEnabled } from "@/config/app.config";
+import { useMyProjects } from "@/hooks/useProjects";
+import { useModelsForProject } from "@/hooks/useModels";
+import { SupabaseStorageService } from "@/services/implementations/SupabaseStorageService";
+import { devLog } from "@/lib/devLog";
+import { useUserSettings, useSaveUserSettings } from "@/hooks/useUserSettings";
 
 const Settings = () => {
+  const navigate = useNavigate();
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Use persistent settings hook
+  const { data: userSettings, isLoading: isLoadingSettings } = useUserSettings();
+  const saveSettings = useSaveUserSettings();
+
+  // Local state synced with persisted settings
   const [darkMode, setDarkMode] = useState(false);
   const [backupReminders, setBackupReminders] = useState(true);
-  const [backupFrequency, setBackupFrequency] = useState("weekly");
-  const [isExporting, setIsExporting] = useState(false);
-  
-  const { projects, loadProjects } = useStore();
-  
-  // Debug: log projects on component mount
+  const [backupFrequency, setBackupFrequency] = useState<'daily' | 'weekly' | 'monthly'>("weekly");
+
+  // Auto-save debounce timer
+  const [autoSaveTimer, setAutoSaveTimer] = useState<NodeJS.Timeout | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+
+  // Sync local state with loaded settings
   useEffect(() => {
-    console.log('Settings component - Current projects:', projects);
-    loadProjects(); // Ensure projects are loaded
-  }, [loadProjects]);
+    if (userSettings) {
+      setDarkMode(userSettings.dark_mode);
+      setBackupReminders(userSettings.backup_reminders);
+      setBackupFrequency(userSettings.backup_frequency);
+    }
+  }, [userSettings]);
 
-  // Test export function that works without projects
-  const handleTestExport = async () => {
-    try {
-      setIsExporting(true);
-      
-      // Create a test project for export
-      const testProject = {
-        id: 1,
-        name: "Test Export Project",
-        description: "This is a test export to verify functionality",
-        productType: "Test Product",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        targetAudience: "Test users"
-      };
+  // Auto-save helper with debounce
+  const autoSaveSettings = (updates: Partial<typeof userSettings>) => {
+    // Clear existing timer
+    if (autoSaveTimer) {
+      clearTimeout(autoSaveTimer);
+    }
 
-      const testModels = [{
-        id: 1,
-        projectId: 1,
-        name: "Test Financial Model",
-        assumptions: {
-          revenue: [
-            { name: "Primary Revenue Stream", value: 10000, type: "recurring", frequency: "monthly" },
-            { name: "Secondary Revenue", value: 5000, type: "variable", frequency: "monthly" }
-          ],
-          costs: [
-            { name: "Operating Costs", value: 3000, type: "fixed", category: "operations" },
-            { name: "Marketing Spend", value: 2000, type: "variable", category: "marketing" }
-          ],
-          growthModel: { type: "linear", rate: 0.05 }
+    // Set new timer for debounced save (1 second after last change)
+    const timer = setTimeout(() => {
+      saveSettings.mutate(updates, {
+        onSuccess: () => {
+          setLastSavedAt(new Date());
+          console.log('✅ Settings auto-saved');
         },
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }];
-      
-      await exportSimpleExcel({
-        project: testProject,
-        models: testModels
       });
-      
-      toast({
-        title: "Test export completed",
-        description: "Test Excel file has been downloaded to verify export functionality.",
-      });
-      
-    } catch (error) {
-      console.error('Test export error:', error);
-      toast({
-        title: "Test export failed",
-        description: `Error: ${error.message}`,
-        variant: "destructive",
-      });
-    } finally {
-      setIsExporting(false);
+    }, 1000);
+
+    setAutoSaveTimer(timer);
+  };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer);
+      }
+    };
+  }, [autoSaveTimer]);
+
+  // Handle setting changes with auto-save
+  const handleDarkModeChange = (checked: boolean) => {
+    setDarkMode(checked);
+    autoSaveSettings({ dark_mode: checked });
+  };
+
+  const handleBackupRemindersChange = (checked: boolean) => {
+    setBackupReminders(checked);
+    autoSaveSettings({ backup_reminders: checked });
+  };
+
+  const handleBackupFrequencyChange = (value: 'daily' | 'weekly' | 'monthly') => {
+    setBackupFrequency(value);
+    autoSaveSettings({ backup_frequency: value });
+  };
+
+  const { data: projects = [], isLoading } = useMyProjects();
+  
+  // Helper function to get models for a project using cloud/local switching
+  const getModelsForProject = async (projectId: string | number) => {
+    
+    if (isCloudModeEnabled()) {
+      console.log('🌤️ Getting models from Supabase for export');
+      const supabaseStorage = new SupabaseStorageService();
+      return await supabaseStorage.getModelsForProject(String(projectId));
+    } else {
+      console.log('💾 Getting models from IndexedDB for export');
+      return await db.financialModels
+        .where('projectId')
+        .equals(projectId)
+        .toArray();
     }
   };
+
+  // Debug: log projects on component mount
+  useEffect(() => {
+    devLog('Settings component - Current projects:', projects);
+  }, [projects]);
+
+  const projectsArray = projects;
+
+  // Test export function that works without projects
+  // Removed test export function - users can test exports from model pages
   
   const handleExportExcel = async () => {
     try {
       setIsExporting(true);
       
-      if (projects.length === 0) {
-        toast({
-          title: "No data to export",
+      if (projectsArray.length === 0) {
+        toast.error("No data to export", {
           description: "Create some projects and financial models first.",
-          variant: "destructive",
         });
         return;
       }
       
-      const firstProject = projects[0];
-      console.log('Exporting project:', firstProject);
+      const firstProject = projectsArray[0];
+      devLog('Exporting project:', firstProject);
       
-      const models = await db.financialModels
-        .where('projectId')
-        .equals(firstProject.id!)
-        .toArray();
-      
-      console.log('Found models:', models);
+      const models = await getModelsForProject(firstProject.id!);
+
+      devLog('Found models:', models);
       
       // Use simple, reliable Excel export first
       await exportSimpleExcel({
@@ -115,17 +144,14 @@ const Settings = () => {
         models
       });
       
-      toast({
-        title: "Excel export completed",
+      toast.success("Excel export completed", {
         description: "Your project data has been exported to Excel successfully.",
       });
       
     } catch (error) {
       console.error('Export error:', error);
-      toast({
-        title: "Export failed",
+      toast.error("Export failed", {
         description: `Error: ${error.message}. Please try again or check the console for details.`,
-        variant: "destructive",
       });
     } finally {
       setIsExporting(false);
@@ -136,20 +162,15 @@ const Settings = () => {
     try {
       setIsExporting(true);
       
-      if (projects.length === 0) {
-        toast({
-          title: "No data to export",
+      if (projectsArray.length === 0) {
+        toast.error("No data to export", {
           description: "Create some projects and financial models first.",
-          variant: "destructive",
         });
         return;
       }
       
-      const firstProject = projects[0];
-      const models = await db.financialModels
-        .where('projectId')
-        .equals(firstProject.id!)
-        .toArray();
+      const firstProject = projectsArray[0];
+      const models = await getModelsForProject(firstProject.id!);
       
       // Use simple, reliable PDF export
       await exportSimplePDF({
@@ -157,17 +178,14 @@ const Settings = () => {
         models
       });
       
-      toast({
-        title: "PDF export completed",
+      toast.success("PDF export completed", {
         description: "Your project report has been exported to PDF successfully.",
       });
       
     } catch (error) {
       console.error('Export error:', error);
-      toast({
-        title: "Export failed",
+      toast.error("Export failed", {
         description: `Error: ${error.message}. Please try again or check the console for details.`,
-        variant: "destructive",
       });
     } finally {
       setIsExporting(false);
@@ -178,26 +196,19 @@ const Settings = () => {
     try {
       setIsExporting(true);
       
-      if (projects.length === 0) {
-        toast({
-          title: "No data to export",
+      if (projectsArray.length === 0) {
+        toast.error("No data to export", {
           description: "Create some projects and financial models first.",
-          variant: "destructive",
         });
         return;
       }
       
-      const firstProject = projects[0];
-      const models = await db.financialModels
-        .where('projectId')
-        .equals(firstProject.id!)
-        .toArray();
+      const firstProject = projectsArray[0];
+      const models = await getModelsForProject(firstProject.id!);
       
       if (models.length === 0) {
-        toast({
-          title: "No financial models found",
+        toast.error("No financial models found", {
           description: "Create at least one financial model to generate a board-ready report.",
-          variant: "destructive",
         });
         return;
       }
@@ -206,36 +217,45 @@ const Settings = () => {
         // Try the enhanced board-ready export
         const reportData = await prepareBoardReadyData(firstProject, models, 36, 0.1);
         await exportBoardReadyPDF(reportData);
-        
-        toast({
-          title: "Executive report generated",
+
+        toast.success("Executive report generated", {
           description: "Your board-ready executive financial report has been exported successfully.",
         });
       } catch (boardError) {
-        console.warn('Board-ready export failed, falling back to enhanced PDF:', boardError);
-        
+        console.warn('Board-ready export failed, falling back to enhanced Excel:', boardError);
+
+        // Show warning that PDF failed and we're switching to Excel
+        toast.warning("PDF export failed", {
+          description: "Generating Excel report instead. The board-ready PDF feature encountered an issue.",
+          duration: 5000,
+        });
+
         // Fallback to enhanced Excel export if board-ready fails
-        await exportEnhancedExcel({
-          project: firstProject,
-          models,
-          includeScenarios: true,
-          includeSensitivity: true,
-          periods: 36,
-          discountRate: 0.1
-        });
-        
-        toast({
-          title: "Enhanced Excel report generated",
-          description: "Board-ready PDF had issues, but your comprehensive Excel analysis has been exported.",
-        });
+        try {
+          await exportEnhancedExcel({
+            project: firstProject,
+            models,
+            includeScenarios: true,
+            includeSensitivity: true,
+            periods: 36,
+            discountRate: 0.1
+          });
+
+          toast.success("Enhanced Excel report generated", {
+            description: "Your comprehensive Excel analysis has been exported as an alternative to the PDF.",
+          });
+        } catch (excelError) {
+          console.error('Excel fallback also failed:', excelError);
+          toast.error("All export formats failed", {
+            description: `Unable to generate report. Error: ${excelError.message}. Please try the basic exports instead.`,
+          });
+        }
       }
       
     } catch (error) {
       console.error('Board-ready export error:', error);
-      toast({
-        title: "Export failed",
+      toast.error("Export failed", {
         description: `Error: ${error.message}. Please try basic exports instead.`,
-        variant: "destructive",
       });
     } finally {
       setIsExporting(false);
@@ -244,7 +264,15 @@ const Settings = () => {
   
   const handleClearAllData = async () => {
     try {
-      // Clear all tables
+        
+      if (isCloudModeEnabled()) {
+        toast.error("Clear not available", {
+          description: "Data clearing is not available in cloud mode. Use the Supabase dashboard to manage your data.",
+        });
+        return;
+      }
+      
+      // Clear all tables (local mode only)
       await db.transaction('rw', [db.projects, db.financialModels, db.actualPerformance, db.risks, db.scenarios], async () => {
         await db.projects.clear();
         await db.financialModels.clear();
@@ -256,16 +284,13 @@ const Settings = () => {
       // Refresh the store
       window.location.reload();
       
-      toast({
-        title: "Data cleared",
+      toast.success("Data cleared", {
         description: "All application data has been cleared successfully.",
       });
     } catch (error) {
       console.error('Clear data error:', error);
-      toast({
-        title: "Clear failed",
+      toast.error("Clear failed", {
         description: "There was an error clearing your data. Please try again.",
-        variant: "destructive",
       });
     }
   };
@@ -277,7 +302,46 @@ const Settings = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Appearance</CardTitle>
+            <CardTitle>Category Management</CardTitle>
+            <CardDescription>
+              Configure event types, cost categories, and frequencies
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Customize the event types, cost categories, and frequencies available throughout the application.
+                Add your own custom categories without needing code changes.
+              </p>
+              <Button
+                onClick={() => navigate('/categories')}
+                className="w-full"
+                variant="default"
+              >
+                <SettingsIcon className="mr-2 h-4 w-4" />
+                Manage Categories
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Appearance</span>
+              {saveSettings.isPending && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Saving...
+                </span>
+              )}
+              {lastSavedAt && !saveSettings.isPending && (
+                <span className="text-xs text-green-600 flex items-center gap-1">
+                  <Check className="h-3 w-3" />
+                  Saved
+                </span>
+              )}
+            </CardTitle>
             <CardDescription>
               Customize the appearance of the application
             </CardDescription>
@@ -288,7 +352,8 @@ const Settings = () => {
               <Switch
                 id="dark-mode"
                 checked={darkMode}
-                onCheckedChange={setDarkMode}
+                onCheckedChange={handleDarkModeChange}
+                disabled={isLoadingSettings}
               />
             </div>
           </CardContent>
@@ -298,7 +363,7 @@ const Settings = () => {
           <CardHeader>
             <CardTitle>Notifications</CardTitle>
             <CardDescription>
-              Manage backup reminder notifications
+              Manage backup reminder notifications (auto-saves)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -307,16 +372,17 @@ const Settings = () => {
               <Switch
                 id="backup-reminders"
                 checked={backupReminders}
-                onCheckedChange={setBackupReminders}
+                onCheckedChange={handleBackupRemindersChange}
+                disabled={isLoadingSettings}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="reminder-frequency">Reminder Frequency</Label>
               <Select
                 value={backupFrequency}
-                onValueChange={setBackupFrequency}
-                disabled={!backupReminders}
+                onValueChange={handleBackupFrequencyChange}
+                disabled={!backupReminders || isLoadingSettings}
               >
                 <SelectTrigger id="reminder-frequency" className="w-full">
                   <SelectValue placeholder="Select frequency" />
@@ -340,31 +406,30 @@ const Settings = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col space-y-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
+                <div className="bg-fortress-emerald/10 border border-fortress-emerald/20 rounded-lg p-4">
+                  <h4 className="font-medium text-fortress-emerald mb-2">📍 Where to Export Reports</h4>
+                  <div className="text-sm text-gray-700 space-y-1">
+                    <p><strong>Per-Model Exports:</strong> Go to any model's overview page and click "Download Report" for model-specific exports with 3 format options.</p>
+                    <p><strong>Bulk Exports:</strong> Use the buttons below to export all your project data at once.</p>
+                  </div>
+                </div>
+                
                 <p className="text-sm text-muted-foreground">
-                  All data is stored locally in your browser. Export your financial models and analysis in multiple formats:
+                  Available export formats for all your projects and financial models:
                 </p>
                 <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-                  <li>• <strong>Test Export:</strong> Download sample Excel file to verify export functionality works</li>
                   <li>• <strong>Excel:</strong> Comprehensive project and financial model data export</li>
                   <li>• <strong>Basic PDF:</strong> Professional project report with revenue and cost breakdowns</li>
-                  <li>• <strong>Executive Report:</strong> Advanced analysis with scenarios and metrics (Excel fallback if needed)</li>
+                  <li>• <strong>Executive Report:</strong> Advanced board-ready analysis with scenarios and metrics</li>
                 </ul>
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                <Button 
-                  onClick={handleTestExport}
-                  disabled={isExporting}
-                  className="bg-purple-600 hover:bg-purple-700"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  {isExporting ? "Testing..." : "Test Export"}
-                </Button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 
                 <Button 
                   onClick={handleExportExcel} 
-                  disabled={isExporting || projects.length === 0}
+                  disabled={isExporting || projectsArray.length === 0}
                   className="bg-green-600 hover:bg-green-700"
                 >
                   <FileSpreadsheet className="mr-2 h-4 w-4" />
@@ -373,7 +438,7 @@ const Settings = () => {
                 
                 <Button 
                   onClick={handleExportPDF}
-                  disabled={isExporting || projects.length === 0}
+                  disabled={isExporting || projectsArray.length === 0}
                   className="bg-red-600 hover:bg-red-700"
                 >
                   <FileText className="mr-2 h-4 w-4" />
@@ -381,8 +446,8 @@ const Settings = () => {
                 </Button>
                 
                 <Button 
-                  onClick={handleExportBoardReadyPDF}
-                  disabled={isExporting || projects.length === 0}
+                  onClick={handleExportBoardReadyPDF} 
+                  disabled={isExporting || projectsArray.length === 0}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
                   <Presentation className="mr-2 h-4 w-4" />
@@ -396,7 +461,7 @@ const Settings = () => {
               </div>
               
               <div className="space-y-3">
-                {projects.length === 0 && (
+                {projectsArray.length === 0 && (
                   <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
                     <strong>Note:</strong> Create some projects and financial models first to enable full export functionality. 
                     Use "Test Export" to verify downloads work on your system.
@@ -404,7 +469,7 @@ const Settings = () => {
                 )}
                 
                 <p className="text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <strong>Debug Info:</strong> Projects found: {projects.length}. 
+                  <strong>Debug Info:</strong> Projects found: {projectsArray.length}. 
                   Check browser console (F12) for detailed logging.
                 </p>
               </div>

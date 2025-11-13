@@ -1,38 +1,38 @@
-
-import { useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PlusCircle, Search } from "lucide-react";
-import useStore from "@/store/useStore";
+import { PlusCircle, Search, Folder as FolderIcon, Globe, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { format } from "date-fns";
-import { config } from "@/lib/config";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ProjectCard } from "./ProjectCard";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { useMyProjects, useSharedProjects, usePublicProjects } from "@/hooks/useProjects";
+import { isCloudModeEnabled } from "@/config/app.config";
 
 const ProjectsList = () => {
   const navigate = useNavigate();
-  const { projects, loadProjects, setCurrentProject } = useStore();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState('my-projects');
+  const cloudEnabled = isCloudModeEnabled();
 
-  useEffect(() => {
-    loadProjects();
-  }, [loadProjects]);
+  const { data: myProjects = [], isLoading: isLoadingMyProjects, error: myProjectsError } = useMyProjects();
+  const { data: sharedProjects = [], isLoading: isLoadingSharedProjects, error: sharedProjectsError } = useSharedProjects();
+  const { data: publicProjects = [], isLoading: isLoadingPublicProjects, error: publicProjectsError } = usePublicProjects();
 
-  // Filter out UUID projects if cloud sync is disabled
-  const availableProjects = config.useCloudSync 
-    ? projects 
-    : projects.filter(project => typeof project.id === 'number');
+  const filterProjects = useCallback((projects: any[]) => {
+    if (!searchTerm) return projects;
+    
+    return projects.filter(project => {
+      if (!project?.name) return false;
+      return project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+             (project.description && project.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+             (project.productType && project.productType.toLowerCase().includes(searchTerm.toLowerCase()));
+    });
+  }, [searchTerm]);
 
-  const handleProjectClick = (projectId: number | string) => {
-    const project = availableProjects.find((p) => p.id === projectId);
-    if (project) {
-      setCurrentProject(project);
-    } else {
-      console.warn(
-        `Project with id ${projectId} not found in local state. Navigation will still occur.`
-      );
-    }
-    navigate(`/projects/${projectId}`);
-  };
+  const filteredMyProjects = useMemo(() => filterProjects(myProjects), [myProjects, filterProjects]);
+  const filteredSharedProjects = useMemo(() => filterProjects(sharedProjects), [sharedProjects, filterProjects]);
+  const filteredPublicProjects = useMemo(() => filterProjects(publicProjects), [publicProjects, filterProjects]);
 
   return (
     <div className="space-y-6">
@@ -51,88 +51,138 @@ const ProjectsList = () => {
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input 
           placeholder="Search projects..." 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10"
         />
       </div>
-      
-      {availableProjects.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 space-y-4">
-          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-            <FolderIcon className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h2 className="text-xl font-semibold">No projects found</h2>
-          <p className="text-muted-foreground text-center max-w-md">
-            Get started by creating your first project. You'll be able to define product details,
-            create financial models, and track performance.
-          </p>
-          <Button 
-            onClick={() => navigate("/projects/new")} 
-            className="bg-fortress-emerald hover:bg-fortress-emerald/90"
-          >
-            Create Your First Project
-          </Button>
-        </div>
+
+      {cloudEnabled ? (
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-3">
+            <TabsTrigger value="my-projects" className="gap-2">
+              <FolderIcon className="h-4 w-4" />
+              My Projects
+            </TabsTrigger>
+            <TabsTrigger value="shared" className="gap-2">
+              <Users className="h-4 w-4" />
+              Shared
+            </TabsTrigger>
+            <TabsTrigger value="public" className="gap-2">
+              <Globe className="h-4 w-4" />
+              Public
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="my-projects" className="space-y-4">
+            {isLoadingMyProjects ? (
+              <div>Loading projects...</div>
+            ) : myProjectsError ? (
+              <div className="text-red-500">Error loading projects: {myProjectsError.message}</div>
+            ) : filteredMyProjects.length === 0 ? (
+              <EmptyState
+                icon={FolderIcon}
+                title="No projects found"
+                description={searchTerm ? "No projects match your search." : "Get started by creating your first project. You'll be able to define product details, create financial models, and track performance."}
+                action={!searchTerm && (
+                  <Button 
+                    onClick={() => navigate("/projects/new")} 
+                    className="bg-fortress-emerald hover:bg-fortress-emerald/90"
+                  >
+                    Create Your First Project
+                  </Button>
+                )}
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredMyProjects.map((project) => (
+                  <ProjectCard 
+                    key={project.id} 
+                    project={project} 
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="shared" className="space-y-4">
+            {isLoadingSharedProjects ? (
+              <div>Loading shared projects...</div>
+            ) : sharedProjectsError ? (
+              <div className="text-red-500">Error loading shared projects: {sharedProjectsError.message}</div>
+            ) : filteredSharedProjects.length === 0 ? (
+              <EmptyState
+                icon={Users}
+                title="No shared projects"
+                description="Projects that others have shared with you will appear here."
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredSharedProjects.map((project) => (
+                  <ProjectCard 
+                    key={project.id} 
+                    project={project} 
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="public" className="space-y-4">
+            {isLoadingPublicProjects ? (
+              <div>Loading public projects...</div>
+            ) : publicProjectsError ? (
+              <div className="text-red-500">Error loading public projects: {publicProjectsError.message}</div>
+            ) : filteredPublicProjects.length === 0 ? (
+              <EmptyState
+                icon={Globe}
+                title="No public projects"
+                description="Public projects from the community will appear here."
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredPublicProjects.map((project) => (
+                  <ProjectCard 
+                    key={project.id} 
+                    project={project} 
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {availableProjects.map((project) => (
-            <Card 
-              key={project.id} 
-              className="hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => handleProjectClick(project.id!)}
-            >
-              <CardHeader>
-                <CardTitle className="text-lg">{project.name}</CardTitle>
-                <CardDescription>{project.productType}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {project.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {project.description}
-                    </p>
-                  )}
-                  <div className="flex justify-between text-xs text-muted-foreground pt-2">
-                    <span>Created {(() => {
-                      try {
-                        return project.createdAt ? format(new Date(project.createdAt), 'MMM d, yyyy') : 'Unknown';
-                      } catch {
-                        return 'Unknown';
-                      }
-                    })()}</span>
-                    <span>Updated {(() => {
-                      try {
-                        return project.updatedAt ? format(new Date(project.updatedAt), 'MMM d, yyyy') : 'Unknown';
-                      } catch {
-                        return 'Unknown';
-                      }
-                    })()}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        // Local mode - show only my projects
+        isLoadingMyProjects ? (
+          <div>Loading projects...</div>
+        ) : myProjectsError ? (
+          <div className="text-red-500">Error loading projects: {myProjectsError.message}</div>
+        ) : filteredMyProjects.length === 0 ? (
+          <EmptyState
+            icon={FolderIcon}
+            title="No projects found"
+            description={searchTerm ? "No projects match your search." : "Get started by creating your first project. You'll be able to define product details, create financial models, and track performance."}
+            action={!searchTerm && (
+              <Button 
+                onClick={() => navigate("/projects/new")} 
+                className="bg-fortress-emerald hover:bg-fortress-emerald/90"
+              >
+                Create Your First Project
+              </Button>
+            )}
+          />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredMyProjects.map((project) => (
+              <ProjectCard 
+                key={project.id} 
+                project={project} 
+              />
+            ))}
+          </div>
+        )
       )}
     </div>
-  );
-};
-
-const FolderIcon = ({ className }: { className?: string }) => {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
-    </svg>
   );
 };
 

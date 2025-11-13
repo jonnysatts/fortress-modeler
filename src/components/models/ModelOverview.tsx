@@ -1,18 +1,17 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Model, RevenueStream, CostCategory, ActualsPeriodEntry } from "@/types/models";
-import { formatCurrency } from "@/lib/utils";
 import { useEffect, useState, useMemo, memo, useCallback } from "react";
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  Tooltip,
-  XAxis, // Keep XAxis if we want period labels on tooltips
-} from "recharts";
 import { Button } from "@/components/ui/button";
-import { Edit, Download, Share2 } from "lucide-react";
+import { Edit, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { db } from "@/lib/db";
+import { getSupabaseStorageService } from "@/services/singleton";
+import { ExportModal } from './ExportModal';
+import { toast } from 'sonner';
+import { db, getProject } from "@/lib/db";
+import { isCloudModeEnabled } from "@/config/app.config";
+import { MetricsCard, MetricRow } from './MetricsCard';
+import { GrowthIndicators } from './GrowthIndicators';
+import { RiskIndicators } from './RiskIndicators';
+import { CriticalAssumptions } from './CriticalAssumptions';
 
 interface ModelOverviewProps {
   model: Model;
@@ -312,6 +311,87 @@ const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverviewProp
     };
   }, [model, isWeekly, actualsData]); // Add actualsData to dependency array
 
+  // Declare all hooks before any conditional returns
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportingOption, setExportingOption] = useState<string>();
+  
+  const handleEdit = useCallback(() => {
+    if (projectId && model.id) {
+        navigate(`/projects/${projectId}/models/${model.id}/edit`);
+    }
+  }, [navigate, projectId, model.id]);
+
+  const handleExport = useCallback(async (optionId: string) => {
+    if (!projectId || !model) {
+      toast.error("Missing project or model data.");
+      return;
+    }
+
+    setIsExporting(true);
+    setExportingOption(optionId);
+
+    try {
+      // Get project data using cloud/local switching
+      let project;
+      
+      if (isCloudModeEnabled()) {
+        console.log('🌤️ Getting project from Supabase for download');
+        const supabaseStorage = getSupabaseStorageService();
+        project = await supabaseStorage.getProject(projectId);
+      } else {
+        console.log('💾 Getting project from IndexedDB for download');
+        project = await getProject(projectId as string | number);
+      }
+      
+      if (!project) {
+        toast.error("Project not found.");
+        return;
+      }
+
+      if (optionId === "rich-pdf") {
+        // Export rich PDF with charts and financial data
+        const { exportRichPDF } = await import("@/lib/rich-pdf-export");
+        await exportRichPDF({
+          project,
+          model,
+          simulationResults
+        });
+        toast.success("Rich PDF report downloaded successfully!");
+      } else if (optionId === "board-pdf") {
+        // Export product strategy PDF
+        const { exportBoardReadyPDF, prepareBoardReadyData } = await import("@/lib/board-ready-export");
+        const reportData = await prepareBoardReadyData(project, [model], 36, 0.1);
+        await exportBoardReadyPDF(reportData);
+        toast.success("Executive summary downloaded successfully!");
+      } else if (optionId === "excel") {
+        // Export Excel using enhanced export
+        const { exportEnhancedExcel } = await import("@/lib/enhanced-excel-export");
+        await exportEnhancedExcel({
+          project,
+          models: [model],
+          includeScenarios: true,
+          includeSensitivity: true,
+          periods: 36,
+          discountRate: 0.1
+        });
+        toast.success("Excel analysis downloaded successfully!");
+      }
+      
+      setExportModalOpen(false);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsExporting(false);
+      setExportingOption(undefined);
+    }
+  }, [projectId, model, simulationResults]);
+
+  const handleDownload = useCallback(() => {
+    setExportModalOpen(true);
+  }, []);
+
   if (!simulationResults) return <p className="text-red-500">Unable to load overview: Simulation failed due to incomplete model data.</p>;
 
   const {
@@ -345,349 +425,128 @@ const ModelOverview = ({ model, projectId, actualsData = [] }: ModelOverviewProp
     finalActualMargin,
   } = simulationResults;
 
-  // Simplified Tooltip for Sparklines
-  interface SparklineTooltipProps {
-    active?: boolean;
-    payload?: Array<{
-      value: number;
-      dataKey: string;
-      color: string;
-    }>;
-    label?: string;
-  }
-  
-  const SparklineTooltip = ({ active, payload, label }: SparklineTooltipProps) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload; // Access the full data point
-      return (
-        <div className="bg-background border px-2 py-1 rounded shadow-lg text-xs">
-          <p className="font-semibold">{data.point}</p>
-          {payload[0].dataKey === 'attendance' ? (
-             <p>{`Attendance: ${Math.round(payload[0].value).toLocaleString()}`}</p>
-          ) : (
-             <p>{`${payload[0].name}: ${formatCurrency(payload[0].value)}`}</p>
-          )}
-        </div>
-      );
-    }
-    return null;
-  };
-
-  const handleEdit = useCallback(() => {
-    if (projectId && model.id) {
-        navigate(`/projects/${projectId}/models/${model.id}/edit`);
-    }
-  }, [navigate, projectId, model.id]);
-  
-  // Download report functionality
-  const handleDownload = useCallback(async () => {
-    if (!projectId || !model) {
-      alert("Missing project or model data.");
-      return;
-    }
-
-    try {
-      // Get project data
-      const project = await db.projects.get(Number(projectId));
-      if (!project) {
-        alert("Project not found.");
-        return;
-      }
-
-      // Show format selection with 3 options
-      const choice = prompt("Choose export format:\n1 = Rich PDF with Charts\n2 = Product Strategy PDF\n3 = Excel Report\n\nEnter 1, 2, or 3:");
-      
-      if (choice === "1") {
-        // Export rich PDF with charts and financial data
-        const { exportRichPDF } = await import("@/lib/rich-pdf-export");
-        await exportRichPDF({
-          project,
-          model,
-          simulationResults
-        });
-      } else if (choice === "2") {
-        // Export product strategy PDF
-        const { exportBoardReadyPDF, prepareBoardReadyData } = await import("@/lib/board-ready-export");
-        const reportData = await prepareBoardReadyData(project, [model], 36, 0.1);
-        await exportBoardReadyPDF(reportData);
-      } else if (choice === "3") {
-        // Export Excel using enhanced export
-        const { exportEnhancedExcel } = await import("@/lib/enhanced-excel-export");
-        await exportEnhancedExcel({
-          project,
-          models: [model],
-          includeScenarios: true,
-          includeSensitivity: true,
-          periods: 36,
-          discountRate: 0.1
-        });
-      } else {
-        return; // User cancelled or invalid choice
-      }
-    } catch (error) {
-      console.error('Download error:', error);
-      alert(`Download failed: ${error.message}`);
-    }
-  }, [projectId, model, simulationResults]);
-  
-  const handleShare = useCallback(() => {
-    alert("Share model functionality not implemented yet.");
-  }, []);
 
   return (
     <div className="space-y-6">
       {/* Quick Actions Bar */}
        <div className="flex space-x-2 mb-4 border-b pb-4">
           <Button variant="outline" size="sm" onClick={handleEdit} disabled={!projectId || !model.id}>
-              <Edit className="mr-1 h-4 w-4" /> Edit Model
+              <Edit className="mr-1 h-4 w-4" /> Edit Scenario
           </Button>
           <Button variant="outline" size="sm" onClick={handleDownload}>
               <Download className="mr-1 h-4 w-4" /> Download Report
           </Button>
-          <Button variant="outline" size="sm" onClick={handleShare}>
-              <Share2 className="mr-1 h-4 w-4" /> Share Model
-          </Button>
        </div>
 
-      {/* Key Metrics Dashboard - Update to show Actual vs Forecast */}
+      {/* Key Metrics Dashboard */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Revenue Card */}
-        <Card>
-          <CardHeader><CardTitle className="text-lg font-semibold text-primary">Revenue</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-             <div className="flex justify-between items-baseline">
-                <span className="text-sm text-muted-foreground">Initial {timeUnit}</span>
-                <span className="text-lg font-semibold">{formatCurrency(initialRevenue)}</span>
-             </div>
-             <div className="flex justify-between items-baseline">
-                <span className="text-sm text-muted-foreground">Final {timeUnit}</span>
-                <span className="text-lg font-semibold">{formatCurrency(finalWeekRevenue)}</span>
-             </div>
-              <div className="border-t pt-3 mt-3 flex justify-between items-baseline">
-                <span className="text-sm font-medium text-muted-foreground">Total Projected</span>
-                <span className="text-2xl font-bold text-green-700">{formatCurrency(totalRevenue)}</span>
-             </div>
-             {/* NEW: Actual Total Revenue */} 
-             {latestActualPeriod > 0 && (
-               <div className="flex justify-between items-baseline">
-                 <span className="text-sm text-green-600">Total Actual ({timeUnit} 1-{latestActualPeriod})</span>
-                 <span className="text-lg font-semibold text-green-600">{formatCurrency(totalActualRevenue)}</span>
-               </div>
-             )}
-             <div className="pt-2">
-                <p className="text-xs text-muted-foreground">Highest Initial Stream</p>
-                <p className="text-sm font-medium">{highestInitialRevenue.name} ({formatCurrency(highestInitialRevenue.value)})</p>
-              </div>
-          </CardContent>
-        </Card>
+        <MetricsCard title="Revenue">
+          <MetricRow label={`Initial ${timeUnit}`} value={initialRevenue} />
+          <MetricRow label={`Final ${timeUnit}`} value={finalWeekRevenue} />
+          <MetricRow 
+            label="Total Projected" 
+            value={totalRevenue} 
+            isHighlight 
+            colorClass="text-green-700" 
+          />
+          {latestActualPeriod > 0 && (
+            <MetricRow 
+              label={`Total Actual (${timeUnit} 1-${latestActualPeriod})`} 
+              value={totalActualRevenue}
+              colorClass="text-green-600"
+            />
+          )}
+          <div className="pt-2">
+            <p className="text-xs text-muted-foreground">Highest Initial Stream</p>
+            <p className="text-sm font-medium">{highestInitialRevenue.name} ({new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(highestInitialRevenue.value)})</p>
+          </div>
+        </MetricsCard>
 
         {/* Costs Card */}
-        <Card>
-           <CardHeader><CardTitle className="text-lg font-semibold text-primary">Costs</CardTitle></CardHeader>
-           <CardContent className="space-y-3">
-              <div className="flex justify-between items-baseline">
-                 <span className="text-sm text-muted-foreground">Initial {timeUnit}</span>
-                 <span className="text-lg font-semibold">{formatCurrency(initialCosts)}</span>
-              </div>
-              <div className="flex justify-between items-baseline">
-                 <span className="text-sm text-muted-foreground">Final {timeUnit}</span>
-                 <span className="text-lg font-semibold">{formatCurrency(finalWeekCosts)}</span>
-              </div>
-              <div className="border-t pt-3 mt-3 flex justify-between items-baseline">
-                 <span className="text-sm font-medium text-muted-foreground">Total Projected</span>
-                 <span className="text-2xl font-bold text-red-700">{formatCurrency(totalCosts)}</span>
-              </div>
-               {/* NEW: Actual Total Costs */} 
-               {latestActualPeriod > 0 && (
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-sm text-red-600">Total Actual ({timeUnit} 1-{latestActualPeriod})</span>
-                    <span className="text-lg font-semibold text-red-600">{formatCurrency(totalActualCosts)}</span>
-                  </div>
-               )}
-              <div className="pt-2">
-                <p className="text-xs text-muted-foreground">Largest Initial Cost</p>
-                <p className="text-sm font-medium">{largestInitialCost.name} ({formatCurrency(largestInitialCost.value)})</p>
-              </div>
-           </CardContent>
-        </Card>
+        <MetricsCard title="Costs">
+          <MetricRow label={`Initial ${timeUnit}`} value={initialCosts} />
+          <MetricRow label={`Final ${timeUnit}`} value={finalWeekCosts} />
+          <MetricRow 
+            label="Total Projected" 
+            value={totalCosts} 
+            isHighlight 
+            colorClass="text-red-700" 
+          />
+          {latestActualPeriod > 0 && (
+            <MetricRow 
+              label={`Total Actual (${timeUnit} 1-${latestActualPeriod})`} 
+              value={totalActualCosts}
+              colorClass="text-red-600"
+            />
+          )}
+          <div className="pt-2">
+            <p className="text-xs text-muted-foreground">Largest Initial Cost</p>
+            <p className="text-sm font-medium">{largestInitialCost.name} ({new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(largestInitialCost.value)})</p>
+          </div>
+        </MetricsCard>
 
         {/* Profitability Card */}
-        <Card>
-           <CardHeader><CardTitle className="text-lg font-semibold text-primary">Profitability</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-                <div className="flex justify-between items-baseline">
-                   <span className="text-sm text-muted-foreground">Initial Margin</span>
-                   <span className="text-lg font-semibold">{initialMargin.toFixed(1)}%</span>
-                </div>
-                <div className="flex justify-between items-baseline">
-                   <span className="text-sm text-muted-foreground">Final {timeUnit} Margin</span>
-                    <span className="text-lg font-semibold">{finalWeekMargin.toFixed(1)}%</span>
-                </div>
-                <div className="border-t pt-3 mt-3 flex justify-between items-baseline">
-                   <span className="text-sm font-medium text-muted-foreground">Total Projected Profit</span>
-                    <span className="text-2xl font-bold text-blue-700">{formatCurrency(totalProfit)}</span>
-                </div>
-                {/* NEW: Actual Total Profit & Margin */} 
-                {latestActualPeriod > 0 && (
-                 <>
-                   <div className="flex justify-between items-baseline">
-                     <span className="text-sm text-blue-600">Total Actual Profit ({timeUnit} 1-{latestActualPeriod})</span>
-                     <span className="text-lg font-semibold text-blue-600">{formatCurrency(totalActualProfit)}</span>
-                   </div>
-                   <div className="flex justify-between items-baseline">
-                      <span className="text-sm text-purple-600">Actual Margin ({timeUnit} {latestActualPeriod})</span>
-                      <span className="text-lg font-semibold text-purple-600">{finalActualMargin.toFixed(1)}%</span>
-                   </div>
-                 </>
-                )}
-                <div className="pt-2">
-                   <p className="text-xs text-muted-foreground">Break-even Point</p>
-                   <p className="text-sm font-medium">{breakEvenPoint ? `${timeUnit} ${breakEvenPoint}` : 'Never'}</p>
-               </div>
-            </CardContent>
-        </Card>
+        <MetricsCard title="Profitability">
+          <MetricRow label="Initial Margin" value={`${initialMargin.toFixed(1)}%`} />
+          <MetricRow label={`Final ${timeUnit} Margin`} value={`${finalWeekMargin.toFixed(1)}%`} />
+          <MetricRow 
+            label="Total Projected Profit" 
+            value={totalProfit} 
+            isHighlight 
+            colorClass="text-blue-700" 
+          />
+          {latestActualPeriod > 0 && (
+           <>
+             <MetricRow 
+               label={`Total Actual Profit (${timeUnit} 1-${latestActualPeriod})`}
+               value={totalActualProfit}
+               colorClass="text-blue-600"
+             />
+             <MetricRow 
+               label={`Actual Margin (${timeUnit} ${latestActualPeriod})`}
+               value={`${finalActualMargin.toFixed(1)}%`}
+               colorClass="text-purple-600"
+             />
+           </>
+          )}
+          <div className="pt-2">
+            <p className="text-xs text-muted-foreground">Break-even Point</p>
+            <p className="text-sm font-medium">{breakEvenPoint ? `${timeUnit} ${breakEvenPoint}` : 'Never'}</p>
+          </div>
+        </MetricsCard>
       </div>
 
-      {/* --- NEW: Growth Indicators Section --- */}
-      <Card>
-          <CardHeader>
-              <CardTitle className="text-lg font-semibold text-primary">Growth Indicators</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-              {/* Revenue Trend Sparkline */}
-              <div className="text-center">
-                  <p className="text-sm font-medium mb-1">Revenue Trend</p>
-                  <div className="h-20 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={periodicData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                              <Tooltip content={<SparklineTooltip />} cursor={{ fill: 'transparent' }} />
-                              <Line type="monotone" dataKey="revenue" stroke="#16a34a" strokeWidth={2} dot={false} name="Revenue"/>
-                          </LineChart>
-                      </ResponsiveContainer>
-                  </div>
-              </div>
-              {/* Cost Trend Sparkline */}
-              <div className="text-center">
-                  <p className="text-sm font-medium mb-1">Cost Trend</p>
-                  <div className="h-20 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={periodicData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                              <Tooltip content={<SparklineTooltip />} cursor={{ fill: 'transparent' }}/>
-                              <Line type="monotone" dataKey="costs" stroke="#dc2626" strokeWidth={2} dot={false} name="Costs"/>
-                          </LineChart>
-                      </ResponsiveContainer>
-                  </div>
-              </div>
-              {/* Attendance Trend / Total */}
-              <div className="text-center">
-                  <p className="text-sm font-medium mb-1">Attendance</p>
-                   <div className="h-20 w-full">
-                      {isWeekly ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={periodicData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                                <Tooltip content={<SparklineTooltip />} cursor={{ fill: 'transparent' }}/>
-                                <Line type="monotone" dataKey="attendance" stroke="#6366f1" strokeWidth={2} dot={false} name="Attendance"/>
-                          </LineChart>
-                      </ResponsiveContainer>
-                      ) : (
-                          <p className="text-xs text-muted-foreground h-full flex items-center justify-center">(Weekly Only)</p>
-                      )}
-                   </div>
-                   {isWeekly && (
-                        <p className="text-xs text-muted-foreground mt-1">Total Est. Attendance: {totalAttendance.toLocaleString()}</p>
-                   )}
-              </div>
-          </CardContent>
-      </Card>
+      {/* Growth Indicators Section */}
+      <GrowthIndicators 
+        periodicData={periodicData} 
+        isWeekly={isWeekly} 
+        totalAttendance={totalAttendance} 
+      />
 
-      {/* --- NEW: Risk Indicators Section --- */}
-      <Card>
-        <CardHeader>
-            <CardTitle className="text-lg font-semibold text-primary">Risk Indicators</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-                <p className="text-sm font-medium text-muted-foreground">Revenue Concentration</p>
-                <p className="text-2xl font-bold">{revenueConcentration.toFixed(1)}%</p>
-                <p className="text-xs text-muted-foreground">From highest stream ({highestInitialRevenue.name})</p>
-            </div>
-            <div>
-                <p className="text-sm font-medium text-muted-foreground">Fixed Cost Ratio</p>
-                <p className="text-2xl font-bold">{fixedCostRatio.toFixed(1)}%</p>
-                <p className="text-xs text-muted-foreground">Percentage of total costs</p>
-            </div>
-             <div>
-                <p className="text-sm font-medium text-muted-foreground">Sensitivity Analysis</p>
-                <p className="text-sm italic text-muted-foreground">(Not Implemented)</p>
-                <p className="text-xs text-muted-foreground">e.g., Impact of ±10% attendance</p>
-            </div>
-        </CardContent>
-      </Card>
+      {/* Risk Indicators Section */}
+      <RiskIndicators 
+        revenueConcentration={revenueConcentration}
+        fixedCostRatio={fixedCostRatio}
+        highestInitialRevenue={highestInitialRevenue}
+      />
 
       {/* Critical Assumptions */}
-      <Card>
-         <CardHeader>
-           <CardTitle className="text-lg font-semibold text-primary">Critical Assumptions</CardTitle>
-         </CardHeader>
-         <CardContent>
-            {/* Existing Assumptions Content */}
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-             <div>
-               <h3 className="font-medium mb-2">Event Structure</h3>
-               <div className="space-y-1">
-                 <p className="text-sm">
-                   <span className="text-muted-foreground">Duration: </span>
-                   {duration} {timeUnit}s
-                 </p>
-                 <p className="text-sm">
-                   <span className="text-muted-foreground">Initial Attendance: </span>
-                   {model.assumptions.metadata?.initialWeeklyAttendance ? model.assumptions.metadata.initialWeeklyAttendance.toLocaleString() : 'N/A'} {isWeekly ? 'per week' : ''}
-                 </p>
-               </div>
-             </div>
-             <div>
-               <h3 className="font-medium mb-2">Growth Rates</h3>
-               <div className="space-y-1">
-                 <p className="text-sm">
-                   <span className="text-muted-foreground">Attendance Growth: </span>
-                   {model.assumptions.metadata?.growth?.attendanceGrowthRate ?? 'N/A'}% {isWeekly ? 'weekly' : 'N/A'}
-                 </p>
-                 {model.assumptions.metadata?.growth?.useCustomerSpendGrowth ? (
-                   <>
-                     <p className="text-sm">
-                       <span className="text-muted-foreground">F&B Spend Growth: </span>
-                       {model.assumptions.metadata?.growth?.fbSpendGrowth ?? 'N/A'}% {isWeekly ? 'weekly' : 'N/A'}
-                     </p>
-                      <p className="text-sm">
-                       <span className="text-muted-foreground">Merch Spend Growth: </span>
-                       {model.assumptions.metadata?.growth?.merchandiseSpendGrowth ?? 'N/A'}% {isWeekly ? 'weekly' : 'N/A'}
-                     </p>
-                   </>
-                 ) : (
-                   <p className="text-sm text-muted-foreground">Customer spend growth not applied.</p>
-                 )}
-               </div>
-             </div>
-             <div>
-               <h3 className="font-medium mb-2">Cost Factors</h3>
-               <div className="space-y-1">
-                  <p className="text-sm">
-                   <span className="text-muted-foreground">Setup Costs: </span>
-                   {formatCurrency(model.assumptions.costs.find(c => c.name === "Setup Costs")?.value || 0)}
-                 </p>
-                 <p className="text-sm">
-                   <span className="text-muted-foreground">F&B COGS %: </span>
-                   {model.assumptions.metadata?.costs?.fbCOGSPercent ?? 'N/A'}%
-                 </p>
-                 <p className="text-sm">
-                   <span className="text-muted-foreground">Staff Count: </span>
-                   {model.assumptions.metadata?.costs?.staffCount ?? 'N/A'}
-                 </p>
-               </div>
-             </div>
-           </div>
-         </CardContent>
-      </Card>
+      <CriticalAssumptions 
+        model={model}
+        duration={duration}
+        timeUnit={timeUnit}
+        isWeekly={isWeekly}
+      />
+
+      {/* Export Modal */}
+      <ExportModal
+        open={exportModalOpen}
+        onOpenChange={setExportModalOpen}
+        onExport={handleExport}
+        isExporting={isExporting}
+        exportingOption={exportingOption}
+      />
     </div>
   );
 };

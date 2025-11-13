@@ -1,7 +1,8 @@
 import { query, withTransaction } from '../db/connection';
 import { PoolClient } from 'pg';
-import { ProjectService, SyncProjectData } from './project.service';
-import { FinancialModelService, SyncModelData } from './financial-model.service';
+import { ProjectService, SyncProjectData, Project } from './project.service';
+import { FinancialModelService, SyncModelData, FinancialModel } from './financial-model.service';
+import { SyncData, PendingChange } from '../types/common';
 
 export interface SyncEvent {
   id: string;
@@ -40,7 +41,7 @@ export interface SyncChange {
   action: 'create' | 'update' | 'delete';
   local_id?: number;
   id?: string;
-  data: any;
+  data: SyncData;
   timestamp: string; // ISO date string
 }
 
@@ -58,7 +59,7 @@ export interface ServerChange {
   action: 'create' | 'update' | 'delete';
   id: string;
   local_id?: number;
-  data: any;
+  data: SyncData;
   version: number;
   updated_at: string;
 }
@@ -67,11 +68,18 @@ export interface ConflictItem {
   type: 'project' | 'model';
   id: string;
   local_id?: number;
-  local_data: any;
-  server_data: any;
+  local_data: SyncData;
+  server_data: SyncData;
   local_timestamp: string;
   server_timestamp: string;
   resolution_needed: 'manual' | 'auto_server' | 'auto_client';
+}
+
+export interface StoredConflict extends ConflictItem {
+  conflict_id: string;
+  resolution: 'pending' | 'use_server' | 'use_client' | 'merge';
+  resolved_data?: SyncData;
+  resolved_at?: string;
 }
 
 export class SyncService {
@@ -100,7 +108,7 @@ export class SyncService {
     updates: Partial<Pick<SyncStatus, 'last_sync' | 'sync_token' | 'pending_changes' | 'sync_in_progress' | 'last_error'>>
   ): Promise<SyncStatus> {
     const updateFields: string[] = [];
-    const values: any[] = [];
+    const values: (Date | string | PendingChange[] | boolean | undefined)[] = [];
     let paramCount = 1;
     
     if (updates.last_sync !== undefined) {
@@ -148,8 +156,8 @@ export class SyncService {
     entityType: 'project' | 'model',
     entityId: string,
     action: 'CREATE' | 'UPDATE' | 'DELETE',
-    dataBefore?: any,
-    dataAfter?: any,
+    dataBefore?: SyncData,
+    dataAfter?: SyncData,
     localEntityId?: number,
     timestampLocal?: Date,
     syncBatchId?: string
@@ -178,6 +186,106 @@ export class SyncService {
     const result = await query(sql, values);
     return result.rows[0];
   }
+
+  // Store conflict record for later resolution
+  static async storeConflict(userId: string, conflict: ConflictItem): Promise<void> {
+    const sql = `
+      INSERT INTO sync_conflicts (
+        user_id, entity_type, entity_id, local_entity_id,
+        local_data, server_data, local_timestamp, server_timestamp
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+    `;
+    const values = [
+      userId,
+      conflict.type,
+      conflict.id || null,
+      conflict.local_id || null,
+      JSON.stringify(conflict.local_data || {}),
+      JSON.stringify(conflict.server_data || {}),
+      conflict.local_timestamp,
+      conflict.server_timestamp
+    ];
+    await query(sql, values);
+  }
+
+  static async resolveConflict(
+    userId: string,
+    conflictId: string,
+    resolution: 'use_server' | 'use_client' | 'merge',
+    resolvedData?: SyncData
+  ): Promise<StoredConflict | null> {
+    // Fetch conflict
+    const result = await query(
+      'SELECT * FROM sync_conflicts WHERE id = $1 AND user_id = $2',
+      [conflictId, userId]
+    );
+    const conflict = result.rows[0];
+    if (!conflict || conflict.resolution !== 'pending') {
+      return null;
+    }
+
+    // Apply chosen resolution
+    if (resolution === 'use_client' || resolution === 'merge') {
+      const data = resolution === 'use_client' ? conflict.local_data : resolvedData;
+      if (conflict.entity_type === 'project') {
+        await ProjectService.upsertProject(userId, {
+          ...data,
+          id: conflict.entity_id,
+          local_id: conflict.local_entity_id,
+          updated_at: data.updated_at ? new Date(data.updated_at) : new Date()
+        });
+      } else if (conflict.entity_type === 'model') {
+        await FinancialModelService.upsertModel(userId, {
+          ...data,
+          id: conflict.entity_id,
+          local_id: conflict.local_entity_id,
+          updated_at: data.updated_at ? new Date(data.updated_at) : new Date()
+        });
+      }
+    } else if (resolution === 'use_server') {
+      const data = conflict.server_data;
+      if (conflict.entity_type === 'project') {
+        await ProjectService.upsertProject(userId, {
+          ...data,
+          id: conflict.entity_id,
+          local_id: conflict.local_entity_id,
+          updated_at: data.updated_at ? new Date(data.updated_at) : new Date()
+        });
+      } else if (conflict.entity_type === 'model') {
+        await FinancialModelService.upsertModel(userId, {
+          ...data,
+          id: conflict.entity_id,
+          local_id: conflict.local_entity_id,
+          updated_at: data.updated_at ? new Date(data.updated_at) : new Date()
+        });
+      }
+    }
+
+    const update = await query(
+      `UPDATE sync_conflicts
+         SET resolution = $1,
+             resolved_data = $2,
+             resolved_at = NOW()
+       WHERE id = $3 AND user_id = $4
+       RETURNING *;`,
+      [resolution, resolvedData ? JSON.stringify(resolvedData) : null, conflictId, userId]
+    );
+    const row = update.rows[0];
+    return {
+      conflict_id: row.id,
+      type: row.entity_type,
+      id: row.entity_id,
+      local_id: row.local_entity_id,
+      local_data: row.local_data,
+      server_data: row.server_data,
+      local_timestamp: row.local_timestamp,
+      server_timestamp: row.server_timestamp,
+      resolution_needed: 'manual',
+      resolution: row.resolution,
+      resolved_data: row.resolved_data,
+      resolved_at: row.resolved_at ? row.resolved_at.toISOString() : null
+    } as StoredConflict;
+  }
   
   // Process sync request
   static async processSync(userId: string, syncRequest: SyncRequest): Promise<SyncResponse> {
@@ -194,14 +302,19 @@ export class SyncService {
         for (const change of syncRequest.changes) {
           try {
             const changeResult = await this.processClientChange(
-              client, 
-              userId, 
-              change, 
+              client,
+              userId,
+              change,
               syncBatchId
             );
-            
+
             if (changeResult.conflict) {
               conflicts.push(changeResult.conflict);
+              try {
+                await this.storeConflict(userId, changeResult.conflict);
+              } catch (e) {
+                console.error("Failed to store conflict", e);
+              }
             } else if (changeResult.serverChange) {
               processedChanges.push(changeResult.serverChange);
             }
@@ -491,8 +604,8 @@ export class SyncService {
   
   // Force full sync (download all data)
   static async getFullSyncData(userId: string): Promise<{
-    projects: any[];
-    models: any[];
+    projects: Project[];
+    models: FinancialModel[];
     sync_token: string;
     last_sync: string;
   }> {
