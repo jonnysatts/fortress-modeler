@@ -4,117 +4,147 @@ import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { Project, FinancialModel } from './db';
 import { formatCurrency } from './utils';
+import {
+  sanitizeExportData,
+  sanitizeSheetData,
+  sanitizeJsonData,
+  sanitizeWorkbookName,
+  sanitizeSheetName,
+  sanitizeString,
+} from './xlsxSanitizer';
 
 export interface SimpleExportData {
   project: Project;
   models: FinancialModel[];
 }
 
-// Simple Excel Export that always works
+// Simple Excel Export with security sanitization
 export const exportSimpleExcel = async (data: SimpleExportData): Promise<void> => {
-  const workbook = XLSX.utils.book_new();
+  try {
+    // Sanitize entire export data structure
+    const sanitizedData = sanitizeExportData(data);
+    console.log('🔒 Export data sanitized for security');
 
-  // Project Info Sheet
-  const projectInfo = [
-    ['Fortress Financial Modeler - Export'],
-    [''],
-    ['Project Name', data.project.name],
-    ['Description', data.project.description || 'No description'],
-    ['Product Type', data.project.productType],
-    ['Created', format(data.project.createdAt, 'PPP')],
-    ['Updated', format(data.project.updatedAt, 'PPP')],
-    ['Target Audience', data.project.targetAudience || 'Not specified'],
-    [''],
-    ['Financial Models', data.models.length.toString()],
-  ];
+    const workbook = XLSX.utils.book_new();
 
-  const projectSheet = XLSX.utils.aoa_to_sheet(projectInfo);
-  XLSX.utils.book_append_sheet(workbook, projectSheet, 'Project Info');
+    // Project Info Sheet - sanitize array data
+    const projectInfo = sanitizeSheetData([
+      ['Fortress Financial Modeler - Export'],
+      [''],
+      ['Project Name', sanitizedData.project.name],
+      ['Description', sanitizedData.project.description || 'No description'],
+      ['Product Type', sanitizedData.project.productType],
+      ['Created', format(sanitizedData.project.createdAt, 'PPP')],
+      ['Updated', format(sanitizedData.project.updatedAt, 'PPP')],
+      ['Target Audience', sanitizedData.project.targetAudience || 'Not specified'],
+      [''],
+      ['Financial Models', sanitizedData.models.length.toString()],
+    ]);
 
-  // Models Overview
-  if (data.models.length > 0) {
-    const modelsData = data.models.map(model => ({
-      'Model Name': model.name,
-      'Created': format(model.createdAt, 'MM/dd/yyyy'),
-      'Revenue Streams': model.assumptions?.revenue?.length || 0,
-      'Cost Items': model.assumptions?.costs?.length || 0,
-      'Growth Type': model.assumptions?.growthModel?.type || 'None'
-    }));
+    const projectSheet = XLSX.utils.aoa_to_sheet(projectInfo);
+    XLSX.utils.book_append_sheet(workbook, projectSheet, sanitizeSheetName('Project Info'));
 
-    const modelsSheet = XLSX.utils.json_to_sheet(modelsData);
-    XLSX.utils.book_append_sheet(workbook, modelsSheet, 'Models');
+    // Models Overview - sanitize JSON data
+    if (sanitizedData.models.length > 0) {
+      const modelsData = sanitizeJsonData(
+        sanitizedData.models.map(model => ({
+          'Model Name': model.name,
+          'Created': format(model.createdAt, 'MM/dd/yyyy'),
+          'Revenue Streams': model.assumptions?.revenue?.length || 0,
+          'Cost Items': model.assumptions?.costs?.length || 0,
+          'Growth Type': model.assumptions?.growthModel?.type || 'None'
+        }))
+      );
 
-    // Revenue Details (if any)
-    const revenueData = [];
-    data.models.forEach(model => {
-      if (model.assumptions?.revenue) {
-        model.assumptions.revenue.forEach(rev => {
-          revenueData.push({
-            'Model': model.name,
-            'Revenue Stream': rev.name,
-            'Value': rev.value,
-            'Type': rev.type,
-            'Frequency': rev.frequency || 'Monthly'
+      const modelsSheet = XLSX.utils.json_to_sheet(modelsData);
+      XLSX.utils.book_append_sheet(workbook, modelsSheet, sanitizeSheetName('Models'));
+
+      // Revenue Details (if any) - sanitize JSON data
+      const revenueData: any[] = [];
+      sanitizedData.models.forEach(model => {
+        if (model.assumptions?.revenue) {
+          model.assumptions.revenue.forEach((rev: any) => {
+            revenueData.push({
+              'Model': model.name,
+              'Revenue Stream': rev.name,
+              'Value': rev.value,
+              'Type': rev.type,
+              'Frequency': rev.frequency || 'Monthly'
+            });
           });
-        });
-      }
-    });
+        }
+      });
 
-    if (revenueData.length > 0) {
-      const revenueSheet = XLSX.utils.json_to_sheet(revenueData);
-      XLSX.utils.book_append_sheet(workbook, revenueSheet, 'Revenue Streams');
+      if (revenueData.length > 0) {
+        const sanitizedRevenue = sanitizeJsonData(revenueData);
+        const revenueSheet = XLSX.utils.json_to_sheet(sanitizedRevenue);
+        XLSX.utils.book_append_sheet(workbook, revenueSheet, sanitizeSheetName('Revenue Streams'));
+      }
+
+      // Cost Details (if any) - sanitize JSON data
+      const costData: any[] = [];
+      sanitizedData.models.forEach(model => {
+        if (model.assumptions?.costs) {
+          model.assumptions.costs.forEach((cost: any) => {
+            costData.push({
+              'Model': model.name,
+              'Cost Item': cost.name,
+              'Value': cost.value,
+              'Type': cost.type,
+              'Category': cost.category
+            });
+          });
+        }
+      });
+
+      if (costData.length > 0) {
+        const sanitizedCosts = sanitizeJsonData(costData);
+        const costSheet = XLSX.utils.json_to_sheet(sanitizedCosts);
+        XLSX.utils.book_append_sheet(workbook, costSheet, sanitizeSheetName('Cost Structure'));
+      }
     }
 
-    // Cost Details (if any)
-    const costData = [];
-    data.models.forEach(model => {
-      if (model.assumptions?.costs) {
-        model.assumptions.costs.forEach(cost => {
-          costData.push({
-            'Model': model.name,
-            'Cost Item': cost.name,
-            'Value': cost.value,
-            'Type': cost.type,
-            'Category': cost.category
-          });
-        });
-      }
-    });
+    // Download with sanitized filename
+    const fileName = sanitizeWorkbookName(
+      `${sanitizedData.project.name}_Export_${format(new Date(), 'yyyy-MM-dd')}`
+    ) + '.xlsx';
+    XLSX.writeFile(workbook, fileName);
 
-    if (costData.length > 0) {
-      const costSheet = XLSX.utils.json_to_sheet(costData);
-      XLSX.utils.book_append_sheet(workbook, costSheet, 'Cost Structure');
-    }
+    console.log('✅ Secure Excel export completed');
+  } catch (error) {
+    console.error('❌ Excel export failed:', error);
+    throw new Error(`Failed to export Excel: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-
-  // Download
-  const fileName = `${data.project.name.replace(/[^a-zA-Z0-9]/g, '_')}_Export_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
-  XLSX.writeFile(workbook, fileName);
 };
 
-// Simple PDF Export that always works
+// Simple PDF Export with security sanitization
 export const exportSimplePDF = async (data: SimpleExportData): Promise<void> => {
-  const doc = new jsPDF();
-  const pageWidth = doc.internal.pageSize.width;
-  const margin = 20;
+  try {
+    // Sanitize entire export data structure
+    const sanitizedData = sanitizeExportData(data);
+    console.log('🔒 PDF data sanitized for security');
 
-  // Title
-  doc.setFontSize(20);
-  doc.setTextColor(41, 128, 185);
-  doc.text('Fortress Financial Analysis', margin, 30);
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 20;
 
-  // Project Info
-  doc.setFontSize(14);
-  doc.setTextColor(0, 0, 0);
-  doc.text('Project Information', margin, 50);
+    // Title
+    doc.setFontSize(20);
+    doc.setTextColor(41, 128, 185);
+    doc.text('Fortress Financial Analysis', margin, 30);
 
-  const projectInfo = [
-    ['Project Name', data.project.name],
-    ['Product Type', data.project.productType],
-    ['Created', format(data.project.createdAt, 'PPP')],
-    ['Description', data.project.description || 'No description provided'],
-    ['Target Audience', data.project.targetAudience || 'Not specified']
-  ];
+    // Project Info
+    doc.setFontSize(14);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Project Information', margin, 50);
+
+    const projectInfo = [
+      ['Project Name', sanitizeString(sanitizedData.project.name, 200)],
+      ['Product Type', sanitizeString(sanitizedData.project.productType, 100)],
+      ['Created', format(sanitizedData.project.createdAt, 'PPP')],
+      ['Description', sanitizeString(sanitizedData.project.description || 'No description provided', 500)],
+      ['Target Audience', sanitizeString(sanitizedData.project.targetAudience || 'Not specified', 200)]
+    ];
 
   autoTable(doc, {
     startY: 60,
@@ -126,19 +156,19 @@ export const exportSimplePDF = async (data: SimpleExportData): Promise<void> => 
     columnStyles: { 0: { fontStyle: 'bold' } }
   });
 
-  // Models Summary
-  if (data.models.length > 0) {
-    const finalY = (doc as any).lastAutoTable.finalY || 120;
-    
-    doc.setFontSize(14);
-    doc.text('Financial Models', margin, finalY + 20);
+    // Models Summary
+    if (sanitizedData.models.length > 0) {
+      const finalY = (doc as any).lastAutoTable.finalY || 120;
 
-    const modelsData = data.models.map(model => [
-      model.name,
-      format(model.createdAt, 'MM/dd/yyyy'),
-      (model.assumptions?.revenue?.length || 0).toString(),
-      (model.assumptions?.costs?.length || 0).toString()
-    ]);
+      doc.setFontSize(14);
+      doc.text('Financial Models', margin, finalY + 20);
+
+      const modelsData = sanitizedData.models.map(model => [
+        sanitizeString(model.name, 100),
+        format(model.createdAt, 'MM/dd/yyyy'),
+        (model.assumptions?.revenue?.length || 0).toString(),
+        (model.assumptions?.costs?.length || 0).toString()
+      ]);
 
     autoTable(doc, {
       startY: finalY + 30,
@@ -149,15 +179,20 @@ export const exportSimplePDF = async (data: SimpleExportData): Promise<void> => 
       headStyles: { fillColor: [22, 160, 133] }
     });
 
-    // Revenue Summary
-    const revenueItems = [];
-    data.models.forEach(model => {
-      if (model.assumptions?.revenue) {
-        model.assumptions.revenue.forEach(rev => {
-          revenueItems.push([model.name, rev.name, formatCurrency(rev.value), rev.type]);
-        });
-      }
-    });
+      // Revenue Summary
+      const revenueItems: any[] = [];
+      sanitizedData.models.forEach(model => {
+        if (model.assumptions?.revenue) {
+          model.assumptions.revenue.forEach((rev: any) => {
+            revenueItems.push([
+              sanitizeString(model.name, 100),
+              sanitizeString(rev.name, 100),
+              formatCurrency(rev.value),
+              sanitizeString(rev.type, 50)
+            ]);
+          });
+        }
+      });
 
     if (revenueItems.length > 0) {
       doc.addPage();
@@ -174,15 +209,20 @@ export const exportSimplePDF = async (data: SimpleExportData): Promise<void> => 
       });
     }
 
-    // Cost Summary
-    const costItems = [];
-    data.models.forEach(model => {
-      if (model.assumptions?.costs) {
-        model.assumptions.costs.forEach(cost => {
-          costItems.push([model.name, cost.name, formatCurrency(cost.value), cost.category]);
-        });
-      }
-    });
+      // Cost Summary
+      const costItems: any[] = [];
+      sanitizedData.models.forEach(model => {
+        if (model.assumptions?.costs) {
+          model.assumptions.costs.forEach((cost: any) => {
+            costItems.push([
+              sanitizeString(model.name, 100),
+              sanitizeString(cost.name, 100),
+              formatCurrency(cost.value),
+              sanitizeString(cost.category, 50)
+            ]);
+          });
+        }
+      });
 
     if (costItems.length > 0) {
       const startY = revenueItems.length > 0 ? (doc as any).lastAutoTable.finalY + 30 : 40;
@@ -216,12 +256,22 @@ export const exportSimplePDF = async (data: SimpleExportData): Promise<void> => 
     }
   }
 
-  // Footer
-  doc.setFontSize(8);
-  doc.setTextColor(128, 128, 128);
-  doc.text(`Generated on ${format(new Date(), 'PPP')} by Fortress Financial Modeler`, margin, doc.internal.pageSize.height - 10);
+    }
 
-  // Download
-  const fileName = `${data.project.name.replace(/[^a-zA-Z0-9]/g, '_')}_Report_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
-  doc.save(fileName);
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(128, 128, 128);
+    doc.text(`Generated on ${format(new Date(), 'PPP')} by Fortress Financial Modeler`, margin, doc.internal.pageSize.height - 10);
+
+    // Download with sanitized filename
+    const fileName = sanitizeWorkbookName(
+      `${sanitizedData.project.name}_Report_${format(new Date(), 'yyyy-MM-dd')}`
+    ) + '.pdf';
+    doc.save(fileName);
+
+    console.log('✅ Secure PDF export completed');
+  } catch (error) {
+    console.error('❌ PDF export failed:', error);
+    throw new Error(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 };

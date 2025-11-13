@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Trash2, FileText, FileSpreadsheet, Presentation, Settings as SettingsIcon } from "lucide-react";
+import { Download, Trash2, FileText, FileSpreadsheet, Presentation, Settings as SettingsIcon, Loader2, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { getProjects, db } from "@/lib/db";
@@ -19,13 +19,78 @@ import { useMyProjects } from "@/hooks/useProjects";
 import { useModelsForProject } from "@/hooks/useModels";
 import { SupabaseStorageService } from "@/services/implementations/SupabaseStorageService";
 import { devLog } from "@/lib/devLog";
+import { useUserSettings, useSaveUserSettings } from "@/hooks/useUserSettings";
 
 const Settings = () => {
   const navigate = useNavigate();
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Use persistent settings hook
+  const { data: userSettings, isLoading: isLoadingSettings } = useUserSettings();
+  const saveSettings = useSaveUserSettings();
+
+  // Local state synced with persisted settings
   const [darkMode, setDarkMode] = useState(false);
   const [backupReminders, setBackupReminders] = useState(true);
-  const [backupFrequency, setBackupFrequency] = useState("weekly");
-  const [isExporting, setIsExporting] = useState(false);
+  const [backupFrequency, setBackupFrequency] = useState<'daily' | 'weekly' | 'monthly'>("weekly");
+
+  // Auto-save debounce timer
+  const [autoSaveTimer, setAutoSaveTimer] = useState<NodeJS.Timeout | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+
+  // Sync local state with loaded settings
+  useEffect(() => {
+    if (userSettings) {
+      setDarkMode(userSettings.dark_mode);
+      setBackupReminders(userSettings.backup_reminders);
+      setBackupFrequency(userSettings.backup_frequency);
+    }
+  }, [userSettings]);
+
+  // Auto-save helper with debounce
+  const autoSaveSettings = (updates: Partial<typeof userSettings>) => {
+    // Clear existing timer
+    if (autoSaveTimer) {
+      clearTimeout(autoSaveTimer);
+    }
+
+    // Set new timer for debounced save (1 second after last change)
+    const timer = setTimeout(() => {
+      saveSettings.mutate(updates, {
+        onSuccess: () => {
+          setLastSavedAt(new Date());
+          console.log('✅ Settings auto-saved');
+        },
+      });
+    }, 1000);
+
+    setAutoSaveTimer(timer);
+  };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer);
+      }
+    };
+  }, [autoSaveTimer]);
+
+  // Handle setting changes with auto-save
+  const handleDarkModeChange = (checked: boolean) => {
+    setDarkMode(checked);
+    autoSaveSettings({ dark_mode: checked });
+  };
+
+  const handleBackupRemindersChange = (checked: boolean) => {
+    setBackupReminders(checked);
+    autoSaveSettings({ backup_reminders: checked });
+  };
+
+  const handleBackupFrequencyChange = (value: 'daily' | 'weekly' | 'monthly') => {
+    setBackupFrequency(value);
+    autoSaveSettings({ backup_frequency: value });
+  };
 
   const { data: projects = [], isLoading } = useMyProjects();
   
@@ -262,7 +327,21 @@ const Settings = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Appearance</CardTitle>
+            <CardTitle className="flex items-center justify-between">
+              <span>Appearance</span>
+              {saveSettings.isPending && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Saving...
+                </span>
+              )}
+              {lastSavedAt && !saveSettings.isPending && (
+                <span className="text-xs text-green-600 flex items-center gap-1">
+                  <Check className="h-3 w-3" />
+                  Saved
+                </span>
+              )}
+            </CardTitle>
             <CardDescription>
               Customize the appearance of the application
             </CardDescription>
@@ -273,7 +352,8 @@ const Settings = () => {
               <Switch
                 id="dark-mode"
                 checked={darkMode}
-                onCheckedChange={setDarkMode}
+                onCheckedChange={handleDarkModeChange}
+                disabled={isLoadingSettings}
               />
             </div>
           </CardContent>
@@ -283,7 +363,7 @@ const Settings = () => {
           <CardHeader>
             <CardTitle>Notifications</CardTitle>
             <CardDescription>
-              Manage backup reminder notifications
+              Manage backup reminder notifications (auto-saves)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -292,16 +372,17 @@ const Settings = () => {
               <Switch
                 id="backup-reminders"
                 checked={backupReminders}
-                onCheckedChange={setBackupReminders}
+                onCheckedChange={handleBackupRemindersChange}
+                disabled={isLoadingSettings}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="reminder-frequency">Reminder Frequency</Label>
               <Select
                 value={backupFrequency}
-                onValueChange={setBackupFrequency}
-                disabled={!backupReminders}
+                onValueChange={handleBackupFrequencyChange}
+                disabled={!backupReminders || isLoadingSettings}
               >
                 <SelectTrigger id="reminder-frequency" className="w-full">
                   <SelectValue placeholder="Select frequency" />
