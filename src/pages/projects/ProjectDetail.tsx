@@ -65,7 +65,7 @@ const ComponentLoader = ({ message = "Loading..." }: { message?: string }) => (
       <div className="h-4 bg-muted rounded w-48" />
       <div className="space-y-2">
         <div className="h-32 bg-muted rounded" />
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="h-20 bg-muted rounded" />
           <div className="h-20 bg-muted rounded" />
           <div className="h-20 bg-muted rounded" />
@@ -247,8 +247,8 @@ const ProjectDetail = () => {
             </div>
           </div>
         </div>
-        <div className="flex space-x-2 self-start sm:self-center">
-          <Button 
+        <div className="flex flex-wrap gap-2 self-start sm:self-center">
+          <Button
             onClick={() => navigate(`/projects/${projectId}/models/new`)}
             className="bg-fortress-emerald hover:bg-fortress-emerald/90"
             size="sm"

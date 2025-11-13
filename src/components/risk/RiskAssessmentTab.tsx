@@ -436,7 +436,7 @@ export const RiskAssessmentTab: React.FC<RiskAssessmentTabProps> = ({
   return (
     <div className="space-y-6">
       {/* Risk Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg font-medium flex items-center gap-2">
@@ -555,7 +555,7 @@ export const RiskAssessmentTab: React.FC<RiskAssessmentTabProps> = ({
                 {/* Priority Distribution */}
                 <div>
                   <h3 className="font-medium mb-3">Risk Priority Distribution</h3>
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {Object.entries(PRIORITY_CONFIG).map(([priority, config]) => (
                       <Card key={priority} className={cn("text-center", config.bgColor, config.borderColor)}>
                         <CardContent className="p-4">

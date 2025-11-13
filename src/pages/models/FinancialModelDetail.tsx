@@ -281,8 +281,8 @@ const FinancialModelDetail = () => {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div className="flex-1">
-               <div className="flex items-center gap-4 mb-2">
-                 <h1 className="text-3xl font-bold text-fortress-blue">{model.name}</h1>
+               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-2">
+                 <h1 className="text-2xl sm:text-3xl font-bold text-fortress-blue">{model.name}</h1>
                  {allModels.length > 1 && (
                    <div className="flex items-center gap-2">
                      <span className="text-sm text-muted-foreground">Model:</span>
@@ -290,7 +290,7 @@ const FinancialModelDetail = () => {
                        value={modelId} 
                        onValueChange={(newModelId) => navigate(`/projects/${projectId}/models/${newModelId}`)}
                      >
-                       <SelectTrigger className="w-48">
+                       <SelectTrigger className="w-full sm:w-48">
                          <SelectValue />
                        </SelectTrigger>
                        <SelectContent>
@@ -310,10 +310,10 @@ const FinancialModelDetail = () => {
                </p>
             </div>
          </div>
-          <div className="flex space-x-2">
-            <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/models/${model.id}/edit`)} disabled={!model.id}><Edit className="mr-1 h-4 w-4" /> Edit Scenario</Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/models/${model.id}/edit`)} disabled={!model.id} className="w-full sm:w-auto"><Edit className="mr-1 h-4 w-4" /> Edit Scenario</Button>
             <AlertDialog>
-               <AlertDialogTrigger asChild><Button variant="destructive" size="sm" disabled={!model.id}><Trash2 className="mr-1 h-4 w-4" /> Delete</Button></AlertDialogTrigger>
+               <AlertDialogTrigger asChild><Button variant="destructive" size="sm" disabled={!model.id} className="w-full sm:w-auto"><Trash2 className="mr-1 h-4 w-4" /> Delete</Button></AlertDialogTrigger>
                <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
