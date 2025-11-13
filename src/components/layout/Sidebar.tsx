@@ -8,9 +8,10 @@ import { cn } from "@/lib/utils";
 interface SidebarProps {
   isCollapsed: boolean;
   toggleSidebar: () => void;
+  isMobile?: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar, isMobile = false }) => {
   const navItems = [
     { name: "Dashboard", path: "/", icon: Home },
     { name: "Projects", path: "/projects", icon: FolderKanban },
@@ -18,10 +19,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
   ];
 
   return (
-    <aside 
+    <aside
       className={cn(
           "flex flex-col h-screen bg-gray-800 text-gray-100 transition-all duration-300 ease-in-out",
-          isCollapsed ? "w-20" : "w-64"
+          isMobile ? "w-64" : (isCollapsed ? "w-20" : "w-64")
       )}
     >
       <div className="flex items-center justify-center h-16 border-b border-gray-700">

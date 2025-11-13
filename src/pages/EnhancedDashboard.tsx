@@ -216,7 +216,7 @@ const EnhancedDashboard = () => {
             <CardTitle>Actual vs Projected Performance</CardTitle>
             <CardDescription>Revenue performance over time</CardDescription>
           </CardHeader>
-          <CardContent className="h-80">
+          <CardContent className="h-64 sm:h-80">
             {chartData.length > 0 && !chartLoading ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData}>
@@ -258,7 +258,7 @@ const EnhancedDashboard = () => {
             <CardTitle>Project Risk Distribution</CardTitle>
             <CardDescription>Risk assessment across all projects</CardDescription>
           </CardHeader>
-          <CardContent className="h-80">
+          <CardContent className="h-64 sm:h-80">
             {riskData.length > 0 ? (
               <div className="flex items-center justify-center h-full">
                 <div className="w-full h-full flex flex-col">

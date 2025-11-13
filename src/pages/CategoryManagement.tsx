@@ -52,7 +52,7 @@ export default function CategoryManagement() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-7xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Category Management</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Category Management</h1>
         <p className="text-muted-foreground mt-2">
           Manage event types, cost categories, and frequencies for your financial models.
           Changes here will be reflected throughout the application.
@@ -265,7 +265,7 @@ function EventTypesManager() {
           cancelEditing();
         }
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-md md:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{isCreating ? 'Create Event Type' : 'Edit Event Type'}</DialogTitle>
             <DialogDescription>
@@ -562,7 +562,7 @@ function CostCategoriesManager() {
           cancelEditing();
         }
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-md md:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{isCreating ? 'Create Cost Category' : 'Edit Cost Category'}</DialogTitle>
             <DialogDescription>
@@ -831,7 +831,7 @@ function FrequenciesManager() {
           cancelEditing();
         }
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-md md:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{isCreating ? 'Create Frequency' : 'Edit Frequency'}</DialogTitle>
             <DialogDescription>

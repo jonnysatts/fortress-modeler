@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
+import { MobileNav } from "./MobileNav";
 import { Toaster } from "@/components/ui/toaster";
 import { addDemoData } from "@/lib/db";
 import { config } from "@/lib/config";
 import { useSupabaseAuth as useAuth } from "@/hooks/useSupabaseAuth";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { isCloudModeEnabled } from "@/config/app.config";
+import { cn } from "@/lib/utils";
 
 const AppLayout = () => {
   const [initializing, setInitializing] = useState(true);
@@ -62,14 +64,26 @@ const AppLayout = () => {
 
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
-      <Sidebar 
-        isCollapsed={isSidebarCollapsed} 
-        toggleSidebar={toggleSidebar}
-      />
+      {/* Desktop Sidebar - Hidden on Mobile */}
+      <div className="hidden md:flex">
+        <Sidebar
+          isCollapsed={isSidebarCollapsed}
+          toggleSidebar={toggleSidebar}
+        />
+      </div>
+
+      {/* Mobile Navigation */}
+      <MobileNav />
+
+      {/* Main Content - Responsive Margins */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <main 
-          className={`flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 p-6 transition-all duration-300 ease-in-out 
-                     ${isSidebarCollapsed ? 'ml-20' : 'ml-64'}`}
+        <main
+          className={cn(
+            "flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 transition-all duration-300 ease-in-out",
+            "p-4 sm:p-6", // Responsive padding
+            "md:ml-0", // Remove left margin on mobile
+            isSidebarCollapsed ? "md:ml-20" : "md:ml-64" // Only apply on desktop
+          )}
         >
           <Outlet />
         </main>
