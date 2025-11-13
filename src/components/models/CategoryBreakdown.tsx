@@ -4,7 +4,7 @@ import { FinancialModel } from "@/lib/db";
 import { useState, useMemo, memo } from "react";
 import { Tooltip } from "recharts";
 import { Card } from "@/components/ui/card";
-import { calculateTotalRevenue, calculateTotalCosts } from "@/lib/financialCalculations";
+import { calculateTotalRevenue, calculateTotalCosts } from "@/lib/financial-calculations";
 import { 
   prepareRevenueDataForWeek,
   prepareCostDataForWeek,

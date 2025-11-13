@@ -131,17 +131,35 @@ export class EnhancedPDFGenerator {
     // Key metrics (using component renderer)
     if (options.includeScenarioComparison && data.scenarios?.length > 0) {
       this.addSectionHeader('Key Performance Indicators');
-      
-      // Generate KPI data from scenarios
+
+      // Calculate actual trends from scenario data instead of hardcoding
+      const calculateTrend = (current: number, baseline: number): { trend: 'up' | 'down' | 'neutral', value: string } => {
+        if (!baseline || baseline === 0) return { trend: 'neutral', value: 'N/A' };
+        const percentChange = ((current - baseline) / baseline) * 100;
+        const trend = percentChange > 0 ? 'up' : percentChange < 0 ? 'down' : 'neutral';
+        const value = percentChange !== 0 ? `${percentChange > 0 ? '+' : ''}${percentChange.toFixed(1)}%` : '0%';
+        return { trend, value };
+      };
+
+      // Use best/worst scenarios for comparison, or previous period data if available
+      const baselineRevenue = data.scenarios[0]?.projectedRevenue || data.analysis?.totalRevenue || 0;
+      const baselineProfit = data.scenarios[0]?.netProfit || data.analysis?.netProfit || 0;
+      const baselineROI = data.scenarios[0]?.roi || data.analysis?.roi || 0;
+
+      const revenueTrend = calculateTrend(data.analysis?.totalRevenue || 0, baselineRevenue);
+      const profitTrend = calculateTrend(data.analysis?.netProfit || 0, baselineProfit);
+      const roiTrend = calculateTrend(data.analysis?.roi || 0, baselineROI);
+
+      // Generate KPI data from scenarios with calculated trends
       const kpiData = [
-        { title: 'Total Revenue', value: `$${data.analysis?.totalRevenue?.toLocaleString() || '0'}`, trend: 'up' as const, trendValue: '+12%' },
-        { title: 'Net Profit', value: `$${data.analysis?.netProfit?.toLocaleString() || '0'}`, trend: data.analysis?.netProfit >= 0 ? 'up' as const : 'down' as const, trendValue: '8.5%' },
-        { title: 'ROI', value: `${data.analysis?.roi?.toFixed(1) || '0'}%`, trend: 'up' as const, trendValue: '+2.1%' },
-        { title: 'Break-even', value: `Month ${data.analysis?.breakEvenMonth || 'N/A'}`, trend: 'neutral' as const },
+        { title: 'Total Revenue', value: `$${data.analysis?.totalRevenue?.toLocaleString() || '0'}`, trend: revenueTrend.trend, trendValue: revenueTrend.value },
+        { title: 'Net Profit', value: `$${data.analysis?.netProfit?.toLocaleString() || '0'}`, trend: profitTrend.trend, trendValue: profitTrend.value },
+        { title: 'ROI', value: `${data.analysis?.roi?.toFixed(1) || '0'}%`, trend: roiTrend.trend, trendValue: roiTrend.value },
+        { title: 'Break-even', value: `Month ${data.analysis?.breakEvenMonth || 'N/A'}`, trend: 'neutral' as const, trendValue: '' },
       ];
-      
+
       const kpiImage = await this.componentRenderer.captureKPIGrid(kpiData, { width: 700, height: 200 });
-      
+
       this.addImage(kpiImage, 'KPI Grid', 180, 50);
     }
 
