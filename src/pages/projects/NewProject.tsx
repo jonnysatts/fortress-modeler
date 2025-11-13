@@ -17,8 +17,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { useImageUpload } from "@/hooks/useImageUpload";
-import { productTypes, eventTypes } from "@/lib/constants";
+import { productTypes } from "@/lib/constants";
 import { useCreateProject } from "@/hooks/useProjects";
+import { useActiveEventTypes } from "@/hooks/useCategories";
 
 const formSchema = z
   .object({
@@ -49,6 +50,7 @@ const NewProject = () => {
   const createProjectMutation = useCreateProject();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { preview: avatarPreview, dataUrl: avatarDataUrl, handleImageChange, removeImage } = useImageUpload();
+  const { data: eventTypes = [], isLoading: eventTypesLoading } = useActiveEventTypes();
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -191,10 +193,10 @@ const NewProject = () => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Event Type</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value} disabled={eventTypesLoading}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select event type" />
+                          <SelectValue placeholder={eventTypesLoading ? "Loading event types..." : "Select event type"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>

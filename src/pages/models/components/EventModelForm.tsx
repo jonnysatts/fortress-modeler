@@ -37,6 +37,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
 import { db, FinancialModel } from '@/lib/db';
 import { useCreateModel, useUpdateModel } from '@/hooks/useModels';
+import { useActiveCostCategories } from '@/hooks/useCategories';
 
 interface PerCustomerRevenue {
   ticketPrice: number;
@@ -108,6 +109,7 @@ const EventModelForm = ({ projectId, projectName, existingModel, onCancel }: Eve
   const eventMetadata = existingModel?.assumptions.metadata;
   const createModelMutation = useCreateModel();
   const updateModelMutation = useUpdateModel();
+  const { data: costCategories = [] } = useActiveCostCategories();
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),

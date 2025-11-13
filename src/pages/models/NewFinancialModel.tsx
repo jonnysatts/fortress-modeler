@@ -29,6 +29,7 @@ import { useCreateModel } from "@/hooks/useModels";
 import { toast } from "sonner";
 import EventModelForm from "./components/EventModelForm";
 import SpecialEventForecastForm from "@/components/events/SpecialEventForecastForm";
+import { useActiveFrequencies, useActiveCostCategories } from "@/hooks/useCategories";
 
 // Default revenue assumption
 const defaultRevenueAssumption: RevenueAssumption = {
@@ -77,6 +78,8 @@ const NewFinancialModel = () => {
   const navigate = useNavigate();
   const { data: currentProject, isLoading: projectLoading } = useProject(projectId);
   const createModel = useCreateModel();
+  const { data: frequencies = [], isLoading: frequenciesLoading } = useActiveFrequencies();
+  const { data: costCategories = [], isLoading: costCategoriesLoading } = useActiveCostCategories();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -312,13 +315,14 @@ const NewFinancialModel = () => {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Frequency</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl><SelectTrigger><SelectValue placeholder="Select frequency" /></SelectTrigger></FormControl>
+                              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={frequenciesLoading}>
+                                <FormControl><SelectTrigger><SelectValue placeholder={frequenciesLoading ? "Loading..." : "Select frequency"} /></SelectTrigger></FormControl>
                                 <SelectContent>
-                                  <SelectItem value="monthly">Monthly</SelectItem>
-                                  <SelectItem value="quarterly">Quarterly</SelectItem>
-                                  <SelectItem value="annually">Annually</SelectItem>
-                                  <SelectItem value="one-time">One-time</SelectItem>
+                                  {frequencies.map((freq) => (
+                                    <SelectItem key={freq.value} value={freq.value}>
+                                      {freq.label}
+                                    </SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                               <FormMessage />
@@ -411,13 +415,14 @@ const NewFinancialModel = () => {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Category</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl><SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger></FormControl>
+                              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={costCategoriesLoading}>
+                                <FormControl><SelectTrigger><SelectValue placeholder={costCategoriesLoading ? "Loading..." : "Select category"} /></SelectTrigger></FormControl>
                                 <SelectContent>
-                                  <SelectItem value="staffing">Staffing</SelectItem>
-                                  <SelectItem value="marketing">Marketing</SelectItem>
-                                  <SelectItem value="operations">Operations</SelectItem>
-                                  <SelectItem value="other">Other</SelectItem>
+                                  {costCategories.map((category) => (
+                                    <SelectItem key={category.value} value={category.value}>
+                                      {category.label}
+                                    </SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                               <FormMessage />
