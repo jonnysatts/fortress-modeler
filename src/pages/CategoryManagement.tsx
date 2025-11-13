@@ -265,7 +265,7 @@ function EventTypesManager() {
           cancelEditing();
         }
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-md md:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{isCreating ? 'Create Event Type' : 'Edit Event Type'}</DialogTitle>
             <DialogDescription>
@@ -562,7 +562,7 @@ function CostCategoriesManager() {
           cancelEditing();
         }
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-md md:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{isCreating ? 'Create Cost Category' : 'Edit Cost Category'}</DialogTitle>
             <DialogDescription>
@@ -831,7 +831,7 @@ function FrequenciesManager() {
           cancelEditing();
         }
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-md md:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{isCreating ? 'Create Frequency' : 'Edit Frequency'}</DialogTitle>
             <DialogDescription>
