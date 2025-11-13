@@ -364,3 +364,33 @@ export const performScenarioAnalysis = (
     },
   };
 };
+// Helper functions for CategoryBreakdown component
+// Added during Phase 1 cleanup to replace deleted duplicate file
+
+/**
+ * Calculate total revenue from a financial model
+ */
+export const calculateTotalRevenue = (model: any): number => {
+  let total = 0;
+  
+  // Sum all revenue streams
+  if (model.revenue && Array.isArray(model.revenue)) {
+    total = model.revenue.reduce((sum: number, stream: any) => sum + (stream.value || 0), 0);
+  }
+  
+  return total;
+};
+
+/**
+ * Calculate total costs from a financial model
+ */
+export const calculateTotalCosts = (model: any): number => {
+  let total = 0;
+  
+  // Sum all cost categories
+  if (model.costs && Array.isArray(model.costs)) {
+    total = model.costs.reduce((sum: number, cost: any) => sum + (cost.value || 0), 0);
+  }
+  
+  return total;
+};
