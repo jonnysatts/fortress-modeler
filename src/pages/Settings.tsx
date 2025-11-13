@@ -150,26 +150,39 @@ const Settings = () => {
         // Try the enhanced board-ready export
         const reportData = await prepareBoardReadyData(firstProject, models, 36, 0.1);
         await exportBoardReadyPDF(reportData);
-        
+
         toast.success("Executive report generated", {
           description: "Your board-ready executive financial report has been exported successfully.",
         });
       } catch (boardError) {
-        console.warn('Board-ready export failed, falling back to enhanced PDF:', boardError);
-        
+        console.warn('Board-ready export failed, falling back to enhanced Excel:', boardError);
+
+        // Show warning that PDF failed and we're switching to Excel
+        toast.warning("PDF export failed", {
+          description: "Generating Excel report instead. The board-ready PDF feature encountered an issue.",
+          duration: 5000,
+        });
+
         // Fallback to enhanced Excel export if board-ready fails
-        await exportEnhancedExcel({
-          project: firstProject,
-          models,
-          includeScenarios: true,
-          includeSensitivity: true,
-          periods: 36,
-          discountRate: 0.1
-        });
-        
-        toast.success("Enhanced Excel report generated", {
-          description: "Board-ready PDF had issues, but your comprehensive Excel analysis has been exported.",
-        });
+        try {
+          await exportEnhancedExcel({
+            project: firstProject,
+            models,
+            includeScenarios: true,
+            includeSensitivity: true,
+            periods: 36,
+            discountRate: 0.1
+          });
+
+          toast.success("Enhanced Excel report generated", {
+            description: "Your comprehensive Excel analysis has been exported as an alternative to the PDF.",
+          });
+        } catch (excelError) {
+          console.error('Excel fallback also failed:', excelError);
+          toast.error("All export formats failed", {
+            description: `Unable to generate report. Error: ${excelError.message}. Please try the basic exports instead.`,
+          });
+        }
       }
       
     } catch (error) {
