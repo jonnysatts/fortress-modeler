@@ -256,9 +256,7 @@ export const exportSimplePDF = async (data: SimpleExportData): Promise<void> => 
     }
   }
 
-    }
-
-    // Footer
+  // Footer
     doc.setFontSize(8);
     doc.setTextColor(128, 128, 128);
     doc.text(`Generated on ${format(new Date(), 'PPP')} by Fortress Financial Modeler`, margin, doc.internal.pageSize.height - 10);
